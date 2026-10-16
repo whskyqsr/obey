@@ -68,6 +68,44 @@ export async function signInWithGoogle(): Promise<void> {
   await signInWithPopup(a, new GoogleAuthProvider());
 }
 
+export async function signInWithEmail(email: string, password: string): Promise<void> {
+  const a = await getFirebaseAuth();
+  const { signInWithEmailAndPassword } = await import("firebase/auth");
+  await signInWithEmailAndPassword(a, email.trim(), password);
+}
+
+export async function createAccount(email: string, password: string): Promise<void> {
+  const a = await getFirebaseAuth();
+  const { createUserWithEmailAndPassword } = await import("firebase/auth");
+  await createUserWithEmailAndPassword(a, email.trim(), password);
+}
+
+/** Firebase errors read like "Firebase: Error (auth/invalid-credential)."; say something a person can act on. */
+export function authErrorMessage(e: unknown): string | null {
+  const code = (e as { code?: string } | null)?.code;
+  switch (code) {
+    case "auth/invalid-credential":
+    case "auth/wrong-password":
+    case "auth/user-not-found":
+      return "That email and password don't match an account.";
+    case "auth/email-already-in-use":
+      return "There's already an account with that email. Sign in instead.";
+    case "auth/weak-password":
+      return "Use a password of at least 6 characters.";
+    case "auth/invalid-email":
+      return "That doesn't look like an email address.";
+    case "auth/popup-closed-by-user":
+    case "auth/cancelled-popup-request":
+      return null;
+    case "auth/unauthorized-domain":
+      return "Sign-in isn't enabled for this website yet.";
+    case "auth/operation-not-allowed":
+      return "This sign-in method isn't turned on yet.";
+    default:
+      return null;
+  }
+}
+
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function signInDev(uid: string): void {
