@@ -1,0 +1,242 @@
+import { sql } from "drizzle-orm";
+import {
+  boolean,
+  date,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
+import type { Schedule } from "@obey/recurrence";
+
+const ts = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
+const createdAt = () => ts("created_at").notNull().defaultNow();
+
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  authUid: text("auth_uid").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  email: text("email"),
+  createdAt: createdAt(),
+});
+
+export const relationships = pgTable("relationships", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  reschedulePolicy: text("reschedule_policy", { enum: ["dominant_only", "request", "allowance"] })
+    .notNull()
+    .default("request"),
+  weeklyDelayAllowance: integer("weekly_delay_allowance").notNull().default(0),
+  createdAt: createdAt(),
+});
+
+export const memberships = pgTable(
+  "memberships",
+  {
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["dominant", "submissive", "switch"] }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.relationshipId, t.userId] }), index("memberships_user_idx").on(t.userId)],
+);
+
+export const invites = pgTable("invites", {
+  code: text("code").primaryKey(),
+  relationshipId: uuid("relationship_id")
+    .notNull()
+    .references(() => relationships.id, { onDelete: "cascade" }),
+  createdBy: uuid("created_by")
+    .notNull()
+    .references(() => users.id),
+  expiresAt: ts("expires_at").notNull(),
+  usedBy: uuid("used_by").references(() => users.id),
+  createdAt: createdAt(),
+});
+
+export const rewards = pgTable("rewards", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  relationshipId: uuid("relationship_id")
+    .notNull()
+    .references(() => relationships.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  bodyMd: text("body_md").notNull().default(""),
+  cost: integer("cost").notNull(),
+  needsApproval: boolean("needs_approval").notNull().default(true),
+  createdAt: createdAt(),
+});
+
+export const consequences = pgTable("consequences", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  relationshipId: uuid("relationship_id")
+    .notNull()
+    .references(() => relationships.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  bodyMd: text("body_md").notNull().default(""),
+  severity: integer("severity").notNull().default(1),
+  createdAt: createdAt(),
+});
+
+export const rules = pgTable("rules", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  relationshipId: uuid("relationship_id")
+    .notNull()
+    .references(() => relationships.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  bodyMd: text("body_md").notNull().default(""),
+  category: text("category"),
+  position: integer("position").notNull().default(0),
+  createdAt: createdAt(),
+});
+
+export const taskSeries = pgTable(
+  "task_series",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    assigneeId: uuid("assignee_id")
+      .notNull()
+      .references(() => users.id),
+    title: text("title").notNull(),
+    bodyMd: text("body_md").notNull().default(""),
+    points: integer("points").notNull().default(0),
+    missPenalty: integer("miss_penalty").notNull().default(0),
+    rewardId: uuid("reward_id").references(() => rewards.id, { onDelete: "set null" }),
+    consequenceId: uuid("consequence_id").references(() => consequences.id, { onDelete: "set null" }),
+    proofRequired: boolean("proof_required").notNull().default(false),
+    approvalRequired: boolean("approval_required").notNull().default(false),
+    schedule: jsonb("schedule").$type<Schedule>().notNull(),
+    dueTime: text("due_time"),
+    timezone: text("timezone").notNull(),
+    graceMinutes: integer("grace_minutes").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    /** Set when "this and following" rescheduling splits the series. */
+    supersededBy: uuid("superseded_by"),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [index("task_series_relationship_idx").on(t.relationshipId)],
+);
+
+export const occurrences = pgTable(
+  "occurrences",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    seriesId: uuid("series_id")
+      .notNull()
+      .references(() => taskSeries.id, { onDelete: "cascade" }),
+    /** Identity within the series, like iCalendar's RECURRENCE-ID. Never changes. */
+    originalDate: date("original_date", { mode: "string" }).notNull(),
+    dueAt: ts("due_at").notNull(),
+    originalDueAt: ts("original_due_at").notNull(),
+    status: text("status", { enum: ["pending", "submitted", "completed", "missed", "excused", "cancelled"] })
+      .notNull()
+      .default("pending"),
+    completedAt: ts("completed_at"),
+    reminderSentAt: ts("reminder_sent_at"),
+    noteMd: text("note_md"),
+    reviewedBy: uuid("reviewed_by").references(() => users.id),
+    reviewedAt: ts("reviewed_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("occurrences_series_date_uq").on(t.seriesId, t.originalDate),
+    index("occurrences_due_idx").on(t.status, t.dueAt),
+  ],
+);
+
+export const reschedules = pgTable("reschedules", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  occurrenceId: uuid("occurrence_id")
+    .notNull()
+    .references(() => occurrences.id, { onDelete: "cascade" }),
+  relationshipId: uuid("relationship_id")
+    .notNull()
+    .references(() => relationships.id, { onDelete: "cascade" }),
+  requestedBy: uuid("requested_by")
+    .notNull()
+    .references(() => users.id),
+  decidedBy: uuid("decided_by").references(() => users.id),
+  scope: text("scope", { enum: ["this", "following"] }).notNull(),
+  fromDueAt: ts("from_due_at").notNull(),
+  toDueAt: ts("to_due_at").notNull(),
+  reason: text("reason"),
+  /** `applied` = made directly by someone allowed to; `approved` = requested then approved. */
+  status: text("status", { enum: ["requested", "approved", "declined", "applied"] }).notNull(),
+  usedAllowance: boolean("used_allowance").notNull().default(false),
+  createdAt: createdAt(),
+  decidedAt: ts("decided_at"),
+});
+
+export const pointsLedger = pgTable(
+  "points_ledger",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    delta: integer("delta").notNull(),
+    kind: text("kind", { enum: ["completion", "miss", "redemption", "adjustment", "delay"] }).notNull(),
+    note: text("note").notNull().default(""),
+    occurrenceId: uuid("occurrence_id").references(() => occurrences.id, { onDelete: "set null" }),
+    rewardId: uuid("reward_id").references(() => rewards.id, { onDelete: "set null" }),
+    createdBy: uuid("created_by").references(() => users.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("ledger_relationship_user_idx").on(t.relationshipId, t.userId),
+    // One completion/miss entry per occurrence, so retries can't double-count points.
+    uniqueIndex("ledger_occurrence_kind_uq")
+      .on(t.occurrenceId, t.kind)
+      .where(sql`${t.occurrenceId} is not null`),
+  ],
+);
+
+export const notes = pgTable(
+  "notes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => users.id),
+    kind: text("kind", { enum: ["note", "journal"] }).notNull().default("note"),
+    title: text("title").notNull().default(""),
+    bodyMd: text("body_md").notNull(),
+    visibility: text("visibility", { enum: ["private", "shared"] }).notNull().default("shared"),
+    tags: text("tags").array().notNull().default(sql`'{}'::text[]`),
+    pinned: boolean("pinned").notNull().default(false),
+    mood: integer("mood"),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [index("notes_relationship_idx").on(t.relationshipId)],
+);
+
+export const devices = pgTable("devices", {
+  token: text("token").primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  platform: text("platform", { enum: ["android", "web"] }).notNull(),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
+});

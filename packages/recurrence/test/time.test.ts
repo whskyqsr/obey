@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { delayDue, dueInstant, localDate } from "../src/index.js";
+import { delayDue, dueInstant, isEndOfLocalDay, localDate, localTime } from "../src/index.js";
 
 const NY = "America/New_York";
 
@@ -35,5 +35,13 @@ describe("delayDue", () => {
 describe("localDate", () => {
   it("uses the zone's calendar date", () => {
     expect(localDate(new Date("2026-10-17T02:00:00Z"), NY)).toBe("2026-10-16");
+  });
+});
+
+describe("localTime and isEndOfLocalDay", () => {
+  it("reads wall-clock values in the zone", () => {
+    expect(localTime(dueInstant("2026-10-16", "21:05", NY), NY)).toBe("21:05");
+    expect(isEndOfLocalDay(dueInstant("2026-10-16", null, NY), NY)).toBe(true);
+    expect(isEndOfLocalDay(dueInstant("2026-10-16", "21:00", NY), NY)).toBe(false);
   });
 });

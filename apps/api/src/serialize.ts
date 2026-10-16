@@ -1,0 +1,83 @@
+import { describe } from "@obey/recurrence";
+import type {
+  consequences,
+  notes,
+  occurrences,
+  pointsLedger,
+  reschedules,
+  rewards,
+  rules,
+  taskSeries,
+} from "./db/schema.js";
+
+const iso = (d: Date) => d.toISOString();
+const isoOrNull = (d: Date | null) => (d ? d.toISOString() : null);
+
+type Series = typeof taskSeries.$inferSelect;
+
+export const taskDto = (s: Series) => ({
+  id: s.id,
+  relationshipId: s.relationshipId,
+  title: s.title,
+  bodyMd: s.bodyMd,
+  assigneeId: s.assigneeId,
+  points: s.points,
+  missPenalty: s.missPenalty,
+  rewardId: s.rewardId,
+  consequenceId: s.consequenceId,
+  proofRequired: s.proofRequired,
+  approvalRequired: s.approvalRequired,
+  schedule: s.schedule,
+  dueTime: s.dueTime,
+  timezone: s.timezone,
+  graceMinutes: s.graceMinutes,
+  summary: describe(s.schedule),
+  active: s.active,
+  createdBy: s.createdBy,
+  createdAt: iso(s.createdAt),
+});
+
+export const occurrenceDto = (o: typeof occurrences.$inferSelect, s: Series) => ({
+  id: o.id,
+  seriesId: o.seriesId,
+  title: s.title,
+  assigneeId: s.assigneeId,
+  points: s.points,
+  originalDate: o.originalDate,
+  dueAt: iso(o.dueAt),
+  rescheduled: o.dueAt.getTime() !== o.originalDueAt.getTime() || s.supersededBy !== null,
+  status: o.status,
+  completedAt: isoOrNull(o.completedAt),
+  noteMd: o.noteMd,
+});
+
+export const rescheduleDto = (r: typeof reschedules.$inferSelect) => ({
+  id: r.id,
+  occurrenceId: r.occurrenceId,
+  requestedBy: r.requestedBy,
+  scope: r.scope,
+  fromDueAt: iso(r.fromDueAt),
+  toDueAt: iso(r.toDueAt),
+  reason: r.reason,
+  status: r.status,
+  createdAt: iso(r.createdAt),
+});
+
+export const ledgerDto = (l: typeof pointsLedger.$inferSelect) => ({
+  id: l.id,
+  userId: l.userId,
+  delta: l.delta,
+  kind: l.kind,
+  note: l.note,
+  createdBy: l.createdBy,
+  createdAt: iso(l.createdAt),
+});
+
+type Library = typeof rewards.$inferSelect | typeof consequences.$inferSelect | typeof rules.$inferSelect;
+export const libraryDto = <T extends Library>(row: T) => ({ ...row, createdAt: iso(row.createdAt) });
+
+export const noteDto = (n: typeof notes.$inferSelect) => ({
+  ...n,
+  createdAt: iso(n.createdAt),
+  updatedAt: iso(n.updatedAt),
+});

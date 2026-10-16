@@ -1,0 +1,227 @@
+import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
+import type { FastifyInstance } from "fastify";
+import { z } from "zod";
+import { completeOccurrence as completeBody, plainDate, rescheduleInput, reviewOccurrence as reviewBody, taskInput } from "@obey/contracts";
+import { addDays, dueInstant, localDate } from "@obey/recurrence";
+import type { Deps } from "../app.js";
+import type { Tx } from "../db/index.js";
+import { occurrences, relationships, reschedules, taskSeries } from "../db/schema.js";
+import { HttpError, forbidden, notFound, parsePatch } from "../errors.js";
+import { occurrenceDto, rescheduleDto, taskDto } from "../serialize.js";
+import { canManage, managers, membership, requireManager, requireMember } from "../services/access.js";
+import {
+  completeOccurrence,
+  decideReschedule,
+  materializeRelationship,
+  materializeSeries,
+  requestReschedule,
+  reviewOccurrence,
+} from "../services/scheduling.js";
+
+const MAX_RANGE_DAYS = 62;
+
+function validZone(zone: string) {
+  try {
+    dueInstant("2026-01-01", null, zone);
+  } catch {
+    throw new HttpError(400, `unknown timezone ${zone}`);
+  }
+}
+
+async function loadOccurrence(db: Tx, id: string, userId: string) {
+  const [row] = await db
+    .select({ occ: occurrences, series: taskSeries })
+    .from(occurrences)
+    .innerJoin(taskSeries, eq(occurrences.seriesId, taskSeries.id))
+    .where(eq(occurrences.id, id));
+  if (!row) throw notFound();
+  const m = await requireMember(db, row.series.relationshipId, userId);
+  const [rel] = await db.select().from(relationships).where(eq(relationships.id, row.series.relationshipId));
+  return { ...row, member: m, rel: rel! };
+}
+
+export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
+  const { db, notifier } = deps;
+  const horizon = (zone: string) => addDays(localDate(deps.now(), zone), deps.materializeDays);
+
+  app.get<{ Params: { id: string } }>("/relationships/:id/tasks", async (req) => {
+    await requireMember(db, req.params.id, req.user.id);
+    const rows = await db
+      .select()
+      .from(taskSeries)
+      .where(and(eq(taskSeries.relationshipId, req.params.id), eq(taskSeries.active, true)))
+      .orderBy(asc(taskSeries.title));
+    return rows.map(taskDto);
+  });
+
+  app.post<{ Params: { id: string } }>("/relationships/:id/tasks", async (req, reply) => {
+    await requireManager(db, req.params.id, req.user.id);
+    const body = taskInput.parse(req.body);
+    validZone(body.timezone);
+    if (!(await membership(db, req.params.id, body.assigneeId))) throw new HttpError(400, "assignee is not in this relationship");
+    const series = await db.transaction(async (tx) => {
+      const [s] = await tx
+        .insert(taskSeries)
+        .values({ ...body, relationshipId: req.params.id, createdBy: req.user.id })
+        .returning();
+      await materializeSeries(tx, s!, horizon(s!.timezone), deps.now());
+      return s!;
+    });
+    if (series.assigneeId !== req.user.id)
+      await notifier.send([series.assigneeId], { title: "Obey", body: "You have a new task", data: { type: "task_assigned", taskId: series.id } });
+    reply.status(201);
+    return taskDto(series);
+  });
+
+  app.patch<{ Params: { id: string } }>("/tasks/:id", async (req) => {
+    const [series] = await db.select().from(taskSeries).where(eq(taskSeries.id, req.params.id));
+    if (!series) throw notFound();
+    await requireManager(db, series.relationshipId, req.user.id);
+    const body = parsePatch(taskInput.partial(), req.body);
+    if (body.timezone) validZone(body.timezone);
+    if (body.assigneeId && !(await membership(db, series.relationshipId, body.assigneeId)))
+      throw new HttpError(400, "assignee is not in this relationship");
+    const timingChanged = body.schedule !== undefined || body.dueTime !== undefined || body.timezone !== undefined;
+    const updated = await db.transaction(async (tx) => {
+      const [s] = await tx
+        .update(taskSeries)
+        .set({ ...body, updatedAt: deps.now() })
+        .where(eq(taskSeries.id, series.id))
+        .returning();
+      if (timingChanged) {
+        // Regenerate untouched future occurrences; ones already moved by a reschedule keep their new deadline.
+        const future = await tx
+          .select()
+          .from(occurrences)
+          .where(and(eq(occurrences.seriesId, s!.id), eq(occurrences.status, "pending"), gte(occurrences.dueAt, deps.now())));
+        const untouched = future.filter((o) => o.dueAt.getTime() === o.originalDueAt.getTime()).map((o) => o.id);
+        if (untouched.length) await tx.delete(occurrences).where(inArray(occurrences.id, untouched));
+        await materializeSeries(tx, s!, horizon(s!.timezone), deps.now());
+      }
+      return s!;
+    });
+    return taskDto(updated);
+  });
+
+  app.delete<{ Params: { id: string } }>("/tasks/:id", async (req, reply) => {
+    const [series] = await db.select().from(taskSeries).where(eq(taskSeries.id, req.params.id));
+    if (!series) throw notFound();
+    await requireManager(db, series.relationshipId, req.user.id);
+    await db.transaction(async (tx) => {
+      await tx.update(taskSeries).set({ active: false, updatedAt: deps.now() }).where(eq(taskSeries.id, series.id));
+      await tx
+        .update(occurrences)
+        .set({ status: "cancelled" })
+        .where(and(eq(occurrences.seriesId, series.id), eq(occurrences.status, "pending")));
+    });
+    reply.status(204);
+  });
+
+  app.get<{ Params: { id: string }; Querystring: { from?: string; to?: string } }>(
+    "/relationships/:id/occurrences",
+    async (req) => {
+      await requireMember(db, req.params.id, req.user.id);
+      const q = z.object({ from: plainDate, to: plainDate }).parse(req.query);
+      const span = (Date.parse(q.to) - Date.parse(q.from)) / 86_400_000;
+      if (span < 0 || span > MAX_RANGE_DAYS) throw new HttpError(400, `range must be 0..${MAX_RANGE_DAYS} days`);
+      await materializeRelationship(db, req.params.id, q.to, deps.now());
+      // Pad by a day each side: due instants are compared in UTC but dates are local to each series.
+      const rows = await db
+        .select({ occ: occurrences, series: taskSeries })
+        .from(occurrences)
+        .innerJoin(taskSeries, eq(occurrences.seriesId, taskSeries.id))
+        .where(
+          and(
+            eq(taskSeries.relationshipId, req.params.id),
+            gte(occurrences.dueAt, new Date(Date.parse(q.from) - 86_400_000)),
+            lte(occurrences.dueAt, new Date(Date.parse(q.to) + 2 * 86_400_000)),
+          ),
+        )
+        .orderBy(asc(occurrences.dueAt));
+      return rows
+        .filter(({ occ, series }) => {
+          const d = localDate(occ.dueAt, series.timezone);
+          return d >= q.from && d <= q.to && occ.status !== "cancelled";
+        })
+        .map(({ occ, series }) => occurrenceDto(occ, series));
+    },
+  );
+
+  app.post<{ Params: { id: string } }>("/occurrences/:id/complete", async (req) => {
+    const body = completeBody.parse(req.body ?? {});
+    const { occ, series, member } = await loadOccurrence(db, req.params.id, req.user.id);
+    const updated = await db.transaction((tx) =>
+      completeOccurrence(tx, series, occ, { userId: req.user.id, role: member.role }, body.noteMd, deps.now()),
+    );
+    if (req.user.id === series.assigneeId) {
+      const submitted = updated.status === "submitted";
+      await notifier.send(await managers(db, series.relationshipId, req.user.id), {
+        title: "Obey",
+        body: submitted ? `${req.user.displayName} submitted a task for review` : `${req.user.displayName} completed a task`,
+        data: { type: submitted ? "occurrence_submitted" : "occurrence_completed", occurrenceId: occ.id },
+      });
+    }
+    return occurrenceDto(updated, series);
+  });
+
+  app.post<{ Params: { id: string } }>("/occurrences/:id/review", async (req) => {
+    const body = reviewBody.parse(req.body);
+    const { occ, series, member } = await loadOccurrence(db, req.params.id, req.user.id);
+    if (!canManage(member.role) || req.user.id === series.assigneeId) throw forbidden("only a Dominant can review this");
+    if (body.noteMd !== undefined) await db.update(occurrences).set({ noteMd: body.noteMd }).where(eq(occurrences.id, occ.id));
+    const updated = await db.transaction((tx) => reviewOccurrence(tx, series, occ, req.user.id, body.approve));
+    await notifier.send([series.assigneeId], {
+      title: "Obey",
+      body: body.approve ? "Your task was approved" : "Your task needs another try",
+      data: { type: "occurrence_reviewed", occurrenceId: occ.id },
+    });
+    return occurrenceDto(updated, series);
+  });
+
+  app.post<{ Params: { id: string } }>("/occurrences/:id/reschedule", async (req) => {
+    const change = rescheduleInput.parse(req.body);
+    const { occ, series, member, rel } = await loadOccurrence(db, req.params.id, req.user.id);
+    const result = await db.transaction((tx) =>
+      requestReschedule(tx, rel, series, occ, { userId: req.user.id, role: member.role }, change, deps.now(), deps.materializeDays),
+    );
+    const [current] = await db.select().from(taskSeries).where(eq(taskSeries.id, result.occurrence.seriesId));
+    if (!result.applied) {
+      await notifier.send(await managers(db, rel.id, req.user.id), {
+        title: "Obey",
+        body: `${req.user.displayName} asked for more time`,
+        data: { type: "reschedule_requested", requestId: result.request.id },
+      });
+    } else if (req.user.id !== series.assigneeId) {
+      await notifier.send([series.assigneeId], { title: "Obey", body: "A deadline changed", data: { type: "rescheduled", occurrenceId: result.occurrence.id } });
+    }
+    return { applied: result.applied, request: rescheduleDto(result.request), occurrence: occurrenceDto(result.occurrence, current!) };
+  });
+
+  app.get<{ Params: { id: string }; Querystring: { status?: string } }>("/relationships/:id/reschedules", async (req) => {
+    await requireMember(db, req.params.id, req.user.id);
+    const status = z.enum(["requested", "approved", "declined", "applied"]).optional().parse(req.query.status);
+    const rows = await db
+      .select()
+      .from(reschedules)
+      .where(and(eq(reschedules.relationshipId, req.params.id), status ? eq(reschedules.status, status) : undefined))
+      .orderBy(asc(reschedules.createdAt));
+    return rows.map(rescheduleDto);
+  });
+
+  app.post<{ Params: { id: string } }>("/reschedules/:id/decide", async (req) => {
+    const { approve } = z.object({ approve: z.boolean() }).parse(req.body);
+    const [request] = await db.select().from(reschedules).where(eq(reschedules.id, req.params.id));
+    if (!request) throw notFound();
+    const m = await requireMember(db, request.relationshipId, req.user.id);
+    if (!canManage(m.role) || request.requestedBy === req.user.id) throw forbidden("only a Dominant can decide this");
+    const result = await db.transaction((tx) => decideReschedule(tx, request, req.user.id, approve, deps.now(), deps.materializeDays));
+    const [series] = await db.select().from(taskSeries).where(eq(taskSeries.id, result.occurrence.seriesId));
+    await notifier.send([request.requestedBy], {
+      title: "Obey",
+      body: approve ? "Your extension was approved" : "Your extension was declined",
+      data: { type: "reschedule_decided", requestId: request.id },
+    });
+    return { request: rescheduleDto(result.request), occurrence: occurrenceDto(result.occurrence, series!) };
+  });
+
+};

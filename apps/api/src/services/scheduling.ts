@@ -1,0 +1,373 @@
+import { and, count, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
+import {
+  type PlainDate,
+  addDays,
+  delayDue,
+  dueInstant,
+  isEndOfLocalDay,
+  localDate,
+  localTime,
+  nextAfterCompletion,
+  occurrencesBetween,
+  splitSeries,
+} from "@obey/recurrence";
+import type { Tx } from "../db/index.js";
+import { occurrences, pointsLedger, relationships, reschedules, taskSeries } from "../db/schema.js";
+import { HttpError, forbidden } from "../errors.js";
+import { type Role, canManage } from "./access.js";
+
+export type Series = typeof taskSeries.$inferSelect;
+export type Occurrence = typeof occurrences.$inferSelect;
+export type Relationship = typeof relationships.$inferSelect;
+
+const maxDate = (a: PlainDate, b: PlainDate) => (a > b ? a : b);
+
+/**
+ * Creates the series' occurrences from today (in its zone) through `through`. Idempotent: the
+ * (series, original_date) key means re-running never duplicates or resurrects a moved occurrence.
+ */
+export async function materializeSeries(db: Tx, series: Series, through: PlainDate, now: Date): Promise<void> {
+  if (!series.active) return;
+  const { schedule } = series;
+  let dates: PlainDate[];
+  if (!schedule.rule) {
+    dates = [schedule.start];
+  } else if (schedule.anchor === "completion") {
+    // One pending occurrence at a time; the rest come from completions and misses.
+    const [{ n }] = (await db.select({ n: count() }).from(occurrences).where(eq(occurrences.seriesId, series.id))) as [
+      { n: number },
+    ];
+    dates = n === 0 ? [schedule.start] : [];
+  } else {
+    const today = localDate(now, series.timezone);
+    dates = occurrencesBetween(schedule, maxDate(schedule.start, today), through);
+  }
+  if (dates.length === 0) return;
+  await db
+    .insert(occurrences)
+    .values(
+      dates.map((date) => {
+        const due = dueInstant(date, series.dueTime, series.timezone);
+        return { seriesId: series.id, originalDate: date, dueAt: due, originalDueAt: due };
+      }),
+    )
+    .onConflictDoNothing();
+}
+
+export async function materializeRelationship(db: Tx, relationshipId: string, through: PlainDate, now: Date) {
+  const rows = await db
+    .select()
+    .from(taskSeries)
+    .where(and(eq(taskSeries.relationshipId, relationshipId), eq(taskSeries.active, true)));
+  for (const s of rows) await materializeSeries(db, s, through, now);
+}
+
+export async function materializeAll(db: Tx, days: number, now: Date) {
+  const rows = await db.select().from(taskSeries).where(eq(taskSeries.active, true));
+  for (const s of rows) await materializeSeries(db, s, addDays(localDate(now, s.timezone), days), now);
+}
+
+/** For completion-anchored series: queue the next occurrence counted from `basis`. */
+async function advanceCompletionSeries(db: Tx, series: Series, basis: PlainDate) {
+  if (series.schedule.anchor !== "completion" || !series.active) return;
+  const [{ n }] = (await db.select({ n: count() }).from(occurrences).where(eq(occurrences.seriesId, series.id))) as [
+    { n: number },
+  ];
+  const next = nextAfterCompletion(series.schedule, basis, n);
+  if (!next) return;
+  const due = dueInstant(next, series.dueTime, series.timezone);
+  await db.insert(occurrences).values({ seriesId: series.id, originalDate: next, dueAt: due, originalDueAt: due }).onConflictDoNothing();
+}
+
+async function finalizeCompletion(db: Tx, series: Series, occ: Occurrence, completedAt: Date, reviewerId: string | null) {
+  const [updated] = await db
+    .update(occurrences)
+    .set({ status: "completed", completedAt, reviewedBy: reviewerId, reviewedAt: reviewerId ? new Date() : null })
+    .where(eq(occurrences.id, occ.id))
+    .returning();
+  if (series.points !== 0) {
+    await db
+      .insert(pointsLedger)
+      .values({
+        relationshipId: series.relationshipId,
+        userId: series.assigneeId,
+        delta: series.points,
+        kind: "completion",
+        note: series.title,
+        occurrenceId: occ.id,
+        createdBy: reviewerId,
+      })
+      .onConflictDoNothing();
+  }
+  await advanceCompletionSeries(db, series, localDate(completedAt, series.timezone));
+  return updated!;
+}
+
+/** The assignee (or a Dominant on their behalf) marks an occurrence done. */
+export async function completeOccurrence(
+  db: Tx,
+  series: Series,
+  occ: Occurrence,
+  actor: { userId: string; role: Role },
+  noteMd: string | undefined,
+  now: Date,
+): Promise<Occurrence> {
+  const isAssignee = actor.userId === series.assigneeId;
+  if (!isAssignee && !canManage(actor.role)) throw forbidden("only the assignee can complete this");
+  if (occ.status !== "pending") throw new HttpError(409, `occurrence is ${occ.status}`);
+  if (noteMd !== undefined) await db.update(occurrences).set({ noteMd }).where(eq(occurrences.id, occ.id));
+  if (series.approvalRequired && isAssignee && !canManage(actor.role)) {
+    const [submitted] = await db
+      .update(occurrences)
+      .set({ status: "submitted", completedAt: now })
+      .where(eq(occurrences.id, occ.id))
+      .returning();
+    return submitted!;
+  }
+  return finalizeCompletion(db, series, occ, now, isAssignee ? null : actor.userId);
+}
+
+export async function reviewOccurrence(db: Tx, series: Series, occ: Occurrence, reviewerId: string, approve: boolean) {
+  if (occ.status !== "submitted") throw new HttpError(409, `occurrence is ${occ.status}`);
+  if (approve) return finalizeCompletion(db, series, occ, occ.completedAt ?? new Date(), reviewerId);
+  const [reopened] = await db
+    .update(occurrences)
+    .set({ status: "pending", completedAt: null, reviewedBy: reviewerId, reviewedAt: new Date() })
+    .where(eq(occurrences.id, occ.id))
+    .returning();
+  return reopened!;
+}
+
+/** Marks pending occurrences past due + grace as missed and applies penalties. Returns what changed. */
+export async function markMissed(db: Tx, now: Date) {
+  const overdue = await db
+    .select({ occ: occurrences, series: taskSeries })
+    .from(occurrences)
+    .innerJoin(taskSeries, eq(occurrences.seriesId, taskSeries.id))
+    .where(
+      and(
+        eq(occurrences.status, "pending"),
+        sql`${occurrences.dueAt} + make_interval(mins => ${taskSeries.graceMinutes}) <= ${now.toISOString()}::timestamptz`,
+      ),
+    );
+  const missed: { occ: Occurrence; series: Series }[] = [];
+  for (const { occ, series } of overdue) {
+    const [updated] = await db
+      .update(occurrences)
+      .set({ status: "missed" })
+      .where(and(eq(occurrences.id, occ.id), eq(occurrences.status, "pending")))
+      .returning();
+    if (!updated) continue;
+    if (series.missPenalty > 0) {
+      await db
+        .insert(pointsLedger)
+        .values({
+          relationshipId: series.relationshipId,
+          userId: series.assigneeId,
+          delta: -series.missPenalty,
+          kind: "miss",
+          note: series.title,
+          occurrenceId: occ.id,
+        })
+        .onConflictDoNothing();
+    }
+    // A missed chore shouldn't vanish: count the next one from when it was due.
+    await advanceCompletionSeries(db, series, localDate(occ.dueAt, series.timezone));
+    missed.push({ occ: updated, series });
+  }
+  return missed;
+}
+
+/** Pending occurrences due within `leadMinutes` that haven't had a reminder yet; marks them reminded. */
+export async function claimReminders(db: Tx, now: Date, leadMinutes: number) {
+  const horizon = new Date(now.getTime() + leadMinutes * 60_000);
+  const due = await db
+    .update(occurrences)
+    .set({ reminderSentAt: now })
+    .where(
+      and(
+        eq(occurrences.status, "pending"),
+        isNull(occurrences.reminderSentAt),
+        lte(occurrences.dueAt, horizon),
+        gte(occurrences.dueAt, now),
+      ),
+    )
+    .returning();
+  if (due.length === 0) return [];
+  const series = await db
+    .select()
+    .from(taskSeries)
+    .where(inArray(taskSeries.id, [...new Set(due.map((o) => o.seriesId))]));
+  const byId = new Map(series.map((s) => [s.id, s]));
+  return due.map((occ) => ({ occ, series: byId.get(occ.seriesId)! }));
+}
+
+export interface RescheduleChange {
+  scope: "this" | "following";
+  delayHours?: number;
+  dueAt?: string;
+  reason?: string;
+}
+
+export function targetDue(series: Series, occ: Occurrence, change: RescheduleChange): Date {
+  if (change.delayHours !== undefined) return delayDue(occ.dueAt, change.delayHours, series.timezone);
+  const due = new Date(change.dueAt!);
+  if (Number.isNaN(due.getTime())) throw new HttpError(400, "invalid dueAt");
+  return due;
+}
+
+/** Undo a miss penalty when a missed occurrence is reopened by rescheduling. */
+async function reopenIfMissed(db: Tx, series: Series, occ: Occurrence) {
+  if (occ.status !== "missed") return;
+  const [penalty] = await db
+    .select()
+    .from(pointsLedger)
+    .where(and(eq(pointsLedger.occurrenceId, occ.id), eq(pointsLedger.kind, "miss")));
+  if (penalty) {
+    await db.insert(pointsLedger).values({
+      relationshipId: series.relationshipId,
+      userId: series.assigneeId,
+      delta: -penalty.delta,
+      kind: "adjustment",
+      note: `Miss reversed by reschedule: ${series.title}`,
+    });
+  }
+}
+
+/** Moves an occurrence (or it and the rest of its series). Returns the occurrence now holding that slot. */
+export async function applyReschedule(
+  db: Tx,
+  series: Series,
+  occ: Occurrence,
+  scope: "this" | "following",
+  toDue: Date,
+  now: Date,
+  materializeDays: number,
+): Promise<Occurrence> {
+  await reopenIfMissed(db, series, occ);
+  const followingApplies = scope === "following" && series.schedule.rule && series.schedule.anchor !== "completion";
+  if (!followingApplies) {
+    const [moved] = await db
+      .update(occurrences)
+      .set({ dueAt: toDue, status: "pending", reminderSentAt: null })
+      .where(eq(occurrences.id, occ.id))
+      .returning();
+    return moved!;
+  }
+
+  const zone = series.timezone;
+  const newStart = localDate(toDue, zone);
+  const newDueTime = series.dueTime === null && isEndOfLocalDay(toDue, zone) ? null : localTime(toDue, zone);
+  if (newStart < occ.originalDate)
+    throw new HttpError(400, "moving a series earlier isn't supported; edit the task's schedule instead");
+  const { before, after } = splitSeries(series.schedule, occ.originalDate, newStart);
+
+  const { id: _id, createdAt: _c, updatedAt: _u, supersededBy: _s, ...copy } = series;
+  const [next] = await db
+    .insert(taskSeries)
+    .values({ ...copy, schedule: after, dueTime: newDueTime, active: true })
+    .returning();
+  await db
+    .update(taskSeries)
+    .set(before ? { schedule: before, supersededBy: next!.id, updatedAt: now } : { active: false, supersededBy: next!.id, updatedAt: now })
+    .where(eq(taskSeries.id, series.id));
+  await db
+    .update(occurrences)
+    .set({ status: "cancelled" })
+    .where(
+      and(
+        eq(occurrences.seriesId, series.id),
+        gte(occurrences.originalDate, occ.originalDate),
+        inArray(occurrences.status, ["pending", "missed"]),
+      ),
+    );
+  await materializeSeries(db, next!, addDays(maxDate(newStart, localDate(now, zone)), materializeDays), now);
+  const [first] = await db
+    .select()
+    .from(occurrences)
+    .where(and(eq(occurrences.seriesId, next!.id), eq(occurrences.originalDate, newStart)));
+  if (!first) throw new HttpError(500, "rescheduled series produced no occurrence");
+  return first;
+}
+
+/**
+ * Applies a reschedule directly when the actor may, or files a request for a Dominant to decide.
+ * Dominants and switches always may. Submissives follow the relationship's policy.
+ */
+export async function requestReschedule(
+  db: Tx,
+  rel: Relationship,
+  series: Series,
+  occ: Occurrence,
+  actor: { userId: string; role: Role },
+  change: RescheduleChange,
+  now: Date,
+  materializeDays: number,
+) {
+  if (occ.status !== "pending" && occ.status !== "missed") throw new HttpError(409, `occurrence is ${occ.status}`);
+  if (!canManage(actor.role) && actor.userId !== series.assigneeId) throw forbidden();
+  const toDue = targetDue(series, occ, change);
+  if (toDue.getTime() <= now.getTime()) throw new HttpError(400, "the new deadline must be in the future");
+
+  let direct = canManage(actor.role);
+  let usedAllowance = false;
+  if (!direct) {
+    if (rel.reschedulePolicy === "dominant_only") throw forbidden("only a Dominant can reschedule tasks");
+    if (rel.reschedulePolicy === "allowance") {
+      const [{ n }] = (await db
+        .select({ n: count() })
+        .from(reschedules)
+        .where(
+          and(
+            eq(reschedules.requestedBy, actor.userId),
+            eq(reschedules.relationshipId, rel.id),
+            eq(reschedules.usedAllowance, true),
+            gte(reschedules.createdAt, new Date(now.getTime() - 7 * 86_400_000)),
+          ),
+        )) as [{ n: number }];
+      if (n < rel.weeklyDelayAllowance) direct = usedAllowance = true;
+    }
+  }
+
+  const [request] = await db
+    .insert(reschedules)
+    .values({
+      occurrenceId: occ.id,
+      relationshipId: rel.id,
+      requestedBy: actor.userId,
+      scope: change.scope,
+      fromDueAt: occ.dueAt,
+      toDueAt: toDue,
+      reason: change.reason ?? null,
+      status: direct ? "applied" : "requested",
+      usedAllowance,
+      decidedBy: direct ? actor.userId : null,
+      decidedAt: direct ? now : null,
+    })
+    .returning();
+  if (!direct) return { applied: false, request: request!, occurrence: occ };
+  const occurrence = await applyReschedule(db, series, occ, change.scope, toDue, now, materializeDays);
+  return { applied: true, request: request!, occurrence };
+}
+
+export async function decideReschedule(
+  db: Tx,
+  request: typeof reschedules.$inferSelect,
+  deciderId: string,
+  approve: boolean,
+  now: Date,
+  materializeDays: number,
+) {
+  if (request.status !== "requested") throw new HttpError(409, `request is ${request.status}`);
+  const [occ] = await db.select().from(occurrences).where(eq(occurrences.id, request.occurrenceId));
+  const [series] = await db.select().from(taskSeries).where(eq(taskSeries.id, occ!.seriesId));
+  const [decided] = await db
+    .update(reschedules)
+    .set({ status: approve ? "approved" : "declined", decidedBy: deciderId, decidedAt: now })
+    .where(eq(reschedules.id, request.id))
+    .returning();
+  if (!approve) return { request: decided!, occurrence: occ! };
+  if (occ!.status !== "pending" && occ!.status !== "missed") throw new HttpError(409, `occurrence is ${occ!.status}`);
+  const occurrence = await applyReschedule(db, series!, occ!, request.scope, request.toDueAt, now, materializeDays);
+  return { request: decided!, occurrence };
+}

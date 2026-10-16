@@ -1,0 +1,235 @@
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { runJobs } from "../src/jobs.js";
+import { setup } from "./helpers.js";
+
+let ctx: Awaited<ReturnType<typeof setup>>;
+beforeAll(async () => {
+  ctx = await setup();
+});
+afterAll(async () => ctx.close());
+
+const NY = "America/New_York";
+const task = (assigneeId: string, extra: object = {}) => ({
+  title: "Kneel and write lines",
+  assigneeId,
+  points: 10,
+  schedule: { start: "2026-10-16", rule: { freq: "daily", interval: 3 } },
+  dueTime: "21:00",
+  timezone: NY,
+  ...extra,
+});
+
+describe("relationships", () => {
+  it("pairs partners through an invite code", async () => {
+    const { dom, relId } = await ctx.pair();
+    const me = (await dom.get("/me")).body;
+    expect(me.relationships[0].id).toBe(relId);
+    expect(me.relationships[0].members.map((m: { role: string }) => m.role).sort()).toEqual(["dominant", "submissive"]);
+  });
+
+  it("rejects unauthenticated requests and hides other relationships", async () => {
+    const res = await ctx.app.inject({ method: "GET", url: "/me" });
+    expect(res.statusCode).toBe(401);
+    const a = await ctx.pair();
+    const b = await ctx.pair();
+    expect((await b.dom.get(`/relationships/${a.relId}/tasks`)).status).toBe(404);
+  });
+
+  it("keeps invite codes single-use", async () => {
+    const { dom, relId } = await ctx.pair();
+    const code = (await dom.post(`/relationships/${relId}/invites`)).body.code;
+    const third = ctx.as(crypto.randomUUID());
+    expect((await third.post("/relationships/join", { code, role: "submissive" })).status).toBe(200);
+    const fourth = ctx.as(crypto.randomUUID());
+    expect((await fourth.post("/relationships/join", { code, role: "submissive" })).status).toBe(404);
+  });
+});
+
+describe("tasks and occurrences", () => {
+  it("only lets Dominants create tasks", async () => {
+    const { sub, relId, subId } = await ctx.pair();
+    expect((await sub.post(`/relationships/${relId}/tasks`, task(subId))).status).toBe(403);
+  });
+
+  it("materialises every-3-days occurrences in the series timezone", async () => {
+    const { dom, relId, subId } = await ctx.pair();
+    const created = await dom.post(`/relationships/${relId}/tasks`, task(subId));
+    expect(created.status).toBe(201);
+    expect(created.body.summary).toBe("Every 3 days");
+    const occ = (await dom.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-25`)).body;
+    expect(occ.map((o: { originalDate: string }) => o.originalDate)).toEqual(["2026-10-16", "2026-10-19", "2026-10-22", "2026-10-25"]);
+    expect(occ[0].dueAt).toBe("2026-10-17T01:00:00.000Z");
+  });
+
+  it("rejects invalid schedules", async () => {
+    const { dom, relId, subId } = await ctx.pair();
+    const bad = task(subId, { schedule: { start: "2026-10-16", rule: { freq: "daily", interval: 0 } } });
+    expect((await dom.post(`/relationships/${relId}/tasks`, bad)).status).toBe(400);
+  });
+
+  it("awards points on completion exactly once", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    await dom.post(`/relationships/${relId}/tasks`, task(subId));
+    const [first] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    expect((await sub.post(`/occurrences/${first.id}/complete`, { noteMd: "done" })).body.status).toBe("completed");
+    expect((await sub.post(`/occurrences/${first.id}/complete`)).status).toBe(409);
+    const balances = (await sub.get(`/relationships/${relId}/balances`)).body;
+    expect(balances).toEqual([{ userId: subId, balance: 10 }]);
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Sub completed a task");
+  });
+
+  it("holds points until a Dominant approves when approval is required", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    await dom.post(`/relationships/${relId}/tasks`, task(subId, { approvalRequired: true }));
+    const [first] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    expect((await sub.post(`/occurrences/${first.id}/complete`)).body.status).toBe("submitted");
+    expect((await sub.post(`/occurrences/${first.id}/review`, { approve: true })).status).toBe(403);
+    expect((await dom.post(`/occurrences/${first.id}/review`, { approve: true })).body.status).toBe("completed");
+    expect((await dom.get(`/relationships/${relId}/balances`)).body[0].balance).toBe(10);
+  });
+
+  it("schedules completion-anchored tasks from the completion date", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    await dom.post(
+      `/relationships/${relId}/tasks`,
+      task(subId, { schedule: { start: "2026-10-16", anchor: "completion", rule: { freq: "daily", interval: 3 } } }),
+    );
+    const [first] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-30`)).body;
+    ctx.clock.now = new Date("2026-10-17T15:00:00Z"); // completed a day late
+    await sub.post(`/occurrences/${first.id}/complete`);
+    const all = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-30`)).body;
+    expect(all.map((o: { originalDate: string }) => o.originalDate)).toEqual(["2026-10-16", "2026-10-20"]);
+    ctx.clock.now = new Date("2026-10-16T12:00:00Z");
+  });
+});
+
+describe("rescheduling", () => {
+  async function withTask(policy: "dominant_only" | "request" | "allowance", allowance = 0) {
+    const p = await ctx.pair();
+    await p.dom.patch(`/relationships/${p.relId}`, { reschedulePolicy: policy, weeklyDelayAllowance: allowance });
+    await p.dom.post(`/relationships/${p.relId}/tasks`, task(p.subId));
+    const [first] = (await p.sub.get(`/relationships/${p.relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    return { ...p, first };
+  }
+
+  it("lets a Dominant delay one occurrence by 24 hours", async () => {
+    const { dom, relId, first } = await withTask("dominant_only");
+    const res = await dom.post(`/occurrences/${first.id}/reschedule`, { scope: "this", delayHours: 24 });
+    expect(res.body.applied).toBe(true);
+    expect(res.body.occurrence.dueAt).toBe("2026-10-18T01:00:00.000Z");
+    expect(res.body.occurrence.rescheduled).toBe(true);
+    // The rest of the series is untouched.
+    const next = (await dom.get(`/relationships/${relId}/occurrences?from=2026-10-19&to=2026-10-19`)).body;
+    expect(next[0].dueAt).toBe("2026-10-20T01:00:00.000Z");
+  });
+
+  it("sets a brand-new deadline", async () => {
+    const { dom, first } = await withTask("dominant_only");
+    const res = await dom.post(`/occurrences/${first.id}/reschedule`, { dueAt: "2026-10-18T14:30:00Z" });
+    expect(res.body.occurrence.dueAt).toBe("2026-10-18T14:30:00.000Z");
+  });
+
+  it("refuses submissives under dominant_only", async () => {
+    const { sub, first } = await withTask("dominant_only");
+    expect((await sub.post(`/occurrences/${first.id}/reschedule`, { delayHours: 24 })).status).toBe(403);
+  });
+
+  it("turns a submissive's delay into a request the Dominant approves", async () => {
+    const { dom, sub, relId, first } = await withTask("request");
+    const res = await sub.post(`/occurrences/${first.id}/reschedule`, { delayHours: 24, reason: "Working late" });
+    expect(res.body.applied).toBe(false);
+    expect(res.body.occurrence.dueAt).toBe(first.dueAt);
+    const pending = (await dom.get(`/relationships/${relId}/reschedules?status=requested`)).body;
+    expect(pending).toHaveLength(1);
+    expect((await sub.post(`/reschedules/${pending[0].id}/decide`, { approve: true })).status).toBe(403);
+    const decided = await dom.post(`/reschedules/${pending[0].id}/decide`, { approve: true });
+    expect(decided.body.occurrence.dueAt).toBe("2026-10-18T01:00:00.000Z");
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Your extension was approved");
+  });
+
+  it("applies delays directly within the weekly allowance", async () => {
+    const { sub, relId, first } = await withTask("allowance", 1);
+    expect((await sub.post(`/occurrences/${first.id}/reschedule`, { delayHours: 24 })).body.applied).toBe(true);
+    const [second] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-19&to=2026-10-19`)).body;
+    expect((await sub.post(`/occurrences/${second.id}/reschedule`, { delayHours: 24 })).body.applied).toBe(false);
+  });
+
+  it("moves this and following occurrences", async () => {
+    const { dom, relId, first } = await withTask("dominant_only");
+    const res = await dom.post(`/occurrences/${first.id}/reschedule`, { scope: "following", delayHours: 24 });
+    expect(res.body.occurrence.originalDate).toBe("2026-10-17");
+    const occ = (await dom.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-26`)).body;
+    expect(occ.map((o: { originalDate: string }) => o.originalDate)).toEqual(["2026-10-17", "2026-10-20", "2026-10-23", "2026-10-26"]);
+    const tasks = (await dom.get(`/relationships/${relId}/tasks`)).body;
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].schedule.start).toBe("2026-10-17");
+  });
+
+  it("rejects deadlines in the past", async () => {
+    const { dom, first } = await withTask("dominant_only");
+    expect((await dom.post(`/occurrences/${first.id}/reschedule`, { dueAt: "2026-10-15T00:00:00Z" })).status).toBe(400);
+  });
+});
+
+describe("background jobs", () => {
+  it("marks missed occurrences, applies penalties, and reopening by reschedule reverses them", async () => {
+    const { dom, relId, subId } = await ctx.pair();
+    await dom.post(`/relationships/${relId}/tasks`, task(subId, { missPenalty: 5, graceMinutes: 60 }));
+    const [first] = (await dom.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+
+    ctx.clock.now = new Date("2026-10-17T01:30:00Z"); // 30 min past due, inside grace
+    await runJobs(ctx.db, ctx.notifier, ctx.clock.now, { materializeDays: 14, reminderLeadMinutes: 30 });
+    expect((await dom.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body[0].status).toBe("pending");
+
+    ctx.clock.now = new Date("2026-10-17T02:01:00Z");
+    await runJobs(ctx.db, ctx.notifier, ctx.clock.now, { materializeDays: 14, reminderLeadMinutes: 30 });
+    expect((await dom.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body[0].status).toBe("missed");
+    expect((await dom.get(`/relationships/${relId}/balances`)).body[0].balance).toBe(-5);
+
+    const res = await dom.post(`/occurrences/${first.id}/reschedule`, { delayHours: 24 });
+    expect(res.body.occurrence.status).toBe("pending");
+    expect((await dom.get(`/relationships/${relId}/balances`)).body[0].balance).toBe(0);
+    ctx.clock.now = new Date("2026-10-16T12:00:00Z");
+  });
+
+  it("sends one reminder per occurrence", async () => {
+    const { dom, relId, subId } = await ctx.pair();
+    await dom.post(`/relationships/${relId}/tasks`, task(subId));
+    const now = new Date("2026-10-17T00:45:00Z"); // 15 min before 21:00 New York
+    const opts = { materializeDays: 14, reminderLeadMinutes: 30 };
+    const before = ctx.notifier.sent.filter((s) => s.userIds.includes(subId) && s.push.data?.type === "reminder").length;
+    await runJobs(ctx.db, ctx.notifier, now, opts);
+    await runJobs(ctx.db, ctx.notifier, now, opts);
+    const after = ctx.notifier.sent.filter((s) => s.userIds.includes(subId) && s.push.data?.type === "reminder").length;
+    expect(after - before).toBe(1);
+  });
+});
+
+describe("points, rewards and notes", () => {
+  it("redeems rewards only with enough points", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    const reward = (await dom.post(`/relationships/${relId}/rewards`, { title: "Movie night", cost: 20 })).body;
+    expect((await sub.post(`/rewards/${reward.id}/redeem`)).status).toBe(409);
+    await dom.post(`/relationships/${relId}/ledger/adjust`, { userId: subId, delta: 25, note: "Good week" });
+    expect((await sub.post(`/rewards/${reward.id}/redeem`)).status).toBe(201);
+    expect((await sub.get(`/relationships/${relId}/balances`)).body[0].balance).toBe(5);
+  });
+
+  it("keeps private notes private and partial updates partial", async () => {
+    const { dom, sub, relId } = await ctx.pair();
+    const priv = (await sub.post(`/relationships/${relId}/notes`, { bodyMd: "# Mine", visibility: "private", tags: ["a"] })).body;
+    await sub.post(`/relationships/${relId}/notes`, { bodyMd: "Shared" });
+    expect((await dom.get(`/relationships/${relId}/notes`)).body).toHaveLength(1);
+    expect((await dom.patch(`/notes/${priv.id}`, { title: "x" })).status).toBe(404);
+    const updated = (await sub.patch(`/notes/${priv.id}`, { title: "Title" })).body;
+    expect(updated).toMatchObject({ title: "Title", visibility: "private", tags: ["a"], bodyMd: "# Mine" });
+  });
+
+  it("lets only Dominants edit the rule book", async () => {
+    const { dom, sub, relId } = await ctx.pair();
+    expect((await sub.post(`/relationships/${relId}/rules`, { title: "Ask first" })).status).toBe(403);
+    const rule = (await dom.post(`/relationships/${relId}/rules`, { title: "Ask first", position: 2 })).body;
+    const patched = (await dom.patch(`/rules/${rule.id}`, { category: "Protocol" })).body;
+    expect(patched).toMatchObject({ title: "Ask first", position: 2, category: "Protocol" });
+  });
+});

@@ -1,0 +1,17 @@
+function env(name: string, fallback?: string): string {
+  const value = process.env[name] ?? fallback;
+  if (value === undefined) throw new Error(`Missing environment variable ${name}`);
+  return value;
+}
+
+export const config = {
+  port: Number(env("PORT", "3000")),
+  databaseUrl: env("DATABASE_URL", "postgres://obey:obey@localhost:5432/obey"),
+  /** Accept `X-Dev-User: <uuid>` instead of a Firebase token. Never enable in production. */
+  devAuth: process.env.DEV_AUTH === "1",
+  /** Firebase service account JSON (the whole file contents). Optional until Firebase is set up. */
+  firebaseServiceAccount: process.env.FIREBASE_SERVICE_ACCOUNT,
+  corsOrigins: env("CORS_ORIGINS", "http://localhost:5173").split(","),
+  reminderLeadMinutes: Number(env("REMINDER_LEAD_MINUTES", "30")),
+  materializeDays: Number(env("MATERIALIZE_DAYS", "14")),
+};

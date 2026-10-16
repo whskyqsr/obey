@@ -33,3 +33,14 @@ export function delayDue(due: Date, hours: number, zone: string): Date {
   if (hours % 24 === 0) return dt.plus({ days: hours / 24 }).toJSDate();
   return dt.plus({ hours }).toJSDate();
 }
+
+/** The local wall-clock time of an instant as "HH:mm". */
+export function localTime(instant: Date, zone: string): string {
+  return DateTime.fromJSDate(instant, { zone }).toFormat("HH:mm");
+}
+
+/** Whether an instant is the end of its local day, i.e. how all-day tasks are due. */
+export function isEndOfLocalDay(instant: Date, zone: string): boolean {
+  const dt = DateTime.fromJSDate(instant, { zone });
+  return dt.hour === 23 && dt.minute === 59 && dt.second === 59;
+}

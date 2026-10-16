@@ -3,7 +3,7 @@
 Obey is an Android and web app for D/s couples (and polycules) to run tasks, rules, rituals, rewards and
 consequences together. It follows Obedience's core loop closely and fixes the things that hold it back.
 
-Status: draft for review. Sections marked **Decision needed** wait on Jake.
+Status: stack confirmed by Jake on 2026-10-16. "Every other 3 days" meant every 3 days. Notes: the editor is the main complaint.
 
 ## 1. What we're fixing in Obedience
 
@@ -57,17 +57,16 @@ shared custom task templates.
 
 ## 3. Proposed stack
 
-**Decision needed:** confirm or change these before the apps are scaffolded. Only the recurrence engine exists so far.
 
 | Part | Choice | Why |
 | --- | --- | --- |
 | Android | Kotlin, Jetpack Compose, Material 3, Hilt, Room (offline cache), WorkManager | Native M3 + dynamic color; Room keeps Today usable offline. |
 | Web | TypeScript, React, Vite, TanStack Query/Router, Tailwind with M3 color tokens from `@material/material-color-utilities` | Google's own web components (`@material/web`) have been in maintenance mode, and MUI is Material 2-flavoured, so I'd build M3 styling on tokens rather than adopt a kit. This is my read of the library landscape; worth a quick look before committing. |
-| Backend | TypeScript on Node, Fastify, Drizzle ORM, Postgres, `pg-boss` for scheduled jobs (reminders, marking missed) | Same language as web, shares `@obey/recurrence`; pg-boss avoids running Redis. |
+| Backend | TypeScript on Node, Fastify, Drizzle ORM, Postgres; a worker process loops every minute (materialise, mark missed, reminders) | Same language as web, shares `@obey/recurrence`. Every job step is idempotent, so no queue is needed yet. |
 | Hosting | Railway: one API service, one worker service, one Postgres | As requested. |
 | Auth | Firebase Authentication (Google + email link), verified server-side with `firebase-admin` | Same SDK on Android and web; we already need Firebase for push. |
 | Push | Firebase Cloud Messaging for Android and web push | One sender for both platforms. |
-| Repo | pnpm monorepo: `apps/api`, `apps/worker`, `apps/web`, `apps/android`, `packages/recurrence`, `packages/contracts` (zod API schemas) | |
+| Repo | pnpm monorepo: `apps/api` (API and worker entrypoints), `apps/web`, `apps/android`, `packages/recurrence`, `packages/contracts` (zod API schemas) | |
 
 The server is the source of truth for occurrences. Android renders what the API returns and caches it; it does not
 run its own copy of the recurrence engine, which avoids two implementations drifting apart.
