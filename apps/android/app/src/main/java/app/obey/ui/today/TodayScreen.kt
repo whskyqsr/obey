@@ -138,8 +138,10 @@ fun TodayScreen(
                     }
                     item(key = "h-today") { SectionHeader("Today") }
                     // Whole-day extension: the user's own open tasks for today, plus today's that already slipped.
+                    // Tasks that already have a request waiting aren't offered again.
+                    val asked = d.requests.flatten().map { it.occurrenceId }.toSet()
                     val mine = (d.overdue + d.today).filter {
-                        it.assigneeId == me && it.status == OccurrenceStatus.Pending &&
+                        it.assigneeId == me && it.status == OccurrenceStatus.Pending && it.id !in asked &&
                             parseInstant(it.dueAt).local().toLocalDate() == LocalDate.now()
                     }
                     if (mine.size > 1) {

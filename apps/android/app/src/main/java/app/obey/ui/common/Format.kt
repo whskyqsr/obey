@@ -17,13 +17,17 @@ private val timeFmt = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
 private val dateFmt = DateTimeFormatter.ofPattern("EEE d MMM")
 private val dateTimeFmt = DateTimeFormatter.ofPattern("EEE d MMM, ")
 
-fun formatTime(iso: String): String = parseInstant(iso).local().format(timeFmt)
+/** All-day tasks are due at 23:59:59 local time; show "all day" rather than 23:59. */
+private fun ZonedDateTime.timeLabel(): String =
+    if (hour == 23 && minute == 59 && second == 59) "all day" else format(timeFmt)
+
+fun formatTime(iso: String): String = parseInstant(iso).local().timeLabel().replaceFirstChar { it.uppercase() }
 
 /** "Today 18:00", "Tomorrow 09:00", "Mon 3 Nov, 18:00". */
 fun formatDue(iso: String, today: LocalDate = LocalDate.now()): String {
     val z = parseInstant(iso).local()
     val d = z.toLocalDate()
-    val time = z.format(timeFmt)
+    val time = z.timeLabel()
     return when (ChronoUnit.DAYS.between(today, d)) {
         0L -> "Today $time"
         1L -> "Tomorrow $time"
@@ -34,6 +38,6 @@ fun formatDue(iso: String, today: LocalDate = LocalDate.now()): String {
 
 fun formatDate(date: LocalDate): String = date.format(dateFmt)
 
-fun formatDateTime(iso: String): String = parseInstant(iso).local().let { it.format(dateTimeFmt) + it.format(timeFmt) }
+fun formatDateTime(iso: String): String = parseInstant(iso).local().let { it.format(dateTimeFmt) + it.timeLabel() }
 
 fun signed(points: Int): String = if (points > 0) "+$points" else points.toString()

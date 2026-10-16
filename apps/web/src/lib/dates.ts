@@ -55,11 +55,19 @@ export function fmtMonth(date: PlainDate) {
   return asDate(date).toLocaleDateString(undefined, { month: "long", year: "numeric" });
 }
 
+/** All-day tasks are due at 23:59:59 local time. */
+export function isAllDayDue(iso: string) {
+  const d = new Date(iso);
+  return d.getHours() === 23 && d.getMinutes() === 59 && d.getSeconds() === 59;
+}
+
 export function fmtTime(iso: string) {
+  if (isAllDayDue(iso)) return "All day";
   return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
 export function fmtDateTime(iso: string) {
+  if (isAllDayDue(iso)) return `${new Date(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}, all day`;
   return new Date(iso).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 

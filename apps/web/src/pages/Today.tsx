@@ -29,10 +29,15 @@ export function TodayPage() {
 
   const todayOpen = groups.today.filter((o) => o.status === "pending").length;
   const [daySheet, setDaySheet] = useState(false);
+  const pending = usePendingReschedules(rel.id);
   // Whole-day extensions cover the user's own open tasks for today (and anything overdue from today).
   const myOpenToday = useMemo(
-    () => groups.today.filter((o) => o.status === "pending" && o.assigneeId === me.user.id),
-    [groups.today, me.user.id],
+    () => {
+      // Tasks that already have a request waiting aren't offered again.
+      const asked = new Set((pending.data ?? []).map((r) => r.occurrenceId));
+      return groups.today.filter((o) => o.status === "pending" && o.assigneeId === me.user.id && !asked.has(o.id));
+    },
+    [groups.today, me.user.id, pending.data],
   );
   const name = me.user.displayName.split(" ")[0];
 
