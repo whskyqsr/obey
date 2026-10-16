@@ -8,8 +8,9 @@ const INTERVAL_MS = 60_000;
 
 const { db } = createDb(config.databaseUrl);
 await runMigrations(config.databaseUrl);
+// The worker only sends push, so it needs the service account.
 const firebase = initFirebase(config.firebaseServiceAccount);
-const notifier = firebase ? fcmNotifier(db, firebase) : noopNotifier;
+const notifier = firebase?.canSendPush ? fcmNotifier(db, firebase.app) : noopNotifier;
 
 async function tick() {
   try {

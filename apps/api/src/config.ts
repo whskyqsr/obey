@@ -12,6 +12,8 @@ export const config = {
   devAuth: process.env.DEV_AUTH === "1",
   /** Firebase service account JSON (the whole file contents). Optional until Firebase is set up. */
   firebaseServiceAccount: process.env.FIREBASE_SERVICE_ACCOUNT,
+  /** Enough to verify sign-in tokens when the service account isn't set yet (push stays off). */
+  firebaseProjectId: process.env.FIREBASE_PROJECT_ID,
   corsOrigins: env("CORS_ORIGINS", "http://localhost:5173").split(","),
   reminderLeadMinutes: Number(env("REMINDER_LEAD_MINUTES", "30")),
   materializeDays: Number(env("MATERIALIZE_DAYS", "14")),

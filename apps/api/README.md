@@ -12,7 +12,7 @@ pnpm --filter @obey/api start:worker
 ```
 
 With `DEV_AUTH=1`, requests can authenticate with `X-Dev-User: <any uuid>` (and optional `X-Dev-Name`).
-Never set it in production. Real sign-in uses Firebase ID tokens once `FIREBASE_SERVICE_ACCOUNT` is set.
+Never set it in production. Real sign-in uses Firebase ID tokens once `FIREBASE_PROJECT_ID` or `FIREBASE_SERVICE_ACCOUNT` is set.
 
 ## Environment
 
@@ -21,6 +21,7 @@ Never set it in production. Real sign-in uses Firebase ID tokens once `FIREBASE_
 | `DATABASE_URL` | `postgres://obey:obey@localhost:5432/obey` | |
 | `PORT` | `3000` | |
 | `FIREBASE_SERVICE_ACCOUNT` | unset | Full service-account JSON. Enables Firebase auth and FCM push. |
+| `FIREBASE_PROJECT_ID` | unset | Enables Firebase auth only (no push) when the service account isn't set. |
 | `DEV_AUTH` | unset | `1` accepts `X-Dev-User`. Development only. |
 | `CORS_ORIGINS` | `http://localhost:5173` | Comma-separated. |
 | `REMINDER_LEAD_MINUTES` | `30` | |
