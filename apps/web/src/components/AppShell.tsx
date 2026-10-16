@@ -69,7 +69,7 @@ export function AppShell() {
   return (
     <div className="min-h-dvh bg-surface">
       {/* Navigation rail (medium and larger) */}
-      <nav className="fixed inset-y-0 left-0 z-30 hidden w-20 flex-col items-center gap-3 overflow-y-auto bg-surface pt-4 pb-4 md:flex">
+      <nav className="fixed inset-y-0 left-0 z-30 hidden w-24 flex-col items-center gap-3 overflow-y-auto bg-surface pt-4 pb-4 md:flex">
         <Link to="/" className="mb-4 flex size-14 items-center justify-center rounded-lg bg-primary-container text-on-primary-container" title={rel.name}>
           <Icon name="link" filled />
         </Link>
@@ -78,7 +78,7 @@ export function AppShell() {
         ))}
       </nav>
 
-      <main className="pb-28 md:pb-10 md:pl-20">
+      <main className="pb-28 md:pb-10 md:pl-24">
         <div className="mx-auto max-w-5xl">
           <Outlet />
         </div>

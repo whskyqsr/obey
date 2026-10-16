@@ -15,8 +15,11 @@ export function excerpt(md: string, max = 160): string {
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/^\s*(#{1,6}\s+|>\s?|[-*+]\s+(\[[ xX]\]\s+)?|\d+\.\s+)/gm, "")
     .replace(/[*_~`]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+    // Keep line breaks visible so lists and headings don't run together.
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join(" · ");
   return text.length > max ? text.slice(0, max - 1) + "…" : text;
 }
 

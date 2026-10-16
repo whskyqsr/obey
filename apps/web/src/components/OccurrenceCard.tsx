@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Occurrence, OccurrenceStatus } from "@obey/contracts";
 import { useCompleteOccurrence, useReviewOccurrence } from "../api/hooks";
 import { errorMessage } from "../api/client";
-import { fmtDateTime, fmtRelative, fmtTime, localDateOf, today } from "../lib/dates";
+import { fmtDate, fmtDateTime, fmtRelative, fmtTime, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 import { RescheduleSheet } from "./RescheduleSheet";
 import { Badge, Button, Dialog, IconButton, TextArea, cx, useSnackbar } from "./ui";
@@ -33,6 +33,8 @@ export function OccurrenceCard({ o, showDate }: { o: Occurrence; showDate?: bool
   const overdue = isOverdue(o);
   const done = o.status === "completed" || o.status === "excused" || o.status === "cancelled";
   const isToday = localDateOf(new Date(o.dueAt)) === today();
+  const due = new Date(o.dueAt);
+  const allDay = due.getHours() === 23 && due.getMinutes() === 59 && due.getSeconds() === 59;
   const status = STATUS[o.status];
 
   return (
@@ -47,7 +49,16 @@ export function OccurrenceCard({ o, showDate }: { o: Occurrence; showDate?: bool
         <div className="min-w-0 flex-1">
           <div className={cx("text-title-medium text-on-surface", done && "line-through")}>{o.title}</div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-body-medium text-on-surface-variant">
-            <span>{showDate || !isToday ? fmtDateTime(o.dueAt) : fmtTime(o.dueAt)}</span>
+            <span>
+              {/* All-day tasks are due at 23:59:59 local; show "All day" rather than 11:59 PM. */}
+              {allDay
+                ? showDate || !isToday
+                  ? `${fmtDate(o.dueAt)}, all day`
+                  : "All day"
+                : showDate || !isToday
+                  ? fmtDateTime(o.dueAt)
+                  : fmtTime(o.dueAt)}
+            </span>
             {o.status === "pending" && <span className={overdue ? "text-error" : ""}>· {fmtRelative(o.dueAt)}</span>}
             {!mine && <span>· {memberName(o.assigneeId)}</span>}
             {o.rescheduled && <span title="Rescheduled">· moved</span>}
