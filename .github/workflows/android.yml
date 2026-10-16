@@ -1,0 +1,44 @@
+name: Android
+on:
+  pull_request:
+    paths:
+      - "apps/android/**"
+      - ".github/workflows/android.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/android/**"
+      - ".github/workflows/android.yml"
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build and lint
+        run: ./gradlew assembleDebug lint --stacktrace
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: apps/android/app/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: obey-debug-apk
+          path: apps/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: ignore

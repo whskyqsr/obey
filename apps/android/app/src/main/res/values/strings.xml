@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Obey</string>
+    <string name="notification_channel_default">obey_default</string>
+    <string name="notification_channel_name">Tasks and reminders</string>
+</resources>
