@@ -1,4 +1,5 @@
 import { and, count, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import {
   type PlainDate,
   addDays,
@@ -291,6 +292,30 @@ export async function applyReschedule(
 }
 
 /**
+ * Whether the actor's reschedule applies directly. Dominants and switches always may; submissives
+ * follow the relationship's policy. Under `allowance`, a whole-day request counts as one delay.
+ */
+async function rescheduleAuthority(db: Tx, rel: Relationship, actor: { userId: string; role: Role }, now: Date) {
+  if (canManage(actor.role)) return { direct: true, usedAllowance: false };
+  if (rel.reschedulePolicy === "dominant_only") throw forbidden("only a Dominant can reschedule tasks");
+  if (rel.reschedulePolicy === "allowance") {
+    const [{ n }] = (await db
+      .select({ n: sql<number>`count(distinct coalesce(${reschedules.groupId}, ${reschedules.id}))::int` })
+      .from(reschedules)
+      .where(
+        and(
+          eq(reschedules.requestedBy, actor.userId),
+          eq(reschedules.relationshipId, rel.id),
+          eq(reschedules.usedAllowance, true),
+          gte(reschedules.createdAt, new Date(now.getTime() - 7 * 86_400_000)),
+        ),
+      )) as [{ n: number }];
+    if (n < rel.weeklyDelayAllowance) return { direct: true, usedAllowance: true };
+  }
+  return { direct: false, usedAllowance: false };
+}
+
+/**
  * Applies a reschedule directly when the actor may, or files a request for a Dominant to decide.
  * Dominants and switches always may. Submissives follow the relationship's policy.
  */
@@ -309,25 +334,7 @@ export async function requestReschedule(
   const toDue = targetDue(series, occ, change);
   if (toDue.getTime() <= now.getTime()) throw new HttpError(400, "the new deadline must be in the future");
 
-  let direct = canManage(actor.role);
-  let usedAllowance = false;
-  if (!direct) {
-    if (rel.reschedulePolicy === "dominant_only") throw forbidden("only a Dominant can reschedule tasks");
-    if (rel.reschedulePolicy === "allowance") {
-      const [{ n }] = (await db
-        .select({ n: count() })
-        .from(reschedules)
-        .where(
-          and(
-            eq(reschedules.requestedBy, actor.userId),
-            eq(reschedules.relationshipId, rel.id),
-            eq(reschedules.usedAllowance, true),
-            gte(reschedules.createdAt, new Date(now.getTime() - 7 * 86_400_000)),
-          ),
-        )) as [{ n: number }];
-      if (n < rel.weeklyDelayAllowance) direct = usedAllowance = true;
-    }
-  }
+  const { direct, usedAllowance } = await rescheduleAuthority(db, rel, actor, now);
 
   const [request] = await db
     .insert(reschedules)
@@ -350,6 +357,55 @@ export async function requestReschedule(
   return { applied: true, request: request!, occurrence };
 }
 
+/**
+ * "More time for the whole day": one request covering several occurrences, each delayed by the
+ * same number of hours. Applied or decided as a unit.
+ */
+export async function requestGroupReschedule(
+  db: Tx,
+  rel: Relationship,
+  items: { series: Series; occ: Occurrence }[],
+  actor: { userId: string; role: Role },
+  delayHours: number,
+  reason: string | undefined,
+  now: Date,
+  materializeDays: number,
+) {
+  if (items.length === 0) throw new HttpError(400, "nothing to reschedule");
+  for (const { series, occ } of items) {
+    if (series.relationshipId !== rel.id) throw new HttpError(400, "all tasks must belong to this relationship");
+    if (occ.status !== "pending" && occ.status !== "missed") throw new HttpError(409, `occurrence is ${occ.status}`);
+    if (!canManage(actor.role) && actor.userId !== series.assigneeId) throw forbidden();
+  }
+  const { direct, usedAllowance } = await rescheduleAuthority(db, rel, actor, now);
+  const groupId = randomUUID();
+  const requests = await db
+    .insert(reschedules)
+    .values(
+      items.map(({ series, occ }) => ({
+        occurrenceId: occ.id,
+        relationshipId: rel.id,
+        groupId,
+        requestedBy: actor.userId,
+        scope: "this" as const,
+        fromDueAt: occ.dueAt,
+        toDueAt: delayDue(occ.dueAt, delayHours, series.timezone),
+        reason: reason ?? null,
+        status: direct ? ("applied" as const) : ("requested" as const),
+        usedAllowance,
+        decidedBy: direct ? actor.userId : null,
+        decidedAt: direct ? now : null,
+      })),
+    )
+    .returning();
+  if (!direct) return { applied: false, groupId, requests, occurrences: items.map((i) => i.occ) };
+  const moved: Occurrence[] = [];
+  for (const [i, { series, occ }] of items.entries())
+    moved.push(await applyReschedule(db, series, occ, "this", requests[i]!.toDueAt, now, materializeDays));
+  return { applied: true, groupId, requests, occurrences: moved };
+}
+
+/** Decides a request, or every pending request in its group. Returns the decided rows and their occurrences. */
 export async function decideReschedule(
   db: Tx,
   request: typeof reschedules.$inferSelect,
@@ -359,15 +415,29 @@ export async function decideReschedule(
   materializeDays: number,
 ) {
   if (request.status !== "requested") throw new HttpError(409, `request is ${request.status}`);
-  const [occ] = await db.select().from(occurrences).where(eq(occurrences.id, request.occurrenceId));
-  const [series] = await db.select().from(taskSeries).where(eq(taskSeries.id, occ!.seriesId));
-  const [decided] = await db
+  const pending = request.groupId
+    ? await db
+        .select()
+        .from(reschedules)
+        .where(and(eq(reschedules.groupId, request.groupId), eq(reschedules.status, "requested")))
+    : [request];
+  const decided = await db
     .update(reschedules)
     .set({ status: approve ? "approved" : "declined", decidedBy: deciderId, decidedAt: now })
-    .where(eq(reschedules.id, request.id))
+    .where(inArray(reschedules.id, pending.map((r) => r.id)))
     .returning();
-  if (!approve) return { request: decided!, occurrence: occ! };
-  if (occ!.status !== "pending" && occ!.status !== "missed") throw new HttpError(409, `occurrence is ${occ!.status}`);
-  const occurrence = await applyReschedule(db, series!, occ!, request.scope, request.toDueAt, now, materializeDays);
-  return { request: decided!, occurrence };
+  const results: { request: typeof reschedules.$inferSelect; occurrence: Occurrence; series: Series }[] = [];
+  for (const r of decided) {
+    const [row] = await db
+      .select({ occ: occurrences, series: taskSeries })
+      .from(occurrences)
+      .innerJoin(taskSeries, eq(occurrences.seriesId, taskSeries.id))
+      .where(eq(occurrences.id, r.occurrenceId));
+    let occurrence = row!.occ;
+    // An occurrence completed or cancelled since the request simply stays as it is.
+    if (approve && (occurrence.status === "pending" || occurrence.status === "missed"))
+      occurrence = await applyReschedule(db, row!.series, occurrence, r.scope, r.toDueAt, now, materializeDays);
+    results.push({ request: r, occurrence, series: row!.series });
+  }
+  return results;
 }

@@ -7,10 +7,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.MoreTime
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
@@ -33,7 +35,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.obey.api.Occurrence
-import app.obey.api.RescheduleScope
+import app.obey.api.OccurrenceStatus
 import app.obey.ui.common.EmptyBox
 import app.obey.ui.common.ErrorBox
 import app.obey.ui.common.Load
@@ -41,7 +43,8 @@ import app.obey.ui.common.LoadingBox
 import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.SectionHeader
 import app.obey.ui.common.SettingsAction
-import app.obey.ui.common.formatDateTime
+import app.obey.ui.common.local
+import app.obey.ui.common.parseInstant
 import app.obey.ui.common.formatDue
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -67,6 +70,7 @@ fun TodayScreen(
 
     var rescheduling by remember { mutableStateOf<Occurrence?>(null) }
     var noting by remember { mutableStateOf<Occurrence?>(null) }
+    var dayTasks by remember { mutableStateOf<List<Occurrence>?>(null) }
     val session = vm.session
 
     Scaffold(
@@ -109,25 +113,13 @@ fun TodayScreen(
 
                 LazyColumn(Modifier.fillMaxSize()) {
                     if (d.requests.isNotEmpty()) {
-                        item(key = "h-req") { SectionHeader("Extension requests") }
-                        items(d.requests, key = { "r-" + it.id }) { r ->
-                            ListItem(
-                                headlineContent = { Text(d.titles[r.occurrenceId] ?: "A task") },
-                                supportingContent = {
-                                    Text(
-                                        buildString {
-                                            append("${session?.nameOf(r.requestedBy) ?: "Someone"} asks to move it to ${formatDateTime(r.toDueAt)}")
-                                            if (r.scope == RescheduleScope.Following) append(" (and following)")
-                                            r.reason?.let { append("\n“$it”") }
-                                        },
-                                    )
-                                },
-                                trailingContent = {
-                                    androidx.compose.foundation.layout.Row {
-                                        TextButton(onClick = { vm.decide(r, false) }) { Text("Decline") }
-                                        Button(onClick = { vm.decide(r, true) }) { Text("Approve") }
-                                    }
-                                },
+                        item(key = "h-req") { SectionHeader(if (session?.canManage == true) "Extension requests" else "Waiting for approval") }
+                        items(d.requests, key = { "r-" + (it.first().groupId ?: it.first().id) }) { rows ->
+                            ExtensionRequestCard(
+                                rows = rows,
+                                requester = if (rows.first().requestedBy == me) null else session?.nameOf(rows.first().requestedBy),
+                                canDecide = session?.canManage == true && rows.first().requestedBy != me,
+                                onDecide = { vm.decide(rows, it) },
                             )
                         }
                     }
@@ -145,6 +137,19 @@ fun TodayScreen(
                         items(d.overdue, key = { "o-" + it.id }) { o -> OccurrenceRow(o, nameFor(o), actionsFor(o)) }
                     }
                     item(key = "h-today") { SectionHeader("Today") }
+                    // Whole-day extension: the user's own open tasks for today, plus today's that already slipped.
+                    val mine = (d.overdue + d.today).filter {
+                        it.assigneeId == me && it.status == OccurrenceStatus.Pending &&
+                            parseInstant(it.dueAt).local().toLocalDate() == LocalDate.now()
+                    }
+                    if (mine.size > 1) {
+                        item(key = "a-day") {
+                            FilledTonalButton(onClick = { dayTasks = mine }, modifier = Modifier.padding(horizontal = 16.dp)) {
+                                Icon(Icons.Outlined.MoreTime, contentDescription = null)
+                                Text("  More time for today")
+                            }
+                        }
+                    }
                     if (d.today.isEmpty()) {
                         item(key = "e-today") {
                             EmptyBox("Nothing else due today", if (d.overdue.isEmpty()) "Enjoy it, or ask for more." else null)
@@ -169,6 +174,14 @@ fun TodayScreen(
 
     rescheduling?.let { o ->
         RescheduleSheet(o, onDismiss = { rescheduling = null }, onSubmit = { vm.reschedule(o, it) })
+    }
+
+    dayTasks?.let { tasks ->
+        DayRescheduleSheet(
+            tasks = tasks,
+            onDismiss = { dayTasks = null },
+            onSubmit = { ids, hours, reason -> vm.rescheduleDay(ids, hours, reason) },
+        )
     }
 
     noting?.let { o ->

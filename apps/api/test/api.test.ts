@@ -165,6 +165,57 @@ describe("rescheduling", () => {
     expect(tasks[0].schedule.start).toBe("2026-10-17");
   });
 
+  it("names the task on a request", async () => {
+    const { dom, sub, relId, first } = await withTask("request");
+    await sub.post(`/occurrences/${first.id}/reschedule`, { delayHours: 24 });
+    const [req] = (await dom.get(`/relationships/${relId}/reschedules?status=requested`)).body;
+    expect(req).toMatchObject({ title: "Kneel and write lines", groupId: null });
+  });
+
+  it("asks for more time on the whole day as one request", async () => {
+    const { dom, sub, relId, subId } = await withTask("request");
+    await dom.post(`/relationships/${relId}/tasks`, task(subId, { title: "Gym", dueTime: "18:00" }));
+    const today = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    expect(today).toHaveLength(2);
+    const res = await sub.post(`/relationships/${relId}/reschedules/day`, {
+      occurrenceIds: today.map((o: { id: string }) => o.id),
+      delayHours: 24,
+      reason: "Sick today",
+    });
+    expect(res.body.applied).toBe(false);
+    const pending = (await dom.get(`/relationships/${relId}/reschedules?status=requested`)).body;
+    expect(pending).toHaveLength(2);
+    expect(new Set(pending.map((r: { groupId: string }) => r.groupId)).size).toBe(1);
+    expect(pending.map((r: { title: string }) => r.title).sort()).toEqual(["Gym", "Kneel and write lines"]);
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Sub asked for more time on 2 tasks");
+
+    const decided = await dom.post(`/reschedules/${pending[0].id}/decide`, { approve: true });
+    expect(decided.body.requests).toHaveLength(2);
+    expect(decided.body.occurrences.map((o: { dueAt: string }) => o.dueAt).sort()).toEqual([
+      "2026-10-17T22:00:00.000Z",
+      "2026-10-18T01:00:00.000Z",
+    ]);
+    expect((await dom.get(`/relationships/${relId}/reschedules?status=requested`)).body).toHaveLength(0);
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Your extension for 2 tasks was approved");
+  });
+
+  it("counts a whole-day request as one delay against the allowance", async () => {
+    const { dom, sub, relId, subId } = await withTask("allowance", 1);
+    await dom.post(`/relationships/${relId}/tasks`, task(subId, { title: "Gym", dueTime: "18:00" }));
+    const today = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    const res = await sub.post(`/relationships/${relId}/reschedules/day`, { occurrenceIds: today.map((o: { id: string }) => o.id), delayHours: 24 });
+    expect(res.body.applied).toBe(true);
+    const [next] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-19&to=2026-10-19`)).body;
+    expect((await sub.post(`/occurrences/${next.id}/reschedule`, { delayHours: 24 })).body.applied).toBe(false);
+  });
+
+  it("rejects whole-day requests for tasks in another relationship", async () => {
+    const a = await withTask("request");
+    const b = await withTask("request");
+    const res = await a.sub.post(`/relationships/${a.relId}/reschedules/day`, { occurrenceIds: [b.first.id], delayHours: 24 });
+    expect(res.status).toBe(404);
+  });
+
   it("rejects deadlines in the past", async () => {
     const { dom, first } = await withTask("dominant_only");
     expect((await dom.post(`/occurrences/${first.id}/reschedule`, { dueAt: "2026-10-15T00:00:00Z" })).status).toBe(400);

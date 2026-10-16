@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useDecideReschedule, useOccurrences, usePendingReschedules } from "../api/hooks";
 import { errorMessage } from "../api/client";
-import type { Occurrence } from "../api/types";
+import type { Occurrence, RescheduleRequest } from "../api/types";
+import { DayRescheduleSheet } from "../components/DayRescheduleSheet";
 import { OccurrenceCard, isOverdue } from "../components/OccurrenceCard";
 import { Button, Empty, ErrorBox, Loading, PageHeader, Section, useSnackbar } from "../components/ui";
 import { addDays, fmtDate, fmtDateTime, localDateOf, today } from "../lib/dates";
@@ -27,6 +28,12 @@ export function TodayPage() {
   }, [occ.data, t]);
 
   const todayOpen = groups.today.filter((o) => o.status === "pending").length;
+  const [daySheet, setDaySheet] = useState(false);
+  // Whole-day extensions cover the user's own open tasks for today (and anything overdue from today).
+  const myOpenToday = useMemo(
+    () => groups.today.filter((o) => o.status === "pending" && o.assigneeId === me.user.id),
+    [groups.today, me.user.id],
+  );
   const name = me.user.displayName.split(" ")[0];
 
   return (
@@ -35,7 +42,7 @@ export function TodayPage() {
         title={`Hi${name ? `, ${name}` : ""}`}
         subtitle={`${fmtDate(t, { weekday: "long", month: "long", day: "numeric" })} · ${todayOpen} open today${groups.overdue.length ? `, ${groups.overdue.length} overdue` : ""}`}
       />
-      {isDom && <PendingRequests />}
+      <PendingRequests />
       {occ.isLoading && <Loading />}
       {occ.error && <ErrorBox error={occ.error} onRetry={() => occ.refetch()} />}
       {occ.data && (
@@ -50,7 +57,16 @@ export function TodayPage() {
               <List items={groups.review} showDate />
             </Section>
           )}
-          <Section title="Today">
+          <Section
+            title="Today"
+            action={
+              myOpenToday.length > 1 ? (
+                <Button variant="tonal" icon="more_time" onClick={() => setDaySheet(true)}>
+                  More time for today
+                </Button>
+              ) : undefined
+            }
+          >
             {groups.today.length ? (
               <List items={groups.today} />
             ) : (
@@ -64,6 +80,7 @@ export function TodayPage() {
           )}
         </>
       )}
+      <DayRescheduleSheet tasks={myOpenToday} open={daySheet} onClose={() => setDaySheet(false)} />
     </>
   );
 }
@@ -78,45 +95,89 @@ function List({ items, showDate }: { items: Occurrence[]; showDate?: boolean }) 
   );
 }
 
+/** One card per request; a whole-day request (shared groupId) is one card listing each task. */
 function PendingRequests() {
-  const { rel, memberName } = useRel();
+  const { rel, me, isDom, memberName } = useRel();
   const snack = useSnackbar();
   const pending = usePendingReschedules(rel.id);
   const decide = useDecideReschedule(rel.id);
-  if (!pending.data?.length) return null;
+
+  const cards = useMemo(() => {
+    const map = new Map<string, RescheduleRequest[]>();
+    for (const r of pending.data ?? []) {
+      // The Dom decides others' requests; everyone sees their own as "waiting".
+      if (!isDom && r.requestedBy !== me.user.id) continue;
+      const key = r.groupId ?? r.id;
+      map.set(key, [...(map.get(key) ?? []), r]);
+    }
+    return [...map.values()];
+  }, [pending.data, isDom, me.user.id]);
+
+  if (!cards.length) return null;
+  const mine = (r: RescheduleRequest) => r.requestedBy === me.user.id;
+
+  function act(r: RescheduleRequest, approve: boolean, n: number) {
+    decide.mutate(
+      { id: r.id, approve },
+      {
+        onSuccess: () => snack(`${approve ? "Approved" : "Declined"}${n > 1 ? ` ${n} tasks` : ""}`),
+        onError: (e) => snack(errorMessage(e)),
+      },
+    );
+  }
+
   return (
-    <Section title="Extension requests">
+    <Section title={isDom ? "Extension requests" : "Waiting for approval"}>
       <div className="flex flex-col gap-2">
-        {pending.data.map((r) => (
-          <div key={r.id} className="flex flex-col gap-3 rounded-md bg-tertiary-container p-4 text-on-tertiary-container">
-            <div>
-              <div className="text-title-medium">
-                {memberName(r.requestedBy)} asks to move {r.scope === "following" ? "this and following" : "a task"}
+        {cards.map((rows) => {
+          const r = rows[0]!;
+          const who = mine(r) ? "You asked" : `${memberName(r.requestedBy)} asks`;
+          const single = rows.length === 1;
+          return (
+            <div key={r.groupId ?? r.id} className="flex flex-col gap-3 rounded-md bg-tertiary-container p-4 text-on-tertiary-container">
+              <div>
+                <div className="text-title-medium">
+                  {single ? (
+                    <>
+                      {who} for more time on “{r.title}”{r.scope === "following" ? " (this and following)" : ""}
+                    </>
+                  ) : (
+                    <>
+                      {who} for more time on {rows.length} tasks today
+                    </>
+                  )}
+                </div>
+                {single ? (
+                  <div className="text-body-medium">
+                    {fmtDateTime(r.fromDueAt)} → {fmtDateTime(r.toDueAt)}
+                  </div>
+                ) : (
+                  <ul className="mt-2 flex flex-col gap-1">
+                    {rows.map((x) => (
+                      <li key={x.id} className="flex flex-wrap justify-between gap-x-3 text-body-medium">
+                        <span className="font-medium">{x.title}</span>
+                        <span>
+                          {fmtDateTime(x.fromDueAt)} → {fmtDateTime(x.toDueAt)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {r.reason && <div className="mt-2 text-body-medium italic">“{r.reason}”</div>}
               </div>
-              <div className="text-body-medium">
-                {fmtDateTime(r.fromDueAt)} → {fmtDateTime(r.toDueAt)}
-              </div>
-              {r.reason && <div className="mt-1 text-body-medium italic">“{r.reason}”</div>}
+              {isDom && !mine(r) && (
+                <div className="flex gap-2">
+                  <Button icon="check" disabled={decide.isPending} onClick={() => act(r, true, rows.length)}>
+                    {single ? "Approve" : "Approve all"}
+                  </Button>
+                  <Button variant="text" className="text-on-tertiary-container" disabled={decide.isPending} onClick={() => act(r, false, rows.length)}>
+                    Decline
+                  </Button>
+                </div>
+              )}
             </div>
-            <div className="flex gap-2">
-              <Button
-                icon="check"
-                disabled={decide.isPending}
-                onClick={() => decide.mutate({ id: r.id, approve: true }, { onSuccess: () => snack("Approved"), onError: (e) => snack(errorMessage(e)) })}
-              >
-                Approve
-              </Button>
-              <Button
-                variant="text"
-                className="text-on-tertiary-container"
-                disabled={decide.isPending}
-                onClick={() => decide.mutate({ id: r.id, approve: false }, { onSuccess: () => snack("Declined"), onError: (e) => snack(errorMessage(e)) })}
-              >
-                Decline
-              </Button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </Section>
   );

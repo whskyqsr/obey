@@ -12,6 +12,7 @@ export type Task = c.Task;
 export type TaskInput = z.infer<typeof c.taskInput>;
 export type Occurrence = c.Occurrence;
 export type RescheduleInput = c.RescheduleInput;
+export type RescheduleDayInput = c.RescheduleDayInput;
 export type RescheduleRequest = c.RescheduleRequest;
 export type LedgerEntry = c.LedgerEntry;
 export type Balance = { userId: string; balance: number };

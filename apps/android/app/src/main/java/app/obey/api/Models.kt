@@ -216,7 +216,11 @@ enum class RescheduleStatus {
 @Serializable
 data class RescheduleRequest(
     val id: String,
+    /** Shared by the rows of one whole-day request, which are decided together. */
+    val groupId: String? = null,
     val occurrenceId: String,
+    /** The task's title, so a request card can name it. */
+    val title: String = "",
     val requestedBy: String,
     val scope: RescheduleScope,
     val fromDueAt: String,
@@ -231,6 +235,22 @@ data class RescheduleResult(
     val applied: Boolean,
     val request: RescheduleRequest? = null,
     val occurrence: Occurrence,
+)
+
+/** "More time for today": delay several occurrences together, decided as one request. */
+@Serializable
+data class RescheduleDayInput(
+    val occurrenceIds: List<String>,
+    val delayHours: Int,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val reason: String? = null,
+)
+
+@Serializable
+data class RescheduleDayResult(
+    val applied: Boolean,
+    val groupId: String,
+    val requests: List<RescheduleRequest>,
+    val occurrences: List<Occurrence>,
 )
 
 @Serializable

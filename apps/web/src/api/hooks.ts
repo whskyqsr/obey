@@ -10,6 +10,7 @@ import type {
   Occurrence,
   Relationship,
   RescheduleInput,
+  RescheduleDayInput,
   RescheduleRequest,
   RescheduleResult,
   Role,
@@ -132,6 +133,18 @@ export function useReschedule(rel: string) {
   });
 }
 
+export function useRescheduleDay(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (input: RescheduleDayInput) =>
+      api<{ applied: boolean; groupId: string; requests: RescheduleRequest[]; occurrences: Occurrence[] }>(
+        `/relationships/${rel}/reschedules/day`,
+        { method: "POST", body: input },
+      ),
+    onSuccess: () => invalidate(),
+  });
+}
+
 export function usePendingReschedules(rel: string) {
   return useQuery({
     queryKey: keys.reschedules(rel),
@@ -143,7 +156,10 @@ export function useDecideReschedule(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({
     mutationFn: ({ id, approve }: { id: string; approve: boolean }) =>
-      api<RescheduleRequest>(`/reschedules/${id}/decide`, { method: "POST", body: { approve } }),
+      api<{ request: RescheduleRequest; occurrence: Occurrence | null; requests: RescheduleRequest[]; occurrences: Occurrence[] }>(
+        `/reschedules/${id}/decide`,
+        { method: "POST", body: { approve } },
+      ),
     onSuccess: () => invalidate(),
   });
 }

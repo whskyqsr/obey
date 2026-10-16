@@ -59,6 +59,9 @@ interface ObeyApi {
     @POST("occurrences/{id}/reschedule")
     suspend fun reschedule(@Path("id") occurrenceId: String, @Body body: RescheduleInput): RescheduleResult
 
+    @POST("relationships/{id}/reschedules/day")
+    suspend fun rescheduleDay(@Path("id") relationshipId: String, @Body body: RescheduleDayInput): RescheduleDayResult
+
     @GET("relationships/{id}/reschedules")
     suspend fun reschedules(
         @Path("id") relationshipId: String,

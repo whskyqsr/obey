@@ -1,7 +1,7 @@
 import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { completeOccurrence as completeBody, plainDate, rescheduleInput, reviewOccurrence as reviewBody, taskInput } from "@obey/contracts";
+import { completeOccurrence as completeBody, plainDate, rescheduleDayInput, rescheduleInput, reviewOccurrence as reviewBody, taskInput } from "@obey/contracts";
 import { addDays, dueInstant, localDate } from "@obey/recurrence";
 import type { Deps } from "../app.js";
 import type { Tx } from "../db/index.js";
@@ -12,6 +12,7 @@ import { canManage, managers, membership, requireManager, requireMember } from "
 import {
   completeOccurrence,
   decideReschedule,
+  requestGroupReschedule,
   materializeRelationship,
   materializeSeries,
   requestReschedule,
@@ -194,18 +195,55 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     } else if (req.user.id !== series.assigneeId) {
       await notifier.send([series.assigneeId], { title: "Obey", body: "A deadline changed", data: { type: "rescheduled", occurrenceId: result.occurrence.id } });
     }
-    return { applied: result.applied, request: rescheduleDto(result.request), occurrence: occurrenceDto(result.occurrence, current!) };
+    return {
+      applied: result.applied,
+      request: rescheduleDto(result.request, current!.title),
+      occurrence: occurrenceDto(result.occurrence, current!),
+    };
+  });
+
+  // "More time for the whole day": one request covering several of the actor's occurrences.
+  app.post<{ Params: { id: string } }>("/relationships/:id/reschedules/day", async (req) => {
+    const body = rescheduleDayInput.parse(req.body);
+    const m = await requireMember(db, req.params.id, req.user.id);
+    const [rel] = await db.select().from(relationships).where(eq(relationships.id, req.params.id));
+    const items = await db
+      .select({ occ: occurrences, series: taskSeries })
+      .from(occurrences)
+      .innerJoin(taskSeries, eq(occurrences.seriesId, taskSeries.id))
+      .where(and(inArray(occurrences.id, body.occurrenceIds), eq(taskSeries.relationshipId, req.params.id)));
+    if (items.length !== new Set(body.occurrenceIds).size) throw notFound("some tasks were not found");
+    const result = await db.transaction((tx) =>
+      requestGroupReschedule(tx, rel!, items, { userId: req.user.id, role: m.role }, body.delayHours, body.reason, deps.now(), deps.materializeDays),
+    );
+    const titles = new Map(items.map((i) => [i.occ.id, i.series.title]));
+    const series = new Map(items.map((i) => [i.series.id, i.series]));
+    if (!result.applied) {
+      await notifier.send(await managers(db, rel!.id, req.user.id), {
+        title: "Obey",
+        body: `${req.user.displayName} asked for more time on ${items.length} tasks`,
+        data: { type: "reschedule_requested", groupId: result.groupId },
+      });
+    }
+    return {
+      applied: result.applied,
+      groupId: result.groupId,
+      requests: result.requests.map((r) => rescheduleDto(r, titles.get(r.occurrenceId)!)),
+      occurrences: result.occurrences.map((o) => occurrenceDto(o, series.get(o.seriesId)!)),
+    };
   });
 
   app.get<{ Params: { id: string }; Querystring: { status?: string } }>("/relationships/:id/reschedules", async (req) => {
     await requireMember(db, req.params.id, req.user.id);
     const status = z.enum(["requested", "approved", "declined", "applied"]).optional().parse(req.query.status);
     const rows = await db
-      .select()
+      .select({ r: reschedules, title: taskSeries.title })
       .from(reschedules)
+      .innerJoin(occurrences, eq(reschedules.occurrenceId, occurrences.id))
+      .innerJoin(taskSeries, eq(occurrences.seriesId, taskSeries.id))
       .where(and(eq(reschedules.relationshipId, req.params.id), status ? eq(reschedules.status, status) : undefined))
-      .orderBy(asc(reschedules.createdAt));
-    return rows.map(rescheduleDto);
+      .orderBy(asc(reschedules.createdAt), asc(occurrences.dueAt));
+    return rows.map(({ r, title }) => rescheduleDto(r, title));
   });
 
   app.post<{ Params: { id: string } }>("/reschedules/:id/decide", async (req) => {
@@ -214,14 +252,17 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     if (!request) throw notFound();
     const m = await requireMember(db, request.relationshipId, req.user.id);
     if (!canManage(m.role) || request.requestedBy === req.user.id) throw forbidden("only a Dominant can decide this");
-    const result = await db.transaction((tx) => decideReschedule(tx, request, req.user.id, approve, deps.now(), deps.materializeDays));
-    const [series] = await db.select().from(taskSeries).where(eq(taskSeries.id, result.occurrence.seriesId));
+    const results = await db.transaction((tx) => decideReschedule(tx, request, req.user.id, approve, deps.now(), deps.materializeDays));
+    const n = results.length;
     await notifier.send([request.requestedBy], {
       title: "Obey",
-      body: approve ? "Your extension was approved" : "Your extension was declined",
+      body: `Your extension${n > 1 ? ` for ${n} tasks` : ""} was ${approve ? "approved" : "declined"}`,
       data: { type: "reschedule_decided", requestId: request.id },
     });
-    return { request: rescheduleDto(result.request), occurrence: occurrenceDto(result.occurrence, series!) };
+    const dtos = results.map((x) => ({ request: rescheduleDto(x.request, x.series.title), occurrence: occurrenceDto(x.occurrence, x.series) }));
+    // `request`/`occurrence` describe the one that was tapped; `requests`/`occurrences` cover its whole group.
+    const tapped = dtos.find((d) => d.request.id === request.id) ?? dtos[0]!;
+    return { ...tapped, requests: dtos.map((d) => d.request), occurrences: dtos.map((d) => d.occurrence) };
   });
 
 };

@@ -51,9 +51,12 @@ export const occurrenceDto = (o: typeof occurrences.$inferSelect, s: Series) => 
   noteMd: o.noteMd,
 });
 
-export const rescheduleDto = (r: typeof reschedules.$inferSelect) => ({
+/** `title` is the task's, so a request card can say which task it's about. */
+export const rescheduleDto = (r: typeof reschedules.$inferSelect, title: string) => ({
   id: r.id,
+  groupId: r.groupId,
   occurrenceId: r.occurrenceId,
+  title,
   requestedBy: r.requestedBy,
   scope: r.scope,
   fromDueAt: iso(r.fromDueAt),

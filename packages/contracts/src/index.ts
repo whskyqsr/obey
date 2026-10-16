@@ -121,9 +121,19 @@ export const rescheduleInput = z
   });
 export type RescheduleInput = z.input<typeof rescheduleInput>;
 
+/** "More time for the whole day": delay several occurrences together; decided as one request. */
+export const rescheduleDayInput = z.object({
+  occurrenceIds: z.array(id).min(1).max(50),
+  delayHours: z.number().int().min(1).max(24 * 60),
+  reason: z.string().max(1_000).optional(),
+});
+export type RescheduleDayInput = z.input<typeof rescheduleDayInput>;
+
 export const rescheduleRequest = z.object({
   id,
+  groupId: id.nullable(),
   occurrenceId: id,
+  title: z.string(),
   requestedBy: id,
   scope: z.enum(["this", "following"]),
   fromDueAt: z.string(),

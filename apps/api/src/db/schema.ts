@@ -167,6 +167,8 @@ export const reschedules = pgTable("reschedules", {
   relationshipId: uuid("relationship_id")
     .notNull()
     .references(() => relationships.id, { onDelete: "cascade" }),
+  /** Shared by the rows of one "more time for the whole day" request; decided together. */
+  groupId: uuid("group_id"),
   requestedBy: uuid("requested_by")
     .notNull()
     .references(() => users.id),
