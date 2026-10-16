@@ -14,6 +14,8 @@ if (hasGoogleServices) {
     apply(plugin = "com.google.gms.google-services")
 }
 
+val apiBaseUrl: String = providers.gradleProperty("obey.apiBaseUrl").getOrElse("https://api-production-2a65c.up.railway.app/")
+
 android {
     namespace = "app.obey"
     compileSdk = 35
@@ -29,17 +31,29 @@ android {
         buildConfigField("boolean", "FIREBASE_CONFIGURED", hasGoogleServices.toString())
     }
 
+    signingConfigs {
+        getByName("debug") {
+            // A shared debug key, so every debug build (CI included) has the SHA-1 registered in Firebase for
+            // Google sign-in. Debug keys aren't secret; the release key will live outside the repo.
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         debug {
-            // 10.0.2.2 is the host machine as seen from the Android emulator.
-            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:3000/\"")
+            signingConfig = signingConfigs.getByName("debug")
+            // Local API from the emulator: ./gradlew assembleDebug -Pobey.apiBaseUrl=http://10.0.2.2:3000/
+            buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
             buildConfigField("boolean", "DEV_AUTH_ALLOWED", "true")
             manifestPlaceholders["usesCleartextTraffic"] = "true"
         }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            buildConfigField("String", "API_BASE_URL", "\"https://api.obey.app/\"")
+            buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
             buildConfigField("boolean", "DEV_AUTH_ALLOWED", "false")
             manifestPlaceholders["usesCleartextTraffic"] = "false"
         }

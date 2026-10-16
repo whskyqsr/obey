@@ -17,13 +17,25 @@ Or open `apps/android` in Android Studio and press Run.
 
 ### Talking to the API
 
-| Build | Base URL | Notes |
-| --- | --- | --- |
-| debug | `http://10.0.2.2:3000/` | `10.0.2.2` is your computer as seen from the emulator. Cleartext HTTP is allowed in debug only. |
-| release | `https://api.obey.app/` | Placeholder until the real domain exists. |
+Every build talks to the production API (`https://api-production-2a65c.up.railway.app/`) unless you pass
+`-Pobey.apiBaseUrl=...`. For a local API from the emulator:
 
-Both live in `app/build.gradle.kts` as `BuildConfig.API_BASE_URL`. On a physical phone, either change the debug
-URL to your machine's LAN IP or run `adb reverse tcp:3000 tcp:3000` and use `http://localhost:3000/`.
+```sh
+./gradlew assembleDebug -Pobey.apiBaseUrl=http://10.0.2.2:3000/
+```
+
+`10.0.2.2` is your computer as seen from the emulator, and cleartext HTTP is allowed in debug builds only. On a
+physical phone, use your machine's LAN IP, or run `adb reverse tcp:3000 tcp:3000` and use `http://localhost:3000/`.
+
+### Signing
+
+Debug builds are signed with the shared `app/debug.keystore` (password `android`), so its SHA-1 can be registered
+in Firebase once and Google sign-in works on any debug build, including the APK CI uploads:
+
+```
+SHA1:   86:C1:EE:33:A8:2C:77:FF:C9:39:20:35:18:1E:AB:24:05:83:43:BF
+SHA256: 59:09:56:10:A7:AB:0B:DD:C5:44:A8:5B:0B:9D:01:A8:D2:53:C3:E8:32:52:9B:BD:A5:12:DD:E4:A5:31:BA:77
+```
 
 ### Signing in without Firebase (dev auth)
 
