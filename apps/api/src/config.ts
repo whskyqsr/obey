@@ -6,7 +6,8 @@ function env(name: string, fallback?: string): string {
 
 export const config = {
   port: Number(env("PORT", "3000")),
-  databaseUrl: env("DATABASE_URL", "postgres://obey:obey@localhost:5432/obey"),
+  // No local default in production, so a missing variable fails loudly instead of dialing localhost.
+  databaseUrl: env("DATABASE_URL", process.env.NODE_ENV === "production" ? undefined : "postgres://obey:obey@localhost:5432/obey"),
   /** Accept `X-Dev-User: <uuid>` instead of a Firebase token. Never enable in production. */
   devAuth: process.env.DEV_AUTH === "1",
   /** Firebase service account JSON (the whole file contents). Optional until Firebase is set up. */
