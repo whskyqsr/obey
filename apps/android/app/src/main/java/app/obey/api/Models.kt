@@ -93,6 +93,9 @@ data class Relationship(
 data class Me(val user: User, val relationships: List<Relationship>)
 
 @Serializable
+data class UpdateMeInput(val displayName: String)
+
+@Serializable
 data class CreateRelationshipInput(val name: String, val role: Role)
 
 @Serializable

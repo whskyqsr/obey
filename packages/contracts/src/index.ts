@@ -52,6 +52,8 @@ export type Relationship = z.infer<typeof relationship>;
 export const me = z.object({ user, relationships: z.array(relationship) });
 export type Me = z.infer<typeof me>;
 
+export const updateMe = z.object({ displayName: z.string().trim().min(1).max(40) });
+
 export const createRelationship = z.object({ name: z.string().min(1).max(80), role });
 export const invite = z.object({ code: z.string(), expiresAt: z.string() });
 export const joinRelationship = z.object({ code: z.string().min(4), role });

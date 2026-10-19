@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { initialDisplayName } from "../src/auth.js";
 import { runJobs } from "../src/jobs.js";
 import { setup } from "./helpers.js";
 
@@ -20,6 +21,12 @@ const task = (assigneeId: string, extra: object = {}) => ({
 });
 
 describe("relationships", () => {
+  it("starts new accounts with just a first name", () => {
+    expect(initialDisplayName("Jane Q. Doe", "jane@example.com")).toBe("Jane");
+    expect(initialDisplayName(undefined, "jane@example.com")).toBe("jane");
+    expect(initialDisplayName("  ", undefined)).toBe("Partner");
+  });
+
   it("pairs partners through an invite code", async () => {
     const { dom, relId } = await ctx.pair();
     const me = (await dom.get("/me")).body;
@@ -33,6 +40,15 @@ describe("relationships", () => {
     const a = await ctx.pair();
     const b = await ctx.pair();
     expect((await b.dom.get(`/relationships/${a.relId}/tasks`)).status).toBe(404);
+  });
+
+  it("lets people change their display name", async () => {
+    const { dom, relId, domId } = await ctx.pair();
+    expect((await dom.patch("/me", { displayName: "  Sir  " })).body.displayName).toBe("Sir");
+    const me = (await dom.get("/me")).body;
+    expect(me.user.displayName).toBe("Sir");
+    expect(me.relationships.find((r: { id: string }) => r.id === relId).members.find((m: { userId: string }) => m.userId === domId).displayName).toBe("Sir");
+    expect((await dom.patch("/me", { displayName: "   " })).status).toBe(400);
   });
 
   it("keeps invite codes single-use", async () => {

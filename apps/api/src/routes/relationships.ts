@@ -5,6 +5,7 @@ import {
   createRelationship,
   joinRelationship,
   registerDevice,
+  updateMe,
   updateRelationship,
 } from "@obey/contracts";
 import type { Deps } from "../app.js";
@@ -46,6 +47,12 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
       user: { id: req.user.id, displayName: req.user.displayName, email: req.user.email },
       relationships: await relationshipDto(db, mine.map((m) => m.relationshipId)),
     };
+  });
+
+  app.patch("/me", async (req) => {
+    const body = updateMe.parse(req.body);
+    const [user] = await db.update(users).set({ displayName: body.displayName }).where(eq(users.id, req.user.id)).returning();
+    return { id: user!.id, displayName: user!.displayName, email: user!.email };
   });
 
   app.post("/relationships", async (req, reply) => {

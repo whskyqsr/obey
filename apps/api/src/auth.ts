@@ -15,6 +15,12 @@ export interface Identity {
 /** Turns a request into the caller's identity, or throws 401. */
 export type Authenticator = (req: FastifyRequest) => Promise<Identity>;
 
+/** New accounts show only a first name; people can change it later with PATCH /me. */
+export function initialDisplayName(fullName: string | undefined, email: string | undefined): string {
+  const first = fullName?.trim().split(/\s+/)[0];
+  return (first || email?.split("@")[0] || "Partner").slice(0, 40);
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function createAuthenticator(opts: { devAuth: boolean; firebase: FirebaseApp | null }): Authenticator {
@@ -25,7 +31,7 @@ export function createAuthenticator(opts: { devAuth: boolean; firebase: Firebase
         const token = await getAuth(opts.firebase).verifyIdToken(header.slice(7));
         return {
           uid: `firebase:${token.uid}`,
-          displayName: (token.name as string | undefined) ?? token.email?.split("@")[0] ?? "Partner",
+          displayName: initialDisplayName(token.name as string | undefined, token.email),
           email: token.email ?? null,
         };
       } catch {

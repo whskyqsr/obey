@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useCreateInvite, useUpdateRelationship } from "../api/hooks";
+import { useCreateInvite, useUpdateMe, useUpdateRelationship } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { ReschedulePolicy } from "../api/types";
 import { signOut } from "../auth/session";
@@ -30,6 +30,10 @@ export function SettingsPage() {
   const [name, setName] = useState(rel.name);
   const [allowance, setAllowance] = useState(String(rel.weeklyDelayAllowance));
   const [push, setPush] = useState<PushState>(pushState);
+  const updateMe = useUpdateMe();
+  const [displayName, setDisplayName] = useState(me.user.displayName);
+
+  useEffect(() => setDisplayName(me.user.displayName), [me.user.displayName]);
 
   useEffect(() => {
     setName(rel.name);
@@ -41,6 +45,25 @@ export function SettingsPage() {
   return (
     <>
       <PageHeader title="Settings" subtitle={me.user.email ?? me.user.displayName} />
+
+      <Section title="Profile">
+        <div className="flex flex-col gap-2 rounded-lg bg-surface-container-low p-4" style={{ ["--field-bg" as string]: "var(--md-surface-container-low)" }}>
+          <div className="flex flex-wrap items-start gap-2">
+            <TextField label="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={40} className="min-w-48 flex-1" />
+            {displayName.trim() && displayName.trim() !== me.user.displayName && (
+              <Button
+                variant="tonal"
+                className="mt-2"
+                busy={updateMe.isPending}
+                onClick={() => updateMe.mutate({ displayName: displayName.trim() }, { onSuccess: () => snack("Name updated"), onError: (e) => snack(errorMessage(e)) })}
+              >
+                Save
+              </Button>
+            )}
+          </div>
+          <p className="px-1 text-body-small text-on-surface-variant">This is what your partner sees in the app and in notifications.</p>
+        </div>
+      </Section>
 
       <Section title="Appearance">
         <div className="flex flex-col gap-5 rounded-lg bg-surface-container-low p-4" style={{ ["--field-bg" as string]: "var(--md-surface-container-low)" }}>

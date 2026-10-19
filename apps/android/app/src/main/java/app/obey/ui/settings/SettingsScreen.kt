@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -76,7 +77,7 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
 
     var devField by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(devUserId) { devField = devUserId.orEmpty() }
-    var dialog by rememberSaveable { mutableStateOf<String?>(null) } // "create" | "join"
+    var dialog by rememberSaveable { mutableStateOf<String?>(null) } // "create" | "join" | "name"
 
     val session = (sessionState as? SessionState.Ready)?.session
 
@@ -94,7 +95,9 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
                 SectionHeader("Account")
                 if (session != null) {
                     ListItem(
+                        modifier = Modifier.clickable { dialog = "name" },
                         headlineContent = { Text(session.me.user.displayName) },
+                        trailingContent = { Icon(Icons.Outlined.Edit, "Change display name") },
                         supportingContent = {
                             SelectionContainer {
                                 Text(listOfNotNull(session.me.user.email, session.userId).joinToString("\n"))
@@ -217,6 +220,28 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
     }
 
     when (dialog) {
+        "name" -> session?.let { s ->
+            var name by rememberSaveable { mutableStateOf(s.me.user.displayName) }
+            AlertDialog(
+                onDismissRequest = { dialog = null },
+                title = { Text("Display name") },
+                text = {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it.take(40) },
+                        singleLine = true,
+                        supportingText = { Text("This is what your partner sees in the app and in notifications.") },
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = !busy && name.isNotBlank() && name.trim() != s.me.user.displayName,
+                        onClick = { vm.updateDisplayName(name); dialog = null },
+                    ) { Text("Save") }
+                },
+                dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
+            )
+        }
         "create" -> AlertDialog(
             onDismissRequest = { dialog = null },
             title = { Text("New relationship") },

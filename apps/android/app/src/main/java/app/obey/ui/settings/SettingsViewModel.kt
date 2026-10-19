@@ -8,6 +8,7 @@ import app.obey.api.JoinRelationshipInput
 import app.obey.api.ObeyApi
 import app.obey.api.ReschedulePolicy
 import app.obey.api.Role
+import app.obey.api.UpdateMeInput
 import app.obey.api.UpdateRelationshipInput
 import app.obey.auth.AuthManager
 import app.obey.auth.AuthState
@@ -46,6 +47,12 @@ class SettingsViewModel @Inject constructor(
         settings.setDevUserId(id)
         sessions.refresh()
         say(if (id.isBlank()) "Dev user cleared" else "Using dev user")
+    }
+
+    fun updateDisplayName(name: String) = action {
+        api.updateMe(UpdateMeInput(name.trim()))
+        sessions.refresh()
+        say("Name updated")
     }
 
     fun selectRelationship(id: String) = action { sessions.select(id) }

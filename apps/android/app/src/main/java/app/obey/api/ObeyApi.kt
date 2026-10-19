@@ -16,6 +16,9 @@ interface ObeyApi {
     @GET("me")
     suspend fun me(): Me
 
+    @PATCH("me")
+    suspend fun updateMe(@Body body: UpdateMeInput): User
+
     // Relationships
     @POST("relationships")
     suspend fun createRelationship(@Body body: CreateRelationshipInput): Relationship

@@ -16,6 +16,7 @@ import type {
   Role,
   Task,
   TaskInput,
+  User,
 } from "./types";
 
 export const keys = {
@@ -41,6 +42,15 @@ function useInvalidateRel(rel: string | undefined) {
 
 export function useMe(enabled = true) {
   return useQuery({ queryKey: keys.me, queryFn: () => api<Me>("/me"), enabled });
+}
+
+export function useUpdateMe() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { displayName: string }) => api<User>("/me", { method: "PATCH", body }),
+    // Names appear in member lists and request cards across every relationship.
+    onSuccess: () => qc.invalidateQueries(),
+  });
 }
 
 export function useCreateRelationship() {
