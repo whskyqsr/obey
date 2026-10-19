@@ -11,6 +11,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import app.obey.MainActivity
 import app.obey.R
+import app.obey.data.AppIcons
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.android.AndroidEntryPoint
@@ -28,6 +29,7 @@ import kotlinx.coroutines.launch
 @AndroidEntryPoint
 class ObeyMessagingService : FirebaseMessagingService() {
     @Inject lateinit var registrar: DeviceRegistrar
+    @Inject lateinit var appIcons: AppIcons
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -37,7 +39,7 @@ class ObeyMessagingService : FirebaseMessagingService() {
 
     @SuppressLint("MissingPermission") // checked just below for API 33+
     override fun onMessageReceived(message: RemoteMessage) {
-        val title = message.notification?.title ?: message.data["title"] ?: getString(R.string.app_name)
+        val title = message.notification?.title ?: message.data["title"] ?: appIcons.currentLabel()
         val body = message.notification?.body ?: message.data["body"] ?: "You have an update"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED

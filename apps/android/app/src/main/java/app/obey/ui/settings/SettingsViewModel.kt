@@ -12,6 +12,8 @@ import app.obey.api.UpdateMeInput
 import app.obey.api.UpdateRelationshipInput
 import app.obey.auth.AuthManager
 import app.obey.auth.AuthState
+import app.obey.data.AppIcon
+import app.obey.data.AppIcons
 import app.obey.data.SessionRepository
 import app.obey.data.SessionState
 import app.obey.data.SettingsStore
@@ -31,6 +33,7 @@ class SettingsViewModel @Inject constructor(
     private val sessions: SessionRepository,
     private val settings: SettingsStore,
     private val auth: AuthManager,
+    private val appIcons: AppIcons,
 ) : BaseViewModel() {
     val session: StateFlow<SessionState> = sessions.state
     val authState: StateFlow<AuthState> = auth.state.stateIn(viewModelScope, SharingStarted.Eagerly, AuthState.SignedOut)
@@ -47,6 +50,16 @@ class SettingsViewModel @Inject constructor(
         settings.setDevUserId(id)
         sessions.refresh()
         say(if (id.isBlank()) "Dev user cleared" else "Using dev user")
+    }
+
+    private val _appIcon = MutableStateFlow(appIcons.current())
+    val appIcon: StateFlow<AppIcon> = _appIcon.asStateFlow()
+
+    fun setAppIcon(icon: AppIcon) {
+        if (icon == _appIcon.value) return
+        appIcons.set(icon)
+        _appIcon.value = icon
+        say(if (icon == AppIcon.Default) "Icon restored" else "Icon changed. Your launcher may take a moment to update.")
     }
 
     fun updateDisplayName(name: String) = action {

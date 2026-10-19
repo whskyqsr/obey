@@ -69,6 +69,7 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
     val sessionState by vm.session.collectAsStateWithLifecycle()
     val devUserId by vm.devUserId.collectAsStateWithLifecycle()
     val invite by vm.invite.collectAsStateWithLifecycle()
+    val appIcon by vm.appIcon.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -105,6 +106,9 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
                         },
                     )
                 }
+
+                SectionHeader("App icon")
+                AppIconPicker(appIcon, vm::setAppIcon)
 
                 session?.let { s ->
                     SectionHeader("Relationship")
