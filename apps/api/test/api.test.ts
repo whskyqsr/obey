@@ -42,6 +42,16 @@ describe("relationships", () => {
     expect((await b.dom.get(`/relationships/${a.relId}/tasks`)).status).toBe(404);
   });
 
+  it("allows PATCH and DELETE from browsers", async () => {
+    const res = await ctx.app.inject({
+      method: "OPTIONS",
+      url: "/me",
+      headers: { origin: "https://app.example.com", "access-control-request-method": "PATCH" },
+    });
+    expect(res.headers["access-control-allow-methods"]).toContain("PATCH");
+    expect(res.headers["access-control-allow-methods"]).toContain("DELETE");
+  });
+
   it("lets people change their display name", async () => {
     const { dom, relId, domId } = await ctx.pair();
     expect((await dom.patch("/me", { displayName: "  Sir  " })).body.displayName).toBe("Sir");

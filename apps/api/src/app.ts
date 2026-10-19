@@ -35,7 +35,8 @@ export function parse<T>(schema: ZodType<T>, value: unknown): T {
 
 export function buildApp(deps: Deps) {
   const app = Fastify({ logger: deps.logger ?? false });
-  app.register(cors, { origin: deps.corsOrigins ?? true, credentials: true });
+  // @fastify/cors only allows GET, HEAD and POST unless told otherwise.
+  app.register(cors, { origin: deps.corsOrigins ?? true, credentials: true, methods: ["GET", "HEAD", "POST", "PATCH", "PUT", "DELETE"] });
 
   app.decorateRequest("user", null as unknown as User);
   app.addHook("onRequest", async (req: FastifyRequest) => {
