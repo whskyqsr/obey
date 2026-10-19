@@ -1,6 +1,6 @@
 import { inArray } from "drizzle-orm";
 import type { App as FirebaseApp } from "firebase-admin/app";
-import { getMessaging } from "firebase-admin/messaging";
+import { type MulticastMessage, getMessaging } from "firebase-admin/messaging";
 import type { Db } from "./db/index.js";
 import { devices } from "./db/schema.js";
 
@@ -23,6 +23,19 @@ export function memoryNotifier(): Notifier & { sent: { userIds: string[]; push: 
   return { sent, send: async (userIds, push) => void sent.push({ userIds, push }) };
 }
 
+/**
+ * Web gets a normal notification. Android gets data only, so the app always draws the
+ * notification itself and can title it with the discreet-mode name instead of "Obey".
+ */
+export function fcmMessages(rows: { token: string; platform: "android" | "web" }[], push: Push): MulticastMessage[] {
+  const web = rows.filter((r) => r.platform === "web").map((r) => r.token);
+  const android = rows.filter((r) => r.platform === "android").map((r) => r.token);
+  const messages: MulticastMessage[] = [];
+  if (web.length) messages.push({ tokens: web, notification: { title: push.title, body: push.body }, data: push.data });
+  if (android.length) messages.push({ tokens: android, data: { ...push.data, body: push.body }, android: { priority: "high" } });
+  return messages;
+}
+
 export function fcmNotifier(db: Db, app: FirebaseApp, log: (msg: string) => void = console.error): Notifier {
   const messaging = getMessaging(app);
   return {
@@ -30,17 +43,14 @@ export function fcmNotifier(db: Db, app: FirebaseApp, log: (msg: string) => void
       if (userIds.length === 0) return;
       const rows = await db.select().from(devices).where(inArray(devices.userId, userIds));
       if (rows.length === 0) return;
-      const res = await messaging.sendEachForMulticast({
-        tokens: rows.map((r) => r.token),
-        notification: { title: push.title, body: push.body },
-        data: push.data,
-        android: { priority: "high" },
-      });
-      const stale = res.responses
-        .map((r, i) => (r.error?.code === "messaging/registration-token-not-registered" ? rows[i]!.token : null))
-        .filter((t): t is string => t !== null);
-      if (stale.length) await db.delete(devices).where(inArray(devices.token, stale));
-      if (res.failureCount > stale.length) log(`FCM: ${res.failureCount - stale.length} sends failed`);
+      for (const message of fcmMessages(rows, push)) {
+        const res = await messaging.sendEachForMulticast(message);
+        const stale = res.responses
+          .map((r, i) => (r.error?.code === "messaging/registration-token-not-registered" ? message.tokens[i]! : null))
+          .filter((t): t is string => t !== null);
+        if (stale.length) await db.delete(devices).where(inArray(devices.token, stale));
+        if (res.failureCount > stale.length) log(`FCM: ${res.failureCount - stale.length} sends failed`);
+      }
     },
   };
 }

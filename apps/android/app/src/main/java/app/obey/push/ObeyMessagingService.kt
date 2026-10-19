@@ -39,7 +39,8 @@ class ObeyMessagingService : FirebaseMessagingService() {
 
     @SuppressLint("MissingPermission") // checked just below for API 33+
     override fun onMessageReceived(message: RemoteMessage) {
-        val title = message.notification?.title ?: message.data["title"] ?: appIcons.currentLabel()
+        // Always the launcher name, so a discreet icon isn't given away by an "Obey" title.
+        val title = appIcons.currentLabel()
         val body = message.notification?.body ?: message.data["body"] ?: "You have an update"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED

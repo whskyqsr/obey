@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { initialDisplayName } from "../src/auth.js";
 import { runJobs } from "../src/jobs.js";
+import { fcmMessages } from "../src/notify.js";
 import { setup } from "./helpers.js";
 
 let ctx: Awaited<ReturnType<typeof setup>>;
@@ -308,5 +309,19 @@ describe("points, rewards and notes", () => {
     const rule = (await dom.post(`/relationships/${relId}/rules`, { title: "Ask first", position: 2 })).body;
     const patched = (await dom.patch(`/rules/${rule.id}`, { category: "Protocol" })).body;
     expect(patched).toMatchObject({ title: "Ask first", position: 2, category: "Protocol" });
+  });
+});
+
+describe("push payloads", () => {
+  it("sends Android data only, so the app titles it with the discreet-mode name", () => {
+    const [web, android] = fcmMessages(
+      [
+        { token: "w", platform: "web" },
+        { token: "a", platform: "android" },
+      ],
+      { title: "Obey", body: "A task is due soon", data: { type: "reminder" } },
+    );
+    expect(web).toMatchObject({ tokens: ["w"], notification: { title: "Obey", body: "A task is due soon" } });
+    expect(android).toEqual({ tokens: ["a"], data: { type: "reminder", body: "A task is due soon" }, android: { priority: "high" } });
   });
 });
