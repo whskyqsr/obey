@@ -3,6 +3,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEvents, useOccurrences } from "../api/hooks";
 import type { CalendarEvent, Occurrence } from "../api/types";
 import { EventDialog, eventOn } from "../components/EventDialog";
+import { MonthWeeks, WeekGrid, inTopStrip } from "../components/WeekGrid";
+import { useMediaQuery } from "../lib/useMediaQuery";
 import { OccurrenceCard, isOverdue } from "../components/OccurrenceCard";
 import { Button, Dialog, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, SegmentedButtons, cx } from "../components/ui";
 import { addDays, addMonths, daysBetween, fmtDate, fmtMonth, fmtTime, localDateOf, monthGrid, startOfWeek, today } from "../lib/dates";
@@ -32,6 +34,8 @@ export function CalendarPage() {
     storage.set("obey.calendar.view", v);
     setViewState(v);
   };
+  // Desktop gets a real calendar: an hourly week and a month with plans spanning their days.
+  const desk = useMediaQuery("(min-width: 1024px)");
   const [anchor, setAnchor] = useState(today());
   const [selected, setSelected] = useState(today());
 
@@ -117,56 +121,68 @@ export function CalendarPage() {
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg bg-outline-variant">
-            {days.map((d) => {
-              const items = byDay.get(d) ?? [];
-              const dayEvents = eventsOn(d);
-              const inMonth = d.startsWith(month);
-              return (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setSelected(d)}
-                  className={cx(
-                    "state-layer flex min-h-16 flex-col items-stretch gap-1 p-1 text-left md:min-h-24 md:p-1.5",
-                    selected === d ? "bg-secondary-container" : inMonth ? "bg-surface-container-low" : "bg-surface",
-                  )}
-                >
-                  <span
+          {desk ? (
+            <MonthWeeks
+              days={days}
+              month={month}
+              selected={selected}
+              occurrences={(occ.data ?? []).filter((o) => o.status !== "cancelled")}
+              events={events.data ?? []}
+              onSelect={setSelected}
+              onOpenEvent={setPlan}
+            />
+          ) : (
+            <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg bg-outline-variant">
+              {days.map((d) => {
+                const items = byDay.get(d) ?? [];
+                const dayEvents = eventsOn(d);
+                const inMonth = d.startsWith(month);
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setSelected(d)}
                     className={cx(
-                      "mx-auto flex size-7 items-center justify-center rounded-full text-label-large md:mx-0",
-                      d === t ? "bg-primary text-on-primary" : inMonth ? "text-on-surface" : "text-on-surface-variant/60",
+                      "state-layer flex min-h-16 flex-col items-stretch gap-1 p-1 text-left md:min-h-24 md:p-1.5",
+                      selected === d ? "bg-secondary-container" : inMonth ? "bg-surface-container-low" : "bg-surface",
                     )}
                   >
-                    {Number(d.slice(8))}
-                  </span>
-                  {/* compact: a bar for plans and dots for tasks; wide: titles */}
-                  {dayEvents.length > 0 && <span className="mx-1 h-1 rounded-full bg-tertiary md:hidden" />}
-                  <span className="flex flex-wrap justify-center gap-0.5 md:hidden">
-                    {items.slice(0, 4).map((o) => (
-                      <span key={o.id} className={cx("size-1.5 rounded-full", dotClass(o))} />
-                    ))}
-                  </span>
-                  <span className="hidden flex-col gap-0.5 md:flex">
-                    {dayEvents.slice(0, 2).map((e) => (
-                      <span key={e.id} className="truncate rounded-xs bg-tertiary-container px-1 text-label-small text-on-tertiary-container">
-                        {e.title}
-                      </span>
-                    ))}
-                    {items.slice(0, 3 - Math.min(dayEvents.length, 2)).map((o) => (
-                      <span key={o.id} className="flex items-center gap-1 truncate text-label-small text-on-surface-variant">
-                        <span className={cx("size-1.5 shrink-0 rounded-full", dotClass(o))} />
-                        <span className="truncate">{o.title}</span>
-                      </span>
-                    ))}
-                    {items.length + Math.min(dayEvents.length, 2) > 3 && (
-                      <span className="text-label-small text-primary">+{items.length + Math.min(dayEvents.length, 2) - 3} more</span>
-                    )}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                    <span
+                      className={cx(
+                        "mx-auto flex size-7 items-center justify-center rounded-full text-label-large md:mx-0",
+                        d === t ? "bg-primary text-on-primary" : inMonth ? "text-on-surface" : "text-on-surface-variant/60",
+                      )}
+                    >
+                      {Number(d.slice(8))}
+                    </span>
+                    {/* compact: a bar for plans and dots for tasks; wide: titles */}
+                    {dayEvents.length > 0 && <span className="mx-1 h-1 rounded-full bg-tertiary md:hidden" />}
+                    <span className="flex flex-wrap justify-center gap-0.5 md:hidden">
+                      {items.slice(0, 4).map((o) => (
+                        <span key={o.id} className={cx("size-1.5 rounded-full", dotClass(o))} />
+                      ))}
+                    </span>
+                    <span className="hidden flex-col gap-0.5 md:flex">
+                      {dayEvents.slice(0, 2).map((e) => (
+                        <span key={e.id} className="truncate rounded-xs bg-tertiary-container px-1 text-label-small text-on-tertiary-container">
+                          {e.title}
+                        </span>
+                      ))}
+                      {items.slice(0, 3 - Math.min(dayEvents.length, 2)).map((o) => (
+                        <span key={o.id} className="flex items-center gap-1 truncate text-label-small text-on-surface-variant">
+                          <span className={cx("size-1.5 shrink-0 rounded-full", dotClass(o))} />
+                          <span className="truncate">{o.title}</span>
+                        </span>
+                      ))}
+                      {items.length + Math.min(dayEvents.length, 2) > 3 && (
+                        <span className="text-label-small text-primary">+{items.length + Math.min(dayEvents.length, 2) - 3} more</span>
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div className="mt-6 px-2 md:px-0">
             <h3 className="mb-2 text-title-medium text-on-surface-variant">{fmtDate(selected, { weekday: "long", month: "long", day: "numeric" })}</h3>
             {occ.isLoading ? (
@@ -185,11 +201,21 @@ export function CalendarPage() {
             )}
           </div>
         </div>
+      ) : desk ? (
+        <WeekGrid
+          days={days}
+          occurrences={(occ.data ?? []).filter((o) => o.status !== "cancelled")}
+          events={events.data ?? []}
+          clashing={clashing}
+          onOpenTask={(o) => setDetailId(o.id)}
+          onOpenEvent={setPlan}
+        />
       ) : (
         <div className="grid gap-3 px-4 md:grid-cols-7 md:gap-2 md:px-6">
           {days.map((d) => {
             const items = byDay.get(d) ?? [];
-            const dayEvents = eventsOn(d);
+            // Like any calendar: all-day and multi-day plans head the day.
+            const dayEvents = eventsOn(d).sort((a, b) => Number(inTopStrip(b)) - Number(inTopStrip(a)) || a.startsAt.localeCompare(b.startsAt));
             // On a phone an empty day is a thin row rather than a whole card.
             const empty = !items.length && !dayEvents.length && !occ.isLoading;
             return (
