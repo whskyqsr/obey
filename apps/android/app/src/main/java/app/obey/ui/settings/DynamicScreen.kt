@@ -181,7 +181,7 @@ fun DynamicScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
                     Text(dynamicTitle(rel, s.userId), style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
                     val since = runCatching { formatDate(Instant.parse(rel.createdAt).atZone(ZoneId.systemDefault()).toLocalDate()) }.getOrNull()
                     Text(
-                        listOfNotNull(me?.let { "You're the ${it.role.label}" }, since?.let { "together in Obey since $it" }).joinToString(" · "),
+                        listOfNotNull(me?.let { "You're the ${it.role.label}" }, since?.let { "together in Fealty since $it" }).joinToString(" · "),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,

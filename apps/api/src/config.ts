@@ -21,6 +21,6 @@ export const config = {
   adminEmails: (process.env.ADMIN_EMAILS ?? "").split(",").filter(Boolean),
   /** Our own verification emails (Resend); without the key, clients fall back to Firebase's emails. */
   resendApiKey: process.env.RESEND_API_KEY,
-  mailFrom: env("MAIL_FROM", "Obey <hello@obey.chzsda.com>"),
+  mailFrom: env("MAIL_FROM", "Fealty <hello@obey.chzsda.com>"),
   appUrl: env("APP_URL", "http://localhost:5173"),
 };

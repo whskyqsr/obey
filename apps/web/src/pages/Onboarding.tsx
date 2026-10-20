@@ -88,7 +88,7 @@ function FirstRun() {
         {stage === "choose" && (
           <>
             <Icon name="favorite" filled size={40} className="mb-4 text-primary" />
-            <h1 className="text-headline-medium text-on-surface">Welcome to Obey</h1>
+            <h1 className="text-headline-medium text-on-surface">Welcome to Fealty</h1>
             <p className="mt-2 mb-6 text-body-large text-on-surface-variant">Tasks, rules and rewards for your dynamic, shared between the two of you.</p>
             <div className="flex flex-col gap-3">
               <Choice icon="add" title="Start a new dynamic" body="Set it up, then invite your partner." onClick={() => setStage("create")} />

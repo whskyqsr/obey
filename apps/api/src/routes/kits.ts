@@ -81,7 +81,7 @@ export const kitRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     });
 
     if (result.tasks && body.assigneeId !== req.user.id) {
-      await notifier.send([body.assigneeId!], { title: "Obey", body: `You have ${result.tasks} new task${result.tasks === 1 ? "" : "s"}`, data: { type: "task_assigned" } });
+      await notifier.send([body.assigneeId!], { title: "Fealty", body: `You have ${result.tasks} new task${result.tasks === 1 ? "" : "s"}`, data: { type: "task_assigned" } });
     }
     return reply.status(201).send(result);
   });

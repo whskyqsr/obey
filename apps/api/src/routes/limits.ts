@@ -28,7 +28,7 @@ export const limitRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const others = (await db.select({ id: memberships.userId }).from(memberships).where(eq(memberships.relationshipId, relationshipId)))
       .map((m) => m.id)
       .filter((id) => id !== userId);
-    await deps.notifier.send(others, { title: "Obey", body: `${name} updated their limits`, data: { type: "limits", relationshipId } });
+    await deps.notifier.send(others, { title: "Fealty", body: `${name} updated their limits`, data: { type: "limits", relationshipId } });
   };
 
   const loadOwn = async (id: string, userId: string) => {

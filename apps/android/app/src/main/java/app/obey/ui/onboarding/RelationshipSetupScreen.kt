@@ -86,7 +86,7 @@ fun RelationshipSetupScreen(vm: SettingsViewModel = hiltViewModel()) {
                     "join" -> JoinStage(busy, onBack = { stage = "choose" }) { code, role -> vm.join(code, role) }
                     else -> {
                         Icon(Icons.Filled.Favorite, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp))
-                        Text("Welcome to Obey", style = MaterialTheme.typography.headlineMedium)
+                        Text("Welcome to Fealty", style = MaterialTheme.typography.headlineMedium)
                         Text(
                             "Tasks, rules and rewards for your dynamic, shared between the two of you.",
                             style = MaterialTheme.typography.bodyLarge,

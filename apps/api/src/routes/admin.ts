@@ -11,7 +11,7 @@ function requireAdmin(req: FastifyRequest) {
   if (!req.admin) throw notFound();
 }
 
-/** The moderation queue: reports people filed, and removing a reported photo. Web only, for the Obey team. */
+/** The moderation queue: reports people filed, and removing a reported photo. Web only, for the Fealty team. */
 export const adminRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   const { db } = deps;
   const reporter = alias(users, "reporter");

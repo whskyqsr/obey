@@ -68,7 +68,7 @@ export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     for (const { userId } of others) {
       const theirs = due.filter((o) => o.assigneeId === userId).length;
       await notifier.send([userId], {
-        title: "Obey",
+        title: "Fealty",
         body: `${authorName} ${verb} a plan on the calendar${theirs ? `; it overlaps ${theirs === 1 ? "one of your tasks" : `${theirs} of your tasks`}` : ""}`,
         data: { type: "event_changed", eventId: e.id },
       });

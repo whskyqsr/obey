@@ -926,9 +926,9 @@ describe("push payloads", () => {
         { token: "w", platform: "web" },
         { token: "a", platform: "android" },
       ],
-      { title: "Obey", body: "A task is due soon", data: { type: "reminder" } },
+      { title: "Fealty", body: "A task is due soon", data: { type: "reminder" } },
     );
-    expect(web).toMatchObject({ tokens: ["w"], notification: { title: "Obey", body: "A task is due soon" } });
+    expect(web).toMatchObject({ tokens: ["w"], notification: { title: "Fealty", body: "A task is due soon" } });
     expect(android).toEqual({ tokens: ["a"], data: { type: "reminder", body: "A task is due soon" }, android: { priority: "high" } });
   });
 
@@ -938,7 +938,7 @@ describe("push payloads", () => {
         { token: "w", platform: "web", quiet: true },
         { token: "a", platform: "android", quiet: true },
       ],
-      { title: "Obey", body: "A task is due soon" },
+      { title: "Fealty", body: "A task is due soon" },
     );
     expect(web).toMatchObject({ tokens: ["w"], webpush: { notification: { silent: true } } });
     expect(android!.data).toMatchObject({ quiet: "1" });

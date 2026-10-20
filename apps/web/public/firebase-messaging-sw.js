@@ -1,4 +1,4 @@
-/* Obey web push service worker.
+/* Fealty web push service worker.
  *
  * Firebase Cloud Messaging delivers Web Push messages to this worker. We handle the standard
  * `push` event ourselves instead of importing the Firebase SDK, so the worker has no CDN
@@ -16,7 +16,7 @@ self.addEventListener("push", (event) => {
   }
   const n = payload.notification || {};
   const data = payload.data || {};
-  const title = n.title || data.title || "Obey";
+  const title = n.title || data.title || "Fealty";
   const options = {
     body: n.body || data.body || "",
     icon: n.icon || "/icon.svg",

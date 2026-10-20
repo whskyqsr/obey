@@ -23,7 +23,8 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "app.obey"
+        // The Play Store id, fixed forever once published. Code stays in the app.obey namespace.
+        applicationId = "me.fealty"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

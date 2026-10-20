@@ -3,7 +3,7 @@ import { getAuth } from "firebase-admin/auth";
 
 export interface MailConfig {
   resendApiKey: string;
-  /** e.g. "Obey <hello@obey.chzsda.com>" */
+  /** e.g. "Fealty <hello@obey.chzsda.com>" */
   from: string;
   /** Where the confirm page lives, e.g. https://app.obey.chzsda.com */
   appUrl: string;
@@ -29,7 +29,7 @@ export function verificationSender(firebase: FirebaseApp, mail: MailConfig) {
 }
 
 export function verificationText(link: string): string {
-  return `Confirm your email\n\nOpen this link to confirm the address you signed up to Obey with:\n${link}\n\nThe link works once and expires after a while. If you didn't sign up, ignore this email and nothing happens.\n`;
+  return `Confirm your email\n\nOpen this link to confirm the address you signed up to Fealty with:\n${link}\n\nThe link works once and expires after a while. If you didn't sign up, ignore this email and nothing happens.\n`;
 }
 
 /** Table layout and inline styles, because that's what email clients render reliably. Colours follow the app's theme. */
@@ -44,7 +44,7 @@ export function verificationHtml(link: string): string {
 <tr><td>
 <div style="width:56px;height:56px;border-radius:16px;background:#ffd9e2;color:#3e001d;font-size:28px;line-height:56px;text-align:center;">&#9993;</div>
 <h1 style="margin:24px 0 8px;font-size:28px;line-height:36px;font-weight:400;">Confirm your email</h1>
-<p style="margin:0 0 32px;font-size:16px;line-height:24px;color:#514347;">Tap the button to confirm this is your address. Then you're all set to use Obey.</p>
+<p style="margin:0 0 32px;font-size:16px;line-height:24px;color:#514347;">Tap the button to confirm this is your address. Then you're all set to use Fealty.</p>
 <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:100px;background:#8b4a62;">
 <a href="${link}" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:500;color:#ffffff;text-decoration:none;border-radius:100px;">Confirm email</a>
 </td></tr></table>

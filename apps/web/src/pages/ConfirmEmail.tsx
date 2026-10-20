@@ -48,7 +48,7 @@ export function ConfirmEmailPage() {
             {resent && <p className="mt-4 rounded-md bg-surface-container px-3 py-2 text-body-medium text-on-surface-variant">{resent}</p>}
             <div className="mt-8 flex flex-col gap-3">
               <Button icon="arrow_forward" onClick={() => location.replace("/")} className="w-full">
-                Open Obey
+                Open Fealty
               </Button>
               {canResend && (
                 <Button

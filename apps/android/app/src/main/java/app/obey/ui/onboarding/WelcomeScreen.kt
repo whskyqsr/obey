@@ -113,7 +113,7 @@ fun WelcomeScreen(vm: SettingsViewModel = hiltViewModel()) {
                     Spacer(Modifier.weight(1f))
                     if (!last) TextButton(onClick = vm::finishWelcome) { Text("Skip setup") }
                     Button(onClick = { if (last) vm.finishWelcome() else at++ }) {
-                        Text(if (!last) "Next" else if (step == Step.Kits) "Start from scratch" else "Open Obey")
+                        Text(if (!last) "Next" else if (step == Step.Kits) "Start from scratch" else "Open Fealty")
                     }
                 }
             }
@@ -201,7 +201,7 @@ private fun FeaturesStep(session: Session, vm: SettingsViewModel) {
 @Composable
 private fun PrivacyStep(vm: SettingsViewModel) {
     val appIcon by vm.appIcon.collectAsStateWithLifecycle()
-    Heading(Icons.Outlined.VisibilityOff, "Keep it private", "Obey is built to be discreet. Here's what's already on, and what you can add.")
+    Heading(Icons.Outlined.VisibilityOff, "Keep it private", "Fealty is built to be discreet. Here's what's already on, and what you can add.")
     InfoCard(
         Icons.Outlined.Notifications,
         "Notifications never name the task",
@@ -212,7 +212,7 @@ private fun PrivacyStep(vm: SettingsViewModel) {
     Spacer(Modifier.height(20.dp))
     Text("App icon", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(horizontal = 16.dp))
     Text(
-        "Show Obey on your home screen as something ordinary. Its notifications use the same name.",
+        "Show Fealty on your home screen as something ordinary. Its notifications use the same name.",
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp),

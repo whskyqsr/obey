@@ -125,7 +125,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       return s!;
     });
     if (series.assigneeId !== req.user.id)
-      await notifier.send([series.assigneeId], { title: "Obey", body: "You have a new task", data: { type: "task_assigned", taskId: series.id } });
+      await notifier.send([series.assigneeId], { title: "Fealty", body: "You have a new task", data: { type: "task_assigned", taskId: series.id } });
     reply.status(201);
     return taskDto(series);
   });
@@ -140,7 +140,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     if (!(await membership(db, c.relationshipId, body.assigneeId))) throw new HttpError(400, "assignee is not in this relationship");
     const series = (await db.transaction((tx) => issueConsequence(tx, c, { ...body, createdBy: req.user.id }, deps.now())))!;
     if (series.assigneeId !== req.user.id)
-      await notifier.send([series.assigneeId], { title: "Obey", body: "You've been given a consequence", data: { type: "task_assigned", taskId: series.id } });
+      await notifier.send([series.assigneeId], { title: "Fealty", body: "You've been given a consequence", data: { type: "task_assigned", taskId: series.id } });
     reply.status(201);
     return taskDto(series);
   });
@@ -314,7 +314,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     );
     if (updated.status !== occ.status && series.assigneeId !== req.user.id) {
       await notifier.send([series.assigneeId], {
-        title: "Obey",
+        title: "Fealty",
         body: `${req.user.displayName} updated your task history`,
         data: { type: "occurrence_edited", occurrenceId: occ.id },
       });
@@ -335,7 +335,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     if (req.user.id === series.assigneeId) {
       const submitted = updated.status === "submitted";
       await notifier.send(await managers(db, series.relationshipId, req.user.id), {
-        title: "Obey",
+        title: "Fealty",
         body: submitted ? `${req.user.displayName} submitted a task for review` : `${req.user.displayName} completed a task`,
         data: { type: submitted ? "occurrence_submitted" : "occurrence_completed", occurrenceId: occ.id },
       });
@@ -364,7 +364,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       return reviewed;
     });
     await notifier.send([series.assigneeId], {
-      title: "Obey",
+      title: "Fealty",
       body: body.approve ? "Your task was approved" : "Your task needs another try",
       data: { type: "occurrence_reviewed", occurrenceId: occ.id },
     });
@@ -378,12 +378,12 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const [current] = await db.select().from(taskSeries).where(eq(taskSeries.id, result.occurrence.seriesId));
     if (!result.applied) {
       await notifier.send(await managers(db, rel.id, req.user.id), {
-        title: "Obey",
+        title: "Fealty",
         body: `${req.user.displayName} asked for more time`,
         data: { type: "reschedule_requested", requestId: result.request.id },
       });
     } else if (req.user.id !== series.assigneeId) {
-      await notifier.send([series.assigneeId], { title: "Obey", body: "A deadline changed", data: { type: "rescheduled", occurrenceId: result.occurrence.id } });
+      await notifier.send([series.assigneeId], { title: "Fealty", body: "A deadline changed", data: { type: "rescheduled", occurrenceId: result.occurrence.id } });
     }
     return {
       applied: result.applied,
@@ -410,7 +410,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const series = new Map(items.map((i) => [i.series.id, i.series]));
     if (!result.applied) {
       await notifier.send(await managers(db, rel!.id, req.user.id), {
-        title: "Obey",
+        title: "Fealty",
         body: `${req.user.displayName} asked for more time on ${items.length} tasks`,
         data: { type: "reschedule_requested", groupId: result.groupId },
       });
@@ -443,13 +443,13 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const series = new Map(rows.map((r) => [r.series.id, r.series]));
     if (result.asked) {
       await notifier.send(await managers(db, rel!.id, req.user.id), {
-        title: "Obey",
+        title: "Fealty",
         body: `${req.user.displayName} asked about ${result.asked === 1 ? "a task that clashes" : `${result.asked} tasks that clash`} with a plan`,
         data: { type: "reschedule_requested", groupId: result.groupId },
       });
     }
     const changedFor = [...new Set(items.filter((it, i) => result.requests[i]!.status === "applied" && it.series.assigneeId !== req.user.id).map((it) => it.series.assigneeId))];
-    if (changedFor.length) await notifier.send(changedFor, { title: "Obey", body: "Some of your tasks changed around a plan", data: { type: "rescheduled" } });
+    if (changedFor.length) await notifier.send(changedFor, { title: "Fealty", body: "Some of your tasks changed around a plan", data: { type: "rescheduled" } });
     return {
       applied: result.asked === 0,
       groupId: result.groupId,
@@ -483,7 +483,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const n = results.length;
     const what = request.kind === "cancel" && n === 1 ? "request to call off a task" : `extension${n > 1 ? ` for ${n} tasks` : ""}`;
     await notifier.send([request.requestedBy], {
-      title: "Obey",
+      title: "Fealty",
       body: dueAt && approve ? `${results[0]!.series.title} was rescheduled instead` : `Your ${what} was ${approve ? "approved" : "declined"}`,
       data: { type: "reschedule_decided", requestId: request.id },
     });

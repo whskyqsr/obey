@@ -96,13 +96,13 @@ export const ruleLogRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     // Discreet like every push: who, not what.
     if (body.subjectId !== req.user.id) {
       await notifier.send([body.subjectId], {
-        title: "Obey",
+        title: "Fealty",
         body: entry.consequenceTaskId ? `${req.user.displayName} logged a broken rule and gave you a consequence` : `${req.user.displayName} logged a broken rule`,
         data: { type: "rule_log", entryId: entry.id },
       });
     } else {
       const doms = await managers(db, relationshipId, req.user.id);
-      await notifier.send(doms, { title: "Obey", body: `${req.user.displayName} owned up to a broken rule`, data: { type: "rule_log", entryId: entry.id } });
+      await notifier.send(doms, { title: "Fealty", body: `${req.user.displayName} owned up to a broken rule`, data: { type: "rule_log", entryId: entry.id } });
     }
     return reply.status(201).send(entryDto(entry));
   });
