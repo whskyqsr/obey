@@ -2,7 +2,7 @@ import { config } from "./config.js";
 import { createDb, runMigrations } from "./db/index.js";
 import { initFirebase } from "./firebase.js";
 import { runJobs } from "./jobs.js";
-import { fcmNotifier, noopNotifier } from "./notify.js";
+import { fcmNotifier, noopNotifier, withPreferences } from "./notify.js";
 
 const INTERVAL_MS = 60_000;
 
@@ -10,7 +10,7 @@ const { db } = createDb(config.databaseUrl);
 await runMigrations(config.databaseUrl);
 // The worker only sends push, so it needs the service account.
 const firebase = initFirebase(config.firebaseServiceAccount);
-const notifier = firebase?.canSendPush ? fcmNotifier(db, firebase.app) : noopNotifier;
+const notifier = withPreferences(db, firebase?.canSendPush ? fcmNotifier(db, firebase.app) : noopNotifier);
 
 async function tick() {
   try {

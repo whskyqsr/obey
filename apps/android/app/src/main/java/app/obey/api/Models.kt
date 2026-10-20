@@ -86,7 +86,12 @@ data class User(
     /** Show proof photos without the blur. */
     val revealProofs: Boolean = false,
     val quietHours: QuietHours? = null,
+    /** Notification kinds turned off, e.g. "comments". */
+    val mutedNotifications: List<String> = emptyList(),
 )
+
+@Serializable
+data class MutedNotificationsInput(val mutedNotifications: List<String>)
 
 /** When pushes arrive without sound or vibration, as "HH:mm" in [timezone]; start after end spans midnight. */
 @Serializable

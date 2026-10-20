@@ -26,6 +26,8 @@ export const users = pgTable("users", {
   quietStart: text("quiet_start"),
   quietEnd: text("quiet_end"),
   timezone: text("timezone"),
+  /** Notification categories turned off (see notifyCategory). */
+  mutedNotifications: jsonb("muted_notifications").$type<string[]>().notNull().default([]),
   createdAt: createdAt(),
 });
 

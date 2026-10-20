@@ -8,6 +8,7 @@ export type AdminReport = c.AdminReport;
 export type OccurrenceComment = c.OccurrenceComment;
 export type WeekStart = c.WeekStart;
 export type QuietHours = c.QuietHours;
+export type NotifyCategory = c.NotifyCategory;
 export type RuleLogEntry = c.RuleLogEntry;
 export type Relationship = c.Relationship;
 export type DynamicDate = c.DynamicDate;

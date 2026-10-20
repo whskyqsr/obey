@@ -148,6 +148,13 @@
       "when": 1792524054735,
       "tag": "0020_rule_log",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792526528035,
+      "tag": "0021_muted_notifications",
+      "breakpoints": true
     }
   ]
 }

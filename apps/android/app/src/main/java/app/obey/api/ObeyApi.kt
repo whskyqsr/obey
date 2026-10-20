@@ -28,6 +28,9 @@ interface ObeyApi {
     @PATCH("me")
     suspend fun setQuietHours(@Body body: QuietHoursInput): User
 
+    @PATCH("me")
+    suspend fun setMutedNotifications(@Body body: MutedNotificationsInput): User
+
     /** A square JPEG; the app crops and shrinks it first. */
     @PUT("me/avatar")
     suspend fun setAvatar(@Body image: RequestBody): User

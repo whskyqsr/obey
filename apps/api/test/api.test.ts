@@ -807,6 +807,19 @@ describe("push payloads", () => {
     expect(isQuiet(null, new Date())).toBe(false);
   });
 
+  it("skips the kinds of notification a person turned off", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    await dom.post(`/relationships/${relId}/tasks`, task(subId));
+    const [occ] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    expect((await dom.patch("/me", { mutedNotifications: ["comments"] })).body.mutedNotifications).toEqual(["comments"]);
+    const before = ctx.notifier.sent.length;
+    await sub.post(`/occurrences/${occ.id}/comments`, { body: "Running late" });
+    expect(ctx.notifier.sent.length).toBe(before);
+    await sub.post(`/occurrences/${occ.id}/complete`);
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Sub completed a task");
+    expect((await dom.patch("/me", { mutedNotifications: ["nonsense"] })).status).toBe(400);
+  });
+
   it("saves quiet hours on the account", async () => {
     const { dom } = await ctx.pair();
     const q = { start: "22:00", end: "07:00", timezone: "America/New_York" };

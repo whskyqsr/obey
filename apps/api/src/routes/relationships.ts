@@ -25,6 +25,7 @@ export const userDto = (u: {
   quietStart: string | null;
   quietEnd: string | null;
   timezone: string | null;
+  mutedNotifications: string[];
 }) => ({
   id: u.id,
   displayName: u.displayName,
@@ -34,6 +35,7 @@ export const userDto = (u: {
   proofTermsAccepted: u.proofTermsAcceptedAt !== null,
   revealProofs: u.revealProofs,
   quietHours: u.quietStart && u.quietEnd && u.timezone ? { start: u.quietStart, end: u.quietEnd, timezone: u.timezone } : null,
+  mutedNotifications: u.mutedNotifications,
 });
 
 const AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"];

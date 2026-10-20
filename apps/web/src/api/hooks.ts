@@ -18,6 +18,7 @@ import type {
   AssignConsequenceInput,
   WeekStart,
   QuietHours,
+  NotifyCategory,
   RuleLogEntry,
   Invite,
   LedgerEntry,
@@ -95,7 +96,8 @@ export function useMe(enabled = true) {
 export function useUpdateMe() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { displayName?: string; weekStart?: WeekStart; revealProofs?: boolean; quietHours?: QuietHours | null }) => api<User>("/me", { method: "PATCH", body }),
+    mutationFn: (body: { displayName?: string; weekStart?: WeekStart; revealProofs?: boolean; quietHours?: QuietHours | null; mutedNotifications?: NotifyCategory[] }) =>
+      api<User>("/me", { method: "PATCH", body }),
     // Names appear in member lists and request cards across every relationship.
     onSuccess: () => qc.invalidateQueries(),
   });

@@ -100,6 +100,11 @@ class SettingsViewModel @Inject constructor(
         sessions.refresh()
     }
 
+    fun setNotificationType(key: String, on: Boolean, current: List<String>) = action {
+        api.setMutedNotifications(app.obey.api.MutedNotificationsInput(if (on) current - key else (current + key).distinct()))
+        sessions.refresh()
+    }
+
     fun selectRelationship(id: String) = action { sessions.select(id) }
 
     /** Ends the dynamic for everyone in it (it stays read-only); the people in [block] can't pair with you again. */

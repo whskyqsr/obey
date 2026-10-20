@@ -9,6 +9,7 @@ import { isCollared, useRel } from "../lib/relationship";
 import { useDynamicTitle } from "./Dynamic";
 import { PushHealth } from "../components/PushHealth";
 import { QuietHoursSetting } from "../components/QuietHours";
+import { NotificationTypes } from "../components/NotificationTypes";
 import { type PushState, pushState, registerPush } from "../push";
 import { type ThemeMode, useTheme } from "../theme/ThemeProvider";
 import { SEED_PRESETS } from "../theme/tokens";
@@ -223,6 +224,7 @@ export function SettingsPage() {
         </div>
         {push === "granted" && <PushHealth />}
         <QuietHoursSetting />
+        <NotificationTypes />
       </Section>
 
       {me.admin && (

@@ -3,7 +3,7 @@ import { createAuthenticator } from "./auth.js";
 import { config } from "./config.js";
 import { createDb, runMigrations } from "./db/index.js";
 import { initFirebase } from "./firebase.js";
-import { fcmNotifier, noopNotifier } from "./notify.js";
+import { fcmNotifier, noopNotifier, withPreferences } from "./notify.js";
 
 const { db } = createDb(config.databaseUrl);
 await runMigrations(config.databaseUrl);
@@ -17,7 +17,7 @@ if (!firebase && !config.devAuth) {
 const app = buildApp({
   db,
   authenticate: createAuthenticator({ devAuth: config.devAuth, firebase: firebase?.app ?? null }),
-  notifier: firebase?.canSendPush ? fcmNotifier(db, firebase.app) : noopNotifier,
+  notifier: withPreferences(db, firebase?.canSendPush ? fcmNotifier(db, firebase.app) : noopNotifier),
   now: () => new Date(),
   materializeDays: config.materializeDays,
   corsOrigins: config.corsOrigins,

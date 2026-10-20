@@ -2,6 +2,7 @@ import { eq, inArray } from "drizzle-orm";
 import { DateTime } from "luxon";
 import type { App as FirebaseApp } from "firebase-admin/app";
 import { type MulticastMessage, getMessaging } from "firebase-admin/messaging";
+import type { NotifyCategory } from "@obey/contracts";
 import type { Db } from "./db/index.js";
 import { devices, users } from "./db/schema.js";
 
@@ -17,6 +18,40 @@ export interface Notifier {
 }
 
 export const noopNotifier: Notifier = { send: async () => {} };
+
+/** Which setting turns a push off, by its data.type; types not listed always come through. */
+const CATEGORY: Record<string, NotifyCategory> = {
+  reminder: "reminders",
+  occurrence_submitted: "completions",
+  occurrence_completed: "completions",
+  occurrence_reviewed: "completions",
+  occurrence_missed: "missed",
+  reschedule_requested: "requests",
+  reschedule_decided: "requests",
+  rescheduled: "requests",
+  occurrence_comment: "comments",
+  task_assigned: "assigned",
+  occurrence_edited: "assigned",
+  rule_log: "assigned",
+  event_changed: "plans",
+  reward_redeemed: "rewards",
+};
+export const categoryOf = (type: string | undefined): NotifyCategory | null => (type ? (CATEGORY[type] ?? null) : null);
+
+/** Drops people who turned this kind of notification off, then hands the rest to [inner]. */
+export function withPreferences(db: Db, inner: Notifier): Notifier {
+  return {
+    async send(userIds, push) {
+      const category = categoryOf(push.data?.type);
+      if (category && userIds.length) {
+        const rows = await db.select({ id: users.id, muted: users.mutedNotifications }).from(users).where(inArray(users.id, userIds));
+        const off = new Set(rows.filter((r) => r.muted.includes(category)).map((r) => r.id));
+        userIds = userIds.filter((id) => !off.has(id));
+      }
+      if (userIds.length) await inner.send(userIds, push);
+    },
+  };
+}
 
 /** Records pushes instead of sending them; for tests. */
 export function memoryNotifier(): Notifier & { sent: { userIds: string[]; push: Push }[] } {

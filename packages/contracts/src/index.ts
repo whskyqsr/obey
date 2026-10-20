@@ -51,6 +51,10 @@ export type WeekStart = z.infer<typeof weekStart>;
 export const quietHours = z.object({ start: timeOfDay, end: timeOfDay, timezone: z.string().min(1).max(64) });
 export type QuietHours = z.infer<typeof quietHours>;
 
+/** Kinds of notification a person can turn off; anything about the dynamic itself always comes through. */
+export const notifyCategory = z.enum(["reminders", "completions", "missed", "requests", "comments", "assigned", "plans", "rewards"]);
+export type NotifyCategory = z.infer<typeof notifyCategory>;
+
 export const user = z.object({
   id,
   displayName: z.string(),
@@ -62,6 +66,8 @@ export const user = z.object({
   /** Show proof photos without the blur. */
   revealProofs: z.boolean().default(false),
   quietHours: quietHours.nullable().default(null),
+  /** Notification kinds this person turned off. */
+  mutedNotifications: z.array(notifyCategory).default([]),
 });
 export type User = z.infer<typeof user>;
 
@@ -105,6 +111,7 @@ export const updateMe = z.object({
   revealProofs: z.boolean().optional(),
   /** null turns quiet hours off. */
   quietHours: quietHours.nullable().optional(),
+  mutedNotifications: z.array(notifyCategory).max(20).optional(),
 });
 /** Both boxes must be ticked; there is no way to upload a proof photo without them. */
 export const acceptProofTerms = z.object({ adult: z.literal(true), rules: z.literal(true) });

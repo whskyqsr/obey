@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { buildApp } from "../src/app.js";
 import { createAuthenticator } from "../src/auth.js";
 import { createDb, runMigrations } from "../src/db/index.js";
-import { memoryNotifier } from "../src/notify.js";
+import { memoryNotifier, withPreferences } from "../src/notify.js";
 
 export const TEST_DB = process.env.TEST_DATABASE_URL ?? "postgres://obey:obey@localhost:5432/obey_test";
 
@@ -19,7 +19,7 @@ export async function setup() {
   const app = buildApp({
     db,
     authenticate: createAuthenticator({ devAuth: true, firebase: null }),
-    notifier,
+    notifier: withPreferences(db, notifier),
     now: () => clock.now,
     materializeDays: 14,
     adminEmails: ["mod@example.com"],

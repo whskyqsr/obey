@@ -174,6 +174,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, vm: SettingsVi
                 SectionHeader("Notifications")
                 PushHealthSection()
                 session?.let { s -> QuietHoursSetting(s.me.user.quietHours, enabled = !busy, onChange = vm::setQuietHours) }
+                session?.let { s -> NotificationTypes(s.me.user.mutedNotifications, enabled = !busy) { key, on -> vm.setNotificationType(key, on, s.me.user.mutedNotifications) } }
 
                 SectionHeader("Privacy")
                 app.obey.ui.proof.ProofBlurSetting()
