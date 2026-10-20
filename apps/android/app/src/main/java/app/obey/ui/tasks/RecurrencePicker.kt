@@ -127,9 +127,9 @@ fun RecurrencePicker(
         if (draft.kind != RepeatKind.Once || draft.passthrough != null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Count from completion", style = MaterialTheme.typography.bodyLarge)
+                    Text("Count from when it's done", style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        "The next one is scheduled from when the last was done, not from the calendar.",
+                        "On: the next one is due after the last is completed, so finishing late moves the rest. Off: it stays on a fixed schedule.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
