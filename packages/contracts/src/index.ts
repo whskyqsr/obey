@@ -35,13 +35,16 @@ export type Role = z.infer<typeof role>;
 /** Who may move a deadline. `request`: the sub asks and the Dom approves. `allowance`: N free delays per week. */
 export const reschedulePolicy = z.enum(["dominant_only", "request", "allowance"]);
 
-export const user = z.object({ id, displayName: z.string(), email: z.string().nullable() });
+/** Changes whenever the picture does; null when there is none. Fetch it from /users/:id/avatar. */
+const avatarVersion = z.string().nullable();
+export const user = z.object({ id, displayName: z.string(), email: z.string().nullable(), avatarVersion });
 export type User = z.infer<typeof user>;
 
-export const member = z.object({ userId: id, displayName: z.string(), role });
+export const member = z.object({ userId: id, displayName: z.string(), role, avatarVersion });
 export const relationship = z.object({
   id,
-  name: z.string(),
+  /** Optional; apps show the partners' names instead. */
+  name: z.string().nullable(),
   members: z.array(member),
   reschedulePolicy,
   weeklyDelayAllowance: z.number().int().nonnegative(),
@@ -54,11 +57,18 @@ export type Me = z.infer<typeof me>;
 
 export const updateMe = z.object({ displayName: z.string().trim().min(1).max(40) });
 
-export const createRelationship = z.object({ name: z.string().min(1).max(80), role });
+// A blank name means "no name": apps then show the partners' names.
+const relationshipName = z
+  .string()
+  .trim()
+  .max(80)
+  .nullish()
+  .transform((s) => s || null);
+export const createRelationship = z.object({ name: relationshipName, role });
 export const invite = z.object({ code: z.string(), expiresAt: z.string() });
 export const joinRelationship = z.object({ code: z.string().min(4), role });
 export const updateRelationship = z.object({
-  name: z.string().min(1).max(80).optional(),
+  name: relationshipName.optional(),
   reschedulePolicy: reschedulePolicy.optional(),
   weeklyDelayAllowance: z.number().int().min(0).max(50).optional(),
 });

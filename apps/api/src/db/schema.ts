@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  customType,
   date,
   index,
   integer,
@@ -16,18 +17,24 @@ import type { Schedule } from "@obey/recurrence";
 
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
 const createdAt = () => ts("created_at").notNull().defaultNow();
+const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" });
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   authUid: text("auth_uid").notNull().unique(),
   displayName: text("display_name").notNull(),
   email: text("email"),
+  /** A small square JPEG/PNG/WebP the client resized; null until someone uploads one. */
+  avatar: bytea("avatar"),
+  avatarType: text("avatar_type"),
+  avatarUpdatedAt: ts("avatar_updated_at"),
   createdAt: createdAt(),
 });
 
 export const relationships = pgTable("relationships", {
   id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull(),
+  /** Optional; apps show the partners' names when it's null. */
+  name: text("name"),
   reschedulePolicy: text("reschedule_policy", { enum: ["dominant_only", "request", "allowance"] })
     .notNull()
     .default("request"),

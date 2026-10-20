@@ -23,7 +23,7 @@ export function Onboarding({ onDone, embedded }: { onDone?: (relationshipId: str
   function submit(e: React.FormEvent) {
     e.preventDefault();
     const done = (r: { id: string }) => onDone?.(r.id);
-    if (mode === "create") create.mutate({ name: name.trim(), role }, { onSuccess: done });
+    if (mode === "create") create.mutate({ name: name.trim() || null, role }, { onSuccess: done });
     else join.mutate({ code: code.trim(), role }, { onSuccess: done });
   }
 
@@ -41,7 +41,13 @@ export function Onboarding({ onDone, embedded }: { onDone?: (relationshipId: str
         ]}
       />
       {mode === "create" ? (
-        <TextField label="Name" placeholder="e.g. Jake & Sam" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
+        <TextField
+          label="Name (optional)"
+          help="Leave it blank to show your partner's name instead."
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={80}
+        />
       ) : (
         <TextField
           label="Invite code"
@@ -56,7 +62,7 @@ export function Onboarding({ onDone, embedded }: { onDone?: (relationshipId: str
         <SegmentedButtons<Role> value={role} onChange={setRole} options={ROLES} className="w-full" />
       </div>
       {m.error && <p className="text-body-medium text-error">{errorMessage(m.error)}</p>}
-      <Button type="submit" busy={m.isPending} disabled={mode === "create" ? !name.trim() : code.trim().length < 4}>
+      <Button type="submit" busy={m.isPending} disabled={mode === "join" && code.trim().length < 4}>
         {mode === "create" ? "Create relationship" : "Join"}
       </Button>
     </form>

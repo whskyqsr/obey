@@ -21,7 +21,8 @@ export interface Deps {
   logger?: boolean;
 }
 
-export type User = typeof users.$inferSelect;
+/** The caller, without the avatar bytes (those are only read by the avatar route). */
+export type User = Omit<typeof users.$inferSelect, "avatar">;
 
 declare module "fastify" {
   interface FastifyRequest {

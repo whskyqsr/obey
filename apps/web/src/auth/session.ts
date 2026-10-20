@@ -9,7 +9,7 @@ import type { Auth } from "firebase/auth";
  * - dev: a UUID typed on the sign-in screen; requests carry `X-Dev-User` (API must run with DEV_AUTH=1).
  */
 export type Session =
-  | { kind: "firebase"; uid: string; name: string | null; email: string | null }
+  | { kind: "firebase"; uid: string; name: string | null; email: string | null; provider: "google" | "password" | null }
   | { kind: "dev"; uid: string };
 
 const DEV_USER_KEY = "obey.devUser";
@@ -58,7 +58,9 @@ export async function initSession(): Promise<void> {
   const a = await getFirebaseAuth();
   const { onIdTokenChanged } = await import("firebase/auth");
   onIdTokenChanged(a, (u) => {
-    emit(u ? { kind: "firebase", uid: u.uid, name: u.displayName, email: u.email } : null);
+    const p = u?.providerData[0]?.providerId;
+    const provider = p === "google.com" ? "google" : p === "password" ? "password" : null;
+    emit(u ? { kind: "firebase", uid: u.uid, name: u.displayName, email: u.email, provider } : null);
   });
 }
 

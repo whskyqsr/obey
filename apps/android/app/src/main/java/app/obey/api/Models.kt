@@ -74,20 +74,32 @@ data class Schedule(
 )
 
 @Serializable
-data class User(val id: String, val displayName: String, val email: String? = null)
+data class User(val id: String, val displayName: String, val email: String? = null, val avatarVersion: String? = null)
 
 @Serializable
-data class Member(val userId: String, val displayName: String, val role: Role)
+data class Member(val userId: String, val displayName: String, val role: Role, val avatarVersion: String? = null)
 
 @Serializable
 data class Relationship(
     val id: String,
-    val name: String,
+    /** Optional; see [title]. */
+    val name: String? = null,
     val members: List<Member>,
     val reschedulePolicy: ReschedulePolicy,
     val weeklyDelayAllowance: Int,
     val createdAt: String,
 )
+
+/** The relationship's name, or the partners' names when it has none. */
+fun Relationship.title(myId: String): String {
+    name?.let { return it }
+    val names = members.filter { it.userId != myId }.map { it.displayName }
+    return when (names.size) {
+        0 -> "Waiting for your partner"
+        1 -> names[0]
+        else -> names.dropLast(1).joinToString(", ") + " & " + names.last()
+    }
+}
 
 @Serializable
 data class Me(val user: User, val relationships: List<Relationship>)
@@ -96,7 +108,7 @@ data class Me(val user: User, val relationships: List<Relationship>)
 data class UpdateMeInput(val displayName: String)
 
 @Serializable
-data class CreateRelationshipInput(val name: String, val role: Role)
+data class CreateRelationshipInput(val name: String?, val role: Role)
 
 @Serializable
 data class Invite(val code: String, val expiresAt: String)
@@ -106,6 +118,7 @@ data class JoinRelationshipInput(val code: String, val role: Role)
 
 @Serializable
 data class UpdateRelationshipInput(
+    /** "" clears the name. */
     @EncodeDefault(EncodeDefault.Mode.NEVER) val name: String? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER) val reschedulePolicy: ReschedulePolicy? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER) val weeklyDelayAllowance: Int? = null,

@@ -50,14 +50,15 @@ fun CreateRelationshipForm(busy: Boolean, onCreate: (String, Role) -> Unit) {
         OutlinedTextField(
             value = name,
             onValueChange = { name = it.take(80) },
-            label = { Text("Name for the two of you") },
+            label = { Text("Name (optional)") },
+            supportingText = { Text("Leave it blank to show your partner's name.") },
             singleLine = true,
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
             modifier = Modifier.fillMaxWidth(),
         )
         Text("Your role")
         RolePicker(role, { role = it })
-        Button(onClick = { onCreate(name, role) }, enabled = !busy && name.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
+        Button(onClick = { onCreate(name, role) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
             Text("Create and invite")
         }
     }

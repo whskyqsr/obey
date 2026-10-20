@@ -14,6 +14,7 @@ export class ApiError extends Error {
 
 interface RequestOptions {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+  /** Sent as JSON, unless it's a Blob, which goes as-is with its own type. */
   body?: unknown;
   query?: Record<string, string | undefined>;
   signal?: AbortSignal;
@@ -23,13 +24,14 @@ export async function api<T = unknown>(path: string, opts: RequestOptions = {}):
   const url = new URL(API_URL + path);
   for (const [k, v] of Object.entries(opts.query ?? {})) if (v !== undefined) url.searchParams.set(k, v);
   const headers: Record<string, string> = { Accept: "application/json", ...(await authHeaders()) };
-  if (opts.body !== undefined) headers["Content-Type"] = "application/json";
+  const raw = opts.body instanceof Blob;
+  if (opts.body !== undefined) headers["Content-Type"] = raw ? (opts.body as Blob).type : "application/json";
   let res: Response;
   try {
     res = await fetch(url, {
       method: opts.method ?? "GET",
       headers,
-      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+      body: opts.body === undefined ? undefined : raw ? (opts.body as Blob) : JSON.stringify(opts.body),
       signal: opts.signal,
     });
   } catch (e) {
@@ -52,6 +54,13 @@ export async function api<T = unknown>(path: string, opts: RequestOptions = {}):
     throw new ApiError(res.status, message || `HTTP ${res.status}`, typeof body === "object" ? body?.details : undefined);
   }
   return data as T;
+}
+
+/** Fetches an authenticated image (img tags can't send our headers) as an object URL. */
+export async function apiObjectUrl(path: string): Promise<string | null> {
+  const res = await fetch(API_URL + path, { headers: await authHeaders() });
+  if (!res.ok) return null;
+  return URL.createObjectURL(await res.blob());
 }
 
 export function errorMessage(e: unknown): string {

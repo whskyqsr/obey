@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
-import { api } from "./client";
+import { api, apiObjectUrl } from "./client";
 import type {
   Balance,
   Invite,
@@ -53,10 +53,30 @@ export function useUpdateMe() {
   });
 }
 
+export function useSetAvatar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (image: Blob | null) =>
+      image ? api<User>("/me/avatar", { method: "PUT", body: image }) : api<User>("/me/avatar", { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.me }),
+  });
+}
+
+/** A member's picture as an object URL, cached per version so a new picture refetches. */
+export function useAvatarUrl(userId: string, version: string | null) {
+  return useQuery({
+    queryKey: ["avatar", userId, version],
+    queryFn: () => apiObjectUrl(`/users/${userId}/avatar?v=${version}`),
+    enabled: version !== null,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+}
+
 export function useCreateRelationship() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { name: string; role: Role }) => api<Relationship>("/relationships", { method: "POST", body }),
+    mutationFn: (body: { name: string | null; role: Role }) => api<Relationship>("/relationships", { method: "POST", body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.me }),
   });
 }

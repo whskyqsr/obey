@@ -26,11 +26,13 @@ export async function setup() {
   await app.ready();
 
   const as = (userId: string, name = "User") => {
+    const headers = { "x-dev-user": userId, "x-dev-name": name };
     const call = async (method: "GET" | "POST" | "PATCH" | "DELETE", url: string, payload?: unknown) => {
-      const res = await app.inject({ method, url, payload: payload as object, headers: { "x-dev-user": userId, "x-dev-name": name } });
+      const res = await app.inject({ method, url, payload: payload as object, headers });
       return { status: res.statusCode, body: res.body ? JSON.parse(res.body) : undefined };
     };
     return {
+      headers,
       get: (url: string) => call("GET", url),
       post: (url: string, payload?: unknown) => call("POST", url, payload ?? {}),
       patch: (url: string, payload: unknown) => call("PATCH", url, payload),

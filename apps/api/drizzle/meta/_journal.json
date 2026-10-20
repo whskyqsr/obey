@@ -15,6 +15,13 @@
       "when": 1792182326587,
       "tag": "0001_reschedule_groups",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792497746830,
+      "tag": "0002_profiles",
+      "breakpoints": true
     }
   ]
 }

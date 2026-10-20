@@ -1,5 +1,8 @@
 package app.obey.ui.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -11,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -54,6 +56,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.obey.api.ReschedulePolicy
+import app.obey.api.title
+import app.obey.auth.AuthState
+import app.obey.ui.common.Avatar
 import app.obey.data.SessionState
 import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.SectionHeader
@@ -70,6 +75,10 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
     val devUserId by vm.devUserId.collectAsStateWithLifecycle()
     val invite by vm.invite.collectAsStateWithLifecycle()
     val appIcon by vm.appIcon.collectAsStateWithLifecycle()
+    val authState by vm.authState.collectAsStateWithLifecycle()
+    val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let(vm::setAvatar)
+    }
     val busy by vm.busy.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -78,7 +87,7 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
 
     var devField by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(devUserId) { devField = devUserId.orEmpty() }
-    var dialog by rememberSaveable { mutableStateOf<String?>(null) } // "create" | "join" | "name"
+    var dialog by rememberSaveable { mutableStateOf<String?>(null) } // "create" | "join" | "name" | "relname"
 
     val session = (sessionState as? SessionState.Ready)?.session
 
@@ -95,16 +104,28 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
             Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(rememberScrollState())) {
                 SectionHeader("Account")
                 if (session != null) {
+                    val user = session.me.user
                     ListItem(
                         modifier = Modifier.clickable { dialog = "name" },
-                        headlineContent = { Text(session.me.user.displayName) },
+                        leadingContent = { Avatar(user.id, user.displayName, user.avatarVersion, vm::loadAvatar, size = 56.dp) },
+                        headlineContent = { Text(user.displayName) },
                         trailingContent = { Icon(Icons.Outlined.Edit, "Change display name") },
                         supportingContent = {
-                            SelectionContainer {
-                                Text(listOfNotNull(session.me.user.email, session.userId).joinToString("\n"))
+                            val method = when ((authState as? AuthState.Firebase)?.provider) {
+                                "password" -> "Signed in with email"
+                                "google.com" -> "Signed in with Google"
+                                else -> if (authState is AuthState.Dev) "Dev sign-in" else "Signed in"
                             }
+                            Text(listOfNotNull(method, user.email).joinToString("\n"))
                         },
                     )
+                    Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilledTonalButton(
+                            onClick = { pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                            enabled = !busy,
+                        ) { Text(if (user.avatarVersion == null) "Add photo" else "Change photo") }
+                        if (user.avatarVersion != null) TextButton(onClick = vm::removeAvatar, enabled = !busy) { Text("Remove") }
+                    }
                 }
 
                 SectionHeader("App icon")
@@ -117,7 +138,7 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
                             ListItem(
                                 modifier = Modifier.clickable { vm.selectRelationship(r.id) },
                                 leadingContent = { RadioButton(selected = r.id == s.relationship?.id, onClick = { vm.selectRelationship(r.id) }) },
-                                headlineContent = { Text(r.name) },
+                                headlineContent = { Text(r.title(s.userId)) },
                                 supportingContent = { Text(r.members.joinToString { it.displayName }) },
                             )
                         }
@@ -125,11 +146,18 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
                     }
                     s.relationship?.let { rel ->
                         ListItem(
-                            headlineContent = { Text(rel.name) },
-                            supportingContent = {
-                                Text(rel.members.joinToString("\n") { m -> "${m.displayName} · ${m.role.label}" + if (m.userId == s.userId) " (you)" else "" })
-                            },
+                            modifier = if (s.canManage) Modifier.clickable { dialog = "relname" } else Modifier,
+                            headlineContent = { Text(rel.title(s.userId)) },
+                            supportingContent = { Text(if (rel.name == null) "No name; your partner's name shows instead" else "Relationship name") },
+                            trailingContent = { if (s.canManage) Icon(Icons.Outlined.Edit, "Name this relationship") },
                         )
+                        rel.members.forEach { m ->
+                            ListItem(
+                                leadingContent = { Avatar(m.userId, m.displayName, m.avatarVersion, vm::loadAvatar) },
+                                headlineContent = { Text(m.displayName + if (m.userId == s.userId) " (you)" else "") },
+                                supportingContent = { Text(m.role.label) },
+                            )
+                        }
                         Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             FilledTonalButton(onClick = vm::createInvite, enabled = !busy) { Text("Invite partner") }
                             OutlinedButton(onClick = { dialog = "join" }) { Text("Join another") }
@@ -224,6 +252,29 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
     }
 
     when (dialog) {
+        "relname" -> session?.relationship?.let { rel ->
+            var name by rememberSaveable { mutableStateOf(rel.name.orEmpty()) }
+            AlertDialog(
+                onDismissRequest = { dialog = null },
+                title = { Text("Name this relationship") },
+                text = {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it.take(80) },
+                        singleLine = true,
+                        placeholder = { Text(rel.copy(name = null).title(session.userId)) },
+                        supportingText = { Text("Optional. Leave it blank to show your partner's name.") },
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = !busy && name.trim() != rel.name.orEmpty(),
+                        onClick = { vm.renameRelationship(name); dialog = null },
+                    ) { Text("Save") }
+                },
+                dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
+            )
+        }
         "name" -> session?.let { s ->
             var name by rememberSaveable { mutableStateOf(s.me.user.displayName) }
             AlertDialog(

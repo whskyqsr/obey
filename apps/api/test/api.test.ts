@@ -62,6 +62,40 @@ describe("relationships", () => {
     expect((await dom.patch("/me", { displayName: "   " })).status).toBe(400);
   });
 
+  it("doesn't need a name for a relationship", async () => {
+    const dom = ctx.as(crypto.randomUUID());
+    const rel = (await dom.post("/relationships", { role: "dominant" })).body;
+    expect(rel.name).toBeNull();
+    expect((await dom.patch(`/relationships/${rel.id}`, { name: " Us " })).body.name).toBe("Us");
+    expect((await dom.patch(`/relationships/${rel.id}`, { name: "" })).body.name).toBeNull();
+  });
+
+  it("stores profile pictures and shows them only to partners", async () => {
+    const { dom, sub, relId, domId } = await ctx.pair();
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+    const put = await ctx.app.inject({
+      method: "PUT",
+      url: "/me/avatar",
+      payload: jpeg,
+      headers: { ...dom.headers, "content-type": "image/jpeg" },
+    });
+    expect(put.statusCode).toBe(200);
+    const version = put.json().avatarVersion;
+    expect(version).toBeTruthy();
+    const member = (await sub.get("/me")).body.relationships.find((r: { id: string }) => r.id === relId).members.find((m: { userId: string }) => m.userId === domId);
+    expect(member.avatarVersion).toBe(version);
+
+    const fetchAs = (who: typeof dom) => ctx.app.inject({ method: "GET", url: `/users/${domId}/avatar?v=${version}`, headers: who.headers });
+    const got = await fetchAs(sub);
+    expect(got.statusCode).toBe(200);
+    expect(got.headers["content-type"]).toBe("image/jpeg");
+    expect(got.rawPayload.equals(jpeg)).toBe(true);
+    expect((await fetchAs(ctx.as(crypto.randomUUID()))).statusCode).toBe(404);
+
+    expect((await dom.del("/me/avatar")).body.avatarVersion).toBeNull();
+    expect((await fetchAs(sub)).statusCode).toBe(404);
+  });
+
   it("keeps invite codes single-use", async () => {
     const { dom, relId } = await ctx.pair();
     const code = (await dom.post(`/relationships/${relId}/invites`)).body.code;

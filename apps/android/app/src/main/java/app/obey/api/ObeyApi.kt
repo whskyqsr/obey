@@ -1,10 +1,13 @@
 package app.obey.api
 
+import okhttp3.RequestBody
+import okhttp3.ResponseBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -18,6 +21,16 @@ interface ObeyApi {
 
     @PATCH("me")
     suspend fun updateMe(@Body body: UpdateMeInput): User
+
+    /** A square JPEG; the app crops and shrinks it first. */
+    @PUT("me/avatar")
+    suspend fun setAvatar(@Body image: RequestBody): User
+
+    @DELETE("me/avatar")
+    suspend fun deleteAvatar(): User
+
+    @GET("users/{id}/avatar")
+    suspend fun avatar(@Path("id") userId: String, @Query("v") version: String): ResponseBody
 
     // Relationships
     @POST("relationships")

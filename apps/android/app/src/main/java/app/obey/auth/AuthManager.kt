@@ -19,7 +19,8 @@ import kotlinx.coroutines.tasks.await
 /** Who the API will see us as. */
 sealed interface AuthState {
     data object SignedOut : AuthState
-    data class Firebase(val uid: String, val email: String?) : AuthState
+    /** [provider] is "google.com" or "password" (Firebase provider ids). */
+    data class Firebase(val uid: String, val email: String?, val provider: String? = null) : AuthState
     data class Dev(val userId: String) : AuthState
 }
 
@@ -43,7 +44,7 @@ class AuthManager @Inject constructor(
             val firebaseAuth = FirebaseAuth.getInstance()
             val listener = FirebaseAuth.AuthStateListener { a ->
                 val u = a.currentUser
-                trySend(if (u == null) AuthState.SignedOut else AuthState.Firebase(u.uid, u.email))
+                trySend(if (u == null) AuthState.SignedOut else AuthState.Firebase(u.uid, u.email, u.providerData.firstOrNull { it.providerId != "firebase" }?.providerId))
             }
             firebaseAuth.addAuthStateListener(listener)
             awaitClose { firebaseAuth.removeAuthStateListener(listener) }

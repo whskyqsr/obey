@@ -1,5 +1,5 @@
 import type { FastifyRequest } from "fastify";
-import { eq } from "drizzle-orm";
+import { eq, getTableColumns } from "drizzle-orm";
 import type { App as FirebaseApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import type { Db } from "./db/index.js";
@@ -47,16 +47,19 @@ export function createAuthenticator(opts: { devAuth: boolean; firebase: Firebase
   };
 }
 
+// Every column but the avatar bytes, which every request would otherwise load.
+const { avatar: _avatar, ...userColumns } = getTableColumns(users);
+
 /** Finds or creates the user row for an identity. */
 export async function upsertUser(db: Db, identity: Identity) {
-  const [existing] = await db.select().from(users).where(eq(users.authUid, identity.uid));
+  const [existing] = await db.select(userColumns).from(users).where(eq(users.authUid, identity.uid));
   if (existing) return existing;
   const [created] = await db
     .insert(users)
     .values({ authUid: identity.uid, displayName: identity.displayName, email: identity.email })
     .onConflictDoNothing()
-    .returning();
+    .returning(userColumns);
   if (created) return created;
-  const [raced] = await db.select().from(users).where(eq(users.authUid, identity.uid));
+  const [raced] = await db.select(userColumns).from(users).where(eq(users.authUid, identity.uid));
   return raced!;
 }

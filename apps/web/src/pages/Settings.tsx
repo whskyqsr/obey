@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
-import { useCreateInvite, useUpdateMe, useUpdateRelationship } from "../api/hooks";
+import { useEffect, useRef, useState } from "react";
+import { useCreateInvite, useSetAvatar, useUpdateMe, useUpdateRelationship } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { ReschedulePolicy } from "../api/types";
-import { signOut } from "../auth/session";
+import { getSession, signOut } from "../auth/session";
+import { Avatar, squareJpeg } from "../components/Avatar";
 import { Button, Divider, Icon, PageHeader, Section, SegmentedButtons, Select, TextField, cx, useSnackbar } from "../components/ui";
-import { API_URL, FIREBASE_ENABLED } from "../env";
 import { fmtDateTime } from "../lib/dates";
-import { ROLE_LABEL, useRel } from "../lib/relationship";
+import { ROLE_LABEL, relTitle, useRel } from "../lib/relationship";
 import { type PushState, pushState, registerPush } from "../push";
 import { type ThemeMode, useTheme } from "../theme/ThemeProvider";
 import { SEED_PRESETS } from "../theme/tokens";
@@ -20,23 +20,35 @@ const POLICIES: { value: ReschedulePolicy; label: string; help: string }[] = [
 ];
 
 export function SettingsPage() {
-  const { me, rel, self, isDom, select } = useRel();
+  const { me, rel, self, isDom, select, title } = useRel();
   const theme = useTheme();
   const snack = useSnackbar();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const update = useUpdateRelationship(rel.id);
   const invite = useCreateInvite(rel.id);
-  const [name, setName] = useState(rel.name);
+  const [name, setName] = useState(rel.name ?? "");
   const [allowance, setAllowance] = useState(String(rel.weeklyDelayAllowance));
   const [push, setPush] = useState<PushState>(pushState);
   const updateMe = useUpdateMe();
   const [displayName, setDisplayName] = useState(me.user.displayName);
+  const setAvatar = useSetAvatar();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const session = getSession();
+
+  async function pickPhoto(file: File | undefined) {
+    if (!file) return;
+    try {
+      setAvatar.mutate(await squareJpeg(file), { onSuccess: () => snack("Photo updated"), onError: (e) => snack(errorMessage(e)) });
+    } catch (e) {
+      snack(errorMessage(e));
+    }
+  }
 
   useEffect(() => setDisplayName(me.user.displayName), [me.user.displayName]);
 
   useEffect(() => {
-    setName(rel.name);
+    setName(rel.name ?? "");
     setAllowance(String(rel.weeklyDelayAllowance));
   }, [rel.id, rel.name, rel.weeklyDelayAllowance]);
 
@@ -47,7 +59,30 @@ export function SettingsPage() {
       <PageHeader title="Settings" subtitle={me.user.email ?? me.user.displayName} />
 
       <Section title="Profile">
-        <div className="flex flex-col gap-2 rounded-lg bg-surface-container-low p-4" style={{ ["--field-bg" as string]: "var(--md-surface-container-low)" }}>
+        <div className="flex flex-col gap-4 rounded-lg bg-surface-container-low p-4" style={{ ["--field-bg" as string]: "var(--md-surface-container-low)" }}>
+          <div className="flex flex-wrap items-center gap-4">
+            <Avatar userId={me.user.id} name={me.user.displayName} version={me.user.avatarVersion} size={72} />
+            <div className="flex flex-wrap gap-2">
+              <Button variant="tonal" icon="photo_camera" busy={setAvatar.isPending} onClick={() => fileInput.current?.click()}>
+                {me.user.avatarVersion ? "Change photo" : "Add photo"}
+              </Button>
+              {me.user.avatarVersion && (
+                <Button variant="text" disabled={setAvatar.isPending} onClick={() => setAvatar.mutate(null, { onSuccess: () => snack("Photo removed"), onError: (e) => snack(errorMessage(e)) })}>
+                  Remove
+                </Button>
+              )}
+            </div>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => {
+                void pickPhoto(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+          </div>
           <div className="flex flex-wrap items-start gap-2">
             <TextField label="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={40} className="min-w-48 flex-1" />
             {displayName.trim() && displayName.trim() !== me.user.displayName && (
@@ -111,16 +146,25 @@ export function SettingsPage() {
             <Select label="Current relationship" value={rel.id} onChange={(e) => select(e.target.value)}>
               {me.relationships.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.name}
+                  {relTitle(r, me.user.id)}
                 </option>
               ))}
             </Select>
           )}
           <div className="flex flex-wrap items-start gap-2">
-            <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} className="min-w-48 flex-1" disabled={!isDom} />
-            {isDom && name.trim() !== rel.name && (
-              <Button variant="tonal" className="mt-2" busy={update.isPending} onClick={() => patch({ name: name.trim() })}>
-                Rename
+            <TextField
+              label="Name (optional)"
+              placeholder={title}
+              help={rel.name ? undefined : "Without a name, the app shows your partner's name."}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={80}
+              className="min-w-48 flex-1"
+              disabled={!isDom}
+            />
+            {isDom && name.trim() !== (rel.name ?? "") && (
+              <Button variant="tonal" className="mt-2" busy={update.isPending} onClick={() => patch({ name: name.trim() || null })}>
+                Save
               </Button>
             )}
           </div>
@@ -128,7 +172,7 @@ export function SettingsPage() {
             <div className="mb-1 text-label-large text-on-surface-variant">Members</div>
             {rel.members.map((m) => (
               <div key={m.userId} className="flex items-center gap-3 py-1.5">
-                <Icon name={m.role === "dominant" ? "shield_person" : m.role === "submissive" ? "person" : "swap_horiz"} className="text-on-surface-variant" />
+                <Avatar userId={m.userId} name={m.displayName} version={m.avatarVersion} size={36} />
                 <span className="flex-1 text-body-large text-on-surface">
                   {m.displayName}
                   {m.userId === me.user.id && " (you)"}
@@ -220,8 +264,11 @@ export function SettingsPage() {
 
       <Section title="Account">
         <div className="flex flex-wrap items-center gap-3 rounded-lg bg-surface-container-low p-4">
-          <div className="min-w-0 flex-1 text-body-medium text-on-surface-variant">
-            {FIREBASE_ENABLED ? "Signed in with Google." : `Dev sign-in as ${me.user.id}.`} API: {API_URL}
+          <div className="min-w-0 flex-1">
+            <div className="text-body-large text-on-surface">
+              {session?.kind === "dev" ? "Dev sign-in" : session?.kind === "firebase" && session.provider === "password" ? "Signed in with email" : "Signed in with Google"}
+            </div>
+            <div className="truncate text-body-medium text-on-surface-variant">{me.user.email ?? me.user.id}</div>
           </div>
           <Button
             variant="outlined"

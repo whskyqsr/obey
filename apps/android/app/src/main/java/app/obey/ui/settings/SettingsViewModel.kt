@@ -1,6 +1,19 @@
 package app.obey.ui.settings
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
+import android.net.Uri
+import android.os.Build
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.viewModelScope
+import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import app.obey.BuildConfig
 import app.obey.api.CreateRelationshipInput
 import app.obey.api.Invite
@@ -19,6 +32,7 @@ import app.obey.data.SessionState
 import app.obey.data.SettingsStore
 import app.obey.ui.common.BaseViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -29,6 +43,7 @@ import kotlinx.coroutines.flow.stateIn
 /** Shared by Settings, sign-in and relationship setup. */
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val api: ObeyApi,
     private val sessions: SessionRepository,
     private val settings: SettingsStore,
@@ -76,7 +91,60 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun createRelationship(name: String, role: Role) = action {
-        sessions.onRelationshipChanged(api.createRelationship(CreateRelationshipInput(name.trim(), role)))
+        sessions.onRelationshipChanged(api.createRelationship(CreateRelationshipInput(name.trim().ifEmpty { null }, role)))
+    }
+
+    /** A blank name clears it, so the app shows the partner's name instead. */
+    fun renameRelationship(name: String) = action {
+        val rel = sessions.requireRelationshipId()
+        sessions.onRelationshipChanged(api.updateRelationship(rel, UpdateRelationshipInput(name = name.trim())))
+    }
+
+    private val avatarCache = mutableMapOf<String, ImageBitmap>()
+
+    suspend fun loadAvatar(userId: String, version: String): ImageBitmap? {
+        val key = "$userId@$version"
+        avatarCache[key]?.let { return it }
+        return runCatching {
+            withContext(Dispatchers.IO) {
+                val bytes = api.avatar(userId, version).bytes()
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+            }
+        }.getOrNull()?.also { avatarCache[key] = it }
+    }
+
+    fun setAvatar(uri: Uri) = action {
+        val jpeg = withContext(Dispatchers.Default) { squareJpeg(uri) }
+        api.setAvatar(jpeg.toRequestBody("image/jpeg".toMediaType()))
+        sessions.refresh()
+        say("Photo updated")
+    }
+
+    fun removeAvatar() = action {
+        api.deleteAvatar()
+        sessions.refresh()
+        say("Photo removed")
+    }
+
+    /** Crops the middle square and shrinks it to 256px, honouring the photo's rotation where Android can. */
+    private fun squareJpeg(uri: Uri, px: Int = 256): ByteArray {
+        val source: Bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) { decoder, info, _ ->
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                val scale = (px * 2f / minOf(info.size.width, info.size.height)).coerceAtMost(1f)
+                decoder.setTargetSize((info.size.width * scale).toInt().coerceAtLeast(1), (info.size.height * scale).toInt().coerceAtLeast(1))
+            }
+        } else {
+            context.contentResolver.openInputStream(uri).use { BitmapFactory.decodeStream(it) }
+                ?: error("Couldn't read that image")
+        }
+        val side = minOf(source.width, source.height)
+        val square = Bitmap.createBitmap(source, (source.width - side) / 2, (source.height - side) / 2, side, side)
+        val scaled = Bitmap.createScaledBitmap(square, px, px, true)
+        return ByteArrayOutputStream().use { out ->
+            scaled.compress(Bitmap.CompressFormat.JPEG, 85, out)
+            out.toByteArray()
+        }
     }
 
     fun join(code: String, role: Role) = action {

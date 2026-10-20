@@ -12,6 +12,8 @@ interface RelState {
   /** Dominants (and switches) manage tasks, libraries and approvals. */
   isDom: boolean;
   partners: Member[];
+  /** The relationship's name, or the partners' names when it has none. */
+  title: string;
   memberName(userId: string | null | undefined): string;
   select(id: string): void;
 }
@@ -30,6 +32,7 @@ export function RelationshipProvider({ me, children }: { me: Me; children: React
       self,
       isDom: self ? self.role !== "submissive" : false,
       partners: rel.members.filter((m) => m.userId !== me.user.id),
+      title: relTitle(rel, me.user.id),
       memberName(userId) {
         if (!userId) return "Someone";
         if (userId === me.user.id) return "You";
@@ -53,6 +56,14 @@ export function useRel(): RelState {
 
 export function useOptionalRel(): RelState | null {
   return useContext(RelContext);
+}
+
+/** "Us", or "Kitten", or "Kitten & Pet", or a nudge to invite someone. */
+export function relTitle(rel: Relationship, myId: string): string {
+  if (rel.name) return rel.name;
+  const names = rel.members.filter((m) => m.userId !== myId).map((m) => m.displayName);
+  if (names.length === 0) return "Waiting for your partner";
+  return names.length === 1 ? names[0]! : `${names.slice(0, -1).join(", ")} & ${names.at(-1)}`;
 }
 
 export const ROLE_LABEL = { dominant: "Dominant", submissive: "submissive", switch: "Switch" } as const;

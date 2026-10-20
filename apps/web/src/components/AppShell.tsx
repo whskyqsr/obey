@@ -62,7 +62,7 @@ function NavItem({ d, active, badge, compact }: { d: Dest; active: boolean; badg
 
 export function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { rel, isDom } = useRel();
+  const { rel, isDom, title } = useRel();
   const pending = usePendingReschedules(rel.id);
   const todayBadge = isDom ? (pending.data?.length ?? 0) : 0;
 
@@ -70,7 +70,7 @@ export function AppShell() {
     <div className="min-h-dvh bg-surface">
       {/* Navigation rail (medium and larger) */}
       <nav className="fixed inset-y-0 left-0 z-30 hidden w-24 flex-col items-center gap-3 overflow-y-auto bg-surface pt-4 pb-4 md:flex">
-        <Link to="/" className="mb-4 flex size-14 items-center justify-center rounded-lg bg-primary-container text-on-primary-container" title={rel.name}>
+        <Link to="/" className="mb-4 flex size-14 items-center justify-center rounded-lg bg-primary-container text-on-primary-container" title={title}>
           <Icon name="link" filled />
         </Link>
         {DESTINATIONS.map((d) => (

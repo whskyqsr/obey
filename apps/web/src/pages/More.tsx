@@ -8,10 +8,10 @@ const ITEMS = DESTINATIONS.filter((d) => ["/rewards", "/rules", "/consequences",
 /** Overflow destinations for the compact navigation bar. */
 export function MorePage() {
   const navigate = useNavigate();
-  const { rel } = useRel();
+  const { title } = useRel();
   return (
     <>
-      <PageHeader title="More" subtitle={rel.name} />
+      <PageHeader title="More" subtitle={title} />
       <div className="mx-4 overflow-hidden rounded-lg bg-surface-container-low">
         {ITEMS.map((d) => (
           <button key={d.to} type="button" onClick={() => navigate({ to: d.to })} className="state-layer flex w-full items-center gap-4 px-4 py-4 text-left">

@@ -3,6 +3,7 @@ import { and, eq, gt, inArray, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import {
   createRelationship,
+  id,
   joinRelationship,
   registerDevice,
   updateMe,
@@ -18,11 +19,27 @@ import { managers, requireManager, requireMember } from "../services/access.js";
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const inviteCode = () => Array.from({ length: 8 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join("");
 
+const avatarVersion = (at: Date | null) => (at ? String(at.getTime()) : null);
+const userDto = (u: { id: string; displayName: string; email: string | null; avatarUpdatedAt: Date | null }) => ({
+  id: u.id,
+  displayName: u.displayName,
+  email: u.email,
+  avatarVersion: avatarVersion(u.avatarUpdatedAt),
+});
+
+const AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
 export async function relationshipDto(db: Tx, ids: string[]) {
   if (ids.length === 0) return [];
   const rels = await db.select().from(relationships).where(inArray(relationships.id, ids));
   const members = await db
-    .select({ relationshipId: memberships.relationshipId, userId: users.id, displayName: users.displayName, role: memberships.role })
+    .select({
+      relationshipId: memberships.relationshipId,
+      userId: users.id,
+      displayName: users.displayName,
+      role: memberships.role,
+      avatarUpdatedAt: users.avatarUpdatedAt,
+    })
     .from(memberships)
     .innerJoin(users, eq(users.id, memberships.userId))
     .where(inArray(memberships.relationshipId, ids));
@@ -34,7 +51,7 @@ export async function relationshipDto(db: Tx, ids: string[]) {
     createdAt: r.createdAt.toISOString(),
     members: members
       .filter((m) => m.relationshipId === r.id)
-      .map(({ userId, displayName, role }) => ({ userId, displayName, role })),
+      .map(({ userId, displayName, role, avatarUpdatedAt }) => ({ userId, displayName, role, avatarVersion: avatarVersion(avatarUpdatedAt) })),
   }));
 }
 
@@ -44,15 +61,51 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
   app.get("/me", async (req) => {
     const mine = await db.select().from(memberships).where(eq(memberships.userId, req.user.id));
     return {
-      user: { id: req.user.id, displayName: req.user.displayName, email: req.user.email },
+      user: userDto(req.user),
       relationships: await relationshipDto(db, mine.map((m) => m.relationshipId)),
     };
   });
 
   app.patch("/me", async (req) => {
     const body = updateMe.parse(req.body);
-    const [user] = await db.update(users).set({ displayName: body.displayName }).where(eq(users.id, req.user.id)).returning();
-    return { id: user!.id, displayName: user!.displayName, email: user!.email };
+    await db.update(users).set({ displayName: body.displayName }).where(eq(users.id, req.user.id));
+    return userDto({ ...req.user, displayName: body.displayName });
+  });
+
+  // Clients crop and shrink the picture first (256px square), so 1 MB is generous.
+  app.addContentTypeParser(AVATAR_TYPES, { parseAs: "buffer", bodyLimit: 1_000_000 }, (_req, body, done) => done(null, body));
+
+  app.put("/me/avatar", async (req) => {
+    const type = req.headers["content-type"]?.split(";")[0]?.trim() ?? "";
+    if (!AVATAR_TYPES.includes(type) || !Buffer.isBuffer(req.body) || req.body.length === 0) {
+      throw new HttpError(415, "send a JPEG, PNG or WebP image");
+    }
+    const now = deps.now();
+    await db.update(users).set({ avatar: req.body, avatarType: type, avatarUpdatedAt: now }).where(eq(users.id, req.user.id));
+    return userDto({ ...req.user, avatarUpdatedAt: now });
+  });
+
+  app.delete("/me/avatar", async (req) => {
+    await db.update(users).set({ avatar: null, avatarType: null, avatarUpdatedAt: null }).where(eq(users.id, req.user.id));
+    return userDto({ ...req.user, avatarUpdatedAt: null });
+  });
+
+  /** Your own picture, or that of anyone you share a relationship with. */
+  app.get<{ Params: { id: string } }>("/users/:id/avatar", async (req, reply) => {
+    if (!id.safeParse(req.params.id).success) throw notFound("no picture");
+    if (req.params.id !== req.user.id) {
+      const mine = db.select({ id: memberships.relationshipId }).from(memberships).where(eq(memberships.userId, req.user.id));
+      const [shared] = await db
+        .select({ id: memberships.relationshipId })
+        .from(memberships)
+        .where(and(eq(memberships.userId, req.params.id), inArray(memberships.relationshipId, mine)))
+        .limit(1);
+      if (!shared) throw notFound("no picture");
+    }
+    const [row] = await db.select({ avatar: users.avatar, type: users.avatarType }).from(users).where(eq(users.id, req.params.id));
+    if (!row?.avatar || !row.type) throw notFound("no picture");
+    // The URL carries ?v=<avatarVersion>, so a new picture is a new URL.
+    return reply.header("content-type", row.type).header("cache-control", "private, max-age=31536000, immutable").send(row.avatar);
   });
 
   app.post("/relationships", async (req, reply) => {
