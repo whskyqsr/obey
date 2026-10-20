@@ -76,7 +76,6 @@ private val featureRows = listOf(
     FeatureRow("Points and rewards", "Tasks earn points that can be spent on rewards.", { it.points }, { f, on -> f.copy(points = on) }),
     FeatureRow("Consequences", "A list of consequences, and one per task if it's missed.", { it.consequences }, { f, on -> f.copy(consequences = on) }),
     FeatureRow("Rules", "A shared list of standing rules.", { it.rules }, { f, on -> f.copy(rules = on) }),
-    FeatureRow("Notes", "Limits, aftercare plans and other notes.", { it.notes }, { f, on -> f.copy(notes = on) }),
     FeatureRow("Journal", "Dated entries with a mood.", { it.journal }, { f, on -> f.copy(journal = on) }),
 )
 

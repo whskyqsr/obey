@@ -58,11 +58,9 @@ const noteRoute = createRoute({
   component: function NoteRoute() {
     const { noteId } = noteRoute.useParams();
     return (
-      <Gate feature="notes">
-        <Suspense fallback={<Loading />}>
-          <NoteEditorPage noteId={noteId} kind="note" />
-        </Suspense>
-      </Gate>
+      <Suspense fallback={<Loading />}>
+        <NoteEditorPage noteId={noteId} kind="note" />
+      </Suspense>
     );
   },
 });
@@ -109,7 +107,7 @@ const routeTree = rootRoute.addChildren([
   page("/rewards", gated("points", RewardsPage)),
   page("/consequences", gated("consequences", ConsequencesPage)),
   page("/rules", gated("rules", RulesPage)),
-  page("/notes", gated("notes", () => <NotesPage kind="note" />)),
+  page("/notes", () => <NotesPage kind="note" />),
   noteRoute,
   page("/journal", gated("journal", () => <NotesPage kind="journal" />)),
   journalEntryRoute,

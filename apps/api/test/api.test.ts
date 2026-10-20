@@ -388,9 +388,10 @@ describe("feature switches", () => {
       points: true,
       consequences: true,
       rules: true,
-      notes: true,
       journal: true,
     });
+    // Notes can't be switched off; the key is ignored.
+    expect((await dom.patch(`/relationships/${relId}`, { features: { notes: false } })).body.features).not.toHaveProperty("notes");
     expect((await sub.patch(`/relationships/${relId}`, { features: { points: false } })).status).toBe(403);
     await dom.patch(`/relationships/${relId}`, { features: { points: false } });
     const rel = (await dom.patch(`/relationships/${relId}`, { features: { journal: false } })).body;

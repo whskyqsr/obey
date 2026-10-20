@@ -23,7 +23,6 @@ const FEATURE_ROWS: { key: keyof Features; label: string; help: string }[] = [
   { key: "points", label: "Points and rewards", help: "Tasks earn points that can be spent on rewards." },
   { key: "consequences", label: "Consequences", help: "A list of consequences, and one per task if it's missed." },
   { key: "rules", label: "Rules", help: "A shared list of standing rules." },
-  { key: "notes", label: "Notes", help: "Limits, aftercare plans and other notes." },
   { key: "journal", label: "Journal", help: "Dated entries with a mood." },
 ];
 

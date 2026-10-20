@@ -91,13 +91,12 @@ data class Relationship(
     val features: Features = Features(),
 )
 
-/** Parts of the app a dynamic can switch off; switched-off parts are hidden for everyone in it. */
+/** Parts of the app a dynamic can switch off; switched-off parts are hidden for everyone in it. Tasks and notes are always on. */
 @Serializable
 data class Features(
     val points: Boolean = true,
     val consequences: Boolean = true,
     val rules: Boolean = true,
-    val notes: Boolean = true,
     val journal: Boolean = true,
 )
 

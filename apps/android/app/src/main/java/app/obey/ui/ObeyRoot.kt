@@ -139,7 +139,7 @@ private fun topLevels(f: Features) = listOfNotNull(
         else -> null
     },
     if (f.rules) TopLevel(RulesRoute, "Rules", Icons.Outlined.Gavel) { it.hasRoute<RulesRoute>() } else null,
-    if (f.notes) TopLevel(NotesRoute, "Notes", Icons.AutoMirrored.Outlined.Notes) { it.hasRoute<NotesRoute>() } else null,
+    TopLevel(NotesRoute, "Notes", Icons.AutoMirrored.Outlined.Notes) { it.hasRoute<NotesRoute>() },
     if (f.journal) TopLevel(JournalRoute, "Journal", Icons.Outlined.AutoStories) { it.hasRoute<JournalRoute>() } else null,
 )
 
@@ -165,7 +165,7 @@ private fun MainScaffold() {
     var moreOpen by remember { mutableStateOf(false) }
     // A tab the dynamic just switched off (say, from Settings) shouldn't stay reachable underneath.
     val switchedOff = destination != null && !isTopLevel && destination.hierarchy.any {
-        it.hasRoute<RewardsRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<NotesRoute>() || it.hasRoute<JournalRoute>()
+        it.hasRoute<RewardsRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<JournalRoute>()
     }
     LaunchedEffect(switchedOff) { if (switchedOff) nav.navigate(TodayRoute) { popUpTo(nav.graph.findStartDestination().id) } }
 

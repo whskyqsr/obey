@@ -19,7 +19,7 @@ const ALL: Dest[] = [
   { to: "/rewards", label: "Rewards", icon: "redeem", feature: "points" },
   { to: "/rules", label: "Rules", icon: "gavel", feature: "rules" },
   { to: "/consequences", label: "Consequences", icon: "bolt", feature: "consequences" },
-  { to: "/notes", label: "Notes", icon: "sticky_note_2", feature: "notes" },
+  { to: "/notes", label: "Notes", icon: "sticky_note_2" },
   { to: "/journal", label: "Journal", icon: "auto_stories", feature: "journal" },
   { to: "/settings", label: "Settings", icon: "settings" },
 ];
