@@ -307,11 +307,14 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
     var editing by remember { mutableStateOf(event == null) }
     var draft by remember { mutableStateOf(Draft.of(event, day)) }
     LaunchedEffect(event?.id) { vm.loadClashes(event) }
+    val clashItems by vm.clashes.collectAsStateWithLifecycle()
+    val form = remember { ClashForm() }
 
     val current = saved
     if (!editing && current != null) {
         val mine = current.authorId == session?.userId
         val author = if (mine) "you" else session?.nameOf(current.authorId) ?: "your partner"
+        val plan = session?.let { ClashPlan(clashItems, it, current, form) }
         AlertDialog(
             onDismissRequest = onDismiss,
             title = { Text(current.title) },
@@ -332,10 +335,18 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
                             Text(it, Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp))
                         }
                     }
-                    Clashes(vm, current, onChanged)
+                    if (session != null && plan != null) Clashes(clashItems, plan, form, session)
                 }
             },
-            confirmButton = { Button(onClick = onDismiss) { Text("Done") } },
+            // Apply sits with Done, so a long list of clashes doesn't need scrolling to the end.
+            confirmButton = {
+                if (plan != null && plan.picked.isNotEmpty()) Row {
+                    TextButton(onClick = onDismiss) { Text("Done") }
+                    Button(onClick = { plan.apply(vm, onChanged) }, enabled = !busy) {
+                        Text("${if (plan.asks) "Ask" else "Apply"} (${plan.picked.size})")
+                    }
+                } else Button(onClick = onDismiss) { Text("Done") }
+            },
             dismissButton = {
                 if (mine) Row {
                     TextButton(onClick = { vm.delete(current) { onChanged(); onDismiss() } }, enabled = !busy) {
@@ -484,28 +495,24 @@ private fun WhenRow(label: String, date: String, time: String?, onDate: () -> Un
 
 private enum class ClashChoice { Keep, Move, Cancel }
 
-/**
- * The tasks a plan runs into, each sorted out its own way: kept, moved (after the plan unless changed), or called off.
- * A Dominant's choices apply at once; a sub's go out as one request.
- */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
-@Composable
-private fun Clashes(vm: PlanViewModel, e: CalendarEvent, onChanged: () -> Unit) {
-    val items by vm.clashes.collectAsStateWithLifecycle()
-    val session = vm.session ?: return
-    val choices = remember { mutableStateMapOf<String, ClashChoice>() }
-    val times = remember { mutableStateMapOf<String, ZonedDateTime>() }
-    var reason by remember { mutableStateOf("") }
-    var picking by remember { mutableStateOf<Occurrence?>(null) }
-    if (items.isEmpty()) return
+/** What's been picked for each clashing task; held by the dialog so its button row can apply it. */
+private class ClashForm {
+    val choices = mutableStateMapOf<String, ClashChoice>()
+    val times = mutableStateMapOf<String, ZonedDateTime>()
+    var reason by mutableStateOf("")
+}
+
+/** Who may do what with each clash, and what's picked so far. */
+private class ClashPlan(items: List<Occurrence>, session: Session, private val e: CalendarEvent, private val form: ClashForm) {
     val isDom = session.canManage
     val policy = session.relationship?.reschedulePolicy
     val subBlocked = !isDom && policy == ReschedulePolicy.DominantOnly
-    val involved = e.withPartner || e.authorId == session.userId
-    fun canMove(o: Occurrence) = !subBlocked && (isDom || o.assigneeId == session.userId)
+    private val involved = e.withPartner || e.authorId == session.userId
+    private val me = session.userId
+    fun canMove(o: Occurrence) = !subBlocked && (isDom || o.assigneeId == me)
     fun canAct(o: Occurrence) = involved || canMove(o)
-    fun choiceOf(o: Occurrence) = choices[o.id]
-    fun timeOf(o: Occurrence) = times[o.id] ?: afterPlan(o.dueAt, e)
+    fun choiceOf(o: Occurrence) = form.choices[o.id]
+    fun timeOf(o: Occurrence) = form.times[o.id] ?: afterPlan(o.dueAt, e)
     val picked = items.filter { canAct(it) && choiceOf(it) != null }
     val changed = picked.filter { choiceOf(it) != ClashChoice.Keep }
     val asks = !isDom && changed.any { choiceOf(it) == ClashChoice.Cancel || policy != ReschedulePolicy.Allowance }
@@ -515,9 +522,42 @@ private fun Clashes(vm: PlanViewModel, e: CalendarEvent, onChanged: () -> Unit) 
     fun allAre(c: ClashChoice) = actionable.isNotEmpty() && actionable.all { choiceOf(it) == c }
     fun setAll(c: ClashChoice) {
         val clear = allAre(c)
-        choices.clear()
-        if (!clear) actionable.forEach { choices[it.id] = c }
+        form.choices.clear()
+        if (!clear) actionable.forEach { form.choices[it.id] = c }
     }
+
+    fun apply(vm: PlanViewModel, onChanged: () -> Unit) {
+        val sent = changed.map { o ->
+            if (choiceOf(o) == ClashChoice.Cancel) PlanRescheduleItem(o.id, "cancel") else PlanRescheduleItem(o.id, "move", timeOf(o).iso())
+        }
+        val keep = picked.filter { choiceOf(it) == ClashChoice.Keep }.map { it.id }
+        vm.sortOut(e.id, keep, sent, form.reason) { form.choices.clear(); form.reason = ""; onChanged() }
+    }
+}
+
+/**
+ * The tasks a plan runs into, each sorted out its own way: kept, moved (after the plan unless changed), or called off.
+ * A Dominant's choices apply at once; a sub's go out as one request.
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+private fun Clashes(items: List<Occurrence>, plan: ClashPlan, form: ClashForm, session: Session) {
+    var picking by remember { mutableStateOf<Occurrence?>(null) }
+    if (items.isEmpty()) return
+    val isDom = plan.isDom
+    val subBlocked = plan.subBlocked
+    val choices = form.choices
+    val times = form.times
+    fun canMove(o: Occurrence) = plan.canMove(o)
+    fun canAct(o: Occurrence) = plan.canAct(o)
+    fun choiceOf(o: Occurrence) = plan.choiceOf(o)
+    fun timeOf(o: Occurrence) = plan.timeOf(o)
+    val picked = plan.picked
+    val asks = plan.asks
+    val actionable = plan.actionable
+    val allMovable = plan.allMovable
+    fun allAre(c: ClashChoice) = plan.allAre(c)
+    fun setAll(c: ClashChoice) = plan.setAll(c)
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -574,18 +614,8 @@ private fun Clashes(vm: PlanViewModel, e: CalendarEvent, onChanged: () -> Unit) 
         }
         Text("Keep means the task is fine alongside the plan, and it stops counting as a clash.", style = MaterialTheme.typography.bodySmall)
         if (subBlocked) Text("Only your Dominant can move or call off tasks in this dynamic.", style = MaterialTheme.typography.bodySmall)
-        if (picked.isNotEmpty()) {
-            if (asks) OutlinedTextField(reason, { reason = it.take(1000) }, label = { Text("Reason (optional)") }, modifier = Modifier.fillMaxWidth())
-            Button(
-                onClick = {
-                    val sent = changed.map { o ->
-                        if (choiceOf(o) == ClashChoice.Cancel) PlanRescheduleItem(o.id, "cancel") else PlanRescheduleItem(o.id, "move", timeOf(o).iso())
-                    }
-                    val keep = picked.filter { choiceOf(it) == ClashChoice.Keep }.map { it.id }
-                    vm.sortOut(e.id, keep, sent, reason) { choices.clear(); reason = ""; onChanged() }
-                },
-                modifier = Modifier.align(Alignment.End),
-            ) { Text("${if (asks) "Ask" else "Apply"} (${picked.size})") }
+        if (picked.isNotEmpty() && asks) {
+            OutlinedTextField(form.reason, { form.reason = it.take(1000) }, label = { Text("Reason (optional)") }, modifier = Modifier.fillMaxWidth())
         }
     }
     picking?.let { o ->
