@@ -1,5 +1,7 @@
 package app.obey.ui.tasks
 
+import app.obey.ui.comments.CommentsSheet
+import app.obey.ui.comments.SendBackDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -137,8 +139,8 @@ class TaskDetailViewModel @Inject constructor(
         refresh()
     }
 
-    fun review(o: Occurrence, approve: Boolean) = action {
-        api.review(o.id, app.obey.api.ReviewOccurrenceInput(approve = approve))
+    fun review(o: Occurrence, approve: Boolean, comment: String? = null) = action {
+        api.review(o.id, app.obey.api.ReviewOccurrenceInput(approve = approve, comment = comment))
         say(if (approve) "Approved" else "Sent back")
         refresh()
     }
@@ -181,6 +183,8 @@ fun TaskDetailScreen(
     var confirmDelete by remember { mutableStateOf(false) }
     var rescheduling by remember { mutableStateOf<Occurrence?>(null) }
     var noting by remember { mutableStateOf<Occurrence?>(null) }
+    var commenting by remember { mutableStateOf<Occurrence?>(null) }
+    var sendingBack by remember { mutableStateOf<Occurrence?>(null) }
     val title = (state as? Load.Ready)?.value?.task?.title.orEmpty()
 
     Scaffold(
@@ -274,12 +278,13 @@ fun TaskDetailScreen(
                             o,
                             if (mine) null else session?.nameOf(o.assigneeId),
                             if (canManage && o.status == OccurrenceStatus.Submitted) {
-                                OccurrenceActions(onApprove = { vm.review(o, true) }, onReject = { vm.review(o, false) })
+                                OccurrenceActions(onApprove = { vm.review(o, true) }, onReject = { sendingBack = o }, onComments = { commenting = o })
                             } else {
                                 OccurrenceActions(
                                     onComplete = if (mine) ({ vm.complete(o) }) else null,
                                     onCompleteWithNote = if (mine) ({ noting = o }) else null,
                                     onReschedule = { rescheduling = o },
+                                    onComments = { commenting = o },
                                 )
                             },
                         )
@@ -303,6 +308,10 @@ fun TaskDetailScreen(
             confirmButton = { TextButton(onClick = { confirmDelete = false; vm.delete() }) { Text("Delete", color = MaterialTheme.colorScheme.error) } },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
         )
+    }
+    commenting?.let { o -> CommentsSheet(o, onDismiss = { commenting = null }, onChanged = vm::refresh) }
+    sendingBack?.let { o ->
+        SendBackDialog(o, onDismiss = { sendingBack = null }, onConfirm = { vm.review(o, false, it); sendingBack = null })
     }
     rescheduling?.let { o -> RescheduleSheet(o, onDismiss = { rescheduling = null }, onSubmit = { vm.reschedule(o, it) }) }
     noting?.let { o ->

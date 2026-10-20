@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Notes
+import androidx.compose.material.icons.outlined.AddComment
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Edit
@@ -36,6 +38,7 @@ import app.obey.api.TaskStreak
 import app.obey.ui.common.StreakStrip
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.unit.dp
 import app.obey.ui.common.formatDue
 import app.obey.ui.common.signed
@@ -50,6 +53,8 @@ data class OccurrenceActions(
     val onReject: (() -> Unit)? = null,
     /** A Dominant excusing a miss: no penalty, and the streak holds. */
     val onExcuse: (() -> Unit)? = null,
+    /** Opens the comments on this due date. */
+    val onComments: (() -> Unit)? = null,
 )
 
 @Composable
@@ -98,6 +103,20 @@ fun OccurrenceRow(
         supportingContent = {
             Column {
                 Text(supporting, color = if (occurrence.status == OccurrenceStatus.Missed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                if (occurrence.commentCount > 0) {
+                    val n = occurrence.commentCount
+                    Row(
+                        Modifier.padding(top = 4.dp).then(if (actions.onComments != null) Modifier.clickable(onClick = actions.onComments) else Modifier),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Outlined.ChatBubbleOutline, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                        Text(
+                            " $n ${if (n == 1) "comment" else "comments"}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
                 StreakStrip(streak, Modifier.padding(top = 6.dp))
             }
         },
@@ -106,10 +125,11 @@ fun OccurrenceRow(
                 androidx.compose.material3.TextButton(onClick = actions.onExcuse) { Text("Excuse") }
             } else if (actions.onApprove != null || actions.onReject != null) {
                 Row {
+                    actions.onComments?.let { IconButton(onClick = it) { Icon(Icons.Outlined.AddComment, "Comment") } }
                     actions.onReject?.let { IconButton(onClick = it) { Icon(Icons.Outlined.Close, "Send back") } }
                     actions.onApprove?.let { IconButton(onClick = it) { Icon(Icons.Outlined.TaskAlt, "Approve") } }
                 }
-            } else if (listOf(actions.onCompleteWithNote, actions.onReschedule, actions.onEditTask).any { it != null }) {
+            } else if (listOf(actions.onCompleteWithNote, actions.onReschedule, actions.onEditTask, actions.onComments).any { it != null }) {
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "More") }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
@@ -128,6 +148,13 @@ fun OccurrenceRow(
                                     onClick = { menu = false; it() },
                                 )
                             }
+                        }
+                        actions.onComments?.let {
+                            DropdownMenuItem(
+                                text = { Text("Comment") },
+                                leadingIcon = { Icon(Icons.Outlined.AddComment, null) },
+                                onClick = { menu = false; it() },
+                            )
                         }
                         actions.onEditTask?.let {
                             DropdownMenuItem(

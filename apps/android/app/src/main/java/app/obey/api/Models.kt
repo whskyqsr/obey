@@ -294,6 +294,7 @@ data class Occurrence(
     val photoCount: Int = 0,
     /** Needs a photo or a note before it can be marked done. */
     val proofRequired: Boolean = false,
+    val commentCount: Int = 0,
 ) {
     /** Tomorrow's daily task waits for its day; the API refuses it before then. */
     fun isOpen(today: java.time.LocalDate = java.time.LocalDate.now()) = opensOn == null || !java.time.LocalDate.parse(opensOn).isAfter(today)
@@ -357,6 +358,21 @@ data class CompleteOccurrenceInput(@EncodeDefault(EncodeDefault.Mode.NEVER) val 
 data class ReviewOccurrenceInput(
     val approve: Boolean,
     @EncodeDefault(EncodeDefault.Mode.NEVER) val noteMd: String? = null,
+    /** Posted as a comment on the task, e.g. what to fix when sending it back. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val comment: String? = null,
+)
+
+@Serializable
+data class CommentInput(val body: String)
+
+/** One message in the conversation on a due date. */
+@Serializable
+data class OccurrenceComment(
+    val id: String,
+    val occurrenceId: String,
+    val authorId: String,
+    val body: String,
+    val createdAt: String,
 )
 
 @Serializable

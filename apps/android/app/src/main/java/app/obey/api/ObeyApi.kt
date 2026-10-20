@@ -133,6 +133,15 @@ interface ObeyApi {
     @POST("occurrences/{id}/review")
     suspend fun review(@Path("id") occurrenceId: String, @Body body: ReviewOccurrenceInput): Occurrence
 
+    @GET("occurrences/{id}/comments")
+    suspend fun comments(@Path("id") occurrenceId: String): List<OccurrenceComment>
+
+    @POST("occurrences/{id}/comments")
+    suspend fun addComment(@Path("id") occurrenceId: String, @Body body: CommentInput): OccurrenceComment
+
+    @DELETE("comments/{id}")
+    suspend fun deleteComment(@Path("id") commentId: String)
+
     @POST("occurrences/{id}/reschedule")
     suspend fun reschedule(@Path("id") occurrenceId: String, @Body body: RescheduleInput): RescheduleResult
 

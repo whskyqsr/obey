@@ -1,5 +1,7 @@
 package app.obey.ui.today
 
+import app.obey.ui.comments.CommentsSheet
+import app.obey.ui.comments.SendBackDialog
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -80,6 +82,8 @@ fun TodayScreen(
 
     var rescheduling by remember { mutableStateOf<Occurrence?>(null) }
     var noting by remember { mutableStateOf<Occurrence?>(null) }
+    var commenting by remember { mutableStateOf<Occurrence?>(null) }
+    var sendingBack by remember { mutableStateOf<Occurrence?>(null) }
     var plan by remember { mutableStateOf<CalendarEvent?>(null) }
     var dayTasks by remember { mutableStateOf<List<Occurrence>?>(null) }
     val session = vm.session
@@ -121,6 +125,7 @@ fun TodayScreen(
                     onCompleteWithNote = if (o.assigneeId == me) ({ noting = o }) else null,
                     onReschedule = { rescheduling = o },
                     onEditTask = if (session?.canManage == true) ({ onEditTask(o.seriesId) }) else null,
+                    onComments = { commenting = o },
                 )
 
                 val isDom = session?.canManage == true
@@ -164,12 +169,12 @@ fun TodayScreen(
                     if (isDom) {
                         items(d.awaitingReview, key = { "v-" + it.id }) { o ->
                             androidx.compose.foundation.layout.Column {
-                                row(o, OccurrenceActions(onApprove = { vm.review(o, true) }, onReject = { vm.review(o, false) }))()
+                                row(o, OccurrenceActions(onApprove = { vm.review(o, true) }, onReject = { sendingBack = o }, onComments = { commenting = o }))()
                                 if (o.photoCount > 0) ProofPhotos(o.id, canAdd = false, modifier = Modifier.padding(start = 64.dp, end = 16.dp, bottom = 8.dp))
                             }
                         }
                         items(d.recentMisses, key = { "m-" + it.id }) { o ->
-                            OccurrenceRow(o, nameFor(o), OccurrenceActions(onExcuse = { vm.excuse(o) }), onOpen = { onOpenTask(o.seriesId) }, streak = d.streaks[o.seriesId])
+                            OccurrenceRow(o, nameFor(o), OccurrenceActions(onExcuse = { vm.excuse(o) }, onComments = { commenting = o }), onOpen = { onOpenTask(o.seriesId) }, streak = d.streaks[o.seriesId])
                         }
                     }
                     if (d.overdue.isNotEmpty()) {
@@ -225,6 +230,10 @@ fun TodayScreen(
         if (result == SnackbarResult.ActionPerformed) vm.undoComplete(o)
     }
 
+    commenting?.let { o -> CommentsSheet(o, onDismiss = { commenting = null }, onChanged = vm::refresh) }
+    sendingBack?.let { o ->
+        SendBackDialog(o, onDismiss = { sendingBack = null }, onConfirm = { vm.review(o, false, it); sendingBack = null })
+    }
     rescheduling?.let { o ->
         RescheduleSheet(o, onDismiss = { rescheduling = null }, onSubmit = { vm.reschedule(o, it) })
     }

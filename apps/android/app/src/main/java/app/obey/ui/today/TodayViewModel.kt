@@ -127,8 +127,8 @@ class TodayViewModel @Inject constructor(
         refresh()
     }
 
-    fun review(o: Occurrence, approve: Boolean) = action {
-        api.review(o.id, ReviewOccurrenceInput(approve = approve))
+    fun review(o: Occurrence, approve: Boolean, comment: String? = null) = action {
+        api.review(o.id, ReviewOccurrenceInput(approve = approve, comment = comment))
         say(if (approve) "Approved" else "Sent back")
         refresh()
     }
