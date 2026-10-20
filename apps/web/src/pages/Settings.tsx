@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useCreateInvite, useSetAvatar, useUpdateMe, useUpdateRelationship } from "../api/hooks";
 import { errorMessage } from "../api/client";
-import type { Features, ReschedulePolicy, WeekStart } from "../api/types";
+import type { Features, ReschedulePolicy, Role, WeekStart } from "../api/types";
 import { getSession, signOut } from "../auth/session";
 import { Avatar, squareJpeg } from "../components/Avatar";
 import { Button, Divider, Icon, PageHeader, Section, SegmentedButtons, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
 import { fmtDateTime } from "../lib/dates";
+import { inviteLink } from "../lib/invite";
 import { ROLE_LABEL, relTitle, useRel } from "../lib/relationship";
 import { type PushState, pushState, registerPush } from "../push";
 import { type ThemeMode, useTheme } from "../theme/ThemeProvider";
@@ -35,6 +36,8 @@ export function SettingsPage() {
   const qc = useQueryClient();
   const update = useUpdateRelationship(rel.id);
   const invite = useCreateInvite(rel.id);
+  // A Dominant usually invites a submissive and the other way round; a Switch leaves it open.
+  const [inviteRole, setInviteRole] = useState<Role | "">(self?.role === "dominant" ? "submissive" : self?.role === "submissive" ? "dominant" : "");
   const [name, setName] = useState(rel.name ?? "");
   const [allowance, setAllowance] = useState(String(rel.weeklyDelayAllowance));
   const [push, setPush] = useState<PushState>(pushState);
@@ -75,7 +78,11 @@ export function SettingsPage() {
                 {me.user.avatarVersion ? "Change photo" : "Add photo"}
               </Button>
               {me.user.avatarVersion && (
-                <Button variant="text" disabled={setAvatar.isPending} onClick={() => setAvatar.mutate(null, { onSuccess: () => snack("Photo removed"), onError: (e) => snack(errorMessage(e)) })}>
+                <Button
+                  variant="text"
+                  disabled={setAvatar.isPending}
+                  onClick={() => setAvatar.mutate(null, { onSuccess: () => snack("Photo removed"), onError: (e) => snack(errorMessage(e)) })}
+                >
                   Remove
                 </Button>
               )}
@@ -205,29 +212,67 @@ export function SettingsPage() {
           <div>
             <div className="mb-2 text-title-small text-on-surface">Invite a partner</div>
             {invite.data ? (
-              <div className="flex flex-wrap items-center gap-3 rounded-md bg-primary-container p-4 text-on-primary-container">
-                <code className="text-headline-small tracking-widest">{invite.data.code}</code>
-                <span className="flex-1 text-body-small">Expires {fmtDateTime(invite.data.expiresAt)}</span>
-                <Button
-                  variant="text"
-                  icon="content_copy"
-                  className="text-on-primary-container"
-                  onClick={() => navigator.clipboard?.writeText(invite.data!.code).then(() => snack("Code copied"), () => snack("Couldn't copy"))}
-                >
-                  Copy
-                </Button>
+              <div className="flex flex-col gap-3 rounded-md bg-primary-container p-4 text-on-primary-container">
+                <span className="text-body-large break-all">{inviteLink(invite.data.code)}</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="filled"
+                    icon="content_copy"
+                    onClick={() =>
+                      navigator.clipboard?.writeText(inviteLink(invite.data!.code)).then(
+                        () => snack("Link copied"),
+                        () => snack("Couldn't copy"),
+                      )
+                    }
+                  >
+                    Copy link
+                  </Button>
+                  {"share" in navigator && (
+                    <Button
+                      variant="text"
+                      icon="share"
+                      className="text-on-primary-container"
+                      onClick={() => navigator.share({ title: "Join me on Obey", url: inviteLink(invite.data!.code) }).catch(() => {})}
+                    >
+                      Share
+                    </Button>
+                  )}
+                </div>
+                <span className="text-body-small">
+                  {invite.data.role ? `They'll join as ${ROLE_LABEL[invite.data.role]}` : "They'll choose their role"} · code {invite.data.code} · expires{" "}
+                  {fmtDateTime(invite.data.expiresAt)}
+                </span>
               </div>
             ) : (
-              <Button variant="tonal" icon="person_add" busy={invite.isPending} onClick={() => invite.mutate(undefined, { onError: (e) => snack(errorMessage(e)) })}>
-                Create invite code
-              </Button>
+              <div className="flex flex-wrap items-start gap-3">
+                <Select label="They'll join as" value={inviteRole} onChange={(e) => setInviteRole(e.target.value as Role | "")} className="w-56">
+                  <option value="submissive">{ROLE_LABEL.submissive}</option>
+                  <option value="dominant">{ROLE_LABEL.dominant}</option>
+                  <option value="switch">{ROLE_LABEL.switch}</option>
+                  <option value="">Let them choose</option>
+                </Select>
+                <Button
+                  variant="tonal"
+                  icon="add_link"
+                  className="mt-2"
+                  busy={invite.isPending}
+                  onClick={() => invite.mutate(inviteRole || null, { onError: (e) => snack(errorMessage(e)) })}
+                >
+                  Create invite link
+                </Button>
+              </div>
             )}
-            <p className="mt-2 text-body-small text-on-surface-variant">They choose “Join with code” after signing in.</p>
+            <p className="mt-2 text-body-small text-on-surface-variant">The link opens Obey, where they sign in or create an account, then accept.</p>
           </div>
           <Divider />
           <div>
             <div className="mb-2 text-title-small text-on-surface">Rescheduling</div>
-            <Select label="Who can move deadlines" value={rel.reschedulePolicy} disabled={!isDom || update.isPending} onChange={(e) => patch({ reschedulePolicy: e.target.value as ReschedulePolicy })}>
+            <Select
+              label="Who can move deadlines"
+              value={rel.reschedulePolicy}
+              disabled={!isDom || update.isPending}
+              onChange={(e) => patch({ reschedulePolicy: e.target.value as ReschedulePolicy })}
+            >
               {POLICIES.map((p) => (
                 <option key={p.value} value={p.value}>
                   {p.label}
@@ -237,7 +282,16 @@ export function SettingsPage() {
             <p className="mt-2 px-1 text-body-small text-on-surface-variant">{POLICIES.find((p) => p.value === rel.reschedulePolicy)?.help}</p>
             {rel.reschedulePolicy === "allowance" && (
               <div className="mt-4 flex flex-wrap items-start gap-2">
-                <TextField label="Free delays per week" type="number" min={0} max={50} value={allowance} onChange={(e) => setAllowance(e.target.value)} disabled={!isDom} className="w-48" />
+                <TextField
+                  label="Free delays per week"
+                  type="number"
+                  min={0}
+                  max={50}
+                  value={allowance}
+                  onChange={(e) => setAllowance(e.target.value)}
+                  disabled={!isDom}
+                  className="w-48"
+                />
                 {isDom && Number(allowance) !== rel.weeklyDelayAllowance && allowance !== "" && (
                   <Button variant="tonal" className="mt-2" onClick={() => patch({ weeklyDelayAllowance: Math.max(0, Math.min(50, Math.trunc(Number(allowance)))) })}>
                     Save

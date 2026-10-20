@@ -3,6 +3,7 @@ import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import {
   allFeatures,
+  createInvite,
   createRelationship,
   id,
   joinRelationship,
@@ -138,14 +139,38 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
   });
 
   app.post<{ Params: { id: string } }>("/relationships/:id/invites", async (req, reply) => {
-    await requireMember(db, req.params.id, req.user.id);
+    const me = await requireMember(db, req.params.id, req.user.id);
+    const body = createInvite.parse(req.body ?? {});
+    // Unless told otherwise, a Dominant invites a submissive and a submissive invites a Dominant; a Switch leaves it open.
+    const role = body.role !== undefined ? body.role : me.role === "dominant" ? "submissive" : me.role === "submissive" ? "dominant" : null;
     const expiresAt = new Date(deps.now().getTime() + 7 * 86_400_000);
     const [invite] = await db
       .insert(invites)
-      .values({ code: inviteCode(), relationshipId: req.params.id, createdBy: req.user.id, expiresAt })
+      .values({ code: inviteCode(), relationshipId: req.params.id, createdBy: req.user.id, expiresAt, role })
       .returning();
     reply.status(201);
-    return { code: invite!.code, expiresAt: invite!.expiresAt.toISOString() };
+    return { code: invite!.code, expiresAt: invite!.expiresAt.toISOString(), role: invite!.role };
+  });
+
+  /** What an invite link shows before it's accepted. */
+  app.get<{ Params: { code: string } }>("/invites/:code", async (req) => {
+    const [row] = await db
+      .select({ invite: invites, inviterName: users.displayName })
+      .from(invites)
+      .innerJoin(users, eq(users.id, invites.createdBy))
+      .where(and(eq(invites.code, req.params.code.trim().toUpperCase()), isNull(invites.usedBy), gt(invites.expiresAt, deps.now())));
+    if (!row) throw notFound("invite not found or expired");
+    const member = await db
+      .select({ userId: memberships.userId })
+      .from(memberships)
+      .where(and(eq(memberships.relationshipId, row.invite.relationshipId), eq(memberships.userId, req.user.id)));
+    return {
+      code: row.invite.code,
+      relationshipId: row.invite.relationshipId,
+      inviterName: row.inviterName,
+      role: row.invite.role,
+      alreadyMember: member.length > 0,
+    };
   });
 
   app.post("/relationships/join", async (req) => {
@@ -159,12 +184,14 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
         )
         .returning();
       if (!invite) throw notFound("invite not found or expired");
+      const role = invite.role ?? body.role;
+      if (!role) throw new HttpError(400, "choose a role");
       const existing = await tx
         .select()
         .from(memberships)
         .where(and(eq(memberships.relationshipId, invite.relationshipId), eq(memberships.userId, req.user.id)));
       if (existing.length) throw new HttpError(409, "already a member");
-      await tx.insert(memberships).values({ relationshipId: invite.relationshipId, userId: req.user.id, role: body.role });
+      await tx.insert(memberships).values({ relationshipId: invite.relationshipId, userId: req.user.id, role });
       return invite.relationshipId;
     });
     await deps.notifier.send(await managers(db, relId, req.user.id), {

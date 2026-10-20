@@ -3,6 +3,7 @@ import { FIREBASE_ENABLED, API_URL } from "../env";
 import { UUID_RE, authErrorMessage, createAccount, signInDev, signInWithEmail, signInWithGoogle } from "../auth/session";
 import { errorMessage } from "../api/client";
 import { Button, Icon, TextField } from "../components/ui";
+import { pendingInvite } from "../lib/invite";
 
 export function SignInPage() {
   const [uid, setUid] = useState("");
@@ -43,6 +44,12 @@ export function SignInPage() {
         </div>
         <h1 className="text-headline-large text-on-surface">Obey</h1>
         <p className="mt-2 mb-8 text-body-large text-on-surface-variant">Tasks, rules and rewards for the two (or more) of you.</p>
+        {pendingInvite() && (
+          <div className="-mt-4 mb-6 flex items-center gap-3 rounded-md bg-secondary-container p-3 text-body-medium text-on-secondary-container">
+            <Icon name="mail" />
+            You've been invited. Sign in, or create an account, to accept.
+          </div>
+        )}
 
         {FIREBASE_ENABLED ? (
           <div className="flex flex-col gap-4">
@@ -62,19 +69,9 @@ export function SignInPage() {
               }}
             >
               <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
-              <TextField
-                label="Password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-              />
+              <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
               <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="text"
-                  disabled={busy || !email.trim() || password.length < 6}
-                  onClick={() => run(() => createAccount(email, password))}
-                >
+                <Button variant="text" disabled={busy || !email.trim() || password.length < 6} onClick={() => run(() => createAccount(email, password))}>
                   Create account
                 </Button>
                 <div className="flex-1" />
@@ -87,8 +84,7 @@ export function SignInPage() {
         ) : (
           <form onSubmit={dev} className="flex flex-col gap-4">
             <div className="rounded-md bg-tertiary-container p-3 text-body-medium text-on-tertiary-container">
-              Dev sign-in: no Firebase config is set, so requests send <code>X-Dev-User</code>. Start the API at{" "}
-              <code>{API_URL}</code> with <code>DEV_AUTH=1</code>.
+              Dev sign-in: no Firebase config is set, so requests send <code>X-Dev-User</code>. Start the API at <code>{API_URL}</code> with <code>DEV_AUTH=1</code>.
             </div>
             <TextField
               label="User id (UUID)"

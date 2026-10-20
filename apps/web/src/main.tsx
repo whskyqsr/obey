@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ApiError } from "./api/client";
 import { App } from "./App";
 import { initSession } from "./auth/session";
+import { captureInviteLink } from "./lib/invite";
 import { SnackbarProvider } from "./components/ui";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import "./index.css";
@@ -18,6 +19,7 @@ const queryClient = new QueryClient({
   },
 });
 
+captureInviteLink();
 void initSession();
 
 createRoot(document.getElementById("root")!).render(

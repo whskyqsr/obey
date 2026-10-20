@@ -113,6 +113,25 @@ describe("relationships", () => {
     const fourth = ctx.as(crypto.randomUUID());
     expect((await fourth.post("/relationships/join", { code, role: "submissive" })).status).toBe(404);
   });
+  it("lets an invite link set the role and preview who sent it", async () => {
+    const { dom, relId } = await ctx.pair();
+    const inv = (await dom.post(`/relationships/${relId}/invites`)).body;
+    expect(inv.role).toBe("submissive");
+    const guest = ctx.as(crypto.randomUUID());
+    const preview = (await guest.get(`/invites/${inv.code.toLowerCase()}`)).body;
+    expect(preview).toMatchObject({ code: inv.code, relationshipId: relId, role: "submissive", alreadyMember: false });
+    expect(preview.inviterName).toBeTruthy();
+    // The invite decides the role, whatever the joiner sends.
+    const joined = (await guest.post("/relationships/join", { code: inv.code, role: "dominant" })).body;
+    expect(joined.members.filter((m: { role: string }) => m.role === "submissive")).toHaveLength(2);
+    expect((await guest.get(`/invites/${inv.code}`)).status).toBe(404);
+
+    const open = (await dom.post(`/relationships/${relId}/invites`, { role: null })).body;
+    expect(open.role).toBeNull();
+    const chooser = ctx.as(crypto.randomUUID());
+    expect((await chooser.post("/relationships/join", { code: open.code })).status).toBe(400);
+    expect((await chooser.post("/relationships/join", { code: open.code, role: "switch" })).status).toBe(200);
+  });
 });
 
 describe("tasks and occurrences", () => {

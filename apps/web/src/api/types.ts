@@ -10,6 +10,7 @@ export type Member = z.infer<typeof c.member>;
 export type Role = c.Role;
 export type ReschedulePolicy = z.infer<typeof c.reschedulePolicy>;
 export type Invite = z.infer<typeof c.invite>;
+export type InvitePreview = z.infer<typeof c.invitePreview>;
 export type Task = c.Task;
 export type TaskInput = z.infer<typeof c.taskInput>;
 export type Occurrence = c.Occurrence;

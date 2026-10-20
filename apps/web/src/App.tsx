@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { RouterProvider } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMe } from "./api/hooks";
@@ -7,6 +7,8 @@ import { signOut } from "./auth/session";
 import { useSession } from "./auth/useSession";
 import { Button, ErrorBox, Loading } from "./components/ui";
 import { RelationshipProvider } from "./lib/relationship";
+import { pendingInvite } from "./lib/invite";
+import { AcceptInvite } from "./pages/AcceptInvite";
 import { Onboarding } from "./pages/Onboarding";
 import { SignInPage } from "./pages/SignIn";
 import { registerPush } from "./push";
@@ -26,6 +28,7 @@ export function App() {
 
 function SignedIn() {
   const me = useMe();
+  const [invite, setInvite] = useState(pendingInvite);
 
   useEffect(() => {
     // Refresh the push token silently when permission was granted earlier.
@@ -44,6 +47,7 @@ function SignedIn() {
         )}
       </div>
     );
+  if (invite) return <AcceptInvite code={invite} onDone={() => setInvite(null)} />;
   if (!me.data.relationships.length) return <Onboarding />;
   return (
     <RelationshipProvider me={me.data}>

@@ -73,6 +73,8 @@ export const invites = pgTable("invites", {
     .references(() => users.id),
   expiresAt: ts("expires_at").notNull(),
   usedBy: uuid("used_by").references(() => users.id),
+  /** What the person joining becomes; null lets them choose. */
+  role: text("role", { enum: ["dominant", "submissive", "switch"] }),
   createdAt: createdAt(),
 });
 

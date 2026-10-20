@@ -77,8 +77,19 @@ const relationshipName = z
   .nullish()
   .transform((s) => s || null);
 export const createRelationship = z.object({ name: relationshipName, role });
-export const invite = z.object({ code: z.string(), expiresAt: z.string() });
-export const joinRelationship = z.object({ code: z.string().min(4), role });
+/** `role` is what the person joining becomes; null lets them choose. */
+export const invite = z.object({ code: z.string(), expiresAt: z.string(), role: role.nullable().default(null) });
+export const createInvite = z.object({ role: role.nullable().optional() });
+/** What an invite link shows before it's accepted. */
+export const invitePreview = z.object({
+  code: z.string(),
+  relationshipId: z.string().uuid(),
+  inviterName: z.string(),
+  role: role.nullable(),
+  alreadyMember: z.boolean(),
+});
+/** `role` is used only when the invite leaves it to the person joining. */
+export const joinRelationship = z.object({ code: z.string().min(4), role: role.optional() });
 export const updateRelationship = z.object({
   name: relationshipName.optional(),
   reschedulePolicy: reschedulePolicy.optional(),

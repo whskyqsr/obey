@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { api, apiObjectUrl } from "./client";
 import type {
+  InvitePreview,
   Balance,
   Features,
   EditOccurrence,
@@ -52,8 +53,7 @@ const HISTORY_PAGE = 30;
 export function useTaskHistory(rel: string, taskId: string) {
   return useInfiniteQuery({
     queryKey: ["rel", rel, "history", taskId],
-    queryFn: ({ pageParam }) =>
-      api<HistoryEntry[]>(`/tasks/${taskId}/history`, { query: { before: pageParam, limit: String(HISTORY_PAGE) } }),
+    queryFn: ({ pageParam }) => api<HistoryEntry[]>(`/tasks/${taskId}/history`, { query: { before: pageParam, limit: String(HISTORY_PAGE) } }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => (last.length === HISTORY_PAGE ? last.at(-1)!.dueAt : undefined),
   });
@@ -93,8 +93,7 @@ export function useUpdateMe() {
 export function useSetAvatar() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (image: Blob | null) =>
-      image ? api<User>("/me/avatar", { method: "PUT", body: image }) : api<User>("/me/avatar", { method: "DELETE" }),
+    mutationFn: (image: Blob | null) => (image ? api<User>("/me/avatar", { method: "PUT", body: image }) : api<User>("/me/avatar", { method: "DELETE" })),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.me }),
   });
 }
@@ -121,7 +120,7 @@ export function useCreateRelationship() {
 export function useJoinRelationship() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { code: string; role: Role }) => api<Relationship>("/relationships/join", { method: "POST", body }),
+    mutationFn: (body: { code: string; role?: Role }) => api<Relationship>("/relationships/join", { method: "POST", body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.me }),
   });
 }
@@ -135,8 +134,13 @@ export function useUpdateRelationship(rel: string) {
   });
 }
 
+/** `role` is what the person joining becomes; null lets them choose, undefined uses the server's default. */
 export function useCreateInvite(rel: string) {
-  return useMutation({ mutationFn: () => api<Invite>(`/relationships/${rel}/invites`, { method: "POST" }) });
+  return useMutation({ mutationFn: (role?: Role | null) => api<Invite>(`/relationships/${rel}/invites`, { method: "POST", body: role === undefined ? {} : { role } }) });
+}
+
+export function useInvitePreview(code: string) {
+  return useQuery({ queryKey: ["invite", code], queryFn: () => api<InvitePreview>(`/invites/${encodeURIComponent(code)}`) });
 }
 
 // ---- tasks
@@ -149,9 +153,7 @@ export function useSaveTask(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({
     mutationFn: ({ id, input }: { id?: string; input: Partial<TaskInput> & { active?: boolean } }) =>
-      id
-        ? api<Task>(`/tasks/${id}`, { method: "PATCH", body: input })
-        : api<Task>(`/relationships/${rel}/tasks`, { method: "POST", body: input }),
+      id ? api<Task>(`/tasks/${id}`, { method: "PATCH", body: input }) : api<Task>(`/relationships/${rel}/tasks`, { method: "POST", body: input }),
     onSuccess: () => invalidate(),
   });
 }
@@ -176,8 +178,7 @@ export function useOccurrences(rel: string, from: string, to: string) {
 export function useCompleteOccurrence(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({
-    mutationFn: ({ id, noteMd }: { id: string; noteMd?: string }) =>
-      api<Occurrence>(`/occurrences/${id}/complete`, { method: "POST", body: noteMd ? { noteMd } : {} }),
+    mutationFn: ({ id, noteMd }: { id: string; noteMd?: string }) => api<Occurrence>(`/occurrences/${id}/complete`, { method: "POST", body: noteMd ? { noteMd } : {} }),
     onSuccess: () => invalidate(),
   });
 }
@@ -202,8 +203,7 @@ export function useReviewOccurrence(rel: string) {
 export function useReschedule(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: RescheduleInput }) =>
-      api<RescheduleResult>(`/occurrences/${id}/reschedule`, { method: "POST", body: input }),
+    mutationFn: ({ id, input }: { id: string; input: RescheduleInput }) => api<RescheduleResult>(`/occurrences/${id}/reschedule`, { method: "POST", body: input }),
     onSuccess: () => invalidate(),
   });
 }
@@ -212,10 +212,10 @@ export function useRescheduleDay(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({
     mutationFn: (input: RescheduleDayInput) =>
-      api<{ applied: boolean; groupId: string; requests: RescheduleRequest[]; occurrences: Occurrence[] }>(
-        `/relationships/${rel}/reschedules/day`,
-        { method: "POST", body: input },
-      ),
+      api<{ applied: boolean; groupId: string; requests: RescheduleRequest[]; occurrences: Occurrence[] }>(`/relationships/${rel}/reschedules/day`, {
+        method: "POST",
+        body: input,
+      }),
     onSuccess: () => invalidate(),
   });
 }
@@ -231,10 +231,10 @@ export function useDecideReschedule(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({
     mutationFn: ({ id, approve }: { id: string; approve: boolean }) =>
-      api<{ request: RescheduleRequest; occurrence: Occurrence | null; requests: RescheduleRequest[]; occurrences: Occurrence[] }>(
-        `/reschedules/${id}/decide`,
-        { method: "POST", body: { approve } },
-      ),
+      api<{ request: RescheduleRequest; occurrence: Occurrence | null; requests: RescheduleRequest[]; occurrences: Occurrence[] }>(`/reschedules/${id}/decide`, {
+        method: "POST",
+        body: { approve },
+      }),
     onSuccess: () => invalidate(),
   });
 }
@@ -252,8 +252,7 @@ export function useBalances(rel: string) {
 export function useAdjustPoints(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({
-    mutationFn: (body: { userId: string; delta: number; note: string }) =>
-      api<LedgerEntry>(`/relationships/${rel}/ledger/adjust`, { method: "POST", body }),
+    mutationFn: (body: { userId: string; delta: number; note: string }) => api<LedgerEntry>(`/relationships/${rel}/ledger/adjust`, { method: "POST", body }),
     onSuccess: () => invalidate(),
   });
 }
@@ -294,7 +293,10 @@ export function useReorder(rel: string, kind: "rules" | "protocols") {
   return useMutation({
     mutationFn: (items: { id: string }[]) => api(`/relationships/${rel}/${kind}/order`, { method: "PUT", body: { ids: items.map((i) => i.id) } }),
     onMutate: (items) => {
-      qc.setQueryData(keys.library(rel, kind), items.map((item, i) => ({ ...item, position: i + 1 })));
+      qc.setQueryData(
+        keys.library(rel, kind),
+        items.map((item, i) => ({ ...item, position: i + 1 })),
+      );
     },
     onSettled: () => invalidate(),
   });
