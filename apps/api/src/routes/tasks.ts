@@ -13,6 +13,7 @@ import {
   completeOccurrence,
   decideReschedule,
   editOccurrence,
+  issueConsequence,
   requestGroupReschedule,
   materializeRelationship,
   materializeSeries,
@@ -116,26 +117,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const body = assignConsequence.parse(req.body);
     validZone(body.timezone);
     if (!(await membership(db, c.relationshipId, body.assigneeId))) throw new HttpError(400, "assignee is not in this relationship");
-    const bodyMd = [body.reason && `**Why:** ${body.reason}`, c.bodyMd].filter(Boolean).join("\n\n");
-    const series = await db.transaction(async (tx) => {
-      const [s] = await tx
-        .insert(taskSeries)
-        .values({
-          relationshipId: c.relationshipId,
-          assigneeId: body.assigneeId,
-          title: c.title,
-          bodyMd,
-          assignedConsequenceId: c.id,
-          approvalRequired: body.approvalRequired,
-          schedule: { start: body.date },
-          dueTime: body.dueTime,
-          timezone: body.timezone,
-          createdBy: req.user.id,
-        })
-        .returning();
-      await materializeSeries(tx, s!, horizon(s!.timezone), deps.now());
-      return s!;
-    });
+    const series = (await db.transaction((tx) => issueConsequence(tx, c, { ...body, createdBy: req.user.id }, deps.now())))!;
     if (series.assigneeId !== req.user.id)
       await notifier.send([series.assigneeId], { title: "Obey", body: "You've been given a consequence", data: { type: "task_assigned", taskId: series.id } });
     reply.status(201);

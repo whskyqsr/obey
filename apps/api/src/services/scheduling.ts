@@ -13,13 +13,14 @@ import {
   splitSeries,
 } from "@obey/recurrence";
 import type { Tx } from "../db/index.js";
-import { occurrences, pointsLedger, relationships, reschedules, taskSeries } from "../db/schema.js";
+import { consequences, occurrences, pointsLedger, relationships, reschedules, taskSeries } from "../db/schema.js";
 import { HttpError, forbidden } from "../errors.js";
 import { type Role, canManage } from "./access.js";
 
 export type Series = typeof taskSeries.$inferSelect;
 export type Occurrence = typeof occurrences.$inferSelect;
 export type Relationship = typeof relationships.$inferSelect;
+export type Consequence = typeof consequences.$inferSelect;
 
 const maxDate = (a: PlainDate, b: PlainDate) => (a > b ? a : b);
 
@@ -173,6 +174,8 @@ export async function editOccurrence(
     .where(eq(occurrences.id, occ.id))
     .returning();
   if (status !== occ.status) {
+    if (status === "missed") await issueMissConsequence(db, series, updated!, now);
+    if (occ.status === "missed") await withdrawMissConsequence(db, occ);
     await db
       .delete(pointsLedger)
       .where(and(eq(pointsLedger.occurrenceId, occ.id), inArray(pointsLedger.kind, ["completion", "miss"])));
@@ -193,7 +196,79 @@ export async function editOccurrence(
   return updated!;
 }
 
-/** Marks pending occurrences past due + grace as missed and applies penalties. Returns what changed. */
+/**
+ * Hands out a consequence as a one-off task, so it's done, missed and reviewed like any other.
+ * With `causedBy` it's the automatic one for that missed occurrence, issued at most once (returns null on a repeat).
+ */
+export async function issueConsequence(
+  db: Tx,
+  c: Consequence,
+  o: { assigneeId: string; date: PlainDate; dueTime: string | null; timezone: string; reason: string; approvalRequired: boolean; createdBy: string; causedBy?: string },
+  now: Date,
+): Promise<Series | null> {
+  const bodyMd = [o.reason && `**Why:** ${o.reason}`, c.bodyMd].filter(Boolean).join("\n\n");
+  const [s] = await db
+    .insert(taskSeries)
+    .values({
+      relationshipId: c.relationshipId,
+      assigneeId: o.assigneeId,
+      title: c.title,
+      bodyMd,
+      assignedConsequenceId: c.id,
+      causedByOccurrenceId: o.causedBy ?? null,
+      approvalRequired: o.approvalRequired,
+      schedule: { start: o.date },
+      dueTime: o.dueTime,
+      timezone: o.timezone,
+      createdBy: o.createdBy,
+    })
+    .onConflictDoNothing()
+    .returning();
+  if (!s) return null;
+  await materializeSeries(db, s, o.date, now);
+  return s;
+}
+
+/** The consequence a task carries, handed out for one of its misses: due by the end of the next day. Null if none applies. */
+async function issueMissConsequence(db: Tx, series: Series, occ: Occurrence, now: Date): Promise<Series | null> {
+  if (!series.consequenceId) return null;
+  const [rel] = await db.select({ features: relationships.features }).from(relationships).where(eq(relationships.id, series.relationshipId));
+  if (rel?.features.consequences === false) return null;
+  const [c] = await db.select().from(consequences).where(eq(consequences.id, series.consequenceId));
+  if (!c) return null;
+  const day = occ.dueAt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: series.timezone });
+  return issueConsequence(
+    db,
+    c,
+    {
+      assigneeId: series.assigneeId,
+      date: addDays(localDate(now, series.timezone), 1),
+      dueTime: null,
+      timezone: series.timezone,
+      reason: `Missed “${series.title}” on ${day}`,
+      approvalRequired: series.approvalRequired,
+      createdBy: series.createdBy,
+      causedBy: occ.id,
+    },
+    now,
+  );
+}
+
+/** Takes back the automatic consequence for an occurrence that's no longer missed, if it hasn't been dealt with yet. */
+async function withdrawMissConsequence(db: Tx, occ: Occurrence) {
+  const issued = await db
+    .update(taskSeries)
+    .set({ active: false, updatedAt: new Date() })
+    .where(and(eq(taskSeries.causedByOccurrenceId, occ.id), eq(taskSeries.active, true)))
+    .returning({ id: taskSeries.id });
+  if (issued.length)
+    await db
+      .update(occurrences)
+      .set({ status: "cancelled" })
+      .where(and(inArray(occurrences.seriesId, issued.map((s) => s.id)), eq(occurrences.status, "pending")));
+}
+
+/** Marks pending occurrences past due + grace as missed, applies penalties and hands out any consequence. Returns what changed. */
 export async function markMissed(db: Tx, now: Date) {
   const overdue = await db
     .select({ occ: occurrences, series: taskSeries })
@@ -205,7 +280,7 @@ export async function markMissed(db: Tx, now: Date) {
         sql`${occurrences.dueAt} + make_interval(mins => ${taskSeries.graceMinutes}) <= ${now.toISOString()}::timestamptz`,
       ),
     );
-  const missed: { occ: Occurrence; series: Series }[] = [];
+  const missed: { occ: Occurrence; series: Series; consequence: Series | null }[] = [];
   for (const { occ, series } of overdue) {
     const [updated] = await db
       .update(occurrences)
@@ -228,7 +303,7 @@ export async function markMissed(db: Tx, now: Date) {
     }
     // A missed chore shouldn't vanish: count the next one from when it was due.
     await advanceCompletionSeries(db, series, localDate(occ.dueAt, series.timezone));
-    missed.push({ occ: updated, series });
+    missed.push({ occ: updated, series, consequence: await issueMissConsequence(db, series, updated, now) });
   }
   return missed;
 }
@@ -274,6 +349,7 @@ export function targetDue(series: Series, occ: Occurrence, change: RescheduleCha
 /** Undo a miss penalty when a missed occurrence is reopened by rescheduling. */
 async function reopenIfMissed(db: Tx, series: Series, occ: Occurrence) {
   if (occ.status !== "missed") return;
+  await withdrawMissConsequence(db, occ);
   const [penalty] = await db
     .select()
     .from(pointsLedger)

@@ -12,6 +12,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import type { Features } from "@obey/contracts";
 import type { Schedule } from "@obey/recurrence";
@@ -148,6 +149,8 @@ export const taskSeries = pgTable(
     timezone: text("timezone").notNull(),
     graceMinutes: integer("grace_minutes").notNull().default(0),
     active: boolean("active").notNull().default(true),
+    /** Set on the consequence handed out automatically for this missed occurrence; unique, so it's issued once. */
+    causedByOccurrenceId: uuid("caused_by_occurrence_id").references((): AnyPgColumn => occurrences.id, { onDelete: "set null" }),
     /** Set when "this and following" rescheduling splits the series. */
     supersededBy: uuid("superseded_by"),
     createdBy: uuid("created_by")
@@ -156,7 +159,7 @@ export const taskSeries = pgTable(
     createdAt: createdAt(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
-  (t) => [index("task_series_relationship_idx").on(t.relationshipId)],
+  (t) => [index("task_series_relationship_idx").on(t.relationshipId), uniqueIndex("task_series_caused_by_uq").on(t.causedByOccurrenceId)],
 );
 
 export const occurrences = pgTable(

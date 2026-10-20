@@ -190,6 +190,13 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                             }
                         }
                     }
+                    if (features.consequences && form.consequenceId != null) {
+                        Text(
+                            "Handed out automatically on a miss, due by the end of the next day",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
 
                     HorizontalDivider(Modifier.padding(vertical = 4.dp))
                     LabeledSwitch("Needs approval", if (features.points) "Points post after you approve it" else "You confirm it's done", form.approvalRequired) { v ->

@@ -412,6 +412,29 @@ describe("assigned consequences", () => {
     const other = await ctx.pair();
     expect((await dom.post(`/consequences/${c.id}/assign`, { ...input, assigneeId: other.subId })).status).toBe(400);
   });
+
+  it("are handed out once when a task carrying one is missed, and taken back if the miss is undone", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    const c = (await dom.post(`/relationships/${relId}/consequences`, { title: "Corner time" })).body;
+    const t = (await dom.post(`/relationships/${relId}/tasks`, task(subId, { consequenceId: c.id, schedule: { start: "2026-10-16", rule: { freq: "daily" } } }))).body;
+    await dom.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-18`);
+    const issued = async () => ((await sub.get(`/relationships/${relId}/tasks`)).body as { assignedConsequenceId: string | null }[]).filter((x) => x.assignedConsequenceId === c.id);
+    try {
+      ctx.clock.now = new Date("2026-10-17T12:00:00Z"); // the 16th's 21:00 New York deadline has passed
+      await runJobs(ctx.db, ctx.notifier, ctx.clock.now, { materializeDays: 14, reminderLeadMinutes: 30 });
+      await runJobs(ctx.db, ctx.notifier, ctx.clock.now, { materializeDays: 14, reminderLeadMinutes: 30 });
+      const [given, ...extra] = await issued();
+      expect(extra).toHaveLength(0);
+      expect(given).toMatchObject({ title: "Corner time", assigneeId: subId, bodyMd: "**Why:** Missed “Kneel and write lines” on Oct 16", schedule: { start: "2026-10-18" }, dueTime: null });
+      expect(ctx.notifier.sent.some((n) => n.push.body === "A task was missed, and a consequence was added")).toBe(true);
+
+      const [miss] = (await sub.get(`/tasks/${t.id}/history`)).body;
+      await dom.patch(`/occurrences/${miss.id}`, { status: "excused" });
+      expect(await issued()).toHaveLength(0);
+    } finally {
+      ctx.clock.now = new Date("2026-10-16T12:00:00Z");
+    }
+  });
 });
 
 describe("protocols", () => {

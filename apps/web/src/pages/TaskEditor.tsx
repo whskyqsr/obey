@@ -172,7 +172,10 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
               </Select>
             )}
             {features.consequences && (
-              <Select label="Consequence if missed" value={form.consequenceId} onChange={(e) => set({ consequenceId: e.target.value })}>
+              <Select
+                label="Consequence if missed"
+                help={form.consequenceId ? "Handed out automatically on a miss, due by the end of the next day" : undefined}
+                value={form.consequenceId} onChange={(e) => set({ consequenceId: e.target.value })}>
                 <option value="">None</option>
                 {consequences.data?.map((c) => (
                   <option key={c.id} value={c.id}>

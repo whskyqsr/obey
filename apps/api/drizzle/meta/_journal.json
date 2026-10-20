@@ -57,6 +57,13 @@
       "when": 1792508470207,
       "tag": "0007_assigned_consequences",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792510681488,
+      "tag": "0008_miss_consequences",
+      "breakpoints": true
     }
   ]
 }
