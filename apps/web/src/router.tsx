@@ -4,6 +4,7 @@ import { AppShell } from "./components/AppShell";
 import type { Features } from "./api/types";
 import { Empty, ErrorBox, Loading, PageHeader } from "./components/ui";
 import { useRel } from "./lib/relationship";
+import { startWelcome, useWelcome } from "./lib/welcome";
 import { CalendarPage } from "./pages/Calendar";
 import { ConsequencesPage } from "./pages/Consequences";
 import { DynamicPage } from "./pages/Dynamic";
@@ -20,6 +21,7 @@ import { SettingsPage } from "./pages/Settings";
 import { TaskEditorPage } from "./pages/TaskEditor";
 import { TasksPage } from "./pages/Tasks";
 import { TodayPage } from "./pages/Today";
+import { Welcome } from "./pages/Welcome";
 
 // The notes editor pulls in TipTap/ProseMirror; load it on demand.
 const NoteEditorPage = lazy(() => import("./pages/NoteEditor").then((m) => ({ default: m.NoteEditorPage })));
@@ -28,8 +30,14 @@ const TaskPage = lazy(() => import("./pages/TaskPage").then((m) => ({ default: m
 const TaskHistoryPage = lazy(() => import("./pages/TaskPage").then((m) => ({ default: m.TaskHistoryPage })));
 const ProtocolPage = lazy(() => import("./pages/ProtocolPage").then((m) => ({ default: m.ProtocolPage })));
 
+/** The app, or the first-run setup for a dynamic someone just started or joined. */
+function Root() {
+  const { rel } = useRel();
+  return useWelcome() === rel.id ? <Welcome /> : <AppShell />;
+}
+
 const rootRoute = createRootRoute({
-  component: AppShell,
+  component: Root,
   notFoundComponent: () => <ErrorBox error="Page not found." />,
 });
 
@@ -165,6 +173,7 @@ function OnboardingRoute() {
           embedded
           onDone={(id) => {
             select(id);
+            startWelcome(id);
             void navigate({ to: "/" });
           }}
         />

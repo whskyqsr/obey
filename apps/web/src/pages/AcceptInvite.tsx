@@ -7,6 +7,7 @@ import { Button, ErrorBox, Icon, Loading, SegmentedButtons } from "../components
 import { clearPendingInvite } from "../lib/invite";
 import { ROLE_LABEL } from "../lib/relationship";
 import { storage } from "../lib/storage";
+import { startWelcome } from "../lib/welcome";
 
 const ROLES: { value: Role; label: string }[] = (["dominant", "submissive", "switch"] as const).map((r) => ({ value: r, label: ROLE_LABEL[r] }));
 const article = (role: Role) => (role === "switch" ? "a Switch" : `the ${ROLE_LABEL[role]}`);
@@ -18,8 +19,9 @@ export function AcceptInvite({ code, onDone }: { code: string; onDone(): void })
   const join = useJoinRelationship();
   const [role, setRole] = useState<Role>("submissive");
 
-  function finish(relationshipId?: string) {
+  function finish(relationshipId?: string, joined = false) {
     if (relationshipId) storage.set("obey.relationship", relationshipId);
+    if (relationshipId && joined) startWelcome(relationshipId);
     clearPendingInvite();
     onDone();
   }
@@ -65,7 +67,7 @@ export function AcceptInvite({ code, onDone }: { code: string; onDone(): void })
                 Not now
               </Button>
               <div className="flex-1" />
-              <Button busy={join.isPending} onClick={() => join.mutate({ code, role: p.role ? undefined : role }, { onSuccess: (r) => finish(r.id) })}>
+              <Button busy={join.isPending} onClick={() => join.mutate({ code, role: p.role ? undefined : role }, { onSuccess: (r) => finish(r.id, true) })}>
                 Accept
               </Button>
             </div>

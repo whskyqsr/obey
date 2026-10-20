@@ -25,7 +25,7 @@ export function kitItemSummary(i: KitItem) {
 }
 
 /** The kits and items this dynamic can use: rules and protocols only when those features are on. */
-function useKits() {
+export function useKits() {
   const { features } = useRel();
   return starterKits
     .map((k) => ({ ...k, items: k.items.filter((i) => i.kind === "task" || (i.kind === "rule" ? features.rules : features.protocols)) }))
@@ -63,7 +63,7 @@ export function KitsPage() {
   );
 }
 
-function KitDialog({ kit, onClose }: { kit: StarterKit; onClose(): void }) {
+export function KitDialog({ kit, onClose, onApplied }: { kit: StarterKit; onClose(): void; onApplied?: () => void }) {
   const { rel, me, partners } = useRel();
   const navigate = useNavigate();
   const snack = useSnackbar();
@@ -96,6 +96,7 @@ function KitDialog({ kit, onClose }: { kit: StarterKit; onClose(): void }) {
           ].filter(Boolean);
           snack(`Added ${parts.join(", ")}`);
           onClose();
+          onApplied?.();
           void navigate({ to: r.tasks ? "/tasks" : r.rules ? "/rules" : "/protocols" });
         },
         onError: (e) => snack(errorMessage(e)),
