@@ -21,9 +21,24 @@ interface RequestOptions {
 }
 
 export async function api<T = unknown>(path: string, opts: RequestOptions = {}): Promise<T> {
+  try {
+    return await request<T>(path, opts, false);
+  } catch (e) {
+    // A token minted before the person clicked the verification link still says unverified for up to an hour.
+    if (!isUnverified(e)) throw e;
+    return request<T>(path, opts, true);
+  }
+}
+
+/** The API refuses email-and-password accounts until the address is confirmed. */
+export function isUnverified(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 403 && (e.details as { code?: string } | undefined)?.code === "email_unverified";
+}
+
+async function request<T>(path: string, opts: RequestOptions, freshToken: boolean): Promise<T> {
   const url = new URL(API_URL + path);
   for (const [k, v] of Object.entries(opts.query ?? {})) if (v !== undefined) url.searchParams.set(k, v);
-  const headers: Record<string, string> = { Accept: "application/json", ...(await authHeaders()) };
+  const headers: Record<string, string> = { Accept: "application/json", ...(await authHeaders(freshToken)) };
   const raw = opts.body instanceof Blob;
   if (opts.body !== undefined) headers["Content-Type"] = raw ? (opts.body as Blob).type : "application/json";
   let res: Response;

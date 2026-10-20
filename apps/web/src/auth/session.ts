@@ -104,7 +104,7 @@ export async function refreshVerification(): Promise<boolean> {
   if (!u) return false;
   await u.reload();
   // A fresh ID token carries email_verified=true for the API; onIdTokenChanged then emits the new session.
-  if (u.emailVerified) await u.getIdToken(true);
+  await u.getIdToken(true);
   emit(firebaseSession(u));
   return u.emailVerified;
 }
@@ -160,11 +160,11 @@ export async function signOut(): Promise<void> {
 }
 
 /** Headers that identify the caller to the API. */
-export async function authHeaders(): Promise<Record<string, string>> {
+export async function authHeaders(freshToken = false): Promise<Record<string, string>> {
   const s = current;
   if (!s) return {};
   if (s.kind === "dev") return { "X-Dev-User": s.uid };
   const a = await getFirebaseAuth();
-  const token = await a.currentUser?.getIdToken();
+  const token = await a.currentUser?.getIdToken(freshToken);
   return token ? { Authorization: `Bearer ${token}` } : {};
 }

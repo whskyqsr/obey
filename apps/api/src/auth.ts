@@ -36,7 +36,7 @@ export function createAuthenticator(opts: { devAuth: boolean; firebase: Firebase
         throw new HttpError(401, "invalid token");
       }
       // Email-and-password sign-ups must confirm their address before using the app; Google vouches for its own.
-      if (token.firebase?.sign_in_provider === "password" && token.email_verified !== true) throw new HttpError(403, "verify your email");
+      if (token.firebase?.sign_in_provider === "password" && token.email_verified !== true) throw new HttpError(403, "verify your email", { code: "email_unverified" });
       return {
         uid: `firebase:${token.uid}`,
         displayName: initialDisplayName(token.name as string | undefined, token.email),
