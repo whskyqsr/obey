@@ -200,11 +200,6 @@ fun TaskDetailScreen(
                             )
                             if (canManage) {
                                 DropdownMenuItem(
-                                    text = { Text("Edit") },
-                                    leadingIcon = { Icon(Icons.Outlined.Edit, null) },
-                                    onClick = { menu = false; onEdit(vm.taskId) },
-                                )
-                                DropdownMenuItem(
                                     text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
                                     leadingIcon = { Icon(Icons.Outlined.Delete, null, tint = MaterialTheme.colorScheme.error) },
                                     onClick = { menu = false; confirmDelete = true },

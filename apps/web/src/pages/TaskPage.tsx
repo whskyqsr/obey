@@ -41,7 +41,6 @@ function TaskView({ task }: { task: Task }) {
     { label: "History", icon: "history", onClick: () => navigate({ to: "/tasks/$taskId/history", params: { taskId: task.id } }) },
     ...(isDom
       ? [
-          { label: "Edit", icon: "edit", onClick: () => navigate({ to: "/tasks/$taskId/edit", params: { taskId: task.id } }) },
           {
             label: "Delete",
             icon: "delete",
