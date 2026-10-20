@@ -171,6 +171,9 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, vm: SettingsVi
                     }
                 }
 
+                SectionHeader("Privacy")
+                app.obey.ui.proof.ProofBlurSetting()
+
                 SectionHeader("App icon")
                 AppIconPicker(appIcon, vm::setAppIcon)
 

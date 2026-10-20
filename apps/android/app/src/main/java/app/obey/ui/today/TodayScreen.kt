@@ -47,6 +47,8 @@ import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.SectionHeader
 import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.local
+import app.obey.ui.proof.ProofPhotos
+import app.obey.ui.proof.proofViewModel
 import app.obey.ui.common.parseInstant
 import app.obey.ui.common.formatDue
 import java.time.LocalDate
@@ -109,7 +111,8 @@ fun TodayScreen(
                 val me = session?.userId
                 fun nameFor(o: Occurrence) = if (o.assigneeId == me) null else session?.nameOf(o.assigneeId)
                 fun actionsFor(o: Occurrence) = OccurrenceActions(
-                    onComplete = if (o.assigneeId == me) ({ vm.complete(o) }) else null,
+                    // A task that needs proof opens the Done sheet instead of completing in one tap.
+                    onComplete = if (o.assigneeId == me) ({ if (o.proofRequired) noting = o else vm.complete(o) }) else null,
                     onCompleteWithNote = if (o.assigneeId == me) ({ noting = o }) else null,
                     onReschedule = { rescheduling = o },
                     onEditTask = if (session?.canManage == true) ({ onEditTask(o.seriesId) }) else null,
@@ -123,7 +126,7 @@ fun TodayScreen(
                 fun row(o: Occurrence, actions: OccurrenceActions = actionsFor(o)): @Composable () -> Unit = {
                     SwipeableRow(
                         o,
-                        onDone = if (o.assigneeId == me && o.status == OccurrenceStatus.Pending && o.isOpen()) ({ vm.complete(o) }) else null,
+                        onDone = if (o.assigneeId == me && o.status == OccurrenceStatus.Pending && o.isOpen()) ({ if (o.proofRequired) noting = o else vm.complete(o) }) else null,
                         // A Dominant moves anyone's deadline the same way a sub asks for more time on their own.
                         onMoreTime = if ((o.assigneeId == me || isDom) && o.status == OccurrenceStatus.Pending) ({ rescheduling = o }) else null,
                         moreTimeLabel = if (o.assigneeId == me) "More time" else "Reschedule",
@@ -153,7 +156,10 @@ fun TodayScreen(
                     }
                     if (isDom) {
                         items(d.awaitingReview, key = { "v-" + it.id }) { o ->
-                            row(o, OccurrenceActions(onApprove = { vm.review(o, true) }, onReject = { vm.review(o, false) }))()
+                            androidx.compose.foundation.layout.Column {
+                                row(o, OccurrenceActions(onApprove = { vm.review(o, true) }, onReject = { vm.review(o, false) }))()
+                                if (o.photoCount > 0) ProofPhotos(o.id, canAdd = false, modifier = Modifier.padding(start = 64.dp, end = 16.dp, bottom = 8.dp))
+                            }
                         }
                         items(d.recentMisses, key = { "m-" + it.id }) { o ->
                             OccurrenceRow(o, nameFor(o), OccurrenceActions(onExcuse = { vm.excuse(o) }), onOpen = { onOpenTask(o.seriesId) }, streak = d.streaks[o.seriesId])
@@ -226,22 +232,28 @@ fun TodayScreen(
 
     noting?.let { o ->
         var note by remember(o.id) { mutableStateOf("") }
+        val photos by proofViewModel(o.id).photos.collectAsStateWithLifecycle()
+        val needsProof = o.proofRequired && photos.isEmpty() && note.isBlank()
         AlertDialog(
             onDismissRequest = { noting = null },
             title = { Text("Mark done") },
             text = {
                 androidx.compose.foundation.layout.Column {
                     Text("${o.title} · ${formatDue(o.dueAt)}", style = MaterialTheme.typography.bodyMedium)
+                    if (o.proofRequired) {
+                        Text("This one needs proof: add a photo, a note, or both.", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
+                    }
+                    ProofPhotos(o.id, canAdd = true, modifier = Modifier.padding(top = 12.dp))
                     OutlinedTextField(
                         value = note,
                         onValueChange = { note = it.take(5000) },
-                        label = { Text("Note for your partner") },
+                        label = { Text(if (o.proofRequired) "Note" else "Note for your partner") },
                         minLines = 3,
                         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                     )
                 }
             },
-            confirmButton = { Button(onClick = { vm.complete(o, note); noting = null }) { Text("Done") } },
+            confirmButton = { Button(onClick = { vm.complete(o, note); noting = null }, enabled = !needsProof) { Text("Done") } },
             dismissButton = { TextButton(onClick = { noting = null }) { Text("Cancel") } },
         )
     }

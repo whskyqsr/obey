@@ -35,6 +35,29 @@ interface ObeyApi {
     @GET("users/{id}/avatar")
     suspend fun avatar(@Path("id") userId: String, @Query("v") version: String): ResponseBody
 
+    // Photo proof
+    @POST("me/proof-terms")
+    suspend fun acceptProofTerms(@Body body: AcceptProofTermsInput = AcceptProofTermsInput()): User
+
+    @PATCH("me")
+    suspend fun setRevealProofs(@Body body: RevealProofsInput): User
+
+    @GET("occurrences/{id}/photos")
+    suspend fun proofPhotos(@Path("id") occurrenceId: String): List<ProofPhoto>
+
+    /** A JPEG the app has already shrunk. */
+    @POST("occurrences/{id}/photos")
+    suspend fun addProofPhoto(@Path("id") occurrenceId: String, @Body image: RequestBody): ProofPhoto
+
+    @GET("photos/{id}")
+    suspend fun proofPhoto(@Path("id") photoId: String): ResponseBody
+
+    @DELETE("photos/{id}")
+    suspend fun deleteProofPhoto(@Path("id") photoId: String)
+
+    @POST("reports")
+    suspend fun report(@Body body: ReportInput): Created
+
     // Relationships
     @POST("relationships")
     suspend fun createRelationship(@Body body: CreateRelationshipInput): Relationship

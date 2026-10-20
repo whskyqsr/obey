@@ -195,6 +195,7 @@ fun DynamicScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
                         leadingContent = { Avatar(m.userId, m.displayName, m.avatarVersion, vm::loadAvatar, collared = rel.isCollared(m.userId)) },
                         headlineContent = { Text(m.displayName + if (m.userId == s.userId) " (you)" else "") },
                         supportingContent = { Text(m.role.label) },
+                        trailingContent = { if (m.userId != s.userId) app.obey.ui.proof.ReportPersonButton(m.userId) },
                     )
                 }
                 ListItem(

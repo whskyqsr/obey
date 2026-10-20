@@ -81,7 +81,39 @@ data class User(
     val avatarVersion: String? = null,
     /** "sun" or "mon": where calendars start the week. */
     val weekStart: String = "sun",
+    /** Confirmed 18+ and accepted the rules for proof photos. */
+    val proofTermsAccepted: Boolean = false,
+    /** Show proof photos without the blur. */
+    val revealProofs: Boolean = false,
 )
+
+@Serializable
+data class AcceptProofTermsInput(val adult: Boolean = true, val rules: Boolean = true)
+
+@Serializable
+data class RevealProofsInput(val revealProofs: Boolean)
+
+@Serializable
+data class ProofPhoto(val id: String, val occurrenceId: String, val uploaderId: String, val createdAt: String)
+
+@Serializable
+enum class ReportReason(val label: String) {
+    @SerialName("minor") Minor("Shows someone under 18"),
+    @SerialName("non_consensual") NonConsensual("Shared without someone's consent"),
+    @SerialName("illegal") Illegal("Something illegal"),
+    @SerialName("other") Other("Something else"),
+}
+
+@Serializable
+data class ReportInput(
+    val subjectId: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val photoId: String? = null,
+    val reason: ReportReason,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val details: String? = null,
+)
+
+@Serializable
+data class Created(val id: String)
 
 /** A date the dynamic marks; [date] is YYYY-MM-DD. */
 @Serializable
@@ -250,6 +282,9 @@ data class Occurrence(
     val noteMd: String? = null,
     /** "YYYY-MM-DD": the first day the assignee may complete it; null when any time is fine. */
     val opensOn: String? = null,
+    val photoCount: Int = 0,
+    /** Needs a photo or a note before it can be marked done. */
+    val proofRequired: Boolean = false,
 ) {
     /** Tomorrow's daily task waits for its day; the API refuses it before then. */
     fun isOpen(today: java.time.LocalDate = java.time.LocalDate.now()) = opensOn == null || !java.time.LocalDate.parse(opensOn).isAfter(today)
