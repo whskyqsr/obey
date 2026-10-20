@@ -21,6 +21,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 class SettingsStore @Inject constructor(@ApplicationContext private val context: Context) {
     private val devUserKey = stringPreferencesKey("dev_user_id")
     private val relationshipKey = stringPreferencesKey("selected_relationship_id")
+    private val calendarViewKey = stringPreferencesKey("calendar_view")
 
     /** Dev-auth user id (sent as X-Dev-User). Always null in release builds. */
     val devUserId: Flow<String?> = context.dataStore.data.map { prefs ->
@@ -28,6 +29,13 @@ class SettingsStore @Inject constructor(@ApplicationContext private val context:
     }
 
     val selectedRelationshipId: Flow<String?> = context.dataStore.data.map { it[relationshipKey] }
+
+    /** "week" or "month": the Calendar remembers the last view, as the web does. */
+    suspend fun calendarView(): String? = context.dataStore.data.first()[calendarViewKey]
+
+    suspend fun setCalendarView(view: String) {
+        context.dataStore.edit { it[calendarViewKey] = view }
+    }
 
     suspend fun currentDevUserId(): String? = devUserId.first()
 

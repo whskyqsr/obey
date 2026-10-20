@@ -1,6 +1,8 @@
 package app.obey.ui.upcoming
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,6 +18,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -43,7 +48,9 @@ import app.obey.ui.common.formatDate
 import app.obey.ui.today.OccurrenceActions
 import app.obey.ui.today.OccurrenceRow
 import app.obey.ui.today.RescheduleSheet
+import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.temporal.TemporalAdjusters
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,7 +64,9 @@ fun UpcomingScreen(
     vm: UpcomingViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
-    val weekStart by vm.weekStart.collectAsStateWithLifecycle()
+    val view by vm.view.collectAsStateWithLifecycle()
+    val anchor by vm.anchor.collectAsStateWithLifecycle()
+    val selected by vm.selected.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     MessageEffect(message, snackbar, vm::messageShown)
@@ -69,6 +78,21 @@ fun UpcomingScreen(
     var rescheduling by remember { mutableStateOf<Occurrence?>(null) }
     val session = vm.session
     val today = LocalDate.now()
+    val canManage = session?.canManage == true
+
+    val occurrenceRow: @Composable (Occurrence) -> Unit = { o ->
+        val mine = o.assigneeId == session?.userId
+        OccurrenceRow(
+            o,
+            if (mine) null else session?.nameOf(o.assigneeId),
+            OccurrenceActions(
+                onComplete = if (mine) ({ vm.complete(o) }) else null,
+                onReschedule = { rescheduling = o },
+                onEditTask = if (canManage) ({ onEditTask(o.seriesId) }) else null,
+            ),
+            onOpen = { onOpenTask(o.seriesId) },
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -81,30 +105,70 @@ fun UpcomingScreen(
             )
         },
         floatingActionButton = {
-            if (session?.canManage == true) {
-                FloatingActionButton(onClick = { onNewTask(null) }) { Icon(Icons.Outlined.Add, "New task") }
+            if (canManage) {
+                // Like a new calendar event: on the picked day in month view.
+                val day = if (view == CalendarView.Month && !selected.isBefore(today)) selected else null
+                FloatingActionButton(onClick = { onNewTask(day) }) { Icon(Icons.Outlined.Add, "New task") }
             }
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        androidx.compose.foundation.layout.Column(Modifier.padding(padding).fillMaxSize()) {
+        Column(Modifier.padding(padding).fillMaxSize()) {
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                CalendarView.entries.forEachIndexed { i, v ->
+                    SegmentedButton(
+                        selected = view == v,
+                        onClick = { vm.setView(v) },
+                        shape = SegmentedButtonDefaults.itemShape(i, CalendarView.entries.size),
+                    ) { Text(if (v == CalendarView.Week) "Week" else "Month") }
+                }
+            }
             Row(
                 Modifier.padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = { vm.shiftWeek(-1) }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Previous week") }
+                val unit = if (view == CalendarView.Week) "week" else "month"
+                IconButton(onClick = { vm.step(-1) }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Previous $unit") }
                 Text(
-                    "${weekStart.format(DateTimeFormatter.ofPattern("d MMM"))} – ${weekStart.plusDays(6).format(DateTimeFormatter.ofPattern("d MMM"))}",
+                    when (view) {
+                        CalendarView.Month -> anchor.format(DateTimeFormatter.ofPattern("MMMM yyyy"))
+                        CalendarView.Week -> anchor.with(TemporalAdjusters.previousOrSame(session?.weekStart ?: DayOfWeek.SUNDAY)).let {
+                            "${it.format(DateTimeFormatter.ofPattern("d MMM"))} – ${it.plusDays(6).format(DateTimeFormatter.ofPattern("d MMM"))}"
+                        }
+                    },
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = vm::thisWeek) { Text("This week") }
-                IconButton(onClick = { vm.shiftWeek(1) }) { Icon(Icons.AutoMirrored.Outlined.ArrowForward, "Next week") }
+                TextButton(onClick = vm::goToday) { Text("Today") }
+                IconButton(onClick = { vm.step(1) }) { Icon(Icons.AutoMirrored.Outlined.ArrowForward, "Next $unit") }
             }
             when (val s = state) {
                 Load.Loading -> LoadingBox()
                 is Load.Failed -> ErrorBox(s.message, vm::refresh)
-                is Load.Ready -> LazyColumn(Modifier.fillMaxSize()) {
+                is Load.Ready -> if (s.value.view == CalendarView.Month) {
+                    val items = s.value.days.firstOrNull { it.first == selected }?.second.orEmpty()
+                    LazyColumn(Modifier.fillMaxSize()) {
+                        item(key = "grid") {
+                            MonthGrid(s.value, selected, today, onSelect = vm::select, Modifier.padding(horizontal = 8.dp))
+                        }
+                        item(key = "h-selected") {
+                            Text(
+                                if (selected == today) "Today · ${formatDate(selected)}" else formatDate(selected),
+                                style = MaterialTheme.typography.titleSmall,
+                                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp),
+                            )
+                        }
+                        if (items.isEmpty()) item(key = "e-selected") {
+                            Text(
+                                "Nothing scheduled",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                            )
+                        }
+                        items(items, key = { it.id }) { occurrenceRow(it) }
+                    }
+                } else LazyColumn(Modifier.fillMaxSize()) {
                     s.value.days.forEach { (day, occs) ->
                         item(key = "h-$day") {
                             Row(
@@ -118,7 +182,7 @@ fun UpcomingScreen(
                                     color = if (day == today) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.weight(1f),
                                 )
-                                if (session?.canManage == true && !day.isBefore(today)) {
+                                if (canManage && !day.isBefore(today)) {
                                     IconButton(onClick = { onNewTask(day) }) { Icon(Icons.Outlined.Add, "New task on ${formatDate(day)}") }
                                 }
                             }
@@ -133,19 +197,7 @@ fun UpcomingScreen(
                                 )
                             }
                         }
-                        items(occs, key = { it.id }) { o ->
-                            val mine = o.assigneeId == session?.userId
-                            OccurrenceRow(
-                                o,
-                                if (mine) null else session?.nameOf(o.assigneeId),
-                                OccurrenceActions(
-                                    onComplete = if (mine) ({ vm.complete(o) }) else null,
-                                    onReschedule = { rescheduling = o },
-                                    onEditTask = if (session?.canManage == true) ({ onEditTask(o.seriesId) }) else null,
-                                ),
-                                onOpen = { onOpenTask(o.seriesId) },
-                            )
-                        }
+                        items(occs, key = { it.id }) { occurrenceRow(it) }
                     }
                 }
             }
