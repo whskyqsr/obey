@@ -3,7 +3,7 @@ import { RouterProvider } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMe } from "./api/hooks";
 import { ApiError } from "./api/client";
-import { signOut } from "./auth/session";
+import { needsVerification, signOut } from "./auth/session";
 import { useSession } from "./auth/useSession";
 import { Button, ErrorBox, Loading } from "./components/ui";
 import { RelationshipProvider } from "./lib/relationship";
@@ -11,6 +11,7 @@ import { pendingInvite } from "./lib/invite";
 import { AcceptInvite } from "./pages/AcceptInvite";
 import { Onboarding } from "./pages/Onboarding";
 import { SignInPage } from "./pages/SignIn";
+import { VerifyEmailPage } from "./pages/VerifyEmail";
 import { registerPush } from "./push";
 import { router } from "./router";
 import { AppLockGate } from "./components/AppLock";
@@ -24,6 +25,7 @@ export function App() {
 
   if (session === undefined) return <Splash />;
   if (session === null) return <SignInPage />;
+  if (needsVerification(session)) return <VerifyEmailPage email={session.kind === "firebase" ? session.email : null} />;
   return (
     <AppLockGate key={session.uid} uid={session.uid}>
       <SignedIn key={session.uid} />

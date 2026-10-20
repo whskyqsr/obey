@@ -222,6 +222,16 @@ class SettingsViewModel @Inject constructor(
 
     fun signInGoogle(idToken: String) = action { auth.signInWithGoogleIdToken(idToken) }
 
+    fun resendVerification() = action {
+        auth.resendVerification()
+        say("Sent another link. Check your spam folder too.")
+    }
+
+    /** [quiet] when checking on return to the app, so an unverified account doesn't nag. */
+    fun checkVerification(quiet: Boolean = false) = action {
+        if (!auth.checkVerification() && !quiet) say("Not verified yet. Open the link in the email, then try again.")
+    }
+
     fun googleClientId(): String? = auth.googleWebClientId()
 
     fun reportError(text: String) = say(text)

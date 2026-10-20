@@ -10,7 +10,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
@@ -20,7 +22,10 @@ import kotlinx.coroutines.tasks.await
 sealed interface AuthState {
     data object SignedOut : AuthState
     /** [provider] is "google.com" or "password" (Firebase provider ids). */
-    data class Firebase(val uid: String, val email: String?, val provider: String? = null) : AuthState
+    data class Firebase(val uid: String, val email: String?, val provider: String? = null, val verified: Boolean = true) : AuthState {
+        /** Email-and-password accounts must confirm their address before the API lets them in. */
+        val needsVerification: Boolean get() = provider == "password" && !verified
+    }
     data class Dev(val userId: String) : AuthState
 }
 
@@ -39,15 +44,23 @@ class AuthManager @Inject constructor(
 
     private val auth: FirebaseAuth? get() = if (firebaseAvailable) FirebaseAuth.getInstance() else null
 
+    private val reloaded = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
     private val firebaseUser: Flow<AuthState> =
         if (!firebaseAvailable) flowOf(AuthState.SignedOut) else callbackFlow<AuthState> {
             val firebaseAuth = FirebaseAuth.getInstance()
-            val listener = FirebaseAuth.AuthStateListener { a ->
-                val u = a.currentUser
-                trySend(if (u == null) AuthState.SignedOut else AuthState.Firebase(u.uid, u.email, u.providerData.firstOrNull { it.providerId != "firebase" }?.providerId))
+            fun current(): AuthState {
+                val u = firebaseAuth.currentUser ?: return AuthState.SignedOut
+                return AuthState.Firebase(u.uid, u.email, u.providerData.firstOrNull { it.providerId != "firebase" }?.providerId, u.isEmailVerified)
             }
+            val listener = FirebaseAuth.AuthStateListener { trySend(current()) }
             firebaseAuth.addAuthStateListener(listener)
-            awaitClose { firebaseAuth.removeAuthStateListener(listener) }
+            // reload() updates isEmailVerified without firing the auth state listener.
+            val reloads = launch { reloaded.collect { trySend(current()) } }
+            awaitClose {
+                reloads.cancel()
+                firebaseAuth.removeAuthStateListener(listener)
+            }
         }
 
     val state: Flow<AuthState> = combine(settings.devUserId, firebaseUser) { dev, fb ->
@@ -67,7 +80,22 @@ class AuthManager @Inject constructor(
 
     suspend fun createAccount(email: String, password: String) {
         val a = auth ?: error("Firebase isn't configured in this build")
-        a.createUserWithEmailAndPassword(email.trim(), password).await()
+        val result = a.createUserWithEmailAndPassword(email.trim(), password).await()
+        result.user?.sendEmailVerification()?.await()
+    }
+
+    suspend fun resendVerification() {
+        auth?.currentUser?.sendEmailVerification()?.await()
+    }
+
+    /** Re-reads the account after the person clicks the emailed link; returns whether it is verified now. */
+    suspend fun checkVerification(): Boolean {
+        val user = auth?.currentUser ?: return false
+        user.reload().await()
+        // A fresh ID token carries email_verified=true for the API.
+        if (user.isEmailVerified) user.getIdToken(true).await()
+        reloaded.tryEmit(Unit)
+        return user.isEmailVerified
     }
 
     suspend fun signInWithGoogleIdToken(idToken: String) {

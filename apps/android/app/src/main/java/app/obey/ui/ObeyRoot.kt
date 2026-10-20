@@ -73,6 +73,7 @@ import app.obey.ui.notes.NoteEditorScreen
 import app.obey.ui.notes.NotesScreen
 import app.obey.ui.onboarding.RelationshipSetupScreen
 import app.obey.ui.onboarding.SignInScreen
+import app.obey.ui.onboarding.VerifyEmailScreen
 import app.obey.ui.rewards.RewardsScreen
 import app.obey.ui.protocols.ProtocolEditorScreen
 import app.obey.ui.protocols.ProtocolsScreen
@@ -99,6 +100,7 @@ fun ObeyRoot(vm: RootViewModel = hiltViewModel()) {
         when {
             auth == null -> LoadingBox()
             auth is AuthState.SignedOut -> SignInScreen()
+            (auth as? AuthState.Firebase)?.needsVerification == true -> VerifyEmailScreen((auth as AuthState.Firebase).email)
             else -> when (val s = session) {
                 SessionState.Loading -> LoadingBox()
                 is SessionState.Error -> SessionError(s.message, vm::retry)

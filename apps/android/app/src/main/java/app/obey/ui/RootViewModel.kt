@@ -31,6 +31,8 @@ class RootViewModel @Inject constructor(
             auth.state.distinctUntilChanged().collect { state ->
                 if (state is AuthState.SignedOut) {
                     sessions.clear()
+                } else if (state is AuthState.Firebase && state.needsVerification) {
+                    // The API refuses unverified email accounts; ObeyRoot shows the verify screen instead.
                 } else {
                     sessions.refresh()
                     if (state is AuthState.Firebase) registrar.register()

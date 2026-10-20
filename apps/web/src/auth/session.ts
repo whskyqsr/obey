@@ -9,7 +9,9 @@ import type { Auth } from "firebase/auth";
  * - firebase: Google sign-in; requests carry `Authorization: Bearer <ID token>`.
  * - dev: a UUID typed on the sign-in screen; requests carry `X-Dev-User` (API must run with DEV_AUTH=1).
  */
-export type Session = { kind: "firebase"; uid: string; name: string | null; email: string | null; provider: "google" | "password" | null } | { kind: "dev"; uid: string };
+export type Session =
+  | { kind: "firebase"; uid: string; name: string | null; email: string | null; provider: "google" | "password" | null; verified: boolean }
+  | { kind: "dev"; uid: string };
 
 const DEV_USER_KEY = "obey.devUser";
 
@@ -56,11 +58,18 @@ export async function initSession(): Promise<void> {
   }
   const a = await getFirebaseAuth();
   const { onIdTokenChanged } = await import("firebase/auth");
-  onIdTokenChanged(a, (u) => {
-    const p = u?.providerData[0]?.providerId;
-    const provider = p === "google.com" ? "google" : p === "password" ? "password" : null;
-    emit(u ? { kind: "firebase", uid: u.uid, name: u.displayName, email: u.email, provider } : null);
-  });
+  onIdTokenChanged(a, (u) => emit(u ? firebaseSession(u) : null));
+}
+
+function firebaseSession(u: import("firebase/auth").User): Session {
+  const p = u.providerData[0]?.providerId;
+  const provider = p === "google.com" ? "google" : p === "password" ? "password" : null;
+  return { kind: "firebase", uid: u.uid, name: u.displayName, email: u.email, provider, verified: u.emailVerified };
+}
+
+/** Email-and-password accounts must confirm their address before the API lets them in. */
+export function needsVerification(s: Session): boolean {
+  return s.kind === "firebase" && s.provider === "password" && !s.verified;
 }
 
 export async function signInWithGoogle(): Promise<void> {
@@ -77,8 +86,27 @@ export async function signInWithEmail(email: string, password: string): Promise<
 
 export async function createAccount(email: string, password: string): Promise<void> {
   const a = await getFirebaseAuth();
-  const { createUserWithEmailAndPassword } = await import("firebase/auth");
-  await createUserWithEmailAndPassword(a, email.trim(), password);
+  const { createUserWithEmailAndPassword, sendEmailVerification } = await import("firebase/auth");
+  const cred = await createUserWithEmailAndPassword(a, email.trim(), password);
+  await sendEmailVerification(cred.user, { url: location.origin });
+}
+
+export async function resendVerification(): Promise<void> {
+  const a = await getFirebaseAuth();
+  const { sendEmailVerification } = await import("firebase/auth");
+  if (a.currentUser) await sendEmailVerification(a.currentUser, { url: location.origin });
+}
+
+/** Re-reads the account after the person clicks the link; returns whether it is verified now. */
+export async function refreshVerification(): Promise<boolean> {
+  const a = await getFirebaseAuth();
+  const u = a.currentUser;
+  if (!u) return false;
+  await u.reload();
+  // A fresh ID token carries email_verified=true for the API; onIdTokenChanged then emits the new session.
+  if (u.emailVerified) await u.getIdToken(true);
+  emit(firebaseSession(u));
+  return u.emailVerified;
 }
 
 /** Firebase errors read like "Firebase: Error (auth/invalid-credential)."; say something a person can act on. */
@@ -102,6 +130,8 @@ export function authErrorMessage(e: unknown): string | null {
       return "Sign-in isn't enabled for this website yet.";
     case "auth/operation-not-allowed":
       return "This sign-in method isn't turned on yet.";
+    case "auth/too-many-requests":
+      return "Too many tries. Wait a minute and try again.";
     default:
       return null;
   }

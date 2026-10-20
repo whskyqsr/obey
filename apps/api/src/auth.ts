@@ -29,17 +29,20 @@ export function createAuthenticator(opts: { devAuth: boolean; firebase: Firebase
   return async (req) => {
     const header = req.headers.authorization;
     if (header?.startsWith("Bearer ") && opts.firebase) {
+      let token: Awaited<ReturnType<ReturnType<typeof getAuth>["verifyIdToken"]>>;
       try {
-        const token = await getAuth(opts.firebase).verifyIdToken(header.slice(7));
-        return {
-          uid: `firebase:${token.uid}`,
-          displayName: initialDisplayName(token.name as string | undefined, token.email),
-          email: token.email ?? null,
-          verifiedEmail: token.email && token.email_verified === true ? token.email : null,
-        };
+        token = await getAuth(opts.firebase).verifyIdToken(header.slice(7));
       } catch {
         throw new HttpError(401, "invalid token");
       }
+      // Email-and-password sign-ups must confirm their address before using the app; Google vouches for its own.
+      if (token.firebase?.sign_in_provider === "password" && token.email_verified !== true) throw new HttpError(403, "verify your email");
+      return {
+        uid: `firebase:${token.uid}`,
+        displayName: initialDisplayName(token.name as string | undefined, token.email),
+        email: token.email ?? null,
+        verifiedEmail: token.email && token.email_verified === true ? token.email : null,
+      };
     }
     const dev = req.headers["x-dev-user"];
     if (opts.devAuth && typeof dev === "string" && UUID.test(dev)) {
