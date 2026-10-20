@@ -1,5 +1,7 @@
 package app.obey.ui.settings
 
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+
 import androidx.compose.material3.Button
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.ui.platform.LocalContext
@@ -78,22 +80,11 @@ import app.obey.ui.onboarding.JoinRelationshipForm
 import app.obey.ui.onboarding.label
 import app.obey.ui.tasks.Stepper
 
-private data class FeatureRow(val label: String, val help: String, val get: (Features) -> Boolean, val set: (Features, Boolean) -> Features)
-
-private val featureRows = listOf(
-    FeatureRow("Points and rewards", "Tasks earn points that can be spent on rewards.", { it.points }, { f, on -> f.copy(points = on) }),
-    FeatureRow("Consequences", "A list of consequences, and one per task if it's missed.", { it.consequences }, { f, on -> f.copy(consequences = on) }),
-    FeatureRow("Rules", "A shared list of standing rules.", { it.rules }, { f, on -> f.copy(rules = on) }),
-    FeatureRow("Protocols", "Exactly what's expected, and when and how it's done.", { it.protocols }, { f, on -> f.copy(protocols = on) }),
-    FeatureRow("Journal", "Dated entries with a mood.", { it.journal }, { f, on -> f.copy(journal = on) }),
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
     val sessionState by vm.session.collectAsStateWithLifecycle()
     val devUserId by vm.devUserId.collectAsStateWithLifecycle()
-    val invite by vm.invite.collectAsStateWithLifecycle()
     val appIcon by vm.appIcon.collectAsStateWithLifecycle()
     val authState by vm.authState.collectAsStateWithLifecycle()
     val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -103,7 +94,6 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     MessageEffect(message, snackbar, vm::messageShown)
-    val clipboard = LocalClipboardManager.current
 
     var devField by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(devUserId) { devField = devUserId.orEmpty() }
@@ -122,6 +112,25 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                session?.relationship?.let { rel ->
+                    // The relationship has its own page; Settings is about you.
+                    Card(
+                        onClick = onOpenDynamic,
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                        shape = MaterialTheme.shapes.extraLarge,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
+                    ) {
+                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            AvatarStack(rel.members, vm::loadAvatar, size = 48.dp, ring = MaterialTheme.colorScheme.primaryContainer)
+                            Column(Modifier.weight(1f)) {
+                                Text(dynamicTitle(rel, session.userId), style = MaterialTheme.typography.titleLarge)
+                                Text("Your dynamic · people, invites, how it works, features", style = MaterialTheme.typography.bodyMedium)
+                            }
+                            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null)
+                        }
+                    }
+                }
+
                 SectionHeader("Account")
                 if (session != null) {
                     val user = session.me.user
@@ -165,126 +174,6 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
                 SectionHeader("App icon")
                 AppIconPicker(appIcon, vm::setAppIcon)
 
-                session?.let { s ->
-                    SectionHeader("Relationship")
-                    if (s.me.relationships.size > 1) {
-                        s.me.relationships.forEach { r ->
-                            ListItem(
-                                modifier = Modifier.clickable { vm.selectRelationship(r.id) },
-                                leadingContent = { RadioButton(selected = r.id == s.relationship?.id, onClick = { vm.selectRelationship(r.id) }) },
-                                headlineContent = { Text(r.title(s.userId)) },
-                                supportingContent = { Text(r.members.joinToString { it.displayName }) },
-                            )
-                        }
-                        HorizontalDivider()
-                    }
-                    s.relationship?.let { rel ->
-                        ListItem(
-                            modifier = if (s.canManage) Modifier.clickable { dialog = "relname" } else Modifier,
-                            headlineContent = { Text(rel.title(s.userId)) },
-                            supportingContent = { Text(if (rel.name == null) "No name; your partner's name shows instead" else "Relationship name") },
-                            trailingContent = { if (s.canManage) Icon(Icons.Outlined.Edit, "Name this relationship") },
-                        )
-                        rel.members.forEach { m ->
-                            ListItem(
-                                leadingContent = { Avatar(m.userId, m.displayName, m.avatarVersion, vm::loadAvatar) },
-                                headlineContent = { Text(m.displayName + if (m.userId == s.userId) " (you)" else "") },
-                                supportingContent = { Text(m.role.label) },
-                            )
-                        }
-                        Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilledTonalButton(onClick = vm::createInvite, enabled = !busy) { Text("Invite partner") }
-                            OutlinedButton(onClick = { dialog = "join" }) { Text("Join another") }
-                            TextButton(onClick = { dialog = "create" }) { Text("New") }
-                        }
-                        invite?.let { inv ->
-                            val context = LocalContext.current
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                                modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                            ) {
-                                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text("Invite link", style = MaterialTheme.typography.labelLarge)
-                                    Text(inv.link, style = MaterialTheme.typography.bodyLarge)
-                                    Text(
-                                        (inv.role?.let { "They'll join as ${it.label}" } ?: "They'll choose their role") +
-                                            " · code ${inv.code} · expires ${formatDateTime(inv.expiresAt)}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                    )
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Button(onClick = {
-                                            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, inv.link)
-                                            context.startActivity(Intent.createChooser(send, "Share invite link"))
-                                        }) {
-                                            Icon(Icons.Outlined.Share, null)
-                                            Text("  Share link")
-                                        }
-                                        TextButton(onClick = { clipboard.setText(AnnotatedString(inv.link)) }) {
-                                            Icon(Icons.Outlined.ContentCopy, null)
-                                            Text("  Copy")
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        SectionHeader("Features")
-                        featureRows.forEach { (label, help, get, set) ->
-                            ListItem(
-                                headlineContent = { Text(label) },
-                                supportingContent = { Text(help) },
-                                trailingContent = {
-                                    Switch(
-                                        checked = get(rel.features),
-                                        onCheckedChange = { on -> vm.setFeatures(set(rel.features, on), if (on) "$label on" else "$label off") },
-                                        enabled = s.canManage && !busy,
-                                    )
-                                },
-                            )
-                        }
-                        Text(
-                            if (s.canManage) "Switched-off features are hidden for everyone in this relationship. Nothing is deleted."
-                            else "Only a Dominant can change these.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                        )
-
-                        if (s.canManage) {
-                            SectionHeader("Rescheduling")
-                            Text(
-                                "Who can move deadlines.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 16.dp),
-                            )
-                            Row(
-                                Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                listOf(
-                                    ReschedulePolicy.DominantOnly to "Only me",
-                                    ReschedulePolicy.Request to "Sub asks, I approve",
-                                    ReschedulePolicy.Allowance to "Free delays per week",
-                                ).forEach { (p, label) ->
-                                    FilterChip(
-                                        selected = rel.reschedulePolicy == p,
-                                        onClick = { vm.updatePolicy(policy = p) },
-                                        label = { Text(label) },
-                                    )
-                                }
-                            }
-                            if (rel.reschedulePolicy == ReschedulePolicy.Allowance) {
-                                Box(Modifier.padding(horizontal = 16.dp)) {
-                                    Stepper("", rel.weeklyDelayAllowance, "free delays a week", 0..50) {
-                                        vm.updatePolicy(allowance = it)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
                 if (vm.devAuthAllowed) {
                     SectionHeader("Developer")
                     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -320,31 +209,7 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
         }
     }
 
-    when (dialog) {
-        "relname" -> session?.relationship?.let { rel ->
-            var name by rememberSaveable { mutableStateOf(rel.name.orEmpty()) }
-            AlertDialog(
-                onDismissRequest = { dialog = null },
-                title = { Text("Name this relationship") },
-                text = {
-                    OutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it.take(80) },
-                        singleLine = true,
-                        placeholder = { Text(rel.copy(name = null).title(session.userId)) },
-                        supportingText = { Text("Optional. Leave it blank to show your partner's name.") },
-                    )
-                },
-                confirmButton = {
-                    TextButton(
-                        enabled = !busy && name.trim() != rel.name.orEmpty(),
-                        onClick = { vm.renameRelationship(name); dialog = null },
-                    ) { Text("Save") }
-                },
-                dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
-            )
-        }
-        "name" -> session?.let { s ->
+    if (dialog == "name") session?.let { s ->
             var name by rememberSaveable { mutableStateOf(s.me.user.displayName) }
             AlertDialog(
                 onDismissRequest = { dialog = null },
@@ -366,19 +231,4 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
                 dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
             )
         }
-        "create" -> AlertDialog(
-            onDismissRequest = { dialog = null },
-            title = { Text("New relationship") },
-            text = { CreateRelationshipForm(busy) { name, role -> vm.createRelationship(name, role); dialog = null } },
-            confirmButton = {},
-            dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
-        )
-        "join" -> AlertDialog(
-            onDismissRequest = { dialog = null },
-            title = { Text("Join with a code") },
-            text = { JoinRelationshipForm(busy) { code, role -> vm.join(code, role); dialog = null } },
-            confirmButton = {},
-            dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
-        )
-    }
 }

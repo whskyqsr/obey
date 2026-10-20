@@ -40,7 +40,7 @@ interface ObeyApi {
     suspend fun createRelationship(@Body body: CreateRelationshipInput): Relationship
 
     @POST("relationships/{id}/invites")
-    suspend fun createInvite(@Path("id") relationshipId: String): Invite
+    suspend fun createInvite(@Path("id") relationshipId: String, @Body body: CreateInviteInput): Invite
 
     @POST("relationships/join")
     suspend fun joinRelationship(@Body body: JoinRelationshipInput): Relationship

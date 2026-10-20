@@ -314,6 +314,7 @@ private fun ObeyNavHost(nav: NavHostController) {
         composable<TaskHistoryRoute> { TaskHistoryScreen(onBack = { nav.popBackStack() }) }
         composable<TaskEditorRoute> { TaskEditorScreen(onDone = { nav.popBackStack() }) }
         composable<NoteEditorRoute> { NoteEditorScreen(onDone = { nav.popBackStack() }) }
-        composable<SettingsRoute> { SettingsScreen(onBack = { nav.popBackStack() }) }
+        composable<SettingsRoute> { SettingsScreen(onBack = { nav.popBackStack() }, onOpenDynamic = { nav.navigate(DynamicRoute) }) }
+        composable<DynamicRoute> { DynamicScreen(onBack = { nav.popBackStack() }) }
     }
 }

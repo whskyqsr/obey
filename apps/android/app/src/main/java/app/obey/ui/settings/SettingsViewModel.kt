@@ -17,6 +17,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import app.obey.BuildConfig
 import app.obey.api.CreateRelationshipInput
+import app.obey.api.CreateInviteInput
 import app.obey.api.Invite
 import app.obey.api.parseInviteCode
 import app.obey.api.JoinRelationshipInput
@@ -93,9 +94,13 @@ class SettingsViewModel @Inject constructor(
 
     fun selectRelationship(id: String) = action { sessions.select(id) }
 
-    fun createInvite() = action {
+    fun createInvite(role: Role?) = action {
         val rel = sessions.requireRelationshipId()
-        _invite.value = api.createInvite(rel)
+        _invite.value = api.createInvite(rel, CreateInviteInput(role))
+    }
+
+    fun clearInvite() {
+        _invite.value = null
     }
 
     fun createRelationship(name: String, role: Role) = action {

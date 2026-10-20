@@ -143,6 +143,10 @@ fun parseInviteCode(text: String): String {
     return (Regex("/join/([A-Za-z0-9]{4,16})").find(t)?.groupValues?.get(1) ?: t).uppercase()
 }
 
+/** [role] is what the person joining becomes; null lets them choose. */
+@Serializable
+data class CreateInviteInput(val role: Role?)
+
 @Serializable
 data class JoinRelationshipInput(val code: String, val role: Role)
 
