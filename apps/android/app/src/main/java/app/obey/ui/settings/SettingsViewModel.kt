@@ -248,4 +248,11 @@ class SettingsViewModel @Inject constructor(
         auth.signOut()
         sessions.clear()
     }
+
+    /** The server removes the sign-in too, so signing out here just clears this device. */
+    fun deleteAccount() = action {
+        api.deleteAccount()
+        auth.signOut()
+        sessions.clear()
+    }
 }
