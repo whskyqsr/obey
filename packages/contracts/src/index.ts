@@ -47,7 +47,17 @@ export const allFeatures = (stored: Partial<Features> = {}): Features => Object.
 export const weekStart = z.enum(["sun", "mon"]);
 export type WeekStart = z.infer<typeof weekStart>;
 
-export const user = z.object({ id, displayName: z.string(), email: z.string().nullable(), avatarVersion, weekStart });
+export const user = z.object({
+  id,
+  displayName: z.string(),
+  email: z.string().nullable(),
+  avatarVersion,
+  weekStart,
+  /** Confirmed 18+ and accepted the rules for proof photos; needed before the first upload. */
+  proofTermsAccepted: z.boolean().default(false),
+  /** Show proof photos without the blur. */
+  revealProofs: z.boolean().default(false),
+});
 export type User = z.infer<typeof user>;
 
 /** A date the dynamic marks: an anniversary, a collaring, or anything else it names. */
@@ -73,7 +83,13 @@ export type Relationship = z.infer<typeof relationship>;
 export const me = z.object({ user, relationships: z.array(relationship) });
 export type Me = z.infer<typeof me>;
 
-export const updateMe = z.object({ displayName: z.string().trim().min(1).max(40).optional(), weekStart: weekStart.optional() });
+export const updateMe = z.object({
+  displayName: z.string().trim().min(1).max(40).optional(),
+  weekStart: weekStart.optional(),
+  revealProofs: z.boolean().optional(),
+});
+/** Both boxes must be ticked; there is no way to upload a proof photo without them. */
+export const acceptProofTerms = z.object({ adult: z.literal(true), rules: z.literal(true) });
 
 // A blank name means "no name": apps then show the partners' names.
 const relationshipName = z
@@ -160,8 +176,20 @@ export const occurrence = z.object({
   noteMd: z.string().nullable(),
   /** The first day the assignee may complete it (the day after the previous occurrence); null when any time is fine. */
   opensOn: plainDate.nullable().default(null),
+  photoCount: z.number().int().default(0),
 });
 export type Occurrence = z.infer<typeof occurrence>;
+
+export const proofPhoto = z.object({ id, occurrenceId: id, uploaderId: id, createdAt: z.string() });
+export type ProofPhoto = z.infer<typeof proofPhoto>;
+
+export const reportReason = z.enum(["minor", "non_consensual", "illegal", "other"]);
+export const reportInput = z.object({
+  subjectId: id,
+  photoId: id.optional(),
+  reason: reportReason,
+  details: z.string().trim().max(1_000).optional(),
+});
 
 /** How a task has gone over its whole history. `rate` is done / (done + missed), null before anything is due. */
 export const taskStats = z.object({

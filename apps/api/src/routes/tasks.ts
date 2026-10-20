@@ -33,7 +33,7 @@ function validZone(zone: string) {
   }
 }
 
-async function loadOccurrence(db: Tx, id: string, userId: string) {
+export async function loadOccurrence(db: Tx, id: string, userId: string) {
   const [row] = await db
     .select({ occ: occurrences, series: taskSeries })
     .from(occurrences)

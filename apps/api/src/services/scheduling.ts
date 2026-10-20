@@ -128,6 +128,9 @@ export async function completeOccurrence(
   const opens = opensOn(series.schedule, occ.originalDate);
   if (isAssignee && !canManage(actor.role) && opens && localDate(now, series.timezone) < opens)
     throw new HttpError(409, `this one opens on ${opens}`);
+  // "Proof required" means a photo or a note; a Dominant marking it done needs neither.
+  if (series.proofRequired && isAssignee && !canManage(actor.role) && occ.photoCount === 0 && !(noteMd ?? occ.noteMd ?? "").trim())
+    throw new HttpError(409, "add a photo or a note as proof");
   if (noteMd !== undefined) await db.update(occurrences).set({ noteMd }).where(eq(occurrences.id, occ.id));
   if (series.approvalRequired && isAssignee && !canManage(actor.role)) {
     const [submitted] = await db

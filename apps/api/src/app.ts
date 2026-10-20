@@ -8,6 +8,7 @@ import { HttpError } from "./errors.js";
 import type { Notifier } from "./notify.js";
 import { libraryRoutes } from "./routes/library.js";
 import { pointsRoutes } from "./routes/points.js";
+import { proofRoutes } from "./routes/proofs.js";
 import { relationshipRoutes } from "./routes/relationships.js";
 import { taskRoutes } from "./routes/tasks.js";
 
@@ -59,5 +60,6 @@ export function buildApp(deps: Deps) {
   app.register(taskRoutes(deps));
   app.register(pointsRoutes(deps));
   app.register(libraryRoutes(deps));
+  app.register(proofRoutes(deps));
   return app;
 }

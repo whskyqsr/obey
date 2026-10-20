@@ -206,6 +206,51 @@ describe("tasks and occurrences", () => {
     expect((await dom.get(`/relationships/${relId}/balances`)).body[0].balance).toBe(10);
   });
 
+  it("takes photo proof only after the rules are accepted, and lets only its owner delete it", async () => {
+    const { dom, sub, relId, subId, domId } = await ctx.pair();
+    await dom.post(`/relationships/${relId}/tasks`, task(subId, { proofRequired: true }));
+    const [first] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    expect((await sub.post(`/occurrences/${first.id}/complete`)).status).toBe(409);
+
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 0xff, 0xd9]);
+    const upload = (who: typeof dom) =>
+      ctx.app.inject({ method: "POST", url: `/occurrences/${first.id}/photos`, payload: jpeg, headers: { ...who.headers, "content-type": "image/jpeg" } });
+    expect((await upload(sub)).statusCode).toBe(403);
+    expect((await sub.post("/me/proof-terms", { adult: true, rules: false })).status).toBe(400);
+    expect((await sub.post("/me/proof-terms", { adult: true, rules: true })).body.proofTermsAccepted).toBe(true);
+    const added = await upload(sub);
+    expect(added.statusCode).toBe(201);
+    const photoId = added.json().id;
+    await dom.post("/me/proof-terms", { adult: true, rules: true });
+    expect((await upload(dom)).statusCode).toBe(403); // only the assignee adds proof
+
+    const [listed] = (await dom.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    expect(listed.photoCount).toBe(1);
+    expect((await dom.get(`/occurrences/${first.id}/photos`)).body.map((p: { id: string }) => p.id)).toEqual([photoId]);
+    const view = (who: typeof dom) => ctx.app.inject({ method: "GET", url: `/photos/${photoId}`, headers: who.headers });
+    expect((await view(dom)).rawPayload.equals(jpeg)).toBe(true);
+    expect((await view(ctx.as(crypto.randomUUID()))).statusCode).toBe(404);
+
+    expect((await dom.post("/reports", { subjectId: subId, photoId, reason: "other" })).status).toBe(201);
+    expect((await dom.post("/reports", { subjectId: domId, reason: "other" })).status).toBe(400);
+    expect((await ctx.as(crypto.randomUUID()).post("/reports", { subjectId: subId, reason: "other" })).status).toBe(404);
+
+    expect((await sub.post(`/occurrences/${first.id}/complete`)).body.status).toBe("completed");
+    expect((await dom.del(`/photos/${photoId}`)).status).toBe(403);
+    expect((await sub.del(`/photos/${photoId}`)).status).toBe(204);
+    expect((await view(dom)).statusCode).toBe(404);
+    const [after] = (await dom.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    expect(after.photoCount).toBe(0);
+  });
+
+  it("accepts a note as proof", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    await dom.post(`/relationships/${relId}/tasks`, task(subId, { proofRequired: true }));
+    const [first] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    expect((await sub.post(`/occurrences/${first.id}/complete`, { noteMd: "  " })).status).toBe(409);
+    expect((await sub.post(`/occurrences/${first.id}/complete`, { noteMd: "Done, 64 oz" })).body.status).toBe("completed");
+  });
+
   it("schedules completion-anchored tasks from the completion date", async () => {
     const { dom, sub, relId, subId } = await ctx.pair();
     await dom.post(`/relationships/${relId}/tasks`, task(subId, { schedule: { start: "2026-10-16", anchor: "completion", rule: { freq: "daily", interval: 3 } } }));

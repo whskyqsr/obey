@@ -44,6 +44,7 @@ export const occurrenceDto = (o: typeof occurrences.$inferSelect, s: Series) => 
   completedAt: isoOrNull(o.completedAt),
   noteMd: o.noteMd,
   opensOn: opensOn(s.schedule, o.originalDate),
+  photoCount: o.photoCount,
 });
 
 /** `title` is the task's, so a request card can say which task it's about. */

@@ -22,12 +22,22 @@ const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const inviteCode = () => Array.from({ length: 8 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join("");
 
 const avatarVersion = (at: Date | null) => (at ? String(at.getTime()) : null);
-const userDto = (u: { id: string; displayName: string; email: string | null; avatarUpdatedAt: Date | null; weekStart: string }) => ({
+export const userDto = (u: {
+  id: string;
+  displayName: string;
+  email: string | null;
+  avatarUpdatedAt: Date | null;
+  weekStart: string;
+  proofTermsAcceptedAt: Date | null;
+  revealProofs: boolean;
+}) => ({
   id: u.id,
   displayName: u.displayName,
   email: u.email,
   avatarVersion: avatarVersion(u.avatarUpdatedAt),
   weekStart: u.weekStart === "mon" ? "mon" : "sun",
+  proofTermsAccepted: u.proofTermsAcceptedAt !== null,
+  revealProofs: u.revealProofs,
 });
 
 const AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"];

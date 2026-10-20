@@ -1,19 +1,5 @@
 import { sql } from "drizzle-orm";
-import {
-  boolean,
-  customType,
-  date,
-  index,
-  integer,
-  jsonb,
-  pgTable,
-  primaryKey,
-  text,
-  timestamp,
-  uniqueIndex,
-  uuid,
-  type AnyPgColumn,
-} from "drizzle-orm/pg-core";
+import { boolean, customType, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
 import type { DynamicDate, Features } from "@obey/contracts";
 import type { Schedule } from "@obey/recurrence";
 
@@ -32,6 +18,10 @@ export const users = pgTable("users", {
   avatarUpdatedAt: ts("avatar_updated_at"),
   /** "sun" or "mon": where calendars start the week. */
   weekStart: text("week_start").notNull().default("sun"),
+  /** When they confirmed they're 18+ and accepted the rules for proof photos; uploads wait for this. */
+  proofTermsAcceptedAt: ts("proof_terms_accepted_at"),
+  /** Proof photos show blurred until tapped unless this is on (it takes a switch and a confirmation). */
+  revealProofs: boolean("reveal_proofs").notNull().default(false),
   createdAt: createdAt(),
 });
 
@@ -187,6 +177,8 @@ export const occurrences = pgTable(
     completedAt: ts("completed_at"),
     reminderSentAt: ts("reminder_sent_at"),
     noteMd: text("note_md"),
+    /** Kept in step with proof_photos, so lists can show a count without a join. */
+    photoCount: integer("photo_count").notNull().default(0),
     reviewedBy: uuid("reviewed_by").references(() => users.id),
     reviewedAt: ts("reviewed_at"),
     /** Who last corrected this by hand from the task's history, and when. */
@@ -194,10 +186,7 @@ export const occurrences = pgTable(
     editedAt: ts("edited_at"),
     createdAt: createdAt(),
   },
-  (t) => [
-    uniqueIndex("occurrences_series_date_uq").on(t.seriesId, t.originalDate),
-    index("occurrences_due_idx").on(t.status, t.dueAt),
-  ],
+  (t) => [uniqueIndex("occurrences_series_date_uq").on(t.seriesId, t.originalDate), index("occurrences_due_idx").on(t.status, t.dueAt)],
 );
 
 export const reschedules = pgTable("reschedules", {
@@ -262,11 +251,18 @@ export const notes = pgTable(
     authorId: uuid("author_id")
       .notNull()
       .references(() => users.id),
-    kind: text("kind", { enum: ["note", "journal"] }).notNull().default("note"),
+    kind: text("kind", { enum: ["note", "journal"] })
+      .notNull()
+      .default("note"),
     title: text("title").notNull().default(""),
     bodyMd: text("body_md").notNull(),
-    visibility: text("visibility", { enum: ["private", "shared"] }).notNull().default("shared"),
-    tags: text("tags").array().notNull().default(sql`'{}'::text[]`),
+    visibility: text("visibility", { enum: ["private", "shared"] })
+      .notNull()
+      .default("shared"),
+    tags: text("tags")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     pinned: boolean("pinned").notNull().default(false),
     mood: integer("mood"),
     /** A Dominant's shared note the submissive may edit too. */
@@ -284,4 +280,39 @@ export const devices = pgTable("devices", {
     .references(() => users.id, { onDelete: "cascade" }),
   platform: text("platform", { enum: ["android", "web"] }).notNull(),
   updatedAt: ts("updated_at").notNull().defaultNow(),
+});
+
+/** A photo attached to an occurrence as proof. Deleting the row is the purge; nothing is kept elsewhere. */
+export const proofPhotos = pgTable(
+  "proof_photos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    occurrenceId: uuid("occurrence_id")
+      .notNull()
+      .references(() => occurrences.id, { onDelete: "cascade" }),
+    uploaderId: uuid("uploader_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    data: bytea("data").notNull(),
+    contentType: text("content_type").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("proof_photos_occurrence_idx").on(t.occurrenceId)],
+);
+
+/** A report of a photo or a person, for the moderation queue Play requires. */
+export const reports = pgTable("reports", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reporterId: uuid("reporter_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  subjectId: uuid("subject_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  /** The photo reported, if any. Not a foreign key: the report outlives a deleted photo. */
+  photoId: uuid("photo_id"),
+  reason: text("reason", { enum: ["minor", "non_consensual", "illegal", "other"] }).notNull(),
+  details: text("details"),
+  createdAt: createdAt(),
+  resolvedAt: ts("resolved_at"),
 });
