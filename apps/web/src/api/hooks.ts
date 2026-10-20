@@ -6,6 +6,7 @@ import type {
   EditOccurrence,
   HistoryEntry,
   TaskStats,
+  TaskStreak,
   AssignConsequenceInput,
   WeekStart,
   Invite,
@@ -60,6 +61,10 @@ export function useTaskHistory(rel: string, taskId: string) {
 
 export function useTaskStats(rel: string, taskId: string) {
   return useQuery({ queryKey: ["rel", rel, "stats", taskId], queryFn: () => api<TaskStats>(`/tasks/${taskId}/stats`) });
+}
+
+export function useStreaks(rel: string) {
+  return useQuery({ queryKey: ["rel", rel, "streaks"], queryFn: () => api<TaskStreak[]>(`/relationships/${rel}/streaks`), staleTime: 60_000 });
 }
 
 export function useEditOccurrence(rel: string) {

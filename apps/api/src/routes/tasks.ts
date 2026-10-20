@@ -21,6 +21,7 @@ import {
 } from "../services/scheduling.js";
 
 const MAX_RANGE_DAYS = 62;
+const STREAK_RECENT = 7;
 
 function validZone(zone: string) {
   try {
@@ -244,6 +245,41 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       editedBy: occ.editedBy,
       editedAt: occ.editedAt?.toISOString() ?? null,
     }));
+  });
+
+  /** Each active task's streak and last few results, for the strips on task cards. Follows "this and following" splits like stats. */
+  app.get<{ Params: { id: string } }>("/relationships/:id/streaks", async (req) => {
+    await requireMember(db, req.params.id, req.user.id);
+    const series = await db
+      .select({ id: taskSeries.id, active: taskSeries.active, supersededBy: taskSeries.supersededBy })
+      .from(taskSeries)
+      .where(eq(taskSeries.relationshipId, req.params.id));
+    const rootOf = new Map<string, string>();
+    const next = new Map(series.map((s) => [s.id, s.supersededBy]));
+    for (const s of series) {
+      let id = s.id;
+      for (const seen = new Set<string>(); next.get(id) && !seen.has(id); ) {
+        seen.add(id);
+        id = next.get(id)!;
+      }
+      rootOf.set(s.id, id);
+    }
+    const rows = await db
+      .select({ seriesId: occurrences.seriesId, status: occurrences.status, completedAt: occurrences.completedAt })
+      .from(occurrences)
+      .where(and(inArray(occurrences.seriesId, series.map((s) => s.id)), inArray(occurrences.status, ["completed", "missed", "excused"])))
+      .orderBy(asc(occurrences.dueAt));
+    const byTask = new Map<string, typeof rows>();
+    for (const r of rows) {
+      const t = rootOf.get(r.seriesId)!;
+      byTask.set(t, [...(byTask.get(t) ?? []), r]);
+    }
+    return series
+      .filter((s) => s.active)
+      .map((s) => {
+        const list = byTask.get(s.id) ?? [];
+        return { taskId: s.id, streak: taskStats(list).streak, recent: list.slice(-STREAK_RECENT).map((r) => r.status as "completed" | "missed" | "excused") };
+      });
   });
 
   /** Completion counts and streaks over a task's whole history. */

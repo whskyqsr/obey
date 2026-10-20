@@ -32,6 +32,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextDecoration
 import app.obey.api.Occurrence
 import app.obey.api.OccurrenceStatus
+import app.obey.api.TaskStreak
+import app.obey.ui.common.StreakStrip
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import app.obey.ui.common.formatDue
 import app.obey.ui.common.signed
 
@@ -53,6 +58,7 @@ fun OccurrenceRow(
     modifier: Modifier = Modifier,
     /** Opens the task this occurrence belongs to. */
     onOpen: (() -> Unit)? = null,
+    streak: TaskStreak? = null,
 ) {
     var menu by remember { mutableStateOf(false) }
     val done = occurrence.status == OccurrenceStatus.Completed || occurrence.status == OccurrenceStatus.Excused
@@ -88,7 +94,10 @@ fun OccurrenceRow(
             Text(occurrence.title, textDecoration = if (done) TextDecoration.LineThrough else null)
         },
         supportingContent = {
-            Text(supporting, color = if (occurrence.status == OccurrenceStatus.Missed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+            Column {
+                Text(supporting, color = if (occurrence.status == OccurrenceStatus.Missed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                StreakStrip(streak, Modifier.padding(top = 6.dp))
+            }
         },
         trailingContent = {
             if (actions.onApprove != null || actions.onReject != null) {

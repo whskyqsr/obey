@@ -10,6 +10,7 @@ import app.obey.api.RescheduleDayInput
 import app.obey.api.RescheduleInput
 import app.obey.api.RescheduleRequest
 import app.obey.api.ReviewOccurrenceInput
+import app.obey.api.TaskStreak
 import app.obey.data.Session
 import app.obey.data.SessionRepository
 import app.obey.ui.common.BaseViewModel
@@ -36,6 +37,8 @@ data class TodayData(
     val done: List<Occurrence>,
     /** Pending extension requests, one entry per request; a whole-day request's rows share an entry. */
     val requests: List<List<RescheduleRequest>>,
+    /** By task id; empty if streaks couldn't load, so the rest of Today still shows. */
+    val streaks: Map<String, TaskStreak> = emptyMap(),
 )
 
 @HiltViewModel
@@ -65,6 +68,7 @@ class TodayViewModel @Inject constructor(
         // Overdue items can be up to the grace window old; two weeks back is plenty for a Today view.
         val occ = async { api.occurrences(relId, today.minusDays(14).toString(), today.toString()) }
         val reqs = async { api.reschedules(relId) }
+        val streaks = async { runCatching { api.streaks(relId) }.getOrDefault(emptyList()) }
         val all = occ.await()
         val now = Instant.now()
         fun dueDate(o: Occurrence) = parseInstant(o.dueAt).local().toLocalDate()
@@ -86,6 +90,7 @@ class TodayViewModel @Inject constructor(
                 .filter { sessions.session?.canManage == true || it.requestedBy == sessions.session?.userId }
                 .groupBy { it.groupId ?: it.id }
                 .values.toList(),
+            streaks = streaks.await().associateBy { it.taskId },
         )
     }
 

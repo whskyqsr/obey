@@ -382,6 +382,7 @@ describe("task history", () => {
       expect(after).toMatchObject({ status: "completed", pointsDelta: 10, completedAt: "2026-10-17T02:30:00.000Z" });
       expect(after.editedBy).toBeTruthy();
       expect((await sub.get(`/tasks/${t.id}/stats`)).body).toMatchObject({ done: 1, missed: 0, rate: 1, streak: 1, bestStreak: 1 });
+      expect((await sub.get(`/relationships/${relId}/streaks`)).body).toEqual([{ taskId: t.id, streak: 1, recent: ["completed"] }]);
 
       await dom.patch(`/occurrences/${id}`, { status: "excused" });
       expect(await balance()).toBe(before + 4);

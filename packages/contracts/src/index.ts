@@ -145,6 +145,14 @@ export const taskStats = z.object({
 });
 export type TaskStats = z.infer<typeof taskStats>;
 
+/** A task's current streak and its last few finished occurrences, oldest first, for the strip on task cards. */
+export const taskStreak = z.object({
+  taskId: id,
+  streak: z.number().int(),
+  recent: z.array(z.enum(["completed", "missed", "excused"])),
+});
+export type TaskStreak = z.infer<typeof taskStreak>;
+
 /** One past occurrence in a task's history, with the points it earned or cost. */
 export const historyEntry = occurrence.extend({
   pointsDelta: z.number().int(),

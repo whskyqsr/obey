@@ -72,6 +72,9 @@ interface ObeyApi {
     @GET("tasks/{id}/history")
     suspend fun taskHistory(@Path("id") taskId: String, @Query("limit") limit: Int = 100): List<HistoryEntry>
 
+    @GET("relationships/{id}/streaks")
+    suspend fun streaks(@Path("id") relationshipId: String): List<TaskStreak>
+
     @GET("tasks/{id}/stats")
     suspend fun taskStats(@Path("id") taskId: String): TaskStats
 

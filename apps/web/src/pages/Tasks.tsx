@@ -5,6 +5,7 @@ import type { Occurrence } from "../api/types";
 import { CompleteDialog, isOverdue } from "../components/OccurrenceCard";
 import { Badge, Chip, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, TextField } from "../components/ui";
 import { useCurrentOccurrences } from "../lib/currentOccurrences";
+import { StreakStrip } from "../components/StreakStrip";
 import { fmtClock, fmtDate, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 
@@ -62,6 +63,7 @@ export function TasksPage() {
                   {t.summary}
                   {t.dueTime ? ` at ${fmtClock(t.dueTime)}` : ""} · {memberName(t.assigneeId)}
                 </div>
+                <StreakStrip taskId={t.id} className="mt-1.5" />
               </div>
               <div className="flex flex-col items-end gap-1">
                 {features.points && t.points !== 0 && <Badge>{t.points > 0 ? `+${t.points}` : t.points} pts</Badge>}

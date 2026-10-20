@@ -234,6 +234,14 @@ data class TaskStats(
     val lastDoneAt: String? = null,
 )
 
+/** A task's current streak and its last few results, oldest first: "completed", "missed" or "excused". */
+@Serializable
+data class TaskStreak(
+    val taskId: String,
+    val streak: Int,
+    val recent: List<String> = emptyList(),
+)
+
 @Serializable
 data class AssignConsequenceInput(
     val assigneeId: String,

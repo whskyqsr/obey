@@ -6,6 +6,7 @@ import { errorMessage } from "../api/client";
 import { fmtDate, fmtDateTime, fmtRelative, fmtTime, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 import { RescheduleSheet } from "./RescheduleSheet";
+import { StreakStrip } from "./StreakStrip";
 import { Badge, Button, Dialog, IconButton, TextArea, cx, useSnackbar } from "./ui";
 
 const STATUS: Record<OccurrenceStatus, { label: string; tone: "primary" | "error" | "tertiary" | "neutral" }> = {
@@ -65,6 +66,7 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
             {!mine && <span>· {memberName(o.assigneeId)}</span>}
             {o.rescheduled && <span title="Rescheduled">· moved</span>}
           </div>
+          <StreakStrip taskId={o.seriesId} className="mt-2" />
         </TitleWrap>
         <div className="flex flex-col items-end gap-1">
           {features.points && o.points !== 0 && <Badge tone="primary">{o.points > 0 ? `+${o.points}` : o.points} pts</Badge>}

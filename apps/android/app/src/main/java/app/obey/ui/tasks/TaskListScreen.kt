@@ -3,6 +3,7 @@ package app.obey.ui.tasks
 import app.obey.ui.common.LocalFeatures
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -53,6 +54,9 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
+import androidx.compose.ui.unit.dp
+import app.obey.api.TaskStreak
+import app.obey.ui.common.StreakStrip
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -69,6 +73,8 @@ class TaskListViewModel @Inject constructor(
     private val _current = MutableStateFlow<Map<String, List<Occurrence>>>(emptyMap())
     /** What's due now for each task, for the status and Done button on each row. */
     val current: StateFlow<Map<String, List<Occurrence>>> = _current.asStateFlow()
+    private val _streaks = MutableStateFlow<Map<String, TaskStreak>>(emptyMap())
+    val streaks: StateFlow<Map<String, TaskStreak>> = _streaks.asStateFlow()
     val session: Session? get() = sessions.session
 
     fun refresh() {
@@ -80,6 +86,9 @@ class TaskListViewModel @Inject constructor(
             runCatching {
                 api.occurrences(sessions.requireRelationshipId(), today.minusDays(CURRENT_DAYS_BACK).toString(), today.plusDays(CURRENT_DAYS_AHEAD).toString())
             }.onSuccess { _current.value = currentByTask(it) }
+        }
+        viewModelScope.launch {
+            runCatching { api.streaks(sessions.requireRelationshipId()) }.onSuccess { list -> _streaks.value = list.associateBy { it.taskId } }
         }
     }
 
@@ -100,6 +109,7 @@ fun TaskListScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val current by vm.current.collectAsStateWithLifecycle()
+    val streaks by vm.streaks.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     MessageEffect(message, snackbar, vm::messageShown)
@@ -131,16 +141,19 @@ fun TaskListScreen(
                         modifier = Modifier.clickable { onOpen(t.id) },
                         headlineContent = { Text(t.title) },
                         supportingContent = {
-                            Text(
-                                listOfNotNull(
-                                    if (t.assignedConsequenceId != null) "Consequence" else null,
-                                    t.summary,
-                                    t.dueTime?.let { "at ${formatClock(it)}" },
-                                    who,
-                                    if (LocalFeatures.current.points && t.points != 0) "${signed(t.points)} pts" else null,
-                                    if (!t.active) "paused" else null,
-                                ).joinToString(" · "),
-                            )
+                            Column {
+                                Text(
+                                    listOfNotNull(
+                                        if (t.assignedConsequenceId != null) "Consequence" else null,
+                                        t.summary,
+                                        t.dueTime?.let { "at ${formatClock(it)}" },
+                                        who,
+                                        if (LocalFeatures.current.points && t.points != 0) "${signed(t.points)} pts" else null,
+                                        if (!t.active) "paused" else null,
+                                    ).joinToString(" · "),
+                                )
+                                StreakStrip(streaks[t.id], Modifier.padding(top = 6.dp))
+                            }
                         },
                         trailingContent = {
                             NowStatus(current[t.id].orEmpty(), mine = t.assigneeId == vm.session?.userId, onComplete = vm::complete)

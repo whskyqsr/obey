@@ -15,6 +15,7 @@ export type TaskInput = z.infer<typeof c.taskInput>;
 export type Occurrence = c.Occurrence;
 export type HistoryEntry = c.HistoryEntry;
 export type TaskStats = c.TaskStats;
+export type TaskStreak = c.TaskStreak;
 export type EditOccurrence = z.infer<typeof c.editOccurrence>;
 export type RescheduleInput = c.RescheduleInput;
 export type RescheduleDayInput = c.RescheduleDayInput;
