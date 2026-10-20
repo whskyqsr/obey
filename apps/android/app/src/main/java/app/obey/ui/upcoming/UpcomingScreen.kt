@@ -48,6 +48,15 @@ import app.obey.ui.common.formatDate
 import app.obey.ui.today.OccurrenceActions
 import app.obey.ui.today.OccurrenceRow
 import app.obey.ui.today.RescheduleSheet
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.material.icons.outlined.EditCalendar
+import app.obey.api.CalendarEvent
+import app.obey.ui.common.parseInstant
+import app.obey.ui.plans.PlanChip
+import app.obey.ui.plans.PlanDialog
+import app.obey.ui.plans.PlanRow
+import app.obey.ui.plans.isLong
+import java.time.Instant
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.TemporalAdjusters
@@ -76,6 +85,8 @@ fun UpcomingScreen(
         onPauseOrDispose { }
     }
     var rescheduling by remember { mutableStateOf<Occurrence?>(null) }
+    // A plan to show, or a day to add one on.
+    var plan by remember { mutableStateOf<Pair<CalendarEvent?, LocalDate>?>(null) }
     val session = vm.session
     val today = LocalDate.now()
     val canManage = session?.canManage == true
@@ -94,11 +105,22 @@ fun UpcomingScreen(
         )
     }
 
+    val planRow: @Composable (CalendarEvent, LocalDate) -> Unit = { e, day ->
+        PlanRow(e, day, if (e.authorId == session?.userId || e.withPartner) null else session?.nameOf(e.authorId)) { plan = e to day }
+    }
+    val planChip: @Composable (CalendarEvent, LocalDate) -> Unit = { e, day ->
+        PlanChip(e, day, onOpen = { plan = e to day }, modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Calendar") },
                 actions = {
+                    IconButton(onClick = {
+                        val day = if (view == CalendarView.Month && !selected.isBefore(today)) selected else today
+                        plan = null to day
+                    }) { Icon(Icons.Outlined.EditCalendar, "New plan") }
                     IconButton(onClick = onAllTasks) { Icon(Icons.AutoMirrored.Outlined.List, "All tasks") }
                     SettingsAction(onOpenSettings)
                 },
@@ -147,6 +169,7 @@ fun UpcomingScreen(
                 is Load.Failed -> ErrorBox(s.message, vm::refresh)
                 is Load.Ready -> if (s.value.view == CalendarView.Month) {
                     val items = s.value.days.firstOrNull { it.first == selected }?.second.orEmpty()
+                    val events = s.value.eventsOn(selected)
                     LazyColumn(Modifier.fillMaxSize()) {
                         item(key = "grid") {
                             MonthGrid(s.value, selected, today, onSelect = vm::select, Modifier.padding(horizontal = 8.dp))
@@ -158,7 +181,7 @@ fun UpcomingScreen(
                                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp),
                             )
                         }
-                        if (items.isEmpty()) item(key = "e-selected") {
+                        if (items.isEmpty() && events.isEmpty()) item(key = "e-selected") {
                             Text(
                                 "Nothing scheduled",
                                 style = MaterialTheme.typography.bodySmall,
@@ -166,10 +189,11 @@ fun UpcomingScreen(
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                             )
                         }
-                        items(items, key = { it.id }) { occurrenceRow(it) }
+                        dayItems(selected, items, events, occurrenceRow, planRow, planChip)
                     }
                 } else LazyColumn(Modifier.fillMaxSize()) {
                     s.value.days.forEach { (day, occs) ->
+                        val events = s.value.eventsOn(day)
                         item(key = "h-$day") {
                             Row(
                                 Modifier.padding(start = 16.dp, end = 8.dp, top = 16.dp),
@@ -187,7 +211,7 @@ fun UpcomingScreen(
                                 }
                             }
                         }
-                        if (occs.isEmpty()) {
+                        if (occs.isEmpty() && events.isEmpty()) {
                             item(key = "e-$day") {
                                 Text(
                                     "Nothing scheduled",
@@ -197,14 +221,35 @@ fun UpcomingScreen(
                                 )
                             }
                         }
-                        items(occs, key = { it.id }) { occurrenceRow(it) }
+                        dayItems(day, occs, events, occurrenceRow, planRow, planChip)
                     }
                 }
             }
         }
     }
 
+    plan?.let { (e, day) ->
+        PlanDialog(e, day, onDismiss = { plan = null }, onChanged = vm::refresh)
+    }
+
     rescheduling?.let { o ->
         RescheduleSheet(o, onDismiss = { rescheduling = null }, onSubmit = { vm.reschedule(o, it) })
+    }
+}
+
+/** A day's plans and tasks: all-day and long plans first, then timed plans and tasks in time order. */
+private fun LazyListScope.dayItems(
+    day: LocalDate,
+    occs: List<Occurrence>,
+    events: List<CalendarEvent>,
+    occurrenceRow: @Composable (Occurrence) -> Unit,
+    planRow: @Composable (CalendarEvent, LocalDate) -> Unit,
+    planChip: @Composable (CalendarEvent, LocalDate) -> Unit,
+) {
+    val (long, timed) = events.partition { it.isLong }
+    items(long, key = { "pl-$day-${it.id}" }) { planChip(it, day) }
+    val rows: List<Pair<Instant, Any>> = (timed.map { parseInstant(it.startsAt) to it } + occs.map { parseInstant(it.dueAt) to it }).sortedBy { it.first }
+    items(rows, key = { (_, v) -> if (v is CalendarEvent) "pt-$day-${v.id}" else (v as Occurrence).id }) { (_, v) ->
+        if (v is CalendarEvent) planRow(v, day) else occurrenceRow(v as Occurrence)
     }
 }

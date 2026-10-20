@@ -1,6 +1,7 @@
 package app.obey.ui.today
 
 import androidx.lifecycle.viewModelScope
+import app.obey.api.CalendarEvent
 import app.obey.api.CompleteOccurrenceInput
 import app.obey.api.DecideInput
 import app.obey.api.EditOccurrenceInput
@@ -20,6 +21,7 @@ import app.obey.ui.common.formatDue
 import app.obey.ui.common.loadCatching
 import app.obey.ui.common.local
 import app.obey.ui.common.parseInstant
+import app.obey.ui.plans.covers
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
 import java.time.LocalDate
@@ -45,6 +47,8 @@ data class TodayData(
     val requests: List<List<RescheduleRequest>>,
     /** By task id; empty if streaks couldn't load, so the rest of Today still shows. */
     val streaks: Map<String, TaskStreak> = emptyMap(),
+    /** Plans today or tomorrow that run into a task, for a heads-up at the top. */
+    val clashingPlans: List<CalendarEvent> = emptyList(),
 )
 
 @HiltViewModel
@@ -75,6 +79,7 @@ class TodayViewModel @Inject constructor(
         val occ = async { api.occurrences(relId, today.minusDays(14).toString(), today.plusDays(7).toString()) }
         val reqs = async { api.reschedules(relId) }
         val streaks = async { runCatching { api.streaks(relId) }.getOrDefault(emptyList()) }
+        val events = async { runCatching { api.events(relId, today.toString(), today.plusDays(1).toString()) }.getOrDefault(emptyList()) }
         val all = occ.await()
         val now = Instant.now()
         fun dueDate(o: Occurrence) = parseInstant(o.dueAt).local().toLocalDate()
@@ -93,6 +98,10 @@ class TodayViewModel @Inject constructor(
                 .groupBy { it.groupId ?: it.id }
                 .values.toList(),
             streaks = streaks.await().associateBy { it.taskId },
+            clashingPlans = events.await().filter {
+                // The server pads the range by a day; keep only today's and tomorrow's, and only ones not over yet.
+                it.conflictIds.isNotEmpty() && parseInstant(it.endsAt).isAfter(now) && (it.covers(today) || it.covers(today.plusDays(1)))
+            },
         )
     }
 

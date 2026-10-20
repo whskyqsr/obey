@@ -8,9 +8,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -29,12 +31,13 @@ import app.obey.api.Occurrence
 import app.obey.api.OccurrenceStatus
 import app.obey.ui.common.formatDate
 import app.obey.ui.common.parseInstant
+import app.obey.ui.plans.isLong
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 
-/** A month as a grid of whole weeks, with a dot per task. Tapping a day shows its tasks below, as on the web. */
+/** A month as a grid of whole weeks, with a dot per task and a bar for plans. Tapping a day shows its tasks below, as on the web. */
 @Composable
 fun MonthGrid(data: CalendarData, selected: LocalDate, today: LocalDate, onSelect: (LocalDate) -> Unit, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
@@ -60,9 +63,12 @@ fun MonthGrid(data: CalendarData, selected: LocalDate, today: LocalDate, onSelec
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(1.dp)) {
                     week.forEach { (d, items) ->
                         val inMonth = d.month == month
+                        val plans = data.eventsOn(d)
                         val label = buildString {
                             append(formatDate(d))
-                            append(if (items.isEmpty()) ", nothing scheduled" else ", ${items.size} task${if (items.size == 1) "" else "s"}")
+                            if (items.isEmpty() && plans.isEmpty()) append(", nothing scheduled")
+                            if (plans.isNotEmpty()) append(", ${plans.size} plan${if (plans.size == 1) "" else "s"}")
+                            if (items.isNotEmpty()) append(", ${items.size} task${if (items.size == 1) "" else "s"}")
                         }
                         Column(
                             Modifier
@@ -89,6 +95,17 @@ fun MonthGrid(data: CalendarData, selected: LocalDate, today: LocalDate, onSelec
                                         inMonth -> colors.onSurface
                                         else -> colors.onSurfaceVariant.copy(alpha = 0.6f)
                                     },
+                                )
+                            }
+                            if (plans.isNotEmpty()) {
+                                // A full-width bar for all-day and multi-day plans, so they read as spanning; a short one for timed plans.
+                                Box(
+                                    Modifier
+                                        .padding(top = 4.dp)
+                                        .then(if (plans.any { it.isLong }) Modifier.fillMaxWidth() else Modifier.width(14.dp))
+                                        .height(4.dp)
+                                        .clip(RoundedCornerShape(2.dp))
+                                        .background(colors.tertiary),
                                 )
                             }
                             Row(

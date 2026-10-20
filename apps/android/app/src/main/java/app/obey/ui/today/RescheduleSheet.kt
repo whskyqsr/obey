@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -36,11 +37,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.obey.api.CalendarEvent
 import app.obey.api.Occurrence
 import app.obey.api.RescheduleInput
 import app.obey.api.RescheduleScope
 import app.obey.ui.common.formatDue
+import app.obey.ui.plans.afterPlan
+import app.obey.ui.plans.iso
 import app.obey.ui.common.local
 import app.obey.ui.common.parseInstant
 import java.time.Instant
@@ -61,6 +66,8 @@ fun RescheduleSheet(
     occurrence: Occurrence,
     onDismiss: () -> Unit,
     onSubmit: (RescheduleInput) -> Unit,
+    /** A plan it runs into, for a one-tap "After the plan". */
+    after: CalendarEvent? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var scope by rememberSaveable { mutableStateOf(RescheduleScope.This) }
@@ -107,6 +114,13 @@ fun RescheduleSheet(
                 FilledTonalButton(onClick = { submit(delayHours = 24) }, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Outlined.Schedule, contentDescription = null)
                     Text("  +24 hours")
+                }
+            }
+            if (after != null) {
+                val at = afterPlan(occurrence.dueAt, after)
+                FilledTonalButton(onClick = { submit(dueAt = at.iso()) }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Outlined.Event, contentDescription = null)
+                    Text("  After ${after.title} · ${formatDue(at.iso())}", maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             OutlinedButton(onClick = { pickDate = true }, modifier = Modifier.fillMaxWidth()) {

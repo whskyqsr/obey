@@ -92,6 +92,23 @@ interface ObeyApi {
         @Query("to") to: String,
     ): List<Occurrence>
 
+    // Calendar plans
+    @GET("relationships/{id}/events")
+    suspend fun events(
+        @Path("id") relationshipId: String,
+        @Query("from") from: String,
+        @Query("to") to: String,
+    ): List<CalendarEvent>
+
+    @POST("relationships/{id}/events")
+    suspend fun createEvent(@Path("id") relationshipId: String, @Body body: CalendarEventInput): CalendarEvent
+
+    @PATCH("events/{id}")
+    suspend fun updateEvent(@Path("id") id: String, @Body body: CalendarEventInput): CalendarEvent
+
+    @DELETE("events/{id}")
+    suspend fun deleteEvent(@Path("id") id: String)
+
     @GET("tasks/{id}/history")
     suspend fun taskHistory(@Path("id") taskId: String, @Query("limit") limit: Int = 100): List<HistoryEntry>
 

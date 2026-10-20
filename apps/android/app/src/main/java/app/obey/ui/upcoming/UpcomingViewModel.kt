@@ -1,6 +1,7 @@
 package app.obey.ui.upcoming
 
 import androidx.lifecycle.viewModelScope
+import app.obey.api.CalendarEvent
 import app.obey.api.CompleteOccurrenceInput
 import app.obey.api.ObeyApi
 import app.obey.api.Occurrence
@@ -14,6 +15,7 @@ import app.obey.ui.common.Load
 import app.obey.ui.common.loadCatching
 import app.obey.ui.common.local
 import app.obey.ui.common.parseInstant
+import app.obey.ui.plans.covers
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -26,10 +28,17 @@ import kotlinx.coroutines.launch
 
 enum class CalendarView { Week, Month }
 
-/** What's on screen: a week, or a month padded out to whole weeks. */
-data class CalendarData(val view: CalendarView, val anchor: LocalDate, val days: List<Pair<LocalDate, List<Occurrence>>>) {
+/** What's on screen: a week, or a month padded out to whole weeks, with the plans that touch it. */
+data class CalendarData(
+    val view: CalendarView,
+    val anchor: LocalDate,
+    val days: List<Pair<LocalDate, List<Occurrence>>>,
+    val events: List<CalendarEvent> = emptyList(),
+) {
     val from: LocalDate get() = days.first().first
     val to: LocalDate get() = days.last().first
+
+    fun eventsOn(day: LocalDate): List<CalendarEvent> = events.filter { it.covers(day) }
 }
 
 @HiltViewModel
@@ -109,6 +118,9 @@ class UpcomingViewModel @Inject constructor(
             val result = loadCatching {
                 val occ = api.occurrences(sessions.requireRelationshipId(), from.toString(), to.toString())
                     .filter { it.status != OccurrenceStatus.Cancelled }
+                // Plans are newer than the rest of the API; an older server just shows none.
+                val rel = sessions.requireRelationshipId()
+                val events = runCatching { api.events(rel, from.toString(), to.toString()) }.getOrDefault(emptyList())
                 val byDay = occ.groupBy { parseInstant(it.dueAt).local().toLocalDate() }
                 CalendarData(
                     view,
@@ -116,6 +128,7 @@ class UpcomingViewModel @Inject constructor(
                     generateSequence(from) { it.plusDays(1) }.takeWhile { !it.isAfter(to) }
                         .map { d -> d to byDay[d].orEmpty().sortedBy { parseInstant(it.dueAt) } }
                         .toList(),
+                    events.sortedBy { parseInstant(it.startsAt) },
                 )
             }
             // Ignore stale results if the user paged on.

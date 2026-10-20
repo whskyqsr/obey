@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import app.obey.ui.plans.PlanDialog
+import app.obey.ui.plans.PlanHeadsUp
+import app.obey.ui.plans.firstDay
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.MoreTime
@@ -37,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.obey.api.CalendarEvent
 import app.obey.api.Occurrence
 import app.obey.api.OccurrenceStatus
 import app.obey.ui.common.EmptyBox
@@ -76,6 +80,7 @@ fun TodayScreen(
 
     var rescheduling by remember { mutableStateOf<Occurrence?>(null) }
     var noting by remember { mutableStateOf<Occurrence?>(null) }
+    var plan by remember { mutableStateOf<CalendarEvent?>(null) }
     var dayTasks by remember { mutableStateOf<List<Occurrence>?>(null) }
     val session = vm.session
 
@@ -136,6 +141,7 @@ fun TodayScreen(
                 }
 
                 LazyColumn(Modifier.fillMaxSize()) {
+                    items(d.clashingPlans, key = { "plan-${it.id}" }) { e -> PlanHeadsUp(e) { plan = e } }
                     if (!isDom) {
                         val counted = d.today.filter { it.status != OccurrenceStatus.Excused }
                         if (counted.isNotEmpty()) item(key = "progress") { ProgressCard(counted) }
@@ -220,6 +226,10 @@ fun TodayScreen(
 
     rescheduling?.let { o ->
         RescheduleSheet(o, onDismiss = { rescheduling = null }, onSubmit = { vm.reschedule(o, it) })
+    }
+
+    plan?.let { e ->
+        PlanDialog(e, e.firstDay(), onDismiss = { plan = null }, onChanged = vm::refresh)
     }
 
     dayTasks?.let { tasks ->

@@ -567,3 +567,30 @@ data class RegisterDeviceInput(val token: String, val platform: String = "androi
 
 @Serializable
 data class ApiError(val error: String, val details: kotlinx.serialization.json.JsonElement? = null)
+
+/** A plan on the shared calendar. All-day plans run from local midnight to the midnight after their last day. */
+@Serializable
+data class CalendarEventInput(
+    val title: String,
+    val startsAt: String,
+    val endsAt: String,
+    val allDay: Boolean = false,
+    /** Whether the partner is in on it; only then do their tasks count as clashing. */
+    val withPartner: Boolean = false,
+    val noteMd: String? = null,
+)
+
+@Serializable
+data class CalendarEvent(
+    val id: String,
+    val relationshipId: String,
+    val authorId: String,
+    val title: String,
+    val startsAt: String,
+    val endsAt: String,
+    val allDay: Boolean = false,
+    val withPartner: Boolean = false,
+    val noteMd: String? = null,
+    /** Tasks still to do that fall due during the plan, for the people it involves. */
+    val conflictIds: List<String> = emptyList(),
+)
