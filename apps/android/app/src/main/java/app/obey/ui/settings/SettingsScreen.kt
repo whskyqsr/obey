@@ -1,5 +1,10 @@
 package app.obey.ui.settings
 
+import androidx.compose.material3.Button
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
+
 import androidx.compose.material3.Switch
 import app.obey.api.Features
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -193,18 +198,31 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
                             TextButton(onClick = { dialog = "create" }) { Text("New") }
                         }
                         invite?.let { inv ->
+                            val context = LocalContext.current
                             Card(
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
                                 modifier = Modifier.padding(16.dp).fillMaxWidth(),
                             ) {
-                                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Column(Modifier.weight(1f)) {
-                                        Text("Invite code", style = MaterialTheme.typography.labelLarge)
-                                        Text(inv.code, style = MaterialTheme.typography.headlineMedium.copy(fontFamily = FontFamily.Monospace))
-                                        Text("Expires ${formatDateTime(inv.expiresAt)}", style = MaterialTheme.typography.bodySmall)
-                                    }
-                                    IconButton(onClick = { clipboard.setText(AnnotatedString(inv.code)) }) {
-                                        Icon(Icons.Outlined.ContentCopy, "Copy code")
+                                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("Invite link", style = MaterialTheme.typography.labelLarge)
+                                    Text(inv.link, style = MaterialTheme.typography.bodyLarge)
+                                    Text(
+                                        (inv.role?.let { "They'll join as ${it.label}" } ?: "They'll choose their role") +
+                                            " · code ${inv.code} · expires ${formatDateTime(inv.expiresAt)}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(onClick = {
+                                            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, inv.link)
+                                            context.startActivity(Intent.createChooser(send, "Share invite link"))
+                                        }) {
+                                            Icon(Icons.Outlined.Share, null)
+                                            Text("  Share link")
+                                        }
+                                        TextButton(onClick = { clipboard.setText(AnnotatedString(inv.link)) }) {
+                                            Icon(Icons.Outlined.ContentCopy, null)
+                                            Text("  Copy")
+                                        }
                                     }
                                 }
                             }

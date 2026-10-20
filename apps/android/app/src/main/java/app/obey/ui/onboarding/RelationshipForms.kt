@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -71,14 +72,19 @@ fun JoinRelationshipForm(busy: Boolean, onJoin: (String, Role) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         OutlinedTextField(
             value = code,
-            onValueChange = { code = it.trim().take(32) },
-            label = { Text("Invite code") },
+            onValueChange = { code = it.trim().take(200) },
+            label = { Text("Invite link or code") },
             singleLine = true,
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
             modifier = Modifier.fillMaxWidth(),
         )
         Text("Your role")
         RolePicker(role, { role = it })
+        Text(
+            "If the invite already names your role, that's the one you get.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Button(onClick = { onJoin(code, role) }, enabled = !busy && code.length >= 4, modifier = Modifier.fillMaxWidth()) {
             Text("Join")
         }

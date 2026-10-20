@@ -18,6 +18,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import app.obey.BuildConfig
 import app.obey.api.CreateRelationshipInput
 import app.obey.api.Invite
+import app.obey.api.parseInviteCode
 import app.obey.api.JoinRelationshipInput
 import app.obey.api.ObeyApi
 import app.obey.api.ReschedulePolicy
@@ -155,7 +156,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun join(code: String, role: Role) = action {
-        sessions.onRelationshipChanged(api.joinRelationship(JoinRelationshipInput(code.trim(), role)))
+        sessions.onRelationshipChanged(api.joinRelationship(JoinRelationshipInput(parseInviteCode(code), role)))
         say("Joined")
     }
 

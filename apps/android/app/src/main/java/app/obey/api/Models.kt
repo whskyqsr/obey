@@ -132,7 +132,16 @@ data class WeekStartInput(val weekStart: String)
 data class CreateRelationshipInput(val name: String?, val role: Role)
 
 @Serializable
-data class Invite(val code: String, val expiresAt: String)
+data class Invite(val code: String, val expiresAt: String, val role: Role? = null) {
+    /** The link a partner opens to join; the web app handles sign-in and accepting. */
+    val link: String get() = "${app.obey.BuildConfig.WEB_URL.trimEnd('/')}/join/$code"
+}
+
+/** An invite code from a pasted link or a bare code. */
+fun parseInviteCode(text: String): String {
+    val t = text.trim()
+    return (Regex("/join/([A-Za-z0-9]{4,16})").find(t)?.groupValues?.get(1) ?: t).uppercase()
+}
 
 @Serializable
 data class JoinRelationshipInput(val code: String, val role: Role)

@@ -15,6 +15,8 @@ if (hasGoogleServices) {
 }
 
 val apiBaseUrl: String = providers.gradleProperty("obey.apiBaseUrl").getOrElse("https://api-production-2a65c.up.railway.app/")
+// Where invite links point: the web app, which handles sign-in and accepting.
+val webUrl: String = providers.gradleProperty("obey.webUrl").getOrElse("https://app.obey.chzsda.com")
 
 android {
     namespace = "app.obey"
@@ -47,6 +49,7 @@ android {
             signingConfig = signingConfigs.getByName("debug")
             // Local API from the emulator: ./gradlew assembleDebug -Pobey.apiBaseUrl=http://10.0.2.2:3000/
             buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+            buildConfigField("String", "WEB_URL", "\"$webUrl\"")
             buildConfigField("boolean", "DEV_AUTH_ALLOWED", "true")
             manifestPlaceholders["usesCleartextTraffic"] = "true"
         }
@@ -54,6 +57,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+            buildConfigField("String", "WEB_URL", "\"$webUrl\"")
             buildConfigField("boolean", "DEV_AUTH_ALLOWED", "false")
             manifestPlaceholders["usesCleartextTraffic"] = "false"
         }
