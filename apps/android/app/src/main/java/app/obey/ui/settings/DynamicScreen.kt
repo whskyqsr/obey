@@ -235,6 +235,13 @@ fun DynamicScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
                     }
                 }
 
+                val sub = rel.members.firstOrNull { it.role == Role.Submissive }
+                ListItem(
+                    headlineContent = { Text("${sub?.displayName ?: "A submissive"} can write notes") },
+                    supportingContent = { Text("Their own notes. Yours stay read-only to them unless you let them edit one.") },
+                    trailingContent = { Switch(checked = rel.subNotes, onCheckedChange = vm::setSubNotes, enabled = s.canManage && !busy) },
+                )
+
                 SectionHeader("Features")
                 featureRows.forEach { (label, help, get, set) ->
                     ListItem(

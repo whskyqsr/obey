@@ -33,6 +33,8 @@ class NotesViewModel @Inject constructor(
     private val _state = MutableStateFlow<Load<List<Note>>>(Load.Loading)
     val state: StateFlow<Load<List<Note>>> = _state.asStateFlow()
     val session: Session? get() = sessions.session
+    /** Journal has its own feature switch; a submissive writes notes only when their Dominant allows it. */
+    fun canWrite(journal: Boolean): Boolean = journal || sessions.session?.let { it.canManage || it.relationship?.subNotes != false } ?: true
 
     fun refresh() {
         viewModelScope.launch {
@@ -64,6 +66,7 @@ data class NoteDraft(
     val tags: String = "",
     val pinned: Boolean = false,
     val mood: Int? = null,
+    val subCanEdit: Boolean = false,
 ) {
     fun toInput() = NoteInput(
         kind = kind,
@@ -73,10 +76,11 @@ data class NoteDraft(
         tags = tags.split(',').map { it.trim() }.filter { it.isNotEmpty() }.distinct().take(20).map { it.take(40) },
         pinned = pinned,
         mood = if (kind == NoteKind.Journal) mood else null,
+        subCanEdit = subCanEdit && visibility == NoteVisibility.Shared,
     )
 
     companion object {
-        fun from(n: Note) = NoteDraft(n.kind, n.title, n.bodyMd, n.visibility, n.tags.joinToString(", "), n.pinned, n.mood)
+        fun from(n: Note) = NoteDraft(n.kind, n.title, n.bodyMd, n.visibility, n.tags.joinToString(", "), n.pinned, n.mood, n.subCanEdit)
     }
 }
 
@@ -102,8 +106,11 @@ class NoteEditorViewModel @Inject constructor(
     private val _draft = MutableStateFlow(blank)
     val draft: StateFlow<NoteDraft> = _draft.asStateFlow()
 
-    /** Whether the current user wrote this note (only authors edit; the API enforces it too). */
-    val canEdit: Boolean get() = original == null || original?.authorId == sessions.session?.userId
+    /** The server decides: the author (unless a sub's notes are switched off), or the sub on a note opened up to them. */
+    val canEdit: Boolean get() = original?.canEdit ?: true
+    val isAuthor: Boolean get() = original == null || original?.authorId == sessions.session?.userId
+    /** The sub a Dominant can let edit a shared note, when the dynamic has one. */
+    val subName: String? get() = sessions.session?.takeIf { it.canManage }?.relationship?.members?.firstOrNull { it.role == app.obey.api.Role.Submissive }?.displayName
 
     private val _closed = Channel<Unit>(Channel.CONFLATED)
     val closed = _closed.receiveAsFlow()

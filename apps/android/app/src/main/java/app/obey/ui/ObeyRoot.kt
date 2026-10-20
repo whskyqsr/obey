@@ -77,6 +77,7 @@ import app.obey.ui.rewards.RewardsScreen
 import app.obey.ui.protocols.ProtocolEditorScreen
 import app.obey.ui.protocols.ProtocolsScreen
 import app.obey.ui.rules.RulesScreen
+import app.obey.ui.settings.DynamicScreen
 import app.obey.ui.settings.SettingsScreen
 import app.obey.ui.settings.SettingsViewModel
 import app.obey.ui.tasks.TaskDetailScreen

@@ -128,7 +128,7 @@ export function useJoinRelationship() {
 export function useUpdateRelationship(rel: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Partial<Pick<Relationship, "name" | "reschedulePolicy" | "weeklyDelayAllowance">> & { features?: Partial<Features> }) =>
+    mutationFn: (body: Partial<Pick<Relationship, "name" | "reschedulePolicy" | "weeklyDelayAllowance" | "subNotes">> & { features?: Partial<Features> }) =>
       api<Relationship>(`/relationships/${rel}`, { method: "PATCH", body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.me }),
   });

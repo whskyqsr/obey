@@ -108,7 +108,7 @@ fun NoteEditorScreen(onDone: () -> Unit, vm: NoteEditorViewModel = hiltViewModel
                 navigationIcon = { IconButton(onClick = ::close) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Save and close") } },
                 actions = {
                     if (canEdit) {
-                        if (draft.kind == NoteKind.Note) {
+                        if (vm.isAuthor && draft.kind == NoteKind.Note) {
                             IconButton(onClick = { vm.update { it.copy(pinned = !it.pinned) } }) {
                                 if (draft.pinned) Icon(Icons.Filled.PushPin, "Unpin") else Icon(Icons.Outlined.PushPin, "Pin")
                             }
@@ -125,7 +125,7 @@ fun NoteEditorScreen(onDone: () -> Unit, vm: NoteEditorViewModel = hiltViewModel
                                 enabled = !busy && vm.dirty,
                             ) { Text("Save") }
                         }
-                        Box {
+                        if (vm.isAuthor) Box {
                             IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "More") }
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                                 DropdownMenuItem(
@@ -178,7 +178,7 @@ fun NoteEditorScreen(onDone: () -> Unit, vm: NoteEditorViewModel = hiltViewModel
                     }
 
                     if (canEdit && !showPreview) {
-                        Row(
+                        if (vm.isAuthor) Row(
                             Modifier.horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -192,6 +192,14 @@ fun NoteEditorScreen(onDone: () -> Unit, vm: NoteEditorViewModel = hiltViewModel
                                 },
                                 label = { Text(if (draft.visibility == NoteVisibility.Private) "Private" else "Shared with partner") },
                             )
+                            val sub = vm.subName
+                            if (sub != null && draft.kind == NoteKind.Note && draft.visibility == NoteVisibility.Shared) {
+                                FilterChip(
+                                    selected = draft.subCanEdit,
+                                    onClick = { vm.update { it.copy(subCanEdit = !it.subCanEdit) } },
+                                    label = { Text("$sub can edit") },
+                                )
+                            }
                         }
                         if (draft.kind == NoteKind.Journal) {
                             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

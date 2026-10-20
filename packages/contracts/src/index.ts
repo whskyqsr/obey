@@ -41,8 +41,7 @@ const avatarVersion = z.string().nullable();
 export const FEATURES = ["points", "consequences", "rules", "protocols", "journal"] as const;
 export const features = z.object(Object.fromEntries(FEATURES.map((f) => [f, z.boolean()])) as Record<(typeof FEATURES)[number], z.ZodBoolean>);
 export type Features = z.infer<typeof features>;
-export const allFeatures = (stored: Partial<Features> = {}): Features =>
-  Object.fromEntries(FEATURES.map((f) => [f, stored[f] ?? true])) as Features;
+export const allFeatures = (stored: Partial<Features> = {}): Features => Object.fromEntries(FEATURES.map((f) => [f, stored[f] ?? true])) as Features;
 
 /** The day calendars start their week on, per person. */
 export const weekStart = z.enum(["sun", "mon"]);
@@ -60,6 +59,8 @@ export const relationship = z.object({
   reschedulePolicy,
   weeklyDelayAllowance: z.number().int().nonnegative(),
   features,
+  /** Whether a submissive may write notes of their own. Dominants always can. */
+  subNotes: z.boolean(),
   createdAt: z.string(),
 });
 export type Relationship = z.infer<typeof relationship>;
@@ -95,6 +96,7 @@ export const updateRelationship = z.object({
   reschedulePolicy: reschedulePolicy.optional(),
   weeklyDelayAllowance: z.number().int().min(0).max(50).optional(),
   features: features.partial().optional(),
+  subNotes: z.boolean().optional(),
 });
 
 export const taskInput = z.object({
@@ -113,7 +115,12 @@ export const taskInput = z.object({
   schedule,
   dueTime: timeOfDay.nullable().default(null),
   timezone: z.string().min(1),
-  graceMinutes: z.number().int().min(0).max(60 * 24 * 7).default(0),
+  graceMinutes: z
+    .number()
+    .int()
+    .min(0)
+    .max(60 * 24 * 7)
+    .default(0),
 });
 export type TaskInput = z.input<typeof taskInput>;
 
@@ -191,7 +198,12 @@ export const reviewOccurrence = z.object({ approve: z.boolean(), noteMd: z.strin
 export const rescheduleInput = z
   .object({
     scope: z.enum(["this", "following"]).default("this"),
-    delayHours: z.number().int().min(1).max(24 * 60).optional(),
+    delayHours: z
+      .number()
+      .int()
+      .min(1)
+      .max(24 * 60)
+      .optional(),
     dueAt: z.string().datetime({ offset: true }).optional(),
     reason: z.string().max(1_000).optional(),
   })
@@ -203,7 +215,11 @@ export type RescheduleInput = z.input<typeof rescheduleInput>;
 /** "More time for the whole day": delay several occurrences together; decided as one request. */
 export const rescheduleDayInput = z.object({
   occurrenceIds: z.array(id).min(1).max(50),
-  delayHours: z.number().int().min(1).max(24 * 60),
+  delayHours: z
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 60),
   reason: z.string().max(1_000).optional(),
 });
 export type RescheduleDayInput = z.input<typeof rescheduleDayInput>;
@@ -291,11 +307,15 @@ export const noteInput = z.object({
   tags: z.array(z.string().min(1).max(40)).max(20).default([]),
   pinned: z.boolean().default(false),
   mood: z.number().int().min(1).max(5).nullable().default(null),
+  /** On a shared note by a Dominant: the submissive may edit its title, text and tags too. */
+  subCanEdit: z.boolean().default(false),
 });
 export const note = noteInput.extend({
   id,
   relationshipId: id,
   authorId: id,
+  /** Whether the person asking may change this note. */
+  canEdit: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

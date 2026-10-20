@@ -74,6 +74,7 @@ export function DynamicPage() {
   const patch = (body: Parameters<typeof update.mutate>[0], msg = "Saved") => update.mutate(body, { onSuccess: () => snack(msg), onError: (e) => snack(errorMessage(e)) });
   const partner = rel.members.find((m) => m.userId !== me.user.id);
   const policy = POLICIES.find((p) => p.value === rel.reschedulePolicy);
+  const sub = rel.members.find((m) => m.role === "submissive");
 
   return (
     <div className="flex flex-col pb-10">
@@ -129,6 +130,14 @@ export function DynamicPage() {
             trailing={isDom && <Icon name="chevron_right" className="text-on-surface-variant" />}
             onClick={isDom ? () => setSheet("deadlines") : undefined}
           />
+          <div className="px-4 py-1">
+            <Switch
+              checked={rel.subNotes}
+              onChange={(on) => isDom && patch({ subNotes: on }, on ? "Notes turned on for them" : "Notes turned off for them")}
+              label={`${sub ? sub.displayName : "A submissive"} can write notes`}
+              help="Their own notes. Yours stay read-only to them unless you let them edit one."
+            />
+          </div>
         </Group>
 
         <Label>Features</Label>

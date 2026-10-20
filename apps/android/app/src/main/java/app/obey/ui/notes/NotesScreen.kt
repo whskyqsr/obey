@@ -89,7 +89,7 @@ fun NotesScreen(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(onClick = onNew, icon = { Icon(Icons.Outlined.Edit, null) }, text = { Text("Write") })
+            if (vm.canWrite(journal)) ExtendedFloatingActionButton(onClick = onNew, icon = { Icon(Icons.Outlined.Edit, null) }, text = { Text("Write") })
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
@@ -145,7 +145,7 @@ fun NotesScreen(
                                 n,
                                 author = vm.session?.let { if (n.authorId == it.userId) null else it.nameOf(n.authorId) },
                                 onOpen = { onOpen(n.id) },
-                                onToggleCheck = if (n.authorId == vm.session?.userId) ({ line: Int -> vm.toggleCheck(n, line) }) else null,
+                                onToggleCheck = if (n.canEdit) ({ line: Int -> vm.toggleCheck(n, line) }) else null,
                             )
                         }
                         item { androidx.compose.foundation.layout.Spacer(Modifier.padding(32.dp)) }

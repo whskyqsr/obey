@@ -172,6 +172,12 @@ class SettingsViewModel @Inject constructor(
         )
     }
 
+    fun setSubNotes(on: Boolean) = action {
+        val rel = sessions.requireRelationshipId()
+        sessions.onRelationshipChanged(api.updateRelationship(rel, UpdateRelationshipInput(subNotes = on)))
+        say(if (on) "Notes turned on for them" else "Notes turned off for them")
+    }
+
     fun setFeatures(features: Features, confirmation: String) = action {
         val rel = sessions.requireRelationshipId()
         sessions.onRelationshipChanged(api.updateRelationship(rel, UpdateRelationshipInput(features = features)))

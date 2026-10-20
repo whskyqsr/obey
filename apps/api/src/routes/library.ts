@@ -3,10 +3,10 @@ import type { FastifyInstance } from "fastify";
 import { consequenceInput, noteInput, protocolInput, reorderInput, rewardInput, ruleInput } from "@obey/contracts";
 import type { ZodObject, ZodRawShape } from "zod";
 import type { Deps } from "../app.js";
-import { consequences, notes, protocols, rewards, rules } from "../db/schema.js";
+import { consequences, notes, protocols, relationships, rewards, rules } from "../db/schema.js";
 import { HttpError, forbidden, notFound, parsePatch } from "../errors.js";
 import { libraryDto, noteDto } from "../serialize.js";
-import { requireManager, requireMember } from "../services/access.js";
+import { type Role, canManage, requireManager, requireMember } from "../services/access.js";
 
 /** Rewards, consequences, rules and protocols: anyone in the relationship reads, Dominants write. */
 const LIBRARIES = [
@@ -43,9 +43,10 @@ export const libraryRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       if (path === "rules" || path === "protocols") {
         // New rules and protocols go to the end of the list.
         const p = (t as unknown as typeof rules).position;
-        const [{ last }] = (await db.select({ last: sql<number>`coalesce(max(${p}), 0)::int` }).from(t).where(eq(t.relationshipId, req.params.id))) as [
-          { last: number },
-        ];
+        const [{ last }] = (await db
+          .select({ last: sql<number>`coalesce(max(${p}), 0)::int` })
+          .from(t)
+          .where(eq(t.relationshipId, req.params.id))) as [{ last: number }];
         (body as { position: number }).position = last + 1;
       }
       const [row] = await db
@@ -96,45 +97,76 @@ export const libraryRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   }
 
   // Notes: shared notes are visible to everyone in the relationship, private ones only to their author.
-  // Only the author edits or deletes.
+  // The author edits and deletes. A Dominant decides whether a submissive writes notes at all (subNotes)
+  // and can let them edit a shared note of theirs (subCanEdit), which covers its title, text and tags only.
+  type NoteRow = typeof notes.$inferSelect;
+  type Viewer = { userId: string; role: Role; subNotes: boolean };
+  const viewer = async (relationshipId: string, userId: string): Promise<Viewer> => {
+    const m = await requireMember(db, relationshipId, userId);
+    const [rel] = await db.select({ subNotes: relationships.subNotes }).from(relationships).where(eq(relationships.id, relationshipId));
+    return { userId, role: m.role, subNotes: rel!.subNotes };
+  };
+  // Journal entries have their own feature switch, so subNotes covers notes only.
+  const mayWriteOwn = (v: Viewer, kind: NoteRow["kind"]) => kind === "journal" || v.role !== "submissive" || v.subNotes;
+  const sharedWithMe = (v: Viewer, n: NoteRow) => n.authorId !== v.userId && n.visibility === "shared" && n.subCanEdit && v.role === "submissive";
+  const canEditNote = (v: Viewer, n: NoteRow) => (n.authorId === v.userId ? mayWriteOwn(v, n.kind) : sharedWithMe(v, n));
+  // Only a Dominant's shared note can be opened up to the sub.
+  const subCanEdit = (v: Viewer, kind: NoteRow["kind"], visibility: NoteRow["visibility"], want: boolean) =>
+    want && canManage(v.role) && kind === "note" && visibility === "shared";
+
   app.get<{ Params: { id: string } }>("/relationships/:id/notes", async (req) => {
-    await requireMember(db, req.params.id, req.user.id);
+    const v = await viewer(req.params.id, req.user.id);
     const rows = await db
       .select()
       .from(notes)
       .where(and(eq(notes.relationshipId, req.params.id), or(eq(notes.visibility, "shared"), eq(notes.authorId, req.user.id))))
       .orderBy(desc(notes.pinned), desc(notes.updatedAt));
-    return rows.map(noteDto);
+    return rows.map((n) => noteDto(n, canEditNote(v, n)));
   });
 
   app.post<{ Params: { id: string } }>("/relationships/:id/notes", async (req, reply) => {
-    await requireMember(db, req.params.id, req.user.id);
+    const v = await viewer(req.params.id, req.user.id);
     const body = noteInput.parse(req.body);
-    const [row] = await db.insert(notes).values({ ...body, relationshipId: req.params.id, authorId: req.user.id }).returning();
+    if (!mayWriteOwn(v, body.kind)) throw forbidden("your Dominant hasn't turned on writing notes");
+    const [row] = await db
+      .insert(notes)
+      .values({ ...body, subCanEdit: subCanEdit(v, body.kind, body.visibility, body.subCanEdit), relationshipId: req.params.id, authorId: req.user.id })
+      .returning();
     reply.status(201);
-    return noteDto(row!);
+    return noteDto(row!, true);
   });
 
-  const ownNote = async (id: string, userId: string) => {
+  const findNote = async (id: string, userId: string) => {
     const [note] = await db.select().from(notes).where(eq(notes.id, id));
     if (!note) throw notFound();
-    await requireMember(db, note.relationshipId, userId);
-    if (note.authorId !== userId) {
-      if (note.visibility === "private") throw notFound();
-      throw forbidden("only the author can change this note");
-    }
-    return note;
+    const v = await viewer(note.relationshipId, userId);
+    if (note.authorId !== userId && note.visibility === "private") throw notFound();
+    return { note, v };
   };
 
   app.patch<{ Params: { id: string } }>("/notes/:id", async (req) => {
-    const note = await ownNote(req.params.id, req.user.id);
+    const { note, v } = await findNote(req.params.id, req.user.id);
+    if (!canEditNote(v, note)) throw forbidden(note.authorId === v.userId ? "your Dominant hasn't turned on writing notes" : "only the author can change this note");
     const body = parsePatch(noteInput.partial(), req.body);
-    const [row] = await db.update(notes).set({ ...body, updatedAt: deps.now() }).where(eq(notes.id, note.id)).returning();
-    return noteDto(row!);
+    let set: Partial<NoteRow>;
+    if (note.authorId === v.userId) {
+      const kind = body.kind ?? note.kind;
+      const visibility = body.visibility ?? note.visibility;
+      set = { ...body, subCanEdit: subCanEdit(v, kind, visibility, body.subCanEdit ?? note.subCanEdit) };
+    } else {
+      set = { title: body.title, bodyMd: body.bodyMd, tags: body.tags };
+    }
+    const [row] = await db
+      .update(notes)
+      .set({ ...set, updatedAt: deps.now() })
+      .where(eq(notes.id, note.id))
+      .returning();
+    return noteDto(row!, canEditNote(v, row!));
   });
 
   app.delete<{ Params: { id: string } }>("/notes/:id", async (req, reply) => {
-    const note = await ownNote(req.params.id, req.user.id);
+    const { note, v } = await findNote(req.params.id, req.user.id);
+    if (note.authorId !== v.userId) throw forbidden("only the author can delete this note");
     await db.delete(notes).where(eq(notes.id, note.id));
     reply.status(204);
   });

@@ -45,6 +45,8 @@ export const relationships = pgTable("relationships", {
   weeklyDelayAllowance: integer("weekly_delay_allowance").notNull().default(0),
   /** Switched-off parts of the app for this dynamic; missing keys mean on. */
   features: jsonb("features").$type<Partial<Features>>().notNull().default({}),
+  /** Whether a submissive may write notes of their own. */
+  subNotes: boolean("sub_notes").notNull().default(true),
   createdAt: createdAt(),
 });
 
@@ -265,6 +267,8 @@ export const notes = pgTable(
     tags: text("tags").array().notNull().default(sql`'{}'::text[]`),
     pinned: boolean("pinned").notNull().default(false),
     mood: integer("mood"),
+    /** A Dominant's shared note the submissive may edit too. */
+    subCanEdit: boolean("sub_can_edit").notNull().default(false),
     createdAt: createdAt(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },

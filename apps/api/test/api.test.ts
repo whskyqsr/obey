@@ -394,6 +394,32 @@ describe("points, rewards and notes", () => {
     expect(updated).toMatchObject({ title: "Title", visibility: "private", tags: ["a"], bodyMd: "# Mine" });
   });
 
+  it("lets a Dominant decide what a sub can write in notes", async () => {
+    const { dom, sub, relId } = await ctx.pair();
+    const domNote = (await dom.post(`/relationships/${relId}/notes`, { bodyMd: "House list" })).body;
+    expect(domNote).toMatchObject({ subCanEdit: false, canEdit: true });
+    expect((await sub.patch(`/notes/${domNote.id}`, { bodyMd: "x" })).status).toBe(403);
+
+    // Opened up: the sub edits the text but can't make it private, re-share it or delete it.
+    await dom.patch(`/notes/${domNote.id}`, { subCanEdit: true });
+    expect((await sub.get(`/relationships/${relId}/notes`)).body[0]).toMatchObject({ canEdit: true });
+    const edited = (await sub.patch(`/notes/${domNote.id}`, { bodyMd: "House list, done", visibility: "private", subCanEdit: false })).body;
+    expect(edited).toMatchObject({ bodyMd: "House list, done", visibility: "shared", subCanEdit: true });
+    expect((await sub.del(`/notes/${domNote.id}`)).status).toBe(403);
+
+    // A sub can't open their own notes to anyone, and loses writing when it's switched off.
+    const own = (await sub.post(`/relationships/${relId}/notes`, { bodyMd: "Mine", subCanEdit: true })).body;
+    expect(own.subCanEdit).toBe(false);
+    expect((await sub.patch(`/relationships/${relId}`, { subNotes: false })).status).toBe(403);
+    expect((await dom.patch(`/relationships/${relId}`, { subNotes: false })).body.subNotes).toBe(false);
+    expect((await sub.post(`/relationships/${relId}/notes`, { bodyMd: "Another" })).status).toBe(403);
+    expect((await sub.patch(`/notes/${own.id}`, { bodyMd: "Changed" })).status).toBe(403);
+    expect((await sub.post(`/relationships/${relId}/notes`, { kind: "journal", bodyMd: "Today" })).status).toBe(201);
+    const list = (await sub.get(`/relationships/${relId}/notes`)).body;
+    expect(list.find((n: { id: string }) => n.id === own.id).canEdit).toBe(false);
+    expect((await sub.patch(`/notes/${domNote.id}`, { bodyMd: "Still allowed" })).status).toBe(200);
+  });
+
   it("lets only Dominants edit the rule book", async () => {
     const { dom, sub, relId } = await ctx.pair();
     expect((await sub.post(`/relationships/${relId}/rules`, { title: "Ask first" })).status).toBe(403);

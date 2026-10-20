@@ -49,7 +49,9 @@ export const MOODS = ["sentiment_very_dissatisfied", "sentiment_dissatisfied", "
 /** Notes and the journal share storage but are separate lists, told apart by `kind`. */
 export function NotesPage({ kind }: { kind: "note" | "journal" }) {
   const copy = COPY[kind];
-  const { rel, memberName } = useRel();
+  const { rel, me, memberName, isDom } = useRel();
+  // Journal has its own feature switch; notes from a submissive are up to their Dominant.
+  const canWrite = kind === "journal" || isDom || rel.subNotes;
   const navigate = useNavigate();
   const snack = useSnackbar();
   const notes = useLibrary(rel.id, "notes");
@@ -60,16 +62,17 @@ export function NotesPage({ kind }: { kind: "note" | "journal" }) {
   const tags = useMemo(() => [...new Set((notes.data ?? []).filter((n) => n.kind === kind).flatMap((n) => n.tags))].sort(), [notes.data, kind]);
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return (notes.data ?? [])
-      .filter((n) => n.kind === kind)
-      .filter((n) => !tag || n.tags.includes(tag))
-      .filter((n) => !needle || n.title.toLowerCase().includes(needle) || n.bodyMd.toLowerCase().includes(needle) || n.tags.some((t) => t.toLowerCase().includes(needle)))
-      // The journal reads as a timeline; notes keep pinned ones on top.
-      .sort((a, b) => (kind === "journal" ? b.createdAt.localeCompare(a.createdAt) : Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt)));
+    return (
+      (notes.data ?? [])
+        .filter((n) => n.kind === kind)
+        .filter((n) => !tag || n.tags.includes(tag))
+        .filter((n) => !needle || n.title.toLowerCase().includes(needle) || n.bodyMd.toLowerCase().includes(needle) || n.tags.some((t) => t.toLowerCase().includes(needle)))
+        // The journal reads as a timeline; notes keep pinned ones on top.
+        .sort((a, b) => (kind === "journal" ? b.createdAt.localeCompare(a.createdAt) : Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt)))
+    );
   }, [notes.data, q, tag, kind]);
 
-  const togglePin = (n: Note) =>
-    save.mutate({ id: n.id, input: { pinned: !n.pinned } }, { onError: (e) => snack(errorMessage(e)) });
+  const togglePin = (n: Note) => save.mutate({ id: n.id, input: { pinned: !n.pinned } }, { onError: (e) => snack(errorMessage(e)) });
 
   return (
     <>
@@ -90,7 +93,7 @@ export function NotesPage({ kind }: { kind: "note" | "journal" }) {
       {notes.error && <ErrorBox error={notes.error} onRetry={() => notes.refetch()} />}
       {notes.data && !list.length && (
         <div className="px-4 md:px-6">
-          <Empty icon={copy.icon} title={q || tag ? "Nothing matches" : copy.empty} body={q || tag ? undefined : "Start one with the button below."} />
+          <Empty icon={copy.icon} title={q || tag ? "Nothing matches" : copy.empty} body={q || tag ? undefined : canWrite ? "Start one with the button below." : undefined} />
         </div>
       )}
       <div className="grid gap-3 px-4 sm:grid-cols-2 md:px-6 xl:grid-cols-3">
@@ -120,11 +123,15 @@ export function NotesPage({ kind }: { kind: "note" | "journal" }) {
                   {memberName(n.authorId)} · {fmtDateTime(kind === "journal" ? n.createdAt : n.updatedAt)}
                 </div>
               </div>
-              {kind === "note" && (
-                <div className="pointer-events-auto relative">
-                  <IconButton icon="push_pin" filled={n.pinned} label={n.pinned ? "Unpin" : "Pin"} onClick={() => togglePin(n)} />
-                </div>
-              )}
+              {/* Pinning changes the note, so only its author can; others just see that it's pinned. */}
+              {kind === "note" &&
+                (n.authorId === me.user.id && n.canEdit ? (
+                  <div className="pointer-events-auto relative">
+                    <IconButton icon="push_pin" filled={n.pinned} label={n.pinned ? "Unpin" : "Pin"} onClick={() => togglePin(n)} />
+                  </div>
+                ) : (
+                  n.pinned && <Icon name="push_pin" filled size={20} className="m-2.5" />
+                ))}
             </div>
             {n.bodyMd && <p className="pointer-events-none line-clamp-4 text-body-medium opacity-85">{excerpt(n.bodyMd, 280)}</p>}
             {n.tags.length > 0 && (
@@ -139,7 +146,7 @@ export function NotesPage({ kind }: { kind: "note" | "journal" }) {
           </div>
         ))}
       </div>
-      <Fab icon="edit" label={copy.fab} onClick={() => navigate({ to: `${copy.base}/$noteId`, params: { noteId: "new" } })} />
+      {canWrite && <Fab icon="edit" label={copy.fab} onClick={() => navigate({ to: `${copy.base}/$noteId`, params: { noteId: "new" } })} />}
     </>
   );
 }

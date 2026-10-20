@@ -4,7 +4,7 @@ import { useDeleteLibraryItem, useLibrary, useSaveLibraryItem } from "../api/hoo
 import { errorMessage } from "../api/client";
 import type { Note, NoteInput } from "../api/types";
 import { MarkdownEditor } from "../components/MarkdownEditor";
-import { Button, Chip, ErrorBox, Icon, IconButton, Loading, SegmentedButtons, useSnackbar } from "../components/ui";
+import { Button, Chip, ErrorBox, Icon, IconButton, Loading, SegmentedButtons, Switch, useSnackbar } from "../components/ui";
 import { fmtDateTime } from "../lib/dates";
 import { MOODS } from "./Notes";
 import { useRel } from "../lib/relationship";
@@ -23,14 +23,16 @@ export function NoteEditorPage({ noteId, kind }: { noteId: string; kind: "note" 
 }
 
 function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
-  const { rel, me, memberName } = useRel();
+  const { rel, me, memberName, isDom } = useRel();
   const navigate = useNavigate();
   const snack = useSnackbar();
   const save = useSaveLibraryItem(rel.id, "notes");
   const del = useDeleteLibraryItem(rel.id, "notes");
   const [confirm, confirmEl] = useConfirm();
-  // Only the author changes a note; the server enforces the same.
-  const canEdit = !note || note.authorId === me.user.id;
+  // The server decides who may change a note: its author (unless a sub's notes are switched off), or the sub on a note opened up to them.
+  const canEdit = !note || note.canEdit;
+  const isAuthor = !note || note.authorId === me.user.id;
+  const sub = rel.members.find((m) => m.role === "submissive");
 
   const [form, setForm] = useState<NoteInput>(() => ({
     kind,
@@ -40,6 +42,7 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
     tags: note?.tags ?? [],
     pinned: note?.pinned ?? false,
     mood: note?.mood ?? null,
+    subCanEdit: note?.subCanEdit ?? false,
   }));
   const [tagDraft, setTagDraft] = useState("");
   const [dirty, setDirty] = useState(false);
@@ -74,7 +77,16 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
   }
 
   function discard() {
-    setForm({ kind, title: note!.title, bodyMd: note!.bodyMd, visibility: note!.visibility, tags: note!.tags, pinned: note!.pinned, mood: note!.mood });
+    setForm({
+      kind,
+      title: note!.title,
+      bodyMd: note!.bodyMd,
+      visibility: note!.visibility,
+      tags: note!.tags,
+      pinned: note!.pinned,
+      mood: note!.mood,
+      subCanEdit: note!.subCanEdit,
+    });
     setDirty(false);
     setEditing(false);
   }
@@ -109,7 +121,7 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
         <header className="sticky top-0 z-20 flex h-14 items-center gap-1 bg-surface px-2 md:px-4">
           <IconButton icon="arrow_back" label="Back" onClick={back} />
           <div className="flex-1" />
-          {canEdit && kind === "note" && <IconButton icon="push_pin" filled={form.pinned} label={form.pinned ? "Unpin" : "Pin"} onClick={togglePin} />}
+          {isAuthor && canEdit && kind === "note" && <IconButton icon="push_pin" filled={form.pinned} label={form.pinned ? "Unpin" : "Pin"} onClick={togglePin} />}
           {deleteButton}
           {canEdit && (
             <Button onClick={() => setEditing(true)} icon="edit">
@@ -124,6 +136,7 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
             <span>
               {memberName(note.authorId)} · {fmtDateTime(kind === "journal" ? note.createdAt : note.updatedAt)}
             </span>
+            {!isAuthor && canEdit && <span>· You can edit this</span>}
             {form.visibility === "private" && (
               <span className="flex items-center gap-1">
                 <Icon name="lock" size={16} /> Private
@@ -158,9 +171,7 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
           }}
         />
         <div className="flex-1" />
-        {canEdit && kind === "note" && (
-          <IconButton icon="push_pin" filled={form.pinned} label={form.pinned ? "Unpin" : "Pin"} onClick={() => set({ pinned: !form.pinned })} />
-        )}
+        {isAuthor && kind === "note" && <IconButton icon="push_pin" filled={form.pinned} label={form.pinned ? "Unpin" : "Pin"} onClick={() => set({ pinned: !form.pinned })} />}
         {deleteButton}
         {canEdit && (
           <Button onClick={submit} busy={save.isPending} disabled={!dirty && !!note} icon="save">
@@ -179,30 +190,42 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
           className="w-full bg-transparent text-headline-medium text-on-surface outline-none placeholder:text-on-surface-variant/60"
         />
 
-        <div className="flex flex-wrap items-center gap-2">
-          <SegmentedButtons
-            value={form.visibility}
-            onChange={(visibility) => set({ visibility })}
-            options={[
-              { value: "shared", label: "Shared", icon: "group" },
-              { value: "private", label: "Private", icon: "lock" },
-            ]}
-          />
-          {form.kind === "journal" && (
-            <div className="flex items-center gap-1" role="radiogroup" aria-label="Mood">
-              {["sentiment_very_dissatisfied", "sentiment_dissatisfied", "sentiment_neutral", "sentiment_satisfied", "sentiment_very_satisfied"].map((icon, i) => (
-                <IconButton
-                  key={icon}
-                  icon={icon}
-                  label={`Mood ${i + 1}`}
-                  filled={form.mood === i + 1}
-                  variant={form.mood === i + 1 ? "tonal" : "standard"}
-                  onClick={() => set({ mood: form.mood === i + 1 ? null : i + 1 })}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+        {isAuthor && (
+          <div className="flex flex-wrap items-center gap-2">
+            <SegmentedButtons
+              value={form.visibility}
+              onChange={(visibility) => set({ visibility, subCanEdit: visibility === "shared" && form.subCanEdit })}
+              options={[
+                { value: "shared", label: "Shared", icon: "group" },
+                { value: "private", label: "Private", icon: "lock" },
+              ]}
+            />
+            {form.kind === "journal" && (
+              <div className="flex items-center gap-1" role="radiogroup" aria-label="Mood">
+                {["sentiment_very_dissatisfied", "sentiment_dissatisfied", "sentiment_neutral", "sentiment_satisfied", "sentiment_very_satisfied"].map((icon, i) => (
+                  <IconButton
+                    key={icon}
+                    icon={icon}
+                    label={`Mood ${i + 1}`}
+                    filled={form.mood === i + 1}
+                    variant={form.mood === i + 1 ? "tonal" : "standard"}
+                    onClick={() => set({ mood: form.mood === i + 1 ? null : i + 1 })}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {isAuthor && isDom && kind === "note" && form.visibility === "shared" && sub && (
+          <div className="max-w-md">
+            <Switch
+              checked={form.subCanEdit}
+              onChange={(subCanEdit) => set({ subCanEdit })}
+              label={`${sub.displayName} can edit`}
+              help="They can change the title, text and tags. Only you can delete it or make it private."
+            />
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-2">
           <Icon name="sell" size={20} className="text-on-surface-variant" />
@@ -228,7 +251,12 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
           )}
         </div>
 
-        <MarkdownEditor value={form.bodyMd} onChange={(bodyMd) => set({ bodyMd })} editable={canEdit} placeholder="Write freely. Use the toolbar for headings, lists and checklists." />
+        <MarkdownEditor
+          value={form.bodyMd}
+          onChange={(bodyMd) => set({ bodyMd })}
+          editable={canEdit}
+          placeholder="Write freely. Use the toolbar for headings, lists and checklists."
+        />
       </div>
       {confirmEl}
     </div>

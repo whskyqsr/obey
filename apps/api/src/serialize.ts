@@ -1,15 +1,5 @@
 import { describe, opensOn } from "@obey/recurrence";
-import type {
-  consequences,
-  notes,
-  occurrences,
-  pointsLedger,
-  protocols,
-  reschedules,
-  rewards,
-  rules,
-  taskSeries,
-} from "./db/schema.js";
+import type { consequences, notes, occurrences, pointsLedger, protocols, reschedules, rewards, rules, taskSeries } from "./db/schema.js";
 
 const iso = (d: Date) => d.toISOString();
 const isoOrNull = (d: Date | null) => (d ? d.toISOString() : null);
@@ -84,8 +74,9 @@ export const ledgerDto = (l: typeof pointsLedger.$inferSelect) => ({
 type Library = typeof rewards.$inferSelect | typeof consequences.$inferSelect | typeof rules.$inferSelect | typeof protocols.$inferSelect;
 export const libraryDto = <T extends Library>(row: T) => ({ ...row, createdAt: iso(row.createdAt) });
 
-export const noteDto = (n: typeof notes.$inferSelect) => ({
+export const noteDto = (n: typeof notes.$inferSelect, canEdit: boolean) => ({
   ...n,
+  canEdit,
   createdAt: iso(n.createdAt),
   updatedAt: iso(n.updatedAt),
 });

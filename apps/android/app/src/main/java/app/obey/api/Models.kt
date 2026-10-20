@@ -96,6 +96,8 @@ data class Relationship(
     val weeklyDelayAllowance: Int,
     val createdAt: String,
     val features: Features = Features(),
+    /** Whether a submissive may write notes of their own. */
+    val subNotes: Boolean = true,
 )
 
 /** Parts of the app a dynamic can switch off; switched-off parts are hidden for everyone in it. Tasks and notes are always on. */
@@ -157,6 +159,7 @@ data class UpdateRelationshipInput(
     @EncodeDefault(EncodeDefault.Mode.NEVER) val reschedulePolicy: ReschedulePolicy? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER) val weeklyDelayAllowance: Int? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER) val features: Features? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val subNotes: Boolean? = null,
 )
 
 @Serializable
@@ -492,6 +495,8 @@ data class NoteInput(
     val pinned: Boolean = false,
     /** 1..5 or null. */
     val mood: Int? = null,
+    /** On a Dominant's shared note: the submissive may edit its title, text and tags. */
+    val subCanEdit: Boolean = false,
 )
 
 @Serializable
@@ -506,10 +511,13 @@ data class Note(
     val tags: List<String> = emptyList(),
     val pinned: Boolean = false,
     val mood: Int? = null,
+    val subCanEdit: Boolean = false,
+    /** Whether the current user may change it; the server decides. */
+    val canEdit: Boolean = false,
     val createdAt: String,
     val updatedAt: String,
 ) {
-    fun toInput() = NoteInput(kind, title, bodyMd, visibility, tags, pinned, mood)
+    fun toInput() = NoteInput(kind, title, bodyMd, visibility, tags, pinned, mood, subCanEdit)
 }
 
 @Serializable
