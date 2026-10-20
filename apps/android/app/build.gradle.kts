@@ -106,6 +106,8 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.material.icons.extended)
     implementation(libs.reorderable)
+    implementation(libs.androidx.biometric)
+    implementation(libs.androidx.fragment)
     debugImplementation(libs.compose.ui.tooling)
 
     implementation(libs.hilt.android)

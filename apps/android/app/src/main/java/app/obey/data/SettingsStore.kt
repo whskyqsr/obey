@@ -24,6 +24,22 @@ class SettingsStore @Inject constructor(@ApplicationContext private val context:
     private val calendarViewKey = stringPreferencesKey("calendar_view")
     private val pushTokenKey = stringPreferencesKey("push_token")
     private val pushReceivedKey = stringPreferencesKey("push_received_at")
+    private val appLockKey = androidx.datastore.preferences.core.booleanPreferencesKey("app_lock")
+    private val lockAfterKey = androidx.datastore.preferences.core.intPreferencesKey("lock_after_seconds")
+
+    /** Whether the app asks for the phone's screen lock (fingerprint, face or PIN) before showing anything. */
+    val appLock: Flow<Boolean> = context.dataStore.data.map { it[appLockKey] ?: false }
+
+    /** Seconds away before it locks again; 0 locks every time the app comes back. */
+    val lockAfterSeconds: Flow<Int> = context.dataStore.data.map { it[lockAfterKey] ?: 60 }
+
+    suspend fun setAppLock(on: Boolean) {
+        context.dataStore.edit { it[appLockKey] = on }
+    }
+
+    suspend fun setLockAfterSeconds(seconds: Int) {
+        context.dataStore.edit { it[lockAfterKey] = seconds }
+    }
 
     /** Dev-auth user id (sent as X-Dev-User). Always null in release builds. */
     val devUserId: Flow<String?> = context.dataStore.data.map { prefs ->

@@ -13,6 +13,7 @@ import { Onboarding } from "./pages/Onboarding";
 import { SignInPage } from "./pages/SignIn";
 import { registerPush } from "./push";
 import { router } from "./router";
+import { AppLockGate } from "./components/AppLock";
 
 export function App() {
   const session = useSession();
@@ -23,7 +24,11 @@ export function App() {
 
   if (session === undefined) return <Splash />;
   if (session === null) return <SignInPage />;
-  return <SignedIn key={session.uid} />;
+  return (
+    <AppLockGate key={session.uid} uid={session.uid}>
+      <SignedIn key={session.uid} />
+    </AppLockGate>
+  );
 }
 
 function SignedIn() {

@@ -1,4 +1,5 @@
 import { FIREBASE_ENABLED, firebaseConfig } from "../env";
+import { clearPin } from "../lib/appLock";
 import { storage } from "../lib/storage";
 import type { FirebaseApp } from "firebase/app";
 import type { Auth } from "firebase/auth";
@@ -8,9 +9,7 @@ import type { Auth } from "firebase/auth";
  * - firebase: Google sign-in; requests carry `Authorization: Bearer <ID token>`.
  * - dev: a UUID typed on the sign-in screen; requests carry `X-Dev-User` (API must run with DEV_AUTH=1).
  */
-export type Session =
-  | { kind: "firebase"; uid: string; name: string | null; email: string | null; provider: "google" | "password" | null }
-  | { kind: "dev"; uid: string };
+export type Session = { kind: "firebase"; uid: string; name: string | null; email: string | null; provider: "google" | "password" | null } | { kind: "dev"; uid: string };
 
 const DEV_USER_KEY = "obey.devUser";
 
@@ -118,6 +117,8 @@ export function signInDev(uid: string): void {
 }
 
 export async function signOut(): Promise<void> {
+  // The app lock belongs to this sign-in on this browser.
+  if (current) clearPin(current.uid);
   if (FIREBASE_ENABLED) {
     const a = await getFirebaseAuth();
     const { signOut: fbSignOut } = await import("firebase/auth");

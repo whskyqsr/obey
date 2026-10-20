@@ -1,5 +1,6 @@
 package app.obey.ui.settings
 
+import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 
 import androidx.compose.material3.Button
@@ -177,6 +178,8 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, vm: SettingsVi
                 session?.let { s -> NotificationTypes(s.me.user.mutedNotifications, enabled = !busy) { key, on -> vm.setNotificationType(key, on, s.me.user.mutedNotifications) } }
 
                 SectionHeader("Privacy")
+                app.obey.lock.AppLockSetting()
+                androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
                 app.obey.ui.proof.ProofBlurSetting()
 
                 SectionHeader("App icon")

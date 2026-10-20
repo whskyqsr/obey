@@ -10,6 +10,7 @@ import { useDynamicTitle } from "./Dynamic";
 import { PushHealth } from "../components/PushHealth";
 import { QuietHoursSetting } from "../components/QuietHours";
 import { NotificationTypes } from "../components/NotificationTypes";
+import { AppLockSetting } from "../components/AppLock";
 import { type PushState, pushState, registerPush } from "../push";
 import { type ThemeMode, useTheme } from "../theme/ThemeProvider";
 import { SEED_PRESETS } from "../theme/tokens";
@@ -167,6 +168,8 @@ export function SettingsPage() {
       </Section>
 
       <Section title="Privacy">
+        {session && <AppLockSetting uid={session.uid} />}
+        <div className="h-3" />
         <div className="rounded-lg bg-surface-container-low px-4 py-2">
           <Switch
             checked={me.user.revealProofs}
