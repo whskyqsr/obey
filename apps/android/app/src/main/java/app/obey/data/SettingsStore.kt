@@ -26,6 +26,14 @@ class SettingsStore @Inject constructor(@ApplicationContext private val context:
     private val pushReceivedKey = stringPreferencesKey("push_received_at")
     private val appLockKey = androidx.datastore.preferences.core.booleanPreferencesKey("app_lock")
     private val lockAfterKey = androidx.datastore.preferences.core.intPreferencesKey("lock_after_seconds")
+    private val welcomeKey = stringPreferencesKey("welcome_relationship_id")
+
+    /** The dynamic someone just started or joined, until they finish or skip its setup steps. */
+    val welcome: Flow<String?> = context.dataStore.data.map { it[welcomeKey] }
+
+    suspend fun setWelcome(relationshipId: String?) {
+        context.dataStore.edit { if (relationshipId == null) it.remove(welcomeKey) else it[welcomeKey] = relationshipId }
+    }
 
     /** Whether the app asks for the phone's screen lock (fingerprint, face or PIN) before showing anything. */
     val appLock: Flow<Boolean> = context.dataStore.data.map { it[appLockKey] ?: false }

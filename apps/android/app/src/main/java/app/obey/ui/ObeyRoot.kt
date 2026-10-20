@@ -74,6 +74,7 @@ import app.obey.ui.notes.NotesScreen
 import app.obey.ui.onboarding.RelationshipSetupScreen
 import app.obey.ui.onboarding.SignInScreen
 import app.obey.ui.onboarding.VerifyEmailScreen
+import app.obey.ui.onboarding.WelcomeScreen
 import app.obey.ui.rewards.RewardsScreen
 import app.obey.ui.protocols.ProtocolEditorScreen
 import app.obey.ui.protocols.ProtocolsScreen
@@ -95,6 +96,7 @@ import app.obey.ui.upcoming.UpcomingScreen
 fun ObeyRoot(vm: RootViewModel = hiltViewModel()) {
     val auth by vm.authState.collectAsStateWithLifecycle()
     val session by vm.session.collectAsStateWithLifecycle()
+    val welcome by vm.welcome.collectAsStateWithLifecycle()
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         when {
@@ -110,7 +112,9 @@ fun ObeyRoot(vm: RootViewModel = hiltViewModel()) {
                     } else {
                         // A new NavHost (and fresh ViewModels) per relationship.
                         key(s.session.relationship.id) {
-                            CompositionLocalProvider(LocalFeatures provides s.session.relationship.features) { MainScaffold() }
+                            CompositionLocalProvider(LocalFeatures provides s.session.relationship.features) {
+                                if (welcome == s.session.relationship.id) WelcomeScreen() else MainScaffold()
+                            }
                         }
                     }
             }

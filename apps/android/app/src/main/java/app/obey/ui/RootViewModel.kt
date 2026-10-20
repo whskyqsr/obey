@@ -21,10 +21,13 @@ class RootViewModel @Inject constructor(
     auth: AuthManager,
     private val sessions: SessionRepository,
     private val registrar: DeviceRegistrar,
+    settings: app.obey.data.SettingsStore,
 ) : ViewModel() {
     /** null until the first auth state arrives, so we don't flash the sign-in screen. */
     val authState: StateFlow<AuthState?> = auth.state.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val session: StateFlow<SessionState> = sessions.state
+    /** The dynamic whose setup steps show instead of the app; see WelcomeScreen. */
+    val welcome: StateFlow<String?> = settings.welcome.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     init {
         viewModelScope.launch {
