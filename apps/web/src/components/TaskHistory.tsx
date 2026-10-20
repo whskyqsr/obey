@@ -14,7 +14,7 @@ const LABEL: Record<HistoryEntry["status"], { label: string; tone: "primary" | "
   completed: { label: "Done", tone: "primary" },
   missed: { label: "Missed", tone: "error" },
   excused: { label: "Excused", tone: "neutral" },
-  cancelled: { label: "Cancelled", tone: "neutral" },
+  cancelled: { label: "Called off", tone: "neutral" },
 };
 
 /** `2026-10-16T21:30` in the browser's zone, for <input type="datetime-local">. */
@@ -44,7 +44,7 @@ export function TaskHistory({ taskId }: { taskId: string }) {
               <li key={h.id}>
                 <button
                   type="button"
-                  disabled={!isDom}
+                  disabled={!isDom || h.status === "cancelled"}
                   onClick={() => setEditing(h)}
                   className="state-layer flex w-full items-center gap-3 px-4 py-3 text-left disabled:cursor-default"
                 >

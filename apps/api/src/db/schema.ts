@@ -236,6 +236,8 @@ export const occurrences = pgTable(
     commentCount: integer("comment_count").notNull().default(0),
     reviewedBy: uuid("reviewed_by").references(() => users.id),
     reviewedAt: ts("reviewed_at"),
+    /** Cancelled because someone called it off around a plan (not because its series was edited); history shows these. */
+    calledOff: boolean("called_off").notNull().default(false),
     /** Who last corrected this by hand from the task's history, and when. */
     editedBy: uuid("edited_by").references(() => users.id),
     editedAt: ts("edited_at"),
