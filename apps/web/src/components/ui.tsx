@@ -133,7 +133,7 @@ export function OverflowMenu({ label = "More options", items }: { label?: string
   );
 }
 
-export function Fab({ icon, label, onClick, extended = true }: { icon: string; label: string; onClick(): void; extended?: boolean }) {
+export function Fab({ icon, label, onClick, extended = true, className }: { icon: string; label: string; onClick(): void; extended?: boolean; className?: string }) {
   return (
     <button
       type="button"
@@ -142,6 +142,7 @@ export function Fab({ icon, label, onClick, extended = true }: { icon: string; l
       className={cx(
         "state-layer fixed right-4 bottom-24 z-20 inline-flex h-14 items-center gap-3 rounded-lg bg-primary-container text-on-primary-container shadow-elev-3 md:right-8 md:bottom-8",
         extended ? "px-4 pr-5" : "w-14 justify-center",
+        className,
       )}
     >
       <Icon name={icon} />

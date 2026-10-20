@@ -31,6 +31,26 @@ const rootRoute = createRootRoute({
 
 const page = <P extends string>(path: P, component: () => React.ReactNode) => createRoute({ getParentRoute: () => rootRoute, path, component });
 
+const todayRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/",
+  // `task` is the task open in the side panel on wide screens.
+  validateSearch: (s: Record<string, unknown>): { task?: string } => (typeof s.task === "string" ? { task: s.task } : {}),
+  component: function TodayRoute() {
+    const { task } = todayRoute.useSearch();
+    return (
+      <TodayPage
+        selected={task}
+        renderTask={(id, close) => (
+          <Suspense fallback={<Loading />}>
+            <TaskPage taskId={id} onClose={close} />
+          </Suspense>
+        )}
+      />
+    );
+  },
+});
+
 const taskRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/tasks/$taskId",
@@ -150,7 +170,7 @@ function OnboardingRoute() {
 }
 
 const routeTree = rootRoute.addChildren([
-  page("/", TodayPage),
+  todayRoute,
   page("/calendar", CalendarPage),
   page("/tasks", TasksPage),
   taskRoute,
@@ -163,7 +183,10 @@ const routeTree = rootRoute.addChildren([
   protocolRoute,
   page("/notes", () => <NotesPage kind="note" />),
   noteRoute,
-  page("/journal", gated("journal", () => <NotesPage kind="journal" />)),
+  page(
+    "/journal",
+    gated("journal", () => <NotesPage kind="journal" />),
+  ),
   journalEntryRoute,
   page("/settings", SettingsPage),
   page("/more", MorePage),

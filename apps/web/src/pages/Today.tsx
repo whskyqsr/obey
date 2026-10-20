@@ -1,20 +1,21 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { useDecideReschedule, useOccurrences, usePendingReschedules } from "../api/hooks";
+import { useBalances, useDecideReschedule, useLibrary, usePendingReschedules } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { Occurrence, RescheduleRequest } from "../api/types";
 import { DayRescheduleSheet } from "../components/DayRescheduleSheet";
 import { isOverdue } from "../components/OccurrenceCard";
-import { ExcuseAction, ReviewActions, RowGroup, TaskRow } from "../components/TaskRow";
+import { ExcuseAction, ReviewActions, RowGroup, RowLink, TaskRow } from "../components/TaskRow";
 import { Button, Empty, ErrorBox, Fab, Icon, Loading, PageHeader, Section, useSnackbar } from "../components/ui";
 import { addDays, fmtDate, fmtDateTime, fmtRelative, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
+import { WIDE, useMediaQuery } from "../lib/useMediaQuery";
 import { useNeedsYou, useTodayOccurrences } from "../lib/today";
 
 const byDue = (a: Occurrence, b: Occurrence) => a.dueAt.localeCompare(b.dueAt);
 const dueDay = (o: Occurrence) => localDateOf(new Date(o.dueAt));
 
-export function TodayPage() {
+export function TodayPage({ selected, renderTask }: { selected?: string; renderTask?(id: string, close: () => void): ReactNode }) {
   const { me, isDom, features, rel, memberName } = useRel();
   const navigate = useNavigate();
   const t = today();
@@ -48,92 +49,190 @@ export function TodayPage() {
   const todays = groups.today.filter((o) => o.status !== "excused");
   const doneToday = todays.filter((o) => o.status === "completed" || o.status === "submitted").length;
   const partner = rel.members.find((m) => m.userId !== me.user.id);
+  const wide = useMediaQuery(WIDE);
+  const newTask = () => navigate({ to: "/tasks/$taskId", params: { taskId: "new" } });
+  useRowShortcuts(isDom ? newTask : undefined);
 
   return (
-    <>
-      <PageHeader
-        title={`Hi${name ? `, ${name}` : ""}`}
-        subtitle={[
-          fmtDate(t, { weekday: "long", month: "long", day: "numeric" }),
-          isDom && partner && todays.length ? `${memberName(partner.userId)} has done ${doneToday} of ${todays.length}` : null,
-        ]
-          .filter(Boolean)
-          .join(" · ")}
-      />
-      {!isDom && occ.data && todays.length > 0 && <Progress today={todays} done={doneToday} points={features.points} />}
-      {isDom ? (
-        <>
-          {needs.count > 0 && (
-            <Section title={`Needs you · ${needs.count}`}>
-              <div className="flex flex-col gap-2">
-                <PendingRequests bare />
-                {(needs.review.length > 0 || needs.missed.length > 0) && (
-                  <RowGroup>
-                    {needs.review.map((o) => (
-                      <TaskRow key={o.id} o={o} showDate={dueDay(o) !== t} actions={<ReviewActions o={o} />} />
-                    ))}
-                    {needs.missed.map((o) => (
-                      <TaskRow key={o.id} o={o} showDate={dueDay(o) !== t} actions={<ExcuseAction o={o} />} />
-                    ))}
-                  </RowGroup>
-                )}
-              </div>
-            </Section>
-          )}
-        </>
-      ) : (
-        <PendingRequests />
-      )}
-      {occ.isLoading && <Loading />}
-      {occ.error && <ErrorBox error={occ.error} onRetry={() => occ.refetch()} />}
-      {occ.data && (
-        <>
-          {groups.overdue.length > 0 && (
-            <Section title="Overdue">
-              <RowGroup>
-                {groups.overdue.map((o) => (
-                  <TaskRow key={o.id} o={o} showDate />
-                ))}
-              </RowGroup>
-            </Section>
-          )}
-          <Section
-            title={isDom && needs.count > 0 ? "Rest of today" : "Today"}
-            action={
-              myOpenToday.length > 1 ? (
-                <Button variant="text" icon="more_time" onClick={() => setDaySheet(true)}>
-                  More time
+    <RowLink.Provider value={wide ? (id) => ({ to: "/", search: { task: id }, current: id === selected }) : null}>
+      <div className="xl:flex xl:items-start">
+        <div className="min-w-0 flex-1 xl:mx-auto xl:max-w-4xl">
+          <PageHeader
+            actions={
+              isDom && wide ? (
+                <Button variant="tonal" icon="add" onClick={newTask}>
+                  New task
                 </Button>
               ) : undefined
             }
-          >
-            {restOfToday.length ? (
-              <RowGroup>
-                {restOfToday.map((o) => (
-                  <TaskRow key={o.id} o={o} />
-                ))}
-              </RowGroup>
-            ) : (
-              <Empty icon="spa" title="Nothing due today" body={isDom ? "Add one with the button below." : "Enjoy it while it lasts."} />
-            )}
-          </Section>
-          {groups.later.length > 0 && (
-            <Section title="Later">
-              <div className="flex flex-col gap-2">
-                {groups.later.map(([day, items]) => (
-                  <LaterDay key={day} day={day} items={items} />
-                ))}
-                <Button variant="text" icon="calendar_month" className="self-start" onClick={() => navigate({ to: "/calendar" })}>
-                  See the week
-                </Button>
-              </div>
-            </Section>
+            title={`Hi${name ? `, ${name}` : ""}`}
+            subtitle={[
+              fmtDate(t, { weekday: "long", month: "long", day: "numeric" }),
+              isDom && partner && todays.length ? `${memberName(partner.userId)} has done ${doneToday} of ${todays.length}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          />
+          {!isDom && occ.data && todays.length > 0 && <Progress today={todays} done={doneToday} points={features.points} />}
+          {isDom ? (
+            <>
+              {needs.count > 0 && (
+                <Section title={`Needs you · ${needs.count}`}>
+                  <div className="flex flex-col gap-2">
+                    <PendingRequests bare />
+                    {(needs.review.length > 0 || needs.missed.length > 0) && (
+                      <RowGroup>
+                        {needs.review.map((o) => (
+                          <TaskRow key={o.id} o={o} showDate={dueDay(o) !== t} actions={<ReviewActions o={o} />} />
+                        ))}
+                        {needs.missed.map((o) => (
+                          <TaskRow key={o.id} o={o} showDate={dueDay(o) !== t} actions={<ExcuseAction o={o} />} />
+                        ))}
+                      </RowGroup>
+                    )}
+                  </div>
+                </Section>
+              )}
+            </>
+          ) : (
+            <PendingRequests />
           )}
-        </>
+          {occ.isLoading && <Loading />}
+          {occ.error && <ErrorBox error={occ.error} onRetry={() => occ.refetch()} />}
+          {occ.data && (
+            <>
+              {groups.overdue.length > 0 && (
+                <Section title="Overdue">
+                  <RowGroup>
+                    {groups.overdue.map((o) => (
+                      <TaskRow key={o.id} o={o} showDate />
+                    ))}
+                  </RowGroup>
+                </Section>
+              )}
+              <Section
+                title={isDom && needs.count > 0 ? "Rest of today" : "Today"}
+                action={
+                  myOpenToday.length > 1 ? (
+                    <Button variant="text" icon="more_time" onClick={() => setDaySheet(true)}>
+                      More time
+                    </Button>
+                  ) : undefined
+                }
+              >
+                {restOfToday.length ? (
+                  <RowGroup>
+                    {restOfToday.map((o) => (
+                      <TaskRow key={o.id} o={o} />
+                    ))}
+                  </RowGroup>
+                ) : (
+                  <Empty icon="spa" title="Nothing due today" body={isDom ? "Add one with the button below." : "Enjoy it while it lasts."} />
+                )}
+              </Section>
+              {groups.later.length > 0 && (
+                <Section title="Later">
+                  <div className="flex flex-col gap-2">
+                    {groups.later.map(([day, items]) => (
+                      <LaterDay key={day} day={day} items={items} />
+                    ))}
+                    <Button variant="text" icon="calendar_month" className="self-start" onClick={() => navigate({ to: "/calendar" })}>
+                      See the week
+                    </Button>
+                  </div>
+                </Section>
+              )}
+            </>
+          )}
+          {wide && occ.data && <ShortcutHints dom={isDom} />}
+          <DayRescheduleSheet tasks={myOpenToday} open={daySheet} onClose={() => setDaySheet(false)} />
+          {isDom && <Fab icon="add" label="New task" onClick={newTask} className="xl:hidden" />}
+        </div>
+        {wide && (
+          <aside className="sticky top-0 h-dvh w-[400px] shrink-0 overflow-y-auto bg-surface-container-low" aria-label="Task details">
+            {selected && renderTask ? renderTask(selected, () => navigate({ to: "/", search: {} })) : <Glance today={todays} done={doneToday} />}
+          </aside>
+        )}
+      </div>
+    </RowLink.Provider>
+  );
+}
+
+/** With no task selected, the side panel shows the day at a glance and points toward the next reward. */
+function Glance({ today: list, done }: { today: Occurrence[]; done: number }) {
+  const { rel, me, isDom, features, memberName } = useRel();
+  const balances = useBalances(rel.id);
+  const rewards = useLibrary(rel.id, "rewards", features.points);
+  const earner = isDom ? rel.members.find((m) => m.userId !== me.user.id)?.userId : me.user.id;
+  const balance = balances.data?.find((b) => b.userId === earner)?.balance ?? 0;
+  const next = (rewards.data ?? []).filter((r) => r.cost > balance).sort((a, b) => a.cost - b.cost)[0];
+  return (
+    <div className="flex flex-col gap-4 p-6">
+      <h2 className="text-title-large text-on-surface">At a glance</h2>
+      {list.length > 0 ? <Progress today={list} done={done} points={features.points} /> : <p className="text-body-medium text-on-surface-variant">Nothing due today.</p>}
+      {features.points && earner && (
+        <div className="rounded-lg bg-surface p-4">
+          <div className="text-title-small text-on-surface-variant">{isDom ? `${memberName(earner)}'s points` : "Your points"}</div>
+          <div className="text-display-small text-on-surface tabular-nums">{balance}</div>
+          {next && (
+            <>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-container-highest">
+                <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (balance / next.cost) * 100)}%` }} />
+              </div>
+              <div className="mt-1 text-body-small text-on-surface-variant">
+                {next.cost - balance} more for {next.title}
+              </div>
+            </>
+          )}
+        </div>
       )}
-      <DayRescheduleSheet tasks={myOpenToday} open={daySheet} onClose={() => setDaySheet(false)} />
-      {isDom && <Fab icon="add" label="New task" onClick={() => navigate({ to: "/tasks/$taskId", params: { taskId: "new" } })} />}
-    </>
+      <p className="text-body-small text-on-surface-variant">Select a task to see its details here.</p>
+    </div>
+  );
+}
+
+/** J/K move between rows, X marks the focused one done, R asks for more time, N starts a new task (Dominant). */
+function useRowShortcuts(onNew?: () => void) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement;
+      if (e.metaKey || e.ctrlKey || e.altKey || el.closest("input, textarea, select, [contenteditable=true], [role=dialog]")) return;
+      const rows = [...document.querySelectorAll<HTMLElement>("a[data-task-row]")];
+      const at = rows.indexOf(el as HTMLElement);
+      const key = e.key.toLowerCase();
+      if (key === "j" || key === "k") {
+        e.preventDefault();
+        rows[Math.max(0, Math.min(rows.length - 1, at < 0 ? 0 : at + (key === "j" ? 1 : -1)))]?.focus();
+      } else if ((key === "x" || key === "r") && at >= 0) {
+        e.preventDefault();
+        el.closest("[data-row]")
+          ?.querySelector<HTMLElement>(`[data-action=${key === "x" ? "done" : "more"}]`)
+          ?.click();
+      } else if (key === "n" && onNew) {
+        e.preventDefault();
+        onNew();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onNew]);
+}
+
+function ShortcutHints({ dom }: { dom: boolean }) {
+  const keys: [string, string][] = [["J K", "move"], ["X", "done"], ["R", "more time"], ...(dom ? ([["N", "new task"]] as [string, string][]) : []), ["Enter", "open"]];
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1 px-6 pb-8 text-body-small text-on-surface-variant">
+      {keys.map(([k, what]) => (
+        <span key={k} className="flex items-center gap-1">
+          {k.split(" ").map((x) => (
+            <kbd key={x} className="rounded-xs border border-outline-variant px-1.5 font-sans">
+              {x}
+            </kbd>
+          ))}
+          {what}
+        </span>
+      ))}
+    </div>
   );
 }
 

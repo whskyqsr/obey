@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import type { Occurrence } from "../api/types";
 import { useCompleteOccurrence, useEditOccurrence, useReviewOccurrence, useUndoComplete } from "../api/hooks";
@@ -9,6 +9,9 @@ import { isOpen, isOverdue } from "./OccurrenceCard";
 import { RescheduleSheet } from "./RescheduleSheet";
 import { StreakStrip } from "./StreakStrip";
 import { Button, Icon, IconButton, cx, useSnackbar } from "./ui";
+
+/** Where a row opens its task. Today's wide layout points it at the side panel instead of the task page. */
+export const RowLink = createContext<((taskId: string) => { to: string; params?: Record<string, string>; search?: Record<string, string>; current?: boolean }) | null>(null);
 
 /** One-tap Done with Undo in the snackbar, shared by rows and the keyboard shortcut. */
 export function useQuickComplete() {
@@ -44,6 +47,7 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
   const done = o.status === "completed" || o.status === "excused";
   const canComplete = mine && o.status === "pending" && isOpen(o);
   const isToday = localDateOf(new Date(o.dueAt)) === today();
+  const { current, ...link } = useContext(RowLink)?.(o.seriesId) ?? { to: "/tasks/$taskId", params: { taskId: o.seriesId } };
 
   const when = isAllDayDue(o.dueAt)
     ? showDate || !isToday
@@ -64,12 +68,19 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
   ].filter(Boolean);
 
   return (
-    <div className="state-layer flex min-h-16 items-center gap-2 bg-surface-container-low py-1 pr-2 pl-1 has-[a[data-card-link]:focus-visible]:outline-2 has-[a[data-card-link]:focus-visible]:outline-primary">
+    <div
+      data-row
+      className={cx(
+        "state-layer flex min-h-16 items-center gap-2 py-1 pr-2 pl-1 has-[a[data-card-link]:focus-visible]:outline-2 has-[a[data-card-link]:focus-visible]:-outline-offset-2 has-[a[data-card-link]:focus-visible]:outline-primary",
+        current ? "bg-secondary-container" : "bg-surface-container-low",
+      )}
+    >
       <div className="relative z-10">
         {canComplete ? (
           <IconButton
             icon="radio_button_unchecked"
             label={`Mark “${o.title}” done`}
+            data-action="done"
             className={missed ? "text-error" : "text-on-surface-variant"}
             onClick={() => quickComplete(o)}
           />
@@ -94,9 +105,9 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
         )}
       </div>
       <Link
-        to="/tasks/$taskId"
-        params={{ taskId: o.seriesId }}
+        {...(link as { to: "/tasks/$taskId"; params: { taskId: string } })}
         data-card-link
+        data-task-row
         className="min-w-0 flex-1 py-1 after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
       >
         <div className={cx("truncate text-body-large text-on-surface", done && "line-through opacity-70")}>{o.title}</div>
@@ -107,7 +118,7 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
       </Link>
       <div className="relative z-10 flex items-center gap-1">
         {actions}
-        {!actions && o.status === "pending" && mine && <IconButton icon="more_time" label="More time" onClick={() => setRescheduling(true)} />}
+        {!actions && o.status === "pending" && mine && <IconButton icon="more_time" label="More time" data-action="more" onClick={() => setRescheduling(true)} />}
         {features.points && o.points !== 0 && (
           <span className="min-w-9 rounded-full bg-primary-container/70 px-2 py-0.5 text-center text-label-medium text-on-primary-container tabular-nums">
             {o.points > 0 ? `+${o.points}` : o.points}

@@ -188,6 +188,10 @@ body {
   outline: 2px solid var(--md-primary);
   outline-offset: 2px;
 }
+/* A card or row's stretched link outlines the whole card instead (see has-[...] on the card). */
+[data-card-link]:focus-visible {
+  outline: none;
+}
 
 input[type="date"],
 input[type="time"],

@@ -6,7 +6,7 @@ import { MarkdownEditor } from "../components/MarkdownEditor";
 import { OccurrenceCard } from "../components/OccurrenceCard";
 import { useCurrentOccurrences } from "../lib/currentOccurrences";
 import { TaskHistory } from "../components/TaskHistory";
-import { Badge, ErrorBox, IconButton, Loading, OverflowMenu, useSnackbar } from "../components/ui";
+import { Badge, ErrorBox, IconButton, Loading, OverflowMenu, useSnackbar, cx } from "../components/ui";
 import { fmtClock, fmtRelative, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
@@ -27,12 +27,13 @@ function useTask(taskId: string) {
 }
 
 /** One task: what it is, how it's going, and what's due now. History and editing live under the ⋮ menu. */
-export function TaskPage({ taskId }: { taskId: string }) {
+/** `onClose` shows it as Today's side panel on wide screens: a close button instead of back, plus open-as-page. */
+export function TaskPage({ taskId, onClose }: { taskId: string; onClose?: () => void }) {
   const { task, gate } = useTask(taskId);
-  return gate ?? <TaskView task={task!} />;
+  return gate ?? <TaskView task={task!} onClose={onClose} />;
 }
 
-function TaskView({ task }: { task: Task }) {
+function TaskView({ task, onClose }: { task: Task; onClose?: () => void }) {
   const { rel, isDom, memberName, features } = useRel();
   const navigate = useNavigate();
   const snack = useSnackbar();
@@ -69,11 +70,13 @@ function TaskView({ task }: { task: Task }) {
   const s = stats.data;
   return (
     <div className="flex flex-col">
-      <header className="sticky top-0 z-20 flex h-14 items-center gap-1 bg-surface px-2 md:px-4">
-        <IconButton icon="arrow_back" label="Back" onClick={back} />
+      <header className={cx("sticky top-0 z-20 flex h-14 items-center gap-1 px-2 md:px-4", onClose ? "bg-surface-container-low" : "bg-surface")}>
+        {!onClose && <IconButton icon="arrow_back" label="Back" onClick={back} />}
         <div className="flex-1" />
         {isDom && <IconButton icon="edit" label="Edit" onClick={() => navigate({ to: "/tasks/$taskId/edit", params: { taskId: task.id } })} />}
+        {onClose && <IconButton icon="open_in_full" label="Open as a page" onClick={() => navigate({ to: "/tasks/$taskId", params: { taskId: task.id } })} />}
         <OverflowMenu items={menu} />
+        {onClose && <IconButton icon="close" label="Close" onClick={onClose} />}
       </header>
       {/* One column, so the stats and due cards line up with the details. */}
       <div className="flex max-w-3xl flex-col gap-6 px-4 pb-10 md:px-6">

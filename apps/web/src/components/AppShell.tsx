@@ -28,6 +28,13 @@ const ALL: Dest[] = [
 
 const MORE: Dest = { to: "/more", label: "More", icon: "menu" };
 
+/** The desktop drawer's groups, by path; anything unlisted (Settings) sits at the bottom. */
+const GROUPS: { title?: string; paths: string[] }[] = [
+  { paths: ["/", "/calendar", "/tasks"] },
+  { title: "Your dynamic", paths: ["/rewards", "/consequences", "/rules", "/protocols"] },
+  { title: "Writing", paths: ["/notes", "/journal"] },
+];
+
 /** Destinations for the current dynamic: everything, plus the compact bar and what overflows into More. */
 export function useDestinations() {
   const { features } = useRel();
@@ -48,11 +55,7 @@ function isActive(pathname: string, to: string, more: Dest[]) {
 
 function NavItem({ d, active, badge, compact }: { d: Dest; active: boolean; badge?: number; compact?: boolean }) {
   return (
-    <Link
-      to={d.to}
-      className={cx("group flex flex-col items-center gap-1 outline-none", compact ? "flex-1 pt-3 pb-4" : "w-full py-1")}
-      aria-current={active ? "page" : undefined}
-    >
+    <Link to={d.to} className={cx("group flex flex-col items-center gap-1 outline-none", compact ? "flex-1 pt-3 pb-4" : "w-full py-1")} aria-current={active ? "page" : undefined}>
       <span
         className={cx(
           "state-layer relative flex h-8 w-14 items-center justify-center rounded-full transition-colors",
@@ -61,9 +64,7 @@ function NavItem({ d, active, badge, compact }: { d: Dest; active: boolean; badg
       >
         <Icon name={d.icon} filled={active} />
         {!!badge && (
-          <span className="absolute top-0 right-2.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-error px-1 text-label-small text-on-error">
-            {badge}
-          </span>
+          <span className="absolute top-0 right-2.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-error px-1 text-label-small text-on-error">{badge}</span>
         )}
       </span>
       <span className={cx("text-label-medium", active ? "text-on-surface" : "text-on-surface-variant")}>{d.label}</span>
@@ -71,16 +72,69 @@ function NavItem({ d, active, badge, compact }: { d: Dest; active: boolean; badg
   );
 }
 
+/** A drawer item: icon and label in a row, the active one in a pill, and an optional count. */
+function DrawerItem({ d, active, badge }: { d: Dest; active: boolean; badge?: number }) {
+  return (
+    <Link
+      to={d.to}
+      aria-current={active ? "page" : undefined}
+      className={cx(
+        "state-layer flex h-12 items-center gap-3 rounded-full px-4 text-label-large",
+        active ? "bg-secondary-container text-on-secondary-container" : "text-on-surface-variant",
+      )}
+    >
+      <Icon name={d.icon} filled={active} />
+      <span className="flex-1">{d.label}</span>
+      {!!badge && <span className="text-label-large">{badge}</span>}
+    </Link>
+  );
+}
+
 export function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { title } = useRel();
+  const { title, me, rel } = useRel();
+  const partner = rel.members.find((m) => m.userId !== me.user.id);
   const todayBadge = useNeedsYou().count;
   const { all, bar, more } = useDestinations();
 
   return (
     <div className="min-h-dvh bg-surface">
-      {/* Navigation rail (medium and larger) */}
-      <nav className="fixed inset-y-0 left-0 z-30 hidden w-24 flex-col items-center gap-3 overflow-y-auto bg-surface pt-4 pb-4 md:flex">
+      {/* Navigation drawer (large): grouped, with Settings and who you are at the bottom */}
+      <nav className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col gap-1 overflow-y-auto border-r border-outline-variant/40 bg-surface px-3 py-4 lg:flex">
+        <Link to="/" className="mb-3 flex items-center gap-3 px-3" title={title}>
+          <span className="flex size-10 items-center justify-center rounded-md bg-primary-container text-on-primary-container">
+            <Icon name="link" filled />
+          </span>
+          <span className="text-title-large text-on-surface">Obey</span>
+        </Link>
+        {GROUPS.map((g) => {
+          const items = all.filter((d) => g.paths.includes(d.to));
+          if (!items.length) return null;
+          return (
+            <div key={g.title ?? "main"} className="flex flex-col gap-1 pb-2">
+              {g.title && <div className="px-4 pt-3 pb-1 text-title-small text-on-surface-variant">{g.title}</div>}
+              {items
+                .sort((a, b) => g.paths.indexOf(a.to) - g.paths.indexOf(b.to))
+                .map((d) => (
+                  <DrawerItem key={d.to} d={d} active={isActive(pathname, d.to, [])} badge={d.to === "/" ? todayBadge : 0} />
+                ))}
+            </div>
+          );
+        })}
+        <div className="flex-1" />
+        {all
+          .filter((d) => !GROUPS.some((g) => g.paths.includes(d.to)))
+          .map((d) => (
+            <DrawerItem key={d.to} d={d} active={isActive(pathname, d.to, [])} />
+          ))}
+        <div className="truncate px-4 pt-2 text-body-medium text-on-surface-variant">
+          {me.user.displayName}
+          {partner ? ` · with ${partner.displayName}` : ""}
+        </div>
+      </nav>
+
+      {/* Navigation rail (medium) */}
+      <nav className="fixed inset-y-0 left-0 z-30 hidden w-24 flex-col items-center gap-3 overflow-y-auto bg-surface pt-4 pb-4 md:flex lg:hidden">
         <Link to="/" className="mb-4 flex size-14 items-center justify-center rounded-lg bg-primary-container text-on-primary-container" title={title}>
           <Icon name="link" filled />
         </Link>
@@ -89,8 +143,9 @@ export function AppShell() {
         ))}
       </nav>
 
-      <main className="pb-28 md:pb-10 md:pl-24">
-        <div className="mx-auto max-w-5xl">
+      <main className="pb-28 md:pb-10 md:pl-24 lg:pl-64">
+        {/* Today brings its own side panel on wide screens, so it gets the full width. */}
+        <div className={cx("mx-auto", pathname === "/" ? "max-w-5xl xl:max-w-none" : "max-w-5xl")}>
           <Outlet />
         </div>
       </main>
