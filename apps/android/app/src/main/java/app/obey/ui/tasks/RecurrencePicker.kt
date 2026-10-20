@@ -56,6 +56,7 @@ fun RecurrencePicker(
     start: LocalDate,
     onChange: (RecurrenceDraft) -> Unit,
     modifier: Modifier = Modifier,
+    weekStart: java.time.DayOfWeek = java.time.DayOfWeek.SUNDAY,
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -78,7 +79,7 @@ fun RecurrencePicker(
                     onChange(draft.copy(interval = it))
                 }
                 val selected = draft.weekdays.ifEmpty { setOf(Weekday.entries[start.dayOfWeek.value - 1]) }
-                WeekdayToggles(selected = selected, onToggle = { d ->
+                WeekdayToggles(weekStart, selected = selected, onToggle = { d ->
                     val next = if (d in selected) selected - d else selected + d
                     if (next.isNotEmpty()) onChange(draft.copy(weekdays = next))
                 })
@@ -119,7 +120,7 @@ fun RecurrencePicker(
                                 FilterChip(selected = draft.nth == n, onClick = { onChange(draft.copy(nth = n)) }, label = { Text(label) })
                             }
                         }
-                        WeekdayToggles(selected = setOf(draft.nthWeekday), onToggle = { onChange(draft.copy(nthWeekday = it)) })
+                        WeekdayToggles(weekStart, selected = setOf(draft.nthWeekday), onToggle = { onChange(draft.copy(nthWeekday = it)) })
                     }
                     MonthlyMode.LastDay -> Unit
                 }
@@ -158,9 +159,12 @@ fun RecurrencePicker(
 }
 
 @Composable
-private fun WeekdayToggles(selected: Set<Weekday>, onToggle: (Weekday) -> Unit) {
+private fun WeekdayToggles(weekStart: java.time.DayOfWeek, selected: Set<Weekday>, onToggle: (Weekday) -> Unit) {
+    // In the order the person's calendar uses: Sunday first unless they chose Monday.
+    val first = weekStart.value - 1
+    val days = Weekday.entries.drop(first) + Weekday.entries.take(first)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Weekday.entries.forEach { d ->
+        days.forEach { d ->
             val on = d in selected
             Surface(
                 shape = CircleShape,

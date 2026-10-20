@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { WEEKDAYS, type Weekday } from "@obey/recurrence";
 import { COMPLETION_KINDS, type PickerState, type RepeatKind, preview, toSchedule } from "../recurrence/picker";
+import { useMe } from "../api/hooks";
 import { fmtDate, today } from "../lib/dates";
 import { Chip, Icon, Select, SegmentedButtons, Switch, TextField, cx } from "./ui";
 
@@ -22,9 +23,25 @@ const DAY_NAME: Record<Weekday, string> = {
   SA: "Saturday",
   SU: "Sunday",
 };
+/** The week as the person's calendar shows it: Sunday first unless they chose Monday. */
+const weekdaysFrom = (weekStart: "sun" | "mon"): Weekday[] => (weekStart === "mon" ? [...WEEKDAYS] : ["SU", ...WEEKDAYS.filter((d) => d !== "SU")]);
 const UNIT: Partial<Record<RepeatKind, string>> = { days: "day", weeks: "week", months: "month" };
 
-function NumberField({ label, value, onChange, min = 1, max = 365, suffix }: { label: string; value: number; onChange(n: number): void; min?: number; max?: number; suffix?: string }) {
+function NumberField({
+  label,
+  value,
+  onChange,
+  min = 1,
+  max = 365,
+  suffix,
+}: {
+  label: string;
+  value: number;
+  onChange(n: number): void;
+  min?: number;
+  max?: number;
+  suffix?: string;
+}) {
   return (
     <TextField
       label={label}
@@ -43,6 +60,7 @@ function NumberField({ label, value, onChange, min = 1, max = 365, suffix }: { l
 export function RecurrencePicker({ value, onChange }: { value: PickerState; onChange(next: PickerState): void }) {
   const set = (patch: Partial<PickerState>) => onChange({ ...value, ...patch });
   const s = value;
+  const days = weekdaysFrom(useMe().data?.user.weekStart ?? "sun");
   const result = useMemo(() => preview(toSchedule(s), s.start > today() ? s.start : today(), 5), [s]);
   const anchored = s.afterCompletion && COMPLETION_KINDS.includes(s.kind);
   const unit = UNIT[s.kind];
@@ -60,7 +78,13 @@ export function RecurrencePicker({ value, onChange }: { value: PickerState; onCh
       <div className="flex flex-wrap items-start gap-4">
         <TextField label={s.kind === "once" ? "Date" : "Starts"} type="date" value={s.start} onChange={(e) => e.target.value && set({ start: e.target.value })} className="w-44" />
         {unit && (
-          <NumberField label={`Every N ${unit}s`} value={s.interval} onChange={(n) => set({ interval: n })} max={unit === "day" ? 365 : unit === "month" ? 120 : 52} suffix={s.interval === 1 ? `every ${unit}` : `every ${s.interval || "?"} ${unit}s`} />
+          <NumberField
+            label={`Every N ${unit}s`}
+            value={s.interval}
+            onChange={(n) => set({ interval: n })}
+            max={unit === "day" ? 365 : unit === "month" ? 120 : 52}
+            suffix={s.interval === 1 ? `every ${unit}` : `every ${s.interval || "?"} ${unit}s`}
+          />
         )}
         {s.kind === "cycle" && (
           <>
@@ -74,7 +98,7 @@ export function RecurrencePicker({ value, onChange }: { value: PickerState; onCh
         <div>
           <div className="mb-2 text-label-large text-on-surface-variant">On</div>
           <div className="flex gap-1.5">
-            {WEEKDAYS.map((d) => {
+            {days.map((d) => {
               const on = s.weekdays.includes(d);
               return (
                 <button
@@ -84,10 +108,7 @@ export function RecurrencePicker({ value, onChange }: { value: PickerState; onCh
                   aria-label={DAY_NAME[d]}
                   title={DAY_NAME[d]}
                   onClick={() => set({ weekdays: on ? s.weekdays.filter((w) => w !== d) : [...s.weekdays, d] })}
-                  className={cx(
-                    "state-layer size-10 rounded-full text-label-large",
-                    on ? "bg-primary text-on-primary" : "border border-outline-variant text-on-surface-variant",
-                  )}
+                  className={cx("state-layer size-10 rounded-full text-label-large", on ? "bg-primary text-on-primary" : "border border-outline-variant text-on-surface-variant")}
                 >
                   {DAY_LABEL[d]}
                 </button>
@@ -123,7 +144,7 @@ export function RecurrencePicker({ value, onChange }: { value: PickerState; onCh
                 <option value={-1}>Last</option>
               </Select>
               <Select label="Weekday" value={s.nthWeekday} onChange={(e) => set({ nthWeekday: e.target.value as Weekday })} className="w-44">
-                {WEEKDAYS.map((d) => (
+                {days.map((d) => (
                   <option key={d} value={d}>
                     {DAY_NAME[d]}
                   </option>

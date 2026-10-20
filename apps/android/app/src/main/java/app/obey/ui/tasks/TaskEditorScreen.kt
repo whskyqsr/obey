@@ -213,7 +213,7 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                             }
                         }
                         LabeledSwitch("All day", "Due by the end of the day", form.allDay) { v -> vm.update { it.copy(allDay = v) } }
-                        RecurrencePicker(form.recurrence, form.start, onChange = { r -> vm.update { it.copy(recurrence = r) } })
+                        RecurrencePicker(form.recurrence, form.start, onChange = { r -> vm.update { it.copy(recurrence = r) } }, weekStart = vm.weekStart)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text("Time zone", style = MaterialTheme.typography.bodyLarge)

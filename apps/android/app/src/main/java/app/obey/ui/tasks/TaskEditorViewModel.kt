@@ -88,6 +88,8 @@ class TaskEditorViewModel @Inject constructor(
 ) : BaseViewModel() {
     private val route = savedState.toRoute<TaskEditorRoute>()
     val isNew: Boolean = route.taskId == null
+    /** Weekday buttons follow the person's calendar. */
+    val weekStart: java.time.DayOfWeek get() = sessions.session?.weekStart ?: java.time.DayOfWeek.SUNDAY
 
     private val _data = MutableStateFlow<Load<EditorData>>(Load.Loading)
     val data: StateFlow<Load<EditorData>> = _data.asStateFlow()
