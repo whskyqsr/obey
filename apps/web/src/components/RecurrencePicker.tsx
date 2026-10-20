@@ -139,8 +139,8 @@ export function RecurrencePicker({ value, onChange }: { value: PickerState; onCh
         <Switch
           checked={s.afterCompletion}
           onChange={(v) => set({ afterCompletion: v })}
-          label="Repeat after completion"
-          help={`The next one is due ${s.interval || "N"} ${unit}${s.interval === 1 ? "" : "s"} after the last was done, so a late completion pushes the rest.`}
+          label="Count from when it's done"
+          help={`On: the next one is due ${s.interval || "N"} ${unit}${s.interval === 1 ? "" : "s"} after the last is completed, so finishing late moves the rest. Off: it stays on a fixed schedule.`}
         />
       )}
 

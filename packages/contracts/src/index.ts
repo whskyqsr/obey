@@ -38,7 +38,7 @@ export const reschedulePolicy = z.enum(["dominant_only", "request", "allowance"]
 /** Changes whenever the picture does; null when there is none. Fetch it from /users/:id/avatar. */
 const avatarVersion = z.string().nullable();
 /** Parts of the app a dynamic can switch off. Points covers rewards too; tasks and notes are always on. */
-export const FEATURES = ["points", "consequences", "rules", "journal"] as const;
+export const FEATURES = ["points", "consequences", "rules", "protocols", "journal"] as const;
 export const features = z.object(Object.fromEntries(FEATURES.map((f) => [f, z.boolean()])) as Record<(typeof FEATURES)[number], z.ZodBoolean>);
 export type Features = z.infer<typeof features>;
 export const allFeatures = (stored: Partial<Features> = {}): Features =>
@@ -216,6 +216,19 @@ export const ruleInput = z.object({
   position: z.number().int().min(0).default(0),
 });
 export const rule = ruleInput.extend({ id, relationshipId: id, createdAt: z.string() });
+
+/** The specifics behind a rule: what exactly is expected, and when and how it's done. */
+export const protocolInput = z.object({
+  title: z.string().min(1).max(200),
+  bodyMd: z.string().max(20_000).default(""),
+  /** The rule this protocol spells out, if any. */
+  ruleId: id.nullable().default(null),
+  position: z.number().int().min(0).default(0),
+});
+export const protocol = protocolInput.extend({ id, relationshipId: id, createdAt: z.string() });
+
+/** A full ordering of a relationship's rules or protocols, top first. */
+export const reorderInput = z.object({ ids: z.array(id).max(1000) });
 
 export const noteVisibility = z.enum(["private", "shared"]);
 export const noteInput = z.object({

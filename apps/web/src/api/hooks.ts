@@ -266,6 +266,19 @@ export function useSaveLibraryItem<K extends LibraryKind>(rel: string, kind: K) 
   });
 }
 
+/** Saves a drag-to-reorder of rules or protocols, showing the new order right away. */
+export function useReorder(rel: string, kind: "rules" | "protocols") {
+  const qc = useQueryClient();
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (items: { id: string }[]) => api(`/relationships/${rel}/${kind}/order`, { method: "PUT", body: { ids: items.map((i) => i.id) } }),
+    onMutate: (items) => {
+      qc.setQueryData(keys.library(rel, kind), items.map((item, i) => ({ ...item, position: i + 1 })));
+    },
+    onSettled: () => invalidate(),
+  });
+}
+
 export function useDeleteLibraryItem(rel: string, kind: LibraryKind) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({

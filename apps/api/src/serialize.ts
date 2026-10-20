@@ -4,6 +4,7 @@ import type {
   notes,
   occurrences,
   pointsLedger,
+  protocols,
   reschedules,
   rewards,
   rules,
@@ -76,7 +77,7 @@ export const ledgerDto = (l: typeof pointsLedger.$inferSelect) => ({
   createdAt: iso(l.createdAt),
 });
 
-type Library = typeof rewards.$inferSelect | typeof consequences.$inferSelect | typeof rules.$inferSelect;
+type Library = typeof rewards.$inferSelect | typeof consequences.$inferSelect | typeof rules.$inferSelect | typeof protocols.$inferSelect;
 export const libraryDto = <T extends Library>(row: T) => ({ ...row, createdAt: iso(row.createdAt) });
 
 export const noteDto = (n: typeof notes.$inferSelect) => ({

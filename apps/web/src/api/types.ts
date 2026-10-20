@@ -25,6 +25,8 @@ export type Consequence = z.infer<typeof c.consequence>;
 export type ConsequenceInput = z.infer<typeof c.consequenceInput>;
 export type Rule = z.infer<typeof c.rule>;
 export type RuleInput = z.infer<typeof c.ruleInput>;
+export type Protocol = z.infer<typeof c.protocol>;
+export type ProtocolInput = z.infer<typeof c.protocolInput>;
 export type Note = c.Note;
 export type NoteInput = z.infer<typeof c.noteInput>;
 
@@ -38,6 +40,7 @@ export interface LibraryTypes {
   rewards: { item: Reward; input: RewardInput };
   consequences: { item: Consequence; input: ConsequenceInput };
   rules: { item: Rule; input: RuleInput };
+  protocols: { item: Protocol; input: ProtocolInput };
   notes: { item: Note; input: NoteInput };
 }
 export type LibraryKind = keyof LibraryTypes;

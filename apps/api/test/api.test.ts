@@ -340,9 +340,9 @@ describe("points, rewards and notes", () => {
   it("lets only Dominants edit the rule book", async () => {
     const { dom, sub, relId } = await ctx.pair();
     expect((await sub.post(`/relationships/${relId}/rules`, { title: "Ask first" })).status).toBe(403);
-    const rule = (await dom.post(`/relationships/${relId}/rules`, { title: "Ask first", position: 2 })).body;
+    const rule = (await dom.post(`/relationships/${relId}/rules`, { title: "Ask first" })).body;
     const patched = (await dom.patch(`/rules/${rule.id}`, { category: "Protocol" })).body;
-    expect(patched).toMatchObject({ title: "Ask first", position: 2, category: "Protocol" });
+    expect(patched).toMatchObject({ title: "Ask first", position: 1, category: "Protocol" });
   });
 });
 
@@ -381,6 +381,36 @@ describe("task history", () => {
   });
 });
 
+describe("protocols", () => {
+  it("stand alone or link to a rule in the same relationship, and reorder with rules", async () => {
+    const { dom, sub, relId } = await ctx.pair();
+    const other = await ctx.pair();
+    const rule = (await dom.post(`/relationships/${relId}/rules`, { title: "Stay hydrated", position: 1 })).body;
+    const r2 = (await dom.post(`/relationships/${relId}/rules`, { title: "Ask first", position: 2 })).body;
+    const foreign = (await other.dom.post(`/relationships/${other.relId}/rules`, { title: "Elsewhere" })).body;
+
+    const water = await dom.post(`/relationships/${relId}/protocols`, { title: "Water", bodyMd: "64 oz a day", ruleId: rule.id });
+    expect(water.status).toBe(201);
+    expect(water.body.ruleId).toBe(rule.id);
+    expect((await dom.post(`/relationships/${relId}/protocols`, { title: "Greeting" })).body.ruleId).toBeNull();
+    expect((await dom.post(`/relationships/${relId}/protocols`, { title: "x", ruleId: foreign.id })).status).toBe(400);
+    expect((await sub.post(`/relationships/${relId}/protocols`, { title: "x" })).status).toBe(403);
+    expect((await sub.get(`/relationships/${relId}/protocols`)).body).toHaveLength(2);
+
+    const order = await dom.put(`/relationships/${relId}/rules/order`, { ids: [r2.id, rule.id, foreign.id] });
+    expect(order.body.map((r: { title: string; position: number }) => [r.title, r.position])).toEqual([
+      ["Ask first", 1],
+      ["Stay hydrated", 2],
+    ]);
+    expect((await other.dom.get(`/relationships/${other.relId}/rules`)).body[0].position).toBe(1);
+    expect((await sub.put(`/relationships/${relId}/rules/order`, { ids: [rule.id] })).status).toBe(403);
+
+    // Deleting a rule keeps its protocols, now standalone.
+    await dom.del(`/rules/${rule.id}`);
+    expect((await dom.get(`/relationships/${relId}/protocols`)).body.find((p: { title: string }) => p.title === "Water").ruleId).toBeNull();
+  });
+});
+
 describe("feature switches", () => {
   it("merges switches and stops booking points when points are off", async () => {
     const { dom, sub, relId, subId } = await ctx.pair();
@@ -388,6 +418,7 @@ describe("feature switches", () => {
       points: true,
       consequences: true,
       rules: true,
+      protocols: true,
       journal: true,
     });
     // Notes can't be switched off; the key is ignored.

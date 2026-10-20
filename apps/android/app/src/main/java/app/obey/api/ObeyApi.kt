@@ -145,6 +145,25 @@ interface ObeyApi {
     @DELETE("rules/{id}")
     suspend fun deleteRule(@Path("id") id: String)
 
+    @PUT("relationships/{id}/rules/order")
+    suspend fun reorderRules(@Path("id") relationshipId: String, @Body body: ReorderInput): List<Rule>
+
+    // Protocols
+    @GET("relationships/{id}/protocols")
+    suspend fun protocols(@Path("id") relationshipId: String): List<Protocol>
+
+    @POST("relationships/{id}/protocols")
+    suspend fun createProtocol(@Path("id") relationshipId: String, @Body body: ProtocolInput): Protocol
+
+    @PATCH("protocols/{id}")
+    suspend fun updateProtocol(@Path("id") id: String, @Body body: ProtocolInput): Protocol
+
+    @DELETE("protocols/{id}")
+    suspend fun deleteProtocol(@Path("id") id: String)
+
+    @PUT("relationships/{id}/protocols/order")
+    suspend fun reorderProtocols(@Path("id") relationshipId: String, @Body body: ReorderInput): List<Protocol>
+
     // Notes
     @GET("relationships/{id}/notes")
     suspend fun notes(@Path("id") relationshipId: String): List<Note>

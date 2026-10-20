@@ -54,6 +54,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.FactCheck
 import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ListItem
@@ -72,6 +73,7 @@ import app.obey.ui.notes.NotesScreen
 import app.obey.ui.onboarding.RelationshipSetupScreen
 import app.obey.ui.onboarding.SignInScreen
 import app.obey.ui.rewards.RewardsScreen
+import app.obey.ui.protocols.ProtocolsScreen
 import app.obey.ui.rules.RulesScreen
 import app.obey.ui.settings.SettingsScreen
 import app.obey.ui.settings.SettingsViewModel
@@ -139,6 +141,7 @@ private fun topLevels(f: Features) = listOfNotNull(
         else -> null
     },
     if (f.rules) TopLevel(RulesRoute, "Rules", Icons.Outlined.Gavel) { it.hasRoute<RulesRoute>() } else null,
+    if (f.protocols) TopLevel(ProtocolsRoute, "Protocols", Icons.Outlined.FactCheck) { it.hasRoute<ProtocolsRoute>() } else null,
     TopLevel(NotesRoute, "Notes", Icons.AutoMirrored.Outlined.Notes) { it.hasRoute<NotesRoute>() },
     if (f.journal) TopLevel(JournalRoute, "Journal", Icons.Outlined.AutoStories) { it.hasRoute<JournalRoute>() } else null,
 )
@@ -165,7 +168,7 @@ private fun MainScaffold() {
     var moreOpen by remember { mutableStateOf(false) }
     // A tab the dynamic just switched off (say, from Settings) shouldn't stay reachable underneath.
     val switchedOff = destination != null && !isTopLevel && destination.hierarchy.any {
-        it.hasRoute<RewardsRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<JournalRoute>()
+        it.hasRoute<RewardsRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<ProtocolsRoute>() || it.hasRoute<JournalRoute>()
     }
     LaunchedEffect(switchedOff) { if (switchedOff) nav.navigate(TodayRoute) { popUpTo(nav.graph.findStartDestination().id) } }
 
@@ -261,6 +264,7 @@ private fun ObeyNavHost(nav: NavHostController) {
         }
         composable<RewardsRoute> { RewardsScreen(onOpenSettings = settings) }
         composable<RulesRoute> { RulesScreen(onOpenSettings = settings) }
+        composable<ProtocolsRoute> { ProtocolsScreen(onOpenSettings = settings) }
         composable<NotesRoute> {
             NotesScreen(
                 journal = false,

@@ -108,6 +108,19 @@ export const rules = pgTable("rules", {
   createdAt: createdAt(),
 });
 
+export const protocols = pgTable("protocols", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  relationshipId: uuid("relationship_id")
+    .notNull()
+    .references(() => relationships.id, { onDelete: "cascade" }),
+  /** The rule it spells out; deleting the rule keeps the protocol. */
+  ruleId: uuid("rule_id").references(() => rules.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  bodyMd: text("body_md").notNull().default(""),
+  position: integer("position").notNull().default(0),
+  createdAt: createdAt(),
+});
+
 export const taskSeries = pgTable(
   "task_series",
   {

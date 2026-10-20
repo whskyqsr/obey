@@ -97,6 +97,7 @@ data class Features(
     val points: Boolean = true,
     val consequences: Boolean = true,
     val rules: Boolean = true,
+    val protocols: Boolean = true,
     val journal: Boolean = true,
 )
 
@@ -367,8 +368,30 @@ data class RuleInput(
     val title: String,
     val bodyMd: String = "",
     val category: String? = null,
-    val position: Int = 0,
 )
+
+@Serializable
+data class Protocol(
+    val id: String,
+    val relationshipId: String,
+    val title: String,
+    val bodyMd: String = "",
+    /** The rule this protocol spells out, if any. */
+    val ruleId: String? = null,
+    val position: Int = 0,
+    val createdAt: String,
+)
+
+@Serializable
+data class ProtocolInput(
+    val title: String,
+    val bodyMd: String = "",
+    val ruleId: String? = null,
+)
+
+/** A full ordering of rules or protocols, top first. */
+@Serializable
+data class ReorderInput(val ids: List<String>)
 
 @Serializable
 data class Rule(

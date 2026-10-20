@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.AlertDialog
@@ -36,6 +34,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.obey.api.ObeyApi
 import app.obey.api.Rule
+import app.obey.api.ReorderInput
 import app.obey.api.RuleInput
 import app.obey.data.Session
 import app.obey.data.SessionRepository
@@ -45,7 +44,7 @@ import app.obey.ui.common.ErrorBox
 import app.obey.ui.common.Load
 import app.obey.ui.common.LoadingBox
 import app.obey.ui.common.MessageEffect
-import app.obey.ui.common.SectionHeader
+import app.obey.ui.common.ReorderableList
 import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.loadCatching
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -71,24 +70,26 @@ class RulesViewModel @Inject constructor(
     fun refresh() {
         viewModelScope.launch {
             if (_state.value !is Load.Ready) _state.value = Load.Loading
-            _state.value = loadCatching {
-                api.rules(sessions.requireRelationshipId()).sortedWith(compareBy({ it.position }, { it.createdAt }))
-            }
+            _state.value = loadCatching { api.rules(sessions.requireRelationshipId()).inOrder() }
         }
     }
 
+    // New rules go to the end; the server numbers them.
     fun save(existing: Rule?, input: RuleInput) = action {
-        if (existing == null) {
-            val count = (_state.value as? Load.Ready)?.value?.size ?: 0
-            api.createRule(sessions.requireRelationshipId(), input.copy(position = count))
-        } else {
-            api.updateRule(existing.id, input.copy(position = existing.position))
-        }
+        if (existing == null) api.createRule(sessions.requireRelationshipId(), input) else api.updateRule(existing.id, input)
         refresh()
     }
 
     fun delete(rule: Rule) = action { api.deleteRule(rule.id); refresh() }
+
+    /** Saves a drag-to-reorder; the list already shows the new order. */
+    fun reorder(rules: List<Rule>) {
+        _state.value = Load.Ready(rules)
+        action { _state.value = Load.Ready(api.reorderRules(sessions.requireRelationshipId(), ReorderInput(rules.map { it.id })).inOrder()) }
+    }
 }
+
+internal fun List<Rule>.inOrder() = sortedWith(compareBy({ it.position }, { it.createdAt }))
 
 private data class Editing(val rule: Rule?)
 
@@ -112,29 +113,30 @@ fun RulesScreen(onOpenSettings: () -> Unit, vm: RulesViewModel = hiltViewModel()
         when (val s = state) {
             Load.Loading -> LoadingBox(Modifier.padding(padding))
             is Load.Failed -> ErrorBox(s.message, vm::refresh, Modifier.padding(padding))
-            is Load.Ready -> LazyColumn(Modifier.padding(padding).fillMaxSize()) {
+            is Load.Ready -> {
                 if (s.value.isEmpty()) {
-                    item { EmptyBox("No rules yet", if (canManage) "Rules are numbered in the order you add them." else null) }
-                }
-                // Number rules across the whole list, then group by category for reading.
-                val numbered = s.value.mapIndexed { i, r -> (i + 1) to r }
-                val groups = numbered.groupBy { it.second.category?.takeIf { c -> c.isNotBlank() } ?: "" }
-                groups.forEach { (category, rules) ->
-                    if (category.isNotEmpty() || groups.size > 1) {
-                        item(key = "h-$category") { SectionHeader(category.ifEmpty { "General" }) }
-                    }
-                    items(rules, key = { it.second.id }) { (n, r) ->
+                    EmptyBox("No rules yet", if (canManage) "Rules are numbered in the order you add them." else null, Modifier.padding(padding))
+                } else {
+                    // Numbers always follow the list order; a Dominant drags the handle to change it.
+                    ReorderableList(
+                        items = s.value,
+                        key = { it.id },
+                        enabled = canManage,
+                        onReorder = vm::reorder,
+                        modifier = Modifier.padding(padding).fillMaxSize(),
+                    ) { r, index, handle ->
                         ListItem(
                             modifier = if (canManage) Modifier.clickable { editing = Editing(r) } else Modifier,
                             leadingContent = {
-                                Text("$n.", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                                Text("${index + 1}.", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                             },
+                            overlineContent = r.category?.takeIf { it.isNotBlank() }?.let { c -> { Text(c) } },
                             headlineContent = { Text(r.title) },
                             supportingContent = if (r.bodyMd.isNotBlank()) { { Text(r.bodyMd) } } else null,
+                            trailingContent = handle,
                         )
                     }
                 }
-                item { androidx.compose.foundation.layout.Spacer(Modifier.padding(40.dp)) }
             }
         }
     }

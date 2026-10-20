@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object UpcomingRoute
 @Serializable data object RewardsRoute
 @Serializable data object RulesRoute
+@Serializable data object ProtocolsRoute
 @Serializable data object NotesRoute
 @Serializable data object JournalRoute
 @Serializable data object SettingsRoute
