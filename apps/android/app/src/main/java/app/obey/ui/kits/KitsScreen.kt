@@ -169,27 +169,30 @@ fun KitsScreen(onBack: () -> Unit, onAdded: (ApplyKitResult) -> Unit, vm: KitsVi
         when (val s = state) {
             Load.Loading -> LoadingBox(Modifier.padding(padding))
             is Load.Failed -> ErrorBox(s.message, vm::refresh, Modifier.padding(padding))
-            is Load.Ready -> LazyColumn(Modifier.padding(padding).fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
-                item(key = "intro") {
-                    Text(
-                        "Pick a set to start from. You choose what to add, and can edit anything afterwards.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
-                }
-                items(usable(s.value), key = { it.id }) { k ->
-                    ElevatedCard(onClick = { open = k }, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp).fillMaxWidth()) {
-                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
-                            Surface(color = colors.secondaryContainer, shape = MaterialTheme.shapes.large, modifier = Modifier.size(48.dp)) {
-                                Box(contentAlignment = Alignment.Center) { Icon(kitIcon(k.icon), null, tint = colors.onSecondaryContainer) }
-                            }
-                            Spacer(Modifier.width(16.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(k.title, style = MaterialTheme.typography.titleMedium)
-                                Text(k.description, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-                                Spacer(Modifier.height(8.dp))
-                                Text(k.items.joinToString(" · ") { it.title }, style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
+            is Load.Ready -> {
+                val kits = usable(s.value)
+                LazyColumn(Modifier.padding(padding).fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+                    item(key = "intro") {
+                        Text(
+                            "Pick a set to start from. You choose what to add, and can edit anything afterwards.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                    items(kits, key = { it.id }) { k ->
+                        ElevatedCard(onClick = { open = k }, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp).fillMaxWidth()) {
+                            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
+                                Surface(color = colors.secondaryContainer, shape = MaterialTheme.shapes.large, modifier = Modifier.size(48.dp)) {
+                                    Box(contentAlignment = Alignment.Center) { Icon(kitIcon(k.icon), null, tint = colors.onSecondaryContainer) }
+                                }
+                                Spacer(Modifier.width(16.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(k.title, style = MaterialTheme.typography.titleMedium)
+                                    Text(k.description, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(k.items.joinToString(" · ") { it.title }, style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
+                                }
                             }
                         }
                     }
