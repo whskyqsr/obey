@@ -431,8 +431,8 @@ function StepsFold({ steps, onChange, readOnly }: { steps: TaskStep[]; onChange(
   return (
     <Fold
       icon="format_list_numbered"
-      title={named.length ? `Ritual: ${named.length} step${named.length === 1 ? "" : "s"}` : "No steps"}
-      sub={named.length ? named.map((s) => s.title.trim()).join(" → ") : "Add steps to make it a routine done in order"}
+      title={named.length ? `Ritual: ${named.length} step${named.length === 1 ? "" : "s"}` : "Make it a ritual"}
+      sub={named.length ? named.map((s) => s.title.trim()).join(" → ") : "Add steps that are done in order, one at a time"}
       open={readOnly && steps.length > 0}
     >
       {steps.length > 0 && (

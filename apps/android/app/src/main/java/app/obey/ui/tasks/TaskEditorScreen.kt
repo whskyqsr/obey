@@ -477,8 +477,8 @@ private fun StepsFold(steps: List<app.obey.api.TaskStep>, onChange: (List<app.ob
     val named = steps.filter { it.title.isNotBlank() }
     Fold(
         Icons.Outlined.FormatListNumbered,
-        if (named.isEmpty()) "No steps" else "Ritual: ${named.size} step${if (named.size == 1) "" else "s"}",
-        if (named.isEmpty()) "Add steps to make it a routine done in order" else named.joinToString(" → ") { it.title.trim() },
+        if (named.isEmpty()) "Make it a ritual" else "Ritual: ${named.size} step${if (named.size == 1) "" else "s"}",
+        if (named.isEmpty()) "Add steps that are done in order, one at a time" else named.joinToString(" → ") { it.title.trim() },
     ) {
         steps.forEachIndexed { i, s ->
             Row(verticalAlignment = Alignment.CenterVertically) {
