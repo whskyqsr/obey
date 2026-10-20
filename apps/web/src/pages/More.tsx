@@ -6,11 +6,11 @@ import { useRel } from "../lib/relationship";
 /** Overflow destinations for the compact navigation bar. */
 export function MorePage() {
   const navigate = useNavigate();
-  const { title } = useRel();
+  const { title, rel, partners } = useRel();
   const ITEMS = useDestinations().more;
   return (
     <>
-      <PageHeader title="More" subtitle={title} />
+      <PageHeader title="More" subtitle={rel.name || !partners.length ? title : `with ${title}`} />
       <div className="mx-4 overflow-hidden rounded-lg bg-surface-container-low">
         {ITEMS.map((d) => (
           <button key={d.to} type="button" onClick={() => navigate({ to: d.to })} className="state-layer flex w-full items-center gap-4 px-4 py-4 text-left">

@@ -43,19 +43,41 @@ export function RewardsPage() {
     <>
       <PageHeader
         title="Rewards & points"
-        actions={isDom && <Button variant="tonal" icon="tune" onClick={() => setAdjusting(true)}>Adjust</Button>}
+        actions={
+          isDom && (
+            <Button variant="tonal" icon="tune" onClick={() => setAdjusting(true)}>
+              Adjust
+            </Button>
+          )
+        }
       />
 
       <Section title="Balances">
         {balances.error && <ErrorBox error={balances.error} />}
         <div className="flex flex-wrap gap-3">
-          {balances.data?.map((b) => (
-            <div key={b.userId} className={cx("min-w-40 flex-1 rounded-lg p-4", b.userId === me.user.id ? "bg-primary-container text-on-primary-container" : "bg-surface-container-high text-on-surface")}>
-              <div className="text-label-large opacity-80">{memberName(b.userId)}</div>
-              <div className="text-display-small">{b.balance}</div>
-              <div className="text-body-small opacity-80">points</div>
-            </div>
-          ))}
+          {balances.data?.map((b) => {
+            // The earner's balance is the headline: the sub's, or yours when you're the one earning.
+            const earner = rel.members.find((m) => m.userId === b.userId)?.role === "submissive" || (b.userId === me.user.id && !isDom);
+            const next = rewards.data?.filter((r) => r.cost > b.balance).sort((a, z) => a.cost - z.cost)[0];
+            return (
+              <div
+                key={b.userId}
+                className={cx("min-w-40 flex-1 rounded-lg p-4", earner ? "bg-primary-container text-on-primary-container" : "bg-surface-container-low text-on-surface")}
+              >
+                <div className="text-label-large opacity-80">{memberName(b.userId)}</div>
+                <div className="text-display-small tabular-nums">{b.balance}</div>
+                <div className="text-body-small opacity-80">points</div>
+                {earner && !!rewards.data?.length && (
+                  <div className="mt-3">
+                    <div className="h-1.5 overflow-hidden rounded-full bg-on-primary-container/15">
+                      <div className="h-full rounded-full bg-primary" style={{ width: `${next ? Math.max(0, Math.min(100, (b.balance / next.cost) * 100)) : 100}%` }} />
+                    </div>
+                    <div className="mt-1.5 text-body-medium">{next ? `${next.cost - b.balance} more for ${next.title}` : "Enough for any reward"}</div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
           {balances.isLoading && <Loading />}
         </div>
       </Section>
@@ -139,14 +161,16 @@ export function RewardsPage() {
         onClose={() => setEditing(null)}
         onDelete={
           current
-            ? () =>
-                confirm(`Delete “${current.title}”?`, () =>
-                  del.mutate(current.id, { onSuccess: () => setEditing(null), onError: (e) => snack(errorMessage(e)) }),
-                )
+            ? () => confirm(`Delete “${current.title}”?`, () => del.mutate(current.id, { onSuccess: () => setEditing(null), onError: (e) => snack(errorMessage(e)) }))
             : undefined
         }
         onSubmit={(v) => {
-          const input: RewardInput = { title: String(v.title).trim(), bodyMd: String(v.bodyMd ?? ""), cost: Math.max(0, Number(v.cost) || 0), needsApproval: Boolean(v.needsApproval) };
+          const input: RewardInput = {
+            title: String(v.title).trim(),
+            bodyMd: String(v.bodyMd ?? ""),
+            cost: Math.max(0, Number(v.cost) || 0),
+            needsApproval: Boolean(v.needsApproval),
+          };
           save.mutate({ id: current?.id, input }, { onSuccess: () => setEditing(null), onError: (e) => snack(errorMessage(e)) });
         }}
       />

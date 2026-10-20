@@ -70,4 +70,4 @@ export function relTitle(rel: Relationship, myId: string): string {
   return names.length === 1 ? names[0]! : `${names.slice(0, -1).join(", ")} & ${names.at(-1)}`;
 }
 
-export const ROLE_LABEL = { dominant: "Dominant", submissive: "submissive", switch: "Switch" } as const;
+export const ROLE_LABEL = { dominant: "Dominant", submissive: "Submissive", switch: "Switch" } as const;

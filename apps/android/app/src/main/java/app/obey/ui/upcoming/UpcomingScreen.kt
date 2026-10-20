@@ -73,7 +73,7 @@ fun UpcomingScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Upcoming") },
+                title = { Text("Calendar") },
                 actions = {
                     IconButton(onClick = onAllTasks) { Icon(Icons.AutoMirrored.Outlined.List, "All tasks") }
                     SettingsAction(onOpenSettings)

@@ -28,11 +28,11 @@ const ALL: Dest[] = [
 
 const MORE: Dest = { to: "/more", label: "More", icon: "menu" };
 
-/** The desktop drawer's groups, by path; anything unlisted (Settings) sits at the bottom. */
-const GROUPS: { title?: string; paths: string[] }[] = [
-  { paths: ["/", "/calendar", "/tasks"] },
-  { title: "Your dynamic", paths: ["/rewards", "/consequences", "/rules", "/protocols"] },
-  { title: "Writing", paths: ["/notes", "/journal"] },
+/** The desktop drawer's groups, by path, split by dividers; anything unlisted (Settings) sits at the bottom. */
+const GROUPS: string[][] = [
+  ["/", "/calendar", "/tasks"],
+  ["/rewards", "/consequences", "/rules", "/protocols"],
+  ["/notes", "/journal"],
 ];
 
 /** Destinations for the current dynamic: everything, plus the compact bar and what overflows into More. */
@@ -109,14 +109,13 @@ export function AppShell() {
           </span>
           <span className="text-title-large text-on-surface">Obey</span>
         </Link>
-        {GROUPS.map((g) => {
-          const items = all.filter((d) => g.paths.includes(d.to));
+        {GROUPS.map((g, i) => {
+          const items = all.filter((d) => g.includes(d.to));
           if (!items.length) return null;
           return (
-            <div key={g.title ?? "main"} className="flex flex-col gap-1 pb-2">
-              {g.title && <div className="px-4 pt-3 pb-1 text-title-small text-on-surface-variant">{g.title}</div>}
+            <div key={g[0]} className={cx("flex flex-col gap-1 py-2", i > 0 && "border-t border-outline-variant/60")}>
               {items
-                .sort((a, b) => g.paths.indexOf(a.to) - g.paths.indexOf(b.to))
+                .sort((a, b) => g.indexOf(a.to) - g.indexOf(b.to))
                 .map((d) => (
                   <DrawerItem key={d.to} d={d} active={isActive(pathname, d.to, [])} badge={d.to === "/" ? todayBadge : 0} />
                 ))}
@@ -125,7 +124,7 @@ export function AppShell() {
         })}
         <div className="flex-1" />
         {all
-          .filter((d) => !GROUPS.some((g) => g.paths.includes(d.to)))
+          .filter((d) => !GROUPS.some((g) => g.includes(d.to)))
           .map((d) => (
             <DrawerItem key={d.to} d={d} active={isActive(pathname, d.to, [])} />
           ))}

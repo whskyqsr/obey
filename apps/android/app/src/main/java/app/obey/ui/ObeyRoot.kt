@@ -138,7 +138,7 @@ private val writingRoutes = setOf<Any>(NotesRoute, JournalRoute)
 /** The destinations this dynamic uses, in bar order. Rewards stays as a home for consequences when points are off. */
 private fun topLevels(f: Features) = listOfNotNull(
     TopLevel(TodayRoute, "Today", Icons.Outlined.Today) { it.hasRoute<TodayRoute>() },
-    TopLevel(UpcomingRoute, "Upcoming", Icons.Outlined.CalendarMonth) { it.hasRoute<UpcomingRoute>() },
+    TopLevel(UpcomingRoute, "Calendar", Icons.Outlined.CalendarMonth) { it.hasRoute<UpcomingRoute>() },
     when {
         f.points -> TopLevel(RewardsRoute, "Rewards", Icons.Outlined.EmojiEvents) { it.hasRoute<RewardsRoute>() }
         f.consequences -> TopLevel(RewardsRoute, "Consequences", Icons.Outlined.Bolt) { it.hasRoute<RewardsRoute>() }
@@ -148,11 +148,11 @@ private fun topLevels(f: Features) = listOfNotNull(
     if (f.protocols) TopLevel(ProtocolsRoute, "Protocols", Icons.Outlined.FactCheck) { it.hasRoute<ProtocolsRoute>() } else null,
     TopLevel(NotesRoute, "Notes", Icons.AutoMirrored.Outlined.Notes) { it.hasRoute<NotesRoute>() },
     if (f.journal) TopLevel(JournalRoute, "Journal", Icons.Outlined.AutoStories) { it.hasRoute<JournalRoute>() } else null,
-    // Tasks open from Today and Upcoming; the full list is for managing them, so it sits under More.
+    // Tasks open from Today and Calendar; the full list is for managing them, so it sits under More.
     TopLevel(TaskListRoute, "All tasks", Icons.Outlined.Checklist) { it.hasRoute<TaskListRoute>() },
 )
 
-/** A phone's bar fits five; past that it keeps Today, Upcoming, Rewards and the first writing space, and the rest go under More. */
+/** A phone's bar fits five; past that it keeps Today, Calendar, Rewards and the first writing space, and the rest go under More. */
 private fun splitBar(all: List<TopLevel>): Pair<List<TopLevel>, List<TopLevel>> {
     if (all.size <= 5) return all to emptyList()
     val writing = all.firstOrNull { it.route in writingRoutes }

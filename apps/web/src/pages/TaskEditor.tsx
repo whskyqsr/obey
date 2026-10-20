@@ -8,7 +8,7 @@ import { MarkdownEditor } from "../components/MarkdownEditor";
 import { Button, Chip, ErrorBox, Icon, IconButton, Loading, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
 import { type PickerState, defaultPicker, fromSchedule, preview, toSchedule } from "../recurrence/picker";
 import { browserTimeZone, fmtClock, fmtDate, today } from "../lib/dates";
-import { useRel } from "../lib/relationship";
+import { ROLE_LABEL, useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
 
 interface Form {
@@ -233,14 +233,14 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
         <div className="mt-2 flex flex-col gap-2">
           <Fold
             icon="person"
-            title={`For ${memberName(form.assigneeId)}`}
+            title={`For ${memberName(form.assigneeId).replace(/^You$/, "you")}`}
             sub={[form.approvalRequired ? "Needs your approval" : "No approval needed", form.proofRequired ? "proof required" : "no proof"].join(" · ")}
             open={readOnly}
           >
             <Select label="Assigned to" value={form.assigneeId} onChange={(e) => set({ assigneeId: e.target.value })}>
               {rel.members.map((m) => (
                 <option key={m.userId} value={m.userId}>
-                  {m.displayName} ({m.role})
+                  {m.displayName} ({ROLE_LABEL[m.role]})
                 </option>
               ))}
             </Select>

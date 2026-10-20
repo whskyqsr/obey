@@ -4,18 +4,7 @@ import { useOccurrences } from "../api/hooks";
 import type { Occurrence } from "../api/types";
 import { OccurrenceCard, isOverdue } from "../components/OccurrenceCard";
 import { Button, Dialog, ErrorBox, Fab, IconButton, Loading, PageHeader, SegmentedButtons, cx } from "../components/ui";
-import {
-  addDays,
-  addMonths,
-  daysBetween,
-  fmtDate,
-  fmtMonth,
-  fmtTime,
-  localDateOf,
-  monthGrid,
-  startOfWeek,
-  today,
-} from "../lib/dates";
+import { addDays, addMonths, daysBetween, fmtDate, fmtMonth, fmtTime, localDateOf, monthGrid, startOfWeek, today } from "../lib/dates";
 import { storage } from "../lib/storage";
 import { useRel } from "../lib/relationship";
 import type { WeekStart } from "../api/types";
@@ -29,7 +18,8 @@ function dotClass(o: Occurrence) {
   if (o.status === "missed" || isOverdue(o)) return "bg-error";
   if (o.status === "submitted") return "bg-tertiary";
   if (o.status === "excused" || o.status === "cancelled") return "bg-outline";
-  return "bg-secondary";
+  // Still to do: an open ring, so it reads differently from done at dot size.
+  return "border-[1.5px] border-on-surface-variant";
 }
 
 export function CalendarPage() {
@@ -61,8 +51,7 @@ export function CalendarPage() {
   }, [occ.data]);
 
   const step = (dir: 1 | -1) => setAnchor((a) => (view === "week" ? addDays(a, 7 * dir) : addMonths(a, dir)));
-  const title =
-    view === "month" ? fmtMonth(anchor) : `${fmtDate(from, { month: "short", day: "numeric" })} – ${fmtDate(to, { month: "short", day: "numeric", year: "numeric" })}`;
+  const title = view === "month" ? fmtMonth(anchor) : `${fmtDate(from, { month: "short", day: "numeric" })} – ${fmtDate(to, { month: "short", day: "numeric", year: "numeric" })}`;
   const t = today();
   const month = anchor.slice(0, 7);
   const selectedItems = byDay.get(selected) ?? [];
@@ -171,24 +160,37 @@ export function CalendarPage() {
         <div className="grid gap-3 px-4 md:grid-cols-7 md:gap-2 md:px-6">
           {days.map((d) => {
             const items = byDay.get(d) ?? [];
+            // On a phone an empty day is a thin row rather than a whole card.
+            const empty = !items.length && !occ.isLoading;
             return (
-              <div key={d} className={cx("rounded-lg p-2 md:min-h-64", d === t ? "bg-secondary-container/60" : "bg-surface-container-low")}>
-                <div className="mb-2 flex items-baseline gap-2 px-1 md:flex-col md:gap-0">
+              <div key={d} className={cx("rounded-lg md:min-h-64 md:p-2", empty ? "px-2 py-1" : "p-2", d === t ? "bg-secondary-container/60" : "bg-surface-container-low")}>
+                <div className={cx("flex items-baseline gap-2 px-1 md:mb-2 md:flex-col md:gap-0", !empty && "mb-2")}>
                   <span className="text-label-medium text-on-surface-variant">{fmtDate(d, { weekday: "short" })}</span>
-                  <span className={cx("text-title-large", d === t ? "text-primary" : "text-on-surface")}>{Number(d.slice(8))}</span>
+                  <span className={cx(empty ? "text-title-medium md:text-title-large" : "text-title-large", d === t ? "text-primary" : "text-on-surface")}>
+                    {Number(d.slice(8))}
+                  </span>
+                  {empty && <span className="text-body-small text-on-surface-variant/70 md:hidden">Nothing scheduled</span>}
                 </div>
                 <div className="flex flex-col gap-1">
                   {items.map((o) => (
                     <WeekItem key={o.id} o={o} onOpen={() => setDetailId(o.id)} />
                   ))}
-                  {!items.length && !occ.isLoading && <span className="px-1 text-body-small text-on-surface-variant/70">—</span>}
+                  {empty && <span className="hidden px-1 text-body-small text-on-surface-variant/70 md:block">—</span>}
                 </div>
               </div>
             );
           })}
         </div>
       )}
-      <Dialog open={!!detail} onClose={() => setDetailId(null)} actions={<Button variant="text" onClick={() => setDetailId(null)}>Close</Button>}>
+      <Dialog
+        open={!!detail}
+        onClose={() => setDetailId(null)}
+        actions={
+          <Button variant="text" onClick={() => setDetailId(null)}>
+            Close
+          </Button>
+        }
+      >
         {detail && <OccurrenceCard o={detail} showDate />}
       </Dialog>
       {isDom && <Fab icon="add" label="New task" onClick={() => navigate({ to: "/tasks/$taskId", params: { taskId: "new" }, search: { start: newTaskDay } })} />}
@@ -201,7 +203,7 @@ function WeekItem({ o, onOpen }: { o: Occurrence; onOpen(): void }) {
     <button type="button" onClick={onOpen} className="state-layer flex w-full items-start gap-2 rounded-sm bg-surface px-2 py-1.5 text-left">
       <span className={cx("mt-1.5 size-2 shrink-0 rounded-full", dotClass(o))} />
       <span className="min-w-0 flex-1">
-        <span className={cx("block truncate text-label-large text-on-surface", o.status === "completed" && "line-through opacity-70")}>{o.title}</span>
+        <span className={cx("line-clamp-2 block text-label-large break-words text-on-surface", o.status === "completed" && "line-through opacity-70")}>{o.title}</span>
         <span className="block text-label-small text-on-surface-variant">{fmtTime(o.dueAt)}</span>
       </span>
     </button>

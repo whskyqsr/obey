@@ -45,10 +45,7 @@ export function RulesPage() {
 
   return (
     <>
-      <PageHeader
-        title="Rules"
-        subtitle={`${rules.length} rule${rules.length === 1 ? "" : "s"}`}
-      />
+      <PageHeader title="Rules" subtitle={`${rules.length} rule${rules.length === 1 ? "" : "s"}`} />
       {categories.length > 0 && (
         <div className="flex gap-2 overflow-x-auto px-4 pb-4 md:px-6">
           <Chip selected={!category} onClick={() => setCategory(null)}>
@@ -77,16 +74,17 @@ export function RulesPage() {
                   onClick={() => setEditing(r)}
                   className="state-layer flex min-w-0 flex-1 items-start gap-4 rounded-sm p-2 text-left disabled:cursor-default"
                 >
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-label-large text-on-primary">{number.get(r.id)}</span>
+                  <span className="w-6 shrink-0 pt-0.5 text-right text-title-medium text-primary tabular-nums">{number.get(r.id)}.</span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-title-medium text-on-surface">{r.title}</span>
                     {r.bodyMd && <span className="mt-1 block text-body-medium whitespace-pre-wrap text-on-surface-variant">{r.bodyMd}</span>}
                   </span>
-                  {r.category && <Chip>{r.category}</Chip>}
+                  {/* The filter already says which category; the chip only helps in the full list. */}
+                  {r.category && !category && <Chip>{r.category}</Chip>}
                 </button>
               </div>
               {features.protocols && !!protocolsByRule.get(r.id)?.length && (
-                <div className="flex flex-wrap gap-2 pt-1 pb-1 pl-[4.25rem]">
+                <div className="flex flex-wrap gap-2 pt-1 pb-1 pl-[3.75rem]">
                   {protocolsByRule.get(r.id)!.map((p) => (
                     <Link
                       key={p.id}
@@ -111,7 +109,11 @@ export function RulesPage() {
         initial={current ? { title: current.title, bodyMd: current.bodyMd, category: current.category ?? "" } : { title: "", bodyMd: "", category: category ?? "" }}
         busy={save.isPending}
         onClose={() => setEditing(null)}
-        onDelete={current ? () => confirm(`Delete rule “${current.title}”?`, () => del.mutate(current.id, { onSuccess: () => setEditing(null), onError: (e) => snack(errorMessage(e)) })) : undefined}
+        onDelete={
+          current
+            ? () => confirm(`Delete rule “${current.title}”?`, () => del.mutate(current.id, { onSuccess: () => setEditing(null), onError: (e) => snack(errorMessage(e)) }))
+            : undefined
+        }
         onSubmit={(v) =>
           save.mutate(
             {
