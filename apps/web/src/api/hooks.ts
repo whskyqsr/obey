@@ -290,6 +290,15 @@ export function useSaveEvent(rel: string) {
   });
 }
 
+/** "That's fine": keep these tasks as they are alongside the plan. */
+export function useDismissClashes(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ id, occurrenceIds }: { id: string; occurrenceIds: string[] }) => api<CalendarEvent>(`/events/${id}/dismiss`, { method: "POST", body: { occurrenceIds } }),
+    onSuccess: () => invalidate(),
+  });
+}
+
 export function useDeleteEvent(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({

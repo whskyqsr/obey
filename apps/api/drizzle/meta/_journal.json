@@ -162,6 +162,13 @@
       "when": 1792528370322,
       "tag": "0022_reschedule_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792528892780,
+      "tag": "0023_event_dismissed",
+      "breakpoints": true
     }
   ]
 }

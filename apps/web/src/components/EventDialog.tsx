@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { CalendarEvent, Occurrence } from "../api/types";
-import { useDeleteEvent, useOccurrences, usePlanReschedule, useSaveEvent } from "../api/hooks";
+import { useDeleteEvent, useDismissClashes, useOccurrences, usePlanReschedule, useSaveEvent } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { addDays, fmtDate, fmtTime, fromLocalInput, localDateOf, toLocalInput, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
@@ -228,8 +228,9 @@ export function EventDialog({ event, day, open, onClose }: { event: CalendarEven
 type ClashChoice = "keep" | "move" | "cancel";
 
 /**
- * The tasks a plan runs into, each sorted out its own way: kept, moved to after the plan, or called off. A Dominant's
- * choices apply at once; a sub's go out as one request (moves may apply straight away, depending on the dynamic's rules).
+ * The tasks a plan runs into, each sorted out its own way: kept as it is (the clash is dismissed for both), moved to
+ * after the plan, or called off. A Dominant's choices apply at once; a sub's moves and call-offs go out as one request
+ * (moves may apply straight away, depending on the dynamic's rules).
  */
 function Clashes({ event }: { event: CalendarEvent }) {
   const { rel, me, isDom, memberName } = useRel();
@@ -238,6 +239,7 @@ function Clashes({ event }: { event: CalendarEvent }) {
   const to = localDateOf(new Date(event.endsAt));
   const occ = useOccurrences(rel.id, from, to);
   const plan = usePlanReschedule(rel.id);
+  const dismiss = useDismissClashes(rel.id);
   const [choices, setChoices] = useState<Record<string, ClashChoice>>({});
   const [times, setTimes] = useState<Record<string, string>>({});
   const [reason, setReason] = useState("");
@@ -245,27 +247,33 @@ function Clashes({ event }: { event: CalendarEvent }) {
   const items = (occ.data ?? []).filter((o) => event.conflictIds.includes(o.id) && o.status === "pending");
   if (!items.length && !occ.isLoading) return null;
   const subBlocked = !isDom && rel.reschedulePolicy === "dominant_only";
-  const canAct = (o: Occurrence) => !subBlocked && (isDom || o.assigneeId === me.user.id);
-  const choiceOf = (o: Occurrence): ClashChoice => choices[o.id] ?? "keep";
+  const involved = event.withPartner || event.authorId === me.user.id;
+  const canMove = (o: Occurrence) => !subBlocked && (isDom || o.assigneeId === me.user.id);
+  const canAct = (o: Occurrence) => involved || canMove(o);
+  const choiceOf = (o: Occurrence): ClashChoice | undefined => choices[o.id];
   const timeOf = (o: Occurrence) => times[o.id] ?? toLocalInput(afterEvent(o.dueAt, event));
-  const picked = items.filter((o) => canAct(o) && choiceOf(o) !== "keep");
-  const asks = !isDom && picked.some((o) => choiceOf(o) === "cancel" || rel.reschedulePolicy !== "allowance");
+  const picked = items.filter((o) => canAct(o) && choiceOf(o));
+  const kept = picked.filter((o) => choiceOf(o) === "keep");
+  const changed = picked.filter((o) => choiceOf(o) !== "keep");
+  const asks = !isDom && changed.some((o) => choiceOf(o) === "cancel" || rel.reschedulePolicy !== "allowance");
 
-  function submit() {
-    plan.mutate(
-      {
-        items: picked.map((o) => (choiceOf(o) === "cancel" ? { occurrenceId: o.id, action: "cancel" } : { occurrenceId: o.id, action: "move", dueAt: fromLocalInput(timeOf(o)) })),
+  async function submit() {
+    try {
+      if (kept.length) await dismiss.mutateAsync({ id: event.id, occurrenceIds: kept.map((o) => o.id) });
+      if (!changed.length) {
+        setChoices({});
+        return snack(kept.length === 1 ? "Kept as it is" : `Kept ${kept.length} tasks as they are`);
+      }
+      const r = await plan.mutateAsync({
+        items: changed.map((o) => (choiceOf(o) === "cancel" ? { occurrenceId: o.id, action: "cancel" } : { occurrenceId: o.id, action: "move", dueAt: fromLocalInput(timeOf(o)) })),
         ...(reason.trim() && { reason: reason.trim() }),
-      },
-      {
-        onSuccess: (r) => {
-          setChoices({});
-          setReason("");
-          snack(r.applied ? "Done" : r.requests.some((x) => x.status === "applied") ? "Moved what you could; the rest is waiting for approval" : "Sent for approval");
-        },
-        onError: (e) => snack(errorMessage(e)),
-      },
-    );
+      });
+      setChoices({});
+      setReason("");
+      snack(r.applied ? "Done" : r.requests.some((x) => x.status === "applied") ? "Moved what you could; the rest is waiting for approval" : "Sent for approval");
+    } catch (e) {
+      snack(errorMessage(e));
+    }
   }
 
   return (
@@ -287,14 +295,18 @@ function Clashes({ event }: { event: CalendarEvent }) {
               </div>
             </div>
             {canAct(o) && (
-              <SegmentedButtons<ClashChoice>
-                value={choice}
-                onChange={(v) => setChoices((c) => ({ ...c, [o.id]: v }))}
+              <SegmentedButtons<ClashChoice | "">
+                value={choice ?? ""}
+                onChange={(v) => v && setChoices((c) => ({ ...c, [o.id]: v }))}
                 className="w-full"
                 options={[
                   { value: "keep", label: "Keep" },
-                  { value: "move", label: "Move" },
-                  { value: "cancel", label: isDom ? "Call off" : "Ask off" },
+                  ...(canMove(o)
+                    ? [
+                        { value: "move" as const, label: "Move" },
+                        { value: "cancel" as const, label: isDom ? "Call off" : "Ask off" },
+                      ]
+                    : []),
                 ]}
               />
             )}
@@ -302,12 +314,13 @@ function Clashes({ event }: { event: CalendarEvent }) {
           </div>
         );
       })}
+      <p className="px-1 text-body-small">Keep means the task is fine alongside the plan, and it stops counting as a clash.</p>
       {subBlocked && <p className="px-1 text-body-small">Only your Dominant can move or call off tasks in this dynamic.</p>}
       {picked.length > 0 && (
         <>
           {asks && <TextField label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} />}
-          <Button icon={asks ? "send" : "check"} busy={plan.isPending} onClick={submit} className="self-end">
-            {asks ? "Ask" : isDom ? "Apply" : "Move"} ({picked.length})
+          <Button icon={asks ? "send" : "check"} busy={plan.isPending || dismiss.isPending} onClick={() => void submit()} className="self-end">
+            {asks ? "Ask" : "Apply"} ({picked.length})
           </Button>
         </>
       )}

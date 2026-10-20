@@ -720,3 +720,7 @@ data class ApplyKitInput(
 
 @Serializable
 data class ApplyKitResult(val tasks: Int, val rules: Int, val protocols: Int)
+
+/** "That's fine": keep these tasks as they are alongside a plan; they stop counting as clashes. */
+@Serializable
+data class DismissClashesInput(val occurrenceIds: List<String>)

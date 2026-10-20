@@ -18,8 +18,8 @@ const allDayDue = (d: Date) => d.getUTCMilliseconds() === 999;
  * Timed tasks still to do that fall due while the event is on, for whoever it involves: the author, and the partner
  * when they're in on it. All-day tasks fit around plans, so they don't clash.
  */
-const clashes = (e: Pick<Event, "startsAt" | "endsAt" | "authorId" | "withPartner">, due: Due[]) =>
-  due.filter((o) => (e.withPartner || o.assigneeId === e.authorId) && !allDayDue(o.dueAt) && o.dueAt >= e.startsAt && o.dueAt < e.endsAt);
+const clashes = (e: Pick<Event, "startsAt" | "endsAt" | "authorId" | "withPartner" | "dismissedIds">, due: Due[]) =>
+  due.filter((o) => (e.withPartner || o.assigneeId === e.authorId) && !allDayDue(o.dueAt) && o.dueAt >= e.startsAt && o.dueAt < e.endsAt && !e.dismissedIds.includes(o.id));
 
 async function pendingBetween(db: Tx, relationshipId: string, from: Date, to: Date): Promise<Due[]> {
   return db
@@ -141,6 +141,22 @@ export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const moved = e!.startsAt.getTime() !== current.startsAt.getTime() || e!.endsAt.getTime() !== current.endsAt.getTime();
     if (moved) await tellPartners(e!, req.user.displayName, "moved");
     return withConflicts(e!);
+  });
+
+  /** "That's fine": either person the plan involves keeps a clashing task as it is, and it stops counting as a clash. */
+  app.post<{ Params: { id: string } }>("/events/:id/dismiss", async (req) => {
+    const { occurrenceIds } = z.object({ occurrenceIds: z.array(z.string().uuid()).min(1).max(50) }).parse(req.body);
+    if (!z.string().uuid().safeParse(req.params.id).success) throw notFound();
+    const [e] = await db.select().from(calendarEvents).where(eq(calendarEvents.id, req.params.id));
+    if (!e) throw notFound();
+    await requireMember(db, e.relationshipId, req.user.id);
+    if (!e.withPartner && e.authorId !== req.user.id) throw forbidden("this plan only involves the person who added it");
+    const [updated] = await db
+      .update(calendarEvents)
+      .set({ dismissedIds: [...new Set([...e.dismissedIds, ...occurrenceIds])] })
+      .where(eq(calendarEvents.id, e.id))
+      .returning();
+    return withConflicts(updated!);
   });
 
   app.delete<{ Params: { id: string } }>("/events/:id", async (req, reply) => {

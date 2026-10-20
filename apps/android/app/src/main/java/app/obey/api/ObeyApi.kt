@@ -118,6 +118,9 @@ interface ObeyApi {
     @DELETE("events/{id}")
     suspend fun deleteEvent(@Path("id") id: String)
 
+    @POST("events/{id}/dismiss")
+    suspend fun dismissClashes(@Path("id") id: String, @Body body: DismissClashesInput): CalendarEvent
+
     @GET("tasks/{id}/history")
     suspend fun taskHistory(@Path("id") taskId: String, @Query("limit") limit: Int = 100): List<HistoryEntry>
 

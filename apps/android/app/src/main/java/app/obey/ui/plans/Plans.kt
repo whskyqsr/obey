@@ -57,6 +57,7 @@ import app.obey.api.CalendarEventInput
 import app.obey.api.ObeyApi
 import app.obey.api.Occurrence
 import app.obey.api.OccurrenceStatus
+import app.obey.api.DismissClashesInput
 import app.obey.api.PlanRescheduleInput
 import app.obey.api.PlanRescheduleItem
 import app.obey.api.ReschedulePolicy
@@ -162,18 +163,23 @@ class PlanViewModel @Inject constructor(
         onDone()
     }
 
-    /** Each clashing task its own way: moved or called off, in one go. */
-    fun sortOut(items: List<PlanRescheduleItem>, reason: String?, onDone: () -> Unit) = action {
-        val r = api.reschedulePlan(sessions.requireRelationshipId(), PlanRescheduleInput(items, reason?.takeIf { it.isNotBlank() }))
-        say(
-            when {
-                r.applied -> "Done"
-                r.requests.any { it.status == RescheduleStatus.Applied } -> "Moved what you could; the rest is waiting for approval"
-                else -> "Sent for approval"
-            },
-        )
-        // Moved, or asked about: either way it's dealt with here.
-        val sent = items.map { it.occurrenceId }.toSet()
+    /** Each clashing task its own way: kept as it is (the clash is dismissed), moved or called off, in one go. */
+    fun sortOut(eventId: String, keep: List<String>, items: List<PlanRescheduleItem>, reason: String?, onDone: () -> Unit) = action {
+        if (keep.isNotEmpty()) api.dismissClashes(eventId, DismissClashesInput(keep))
+        if (items.isEmpty()) {
+            say(if (keep.size == 1) "Kept as it is" else "Kept ${keep.size} tasks as they are")
+        } else {
+            val r = api.reschedulePlan(sessions.requireRelationshipId(), PlanRescheduleInput(items, reason?.takeIf { it.isNotBlank() }))
+            say(
+                when {
+                    r.applied -> "Done"
+                    r.requests.any { it.status == RescheduleStatus.Applied } -> "Moved what you could; the rest is waiting for approval"
+                    else -> "Sent for approval"
+                },
+            )
+        }
+        // Kept, moved, or asked about: either way it's dealt with here.
+        val sent = (items.map { it.occurrenceId } + keep).toSet()
         _clashes.value = _clashes.value.filter { it.id !in sent }
         onDone()
     }
@@ -492,11 +498,14 @@ private fun Clashes(vm: PlanViewModel, e: CalendarEvent, onChanged: () -> Unit) 
     val isDom = session.canManage
     val policy = session.relationship?.reschedulePolicy
     val subBlocked = !isDom && policy == ReschedulePolicy.DominantOnly
-    fun canAct(o: Occurrence) = !subBlocked && (isDom || o.assigneeId == session.userId)
-    fun choiceOf(o: Occurrence) = choices[o.id] ?: ClashChoice.Keep
+    val involved = e.withPartner || e.authorId == session.userId
+    fun canMove(o: Occurrence) = !subBlocked && (isDom || o.assigneeId == session.userId)
+    fun canAct(o: Occurrence) = involved || canMove(o)
+    fun choiceOf(o: Occurrence) = choices[o.id]
     fun timeOf(o: Occurrence) = times[o.id] ?: afterPlan(o.dueAt, e)
-    val picked = items.filter { canAct(it) && choiceOf(it) != ClashChoice.Keep }
-    val asks = !isDom && picked.any { choiceOf(it) == ClashChoice.Cancel || policy != ReschedulePolicy.Allowance }
+    val picked = items.filter { canAct(it) && choiceOf(it) != null }
+    val changed = picked.filter { choiceOf(it) != ClashChoice.Keep }
+    val asks = !isDom && changed.any { choiceOf(it) == ClashChoice.Cancel || policy != ReschedulePolicy.Allowance }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -521,7 +530,8 @@ private fun Clashes(vm: PlanViewModel, e: CalendarEvent, onChanged: () -> Unit) 
                         )
                     }
                     if (canAct(o)) {
-                        val labels = listOf(ClashChoice.Keep to "Keep", ClashChoice.Move to "Move", ClashChoice.Cancel to if (isDom) "Call off" else "Ask off")
+                        val labels = listOf(ClashChoice.Keep to "Keep") +
+                            if (canMove(o)) listOf(ClashChoice.Move to "Move", ClashChoice.Cancel to if (isDom) "Call off" else "Ask off") else emptyList()
                         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                             labels.forEachIndexed { i, (c, label) ->
                                 SegmentedButton(selected = choiceOf(o) == c, onClick = { choices[o.id] = c }, shape = SegmentedButtonDefaults.itemShape(i, labels.size)) { Text(label, maxLines = 1) }
@@ -536,18 +546,20 @@ private fun Clashes(vm: PlanViewModel, e: CalendarEvent, onChanged: () -> Unit) 
                 }
             }
         }
+        Text("Keep means the task is fine alongside the plan, and it stops counting as a clash.", style = MaterialTheme.typography.bodySmall)
         if (subBlocked) Text("Only your Dominant can move or call off tasks in this dynamic.", style = MaterialTheme.typography.bodySmall)
         if (picked.isNotEmpty()) {
             if (asks) OutlinedTextField(reason, { reason = it.take(1000) }, label = { Text("Reason (optional)") }, modifier = Modifier.fillMaxWidth())
             Button(
                 onClick = {
-                    val sent = picked.map { o ->
+                    val sent = changed.map { o ->
                         if (choiceOf(o) == ClashChoice.Cancel) PlanRescheduleItem(o.id, "cancel") else PlanRescheduleItem(o.id, "move", timeOf(o).iso())
                     }
-                    vm.sortOut(sent, reason) { choices.clear(); reason = ""; onChanged() }
+                    val keep = picked.filter { choiceOf(it) == ClashChoice.Keep }.map { it.id }
+                    vm.sortOut(e.id, keep, sent, reason) { choices.clear(); reason = ""; onChanged() }
                 },
                 modifier = Modifier.align(Alignment.End),
-            ) { Text("${if (asks) "Ask" else if (isDom) "Apply" else "Move"} (${picked.size})") }
+            ) { Text("${if (asks) "Ask" else "Apply"} (${picked.size})") }
         }
     }
     picking?.let { o ->

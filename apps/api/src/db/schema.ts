@@ -394,6 +394,8 @@ export const calendarEvents = pgTable(
     allDay: boolean("all_day").notNull().default(false),
     withPartner: boolean("with_partner").notNull().default(false),
     noteMd: text("note_md"),
+    /** Tasks someone said are fine alongside this plan; they no longer count as clashes. */
+    dismissedIds: jsonb("dismissed_ids").$type<string[]>().notNull().default([]),
     createdAt: createdAt(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },

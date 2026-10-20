@@ -952,4 +952,19 @@ describe("calendar events", () => {
     expect((await dom.del(`/events/${made.body.id}`)).status).toBe(403);
     expect((await sub.del(`/events/${made.body.id}`)).status).toBe(204);
   });
+  it("lets either person a plan involves dismiss a clash, keeping the task as it is", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    await dom.post(`/relationships/${relId}/tasks`, task(subId));
+    const [timed] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    const night = { title: "Night out", startsAt: "2026-10-16T19:00:00-04:00", endsAt: "2026-10-16T23:00:00-04:00" };
+    const solo = await sub.post(`/relationships/${relId}/events`, night);
+    // Only the sub is in on their own plan.
+    expect((await dom.post(`/events/${solo.body.id}/dismiss`, { occurrenceIds: [timed.id] })).status).toBe(403);
+    expect((await sub.post(`/events/${solo.body.id}/dismiss`, { occurrenceIds: [timed.id] })).body.conflictIds).toEqual([]);
+
+    const together = await dom.post(`/relationships/${relId}/events`, { ...night, withPartner: true });
+    expect(together.body.conflictIds).toEqual([timed.id]);
+    expect((await dom.post(`/events/${together.body.id}/dismiss`, { occurrenceIds: [timed.id] })).body.conflictIds).toEqual([]);
+    expect((await sub.get(`/relationships/${relId}/events?from=2026-10-16&to=2026-10-16`)).body.every((e: { conflictIds: string[] }) => !e.conflictIds.length)).toBe(true);
+  });
 });
