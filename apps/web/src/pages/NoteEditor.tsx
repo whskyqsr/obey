@@ -29,7 +29,8 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
   const save = useSaveLibraryItem(rel.id, "notes");
   const del = useDeleteLibraryItem(rel.id, "notes");
   const [confirm, confirmEl] = useConfirm();
-  const canEdit = !note || note.authorId === me.user.id || note.visibility === "shared";
+  // Only the author changes a note; the server enforces the same.
+  const canEdit = !note || note.authorId === me.user.id;
 
   const [form, setForm] = useState<NoteInput>(() => ({
     kind,
