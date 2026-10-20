@@ -25,6 +25,7 @@ export type Reward = z.infer<typeof c.reward>;
 export type RewardInput = z.infer<typeof c.rewardInput>;
 export type Consequence = z.infer<typeof c.consequence>;
 export type ConsequenceInput = z.infer<typeof c.consequenceInput>;
+export type AssignConsequenceInput = z.input<typeof c.assignConsequence>;
 export type Rule = z.infer<typeof c.rule>;
 export type RuleInput = z.infer<typeof c.ruleInput>;
 export type Protocol = z.infer<typeof c.protocol>;

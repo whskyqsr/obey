@@ -129,6 +129,9 @@ interface ObeyApi {
     @GET("relationships/{id}/consequences")
     suspend fun consequences(@Path("id") relationshipId: String): List<Consequence>
 
+    @POST("consequences/{id}/assign")
+    suspend fun assignConsequence(@Path("id") consequenceId: String, @Body body: AssignConsequenceInput): Task
+
     @POST("relationships/{id}/consequences")
     suspend fun createConsequence(@Path("id") relationshipId: String, @Body body: ConsequenceInput): Consequence
 

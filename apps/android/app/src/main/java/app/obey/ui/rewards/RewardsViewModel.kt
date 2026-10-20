@@ -2,6 +2,7 @@ package app.obey.ui.rewards
 
 import androidx.lifecycle.viewModelScope
 import app.obey.api.AdjustPointsInput
+import app.obey.api.AssignConsequenceInput
 import app.obey.api.Balance
 import app.obey.api.Consequence
 import app.obey.api.ConsequenceInput
@@ -84,6 +85,11 @@ class RewardsViewModel @Inject constructor(
         if (existing == null) api.createConsequence(sessions.requireRelationshipId(), input)
         else api.updateConsequence(existing.id, input)
         refresh()
+    }
+
+    fun assignConsequence(c: Consequence, input: AssignConsequenceInput) = action {
+        api.assignConsequence(c.id, input)
+        say("Consequence assigned")
     }
 
     fun deleteConsequence(c: Consequence) = action { api.deleteConsequence(c.id); refresh() }

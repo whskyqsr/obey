@@ -1,11 +1,11 @@
 import { and, asc, desc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { type TaskStats, completeOccurrence as completeBody, editOccurrence as editBody, plainDate, rescheduleDayInput, rescheduleInput, reviewOccurrence as reviewBody, taskInput } from "@obey/contracts";
+import { type TaskStats, assignConsequence, completeOccurrence as completeBody, editOccurrence as editBody, plainDate, rescheduleDayInput, rescheduleInput, reviewOccurrence as reviewBody, taskInput } from "@obey/contracts";
 import { addDays, dueInstant, localDate } from "@obey/recurrence";
 import type { Deps } from "../app.js";
 import type { Tx } from "../db/index.js";
-import { occurrences, pointsLedger, relationships, reschedules, taskSeries } from "../db/schema.js";
+import { consequences, occurrences, pointsLedger, relationships, reschedules, taskSeries } from "../db/schema.js";
 import { HttpError, forbidden, notFound, parsePatch } from "../errors.js";
 import { occurrenceDto, rescheduleDto, taskDto } from "../serialize.js";
 import { canManage, managers, membership, requireManager, requireMember } from "../services/access.js";
@@ -103,6 +103,40 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     });
     if (series.assigneeId !== req.user.id)
       await notifier.send([series.assigneeId], { title: "Obey", body: "You have a new task", data: { type: "task_assigned", taskId: series.id } });
+    reply.status(201);
+    return taskDto(series);
+  });
+
+  /** A consequence handed out on its own becomes a one-off task, so it's done, missed and reviewed like any other. */
+  app.post<{ Params: { id: string } }>("/consequences/:id/assign", async (req, reply) => {
+    const [c] = await db.select().from(consequences).where(eq(consequences.id, req.params.id));
+    if (!c) throw notFound();
+    await requireManager(db, c.relationshipId, req.user.id);
+    const body = assignConsequence.parse(req.body);
+    validZone(body.timezone);
+    if (!(await membership(db, c.relationshipId, body.assigneeId))) throw new HttpError(400, "assignee is not in this relationship");
+    const bodyMd = [body.reason && `**Why:** ${body.reason}`, c.bodyMd].filter(Boolean).join("\n\n");
+    const series = await db.transaction(async (tx) => {
+      const [s] = await tx
+        .insert(taskSeries)
+        .values({
+          relationshipId: c.relationshipId,
+          assigneeId: body.assigneeId,
+          title: c.title,
+          bodyMd,
+          assignedConsequenceId: c.id,
+          approvalRequired: body.approvalRequired,
+          schedule: { start: body.date },
+          dueTime: body.dueTime,
+          timezone: body.timezone,
+          createdBy: req.user.id,
+        })
+        .returning();
+      await materializeSeries(tx, s!, horizon(s!.timezone), deps.now());
+      return s!;
+    });
+    if (series.assigneeId !== req.user.id)
+      await notifier.send([series.assigneeId], { title: "Obey", body: "You've been given a consequence", data: { type: "task_assigned", taskId: series.id } });
     reply.status(201);
     return taskDto(series);
   });

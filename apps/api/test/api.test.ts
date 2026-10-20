@@ -392,6 +392,27 @@ describe("task history", () => {
   });
 });
 
+describe("assigned consequences", () => {
+  it("become a one-off task with the reason, for a Dominant to hand out", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    const c = (await dom.post(`/relationships/${relId}/consequences`, { title: "Write lines", bodyMd: "100 lines, by hand." })).body;
+    const input = { assigneeId: subId, date: "2026-10-17", dueTime: "20:00", timezone: "UTC", reason: "Talked back" };
+    expect((await sub.post(`/consequences/${c.id}/assign`, input)).status).toBe(403);
+    const res = await dom.post(`/consequences/${c.id}/assign`, input);
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ title: "Write lines", assigneeId: subId, assignedConsequenceId: c.id, bodyMd: "**Why:** Talked back\n\n100 lines, by hand.", schedule: { start: "2026-10-17" } });
+    expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [subId] });
+
+    const occ = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-20`)).body.filter((o: { seriesId: string }) => o.seriesId === res.body.id);
+    expect(occ).toHaveLength(1);
+    expect(occ[0]).toMatchObject({ dueAt: "2026-10-17T20:00:00.000Z", status: "pending" });
+    expect((await sub.post(`/occurrences/${occ[0].id}/complete`, {})).body.status).toBe("completed");
+
+    const other = await ctx.pair();
+    expect((await dom.post(`/consequences/${c.id}/assign`, { ...input, assigneeId: other.subId })).status).toBe(400);
+  });
+});
+
 describe("protocols", () => {
   it("stand alone or link to a rule in the same relationship, and reorder with rules", async () => {
     const { dom, sub, relId } = await ctx.pair();

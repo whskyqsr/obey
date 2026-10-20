@@ -107,6 +107,8 @@ export const task = taskInput.extend({
   id,
   relationshipId: id,
   summary: z.string(),
+  /** Set when this task is a consequence assigned on its own, not a regular task. */
+  assignedConsequenceId: id.nullable().default(null),
   active: z.boolean(),
   createdBy: id,
   createdAt: z.string(),
@@ -224,6 +226,16 @@ export const consequenceInput = z.object({
   severity: z.number().int().min(1).max(5).default(1),
 });
 export const consequence = consequenceInput.extend({ id, relationshipId: id, createdAt: z.string() });
+
+/** Hands out a consequence on its own: it becomes a one-off task due on `date`. */
+export const assignConsequence = z.object({
+  assigneeId: id,
+  date: plainDate,
+  dueTime: timeOfDay.nullable().default(null),
+  timezone: z.string().min(1),
+  reason: z.string().trim().max(2_000).default(""),
+  approvalRequired: z.boolean().default(false),
+});
 
 export const ruleInput = z.object({
   title: z.string().min(1).max(200),

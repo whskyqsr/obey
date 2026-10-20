@@ -33,6 +33,7 @@ export const taskDto = (s: Series) => ({
   timezone: s.timezone,
   graceMinutes: s.graceMinutes,
   summary: describe(s.schedule),
+  assignedConsequenceId: s.assignedConsequenceId,
   active: s.active,
   createdBy: s.createdBy,
   createdAt: iso(s.createdAt),

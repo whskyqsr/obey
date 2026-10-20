@@ -77,6 +77,7 @@ function TaskView({ task }: { task: Task }) {
           {task.dueTime ? ` at ${fmtClock(task.dueTime)}` : ", all day"} · {memberName(task.assigneeId)}
         </p>
         <div className="flex flex-wrap gap-2 empty:hidden">
+          {task.assignedConsequenceId && <Badge tone="error">Consequence</Badge>}
           {!task.active && <Badge tone="neutral">Paused</Badge>}
           {features.points && task.points !== 0 && <Badge tone="primary">{task.points > 0 ? `+${task.points}` : task.points} pts</Badge>}
           {task.approvalRequired && <Badge tone="tertiary">Needs approval</Badge>}

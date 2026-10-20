@@ -133,6 +133,7 @@ fun TaskListScreen(
                         supportingContent = {
                             Text(
                                 listOfNotNull(
+                                    if (t.assignedConsequenceId != null) "Consequence" else null,
                                     t.summary,
                                     t.dueTime?.let { "at ${formatClock(it)}" },
                                     who,

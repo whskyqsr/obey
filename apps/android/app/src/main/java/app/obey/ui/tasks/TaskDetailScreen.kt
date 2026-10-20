@@ -230,6 +230,7 @@ fun TaskDetailScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         val tags = listOfNotNull(
+                            if (task.assignedConsequenceId != null) "Consequence" else null,
                             if (!task.active) "Paused" else null,
                             if (features.points && task.points != 0) "${signed(task.points)} pts" else null,
                             if (task.approvalRequired) "Needs approval" else null,

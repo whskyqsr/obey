@@ -54,7 +54,7 @@ export function TasksPage() {
               className="state-layer flex min-w-0 flex-1 items-center gap-4 rounded-md p-4 text-left"
             >
               <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-container text-on-primary-container">
-                <Icon name={t.schedule.rule ? (t.schedule.anchor === "completion" ? "autorenew" : "event_repeat") : "event"} />
+                <Icon name={t.assignedConsequenceId ? "bolt" : t.schedule.rule ? (t.schedule.anchor === "completion" ? "autorenew" : "event_repeat") : "event"} />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-title-medium text-on-surface">{t.title}</div>

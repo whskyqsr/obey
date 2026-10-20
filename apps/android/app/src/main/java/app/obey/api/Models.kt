@@ -182,6 +182,8 @@ data class Task(
     val timezone: String,
     val graceMinutes: Int = 0,
     val summary: String,
+    /** Set when this one-off task is a consequence handed out on its own. */
+    val assignedConsequenceId: String? = null,
     val active: Boolean,
     val createdBy: String,
     val createdAt: String,
@@ -230,6 +232,16 @@ data class TaskStats(
     val streak: Int,
     val bestStreak: Int,
     val lastDoneAt: String? = null,
+)
+
+@Serializable
+data class AssignConsequenceInput(
+    val assigneeId: String,
+    val date: String,
+    val dueTime: String?,
+    val timezone: String,
+    val reason: String,
+    val approvalRequired: Boolean,
 )
 
 @Serializable

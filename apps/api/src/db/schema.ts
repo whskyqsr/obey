@@ -139,6 +139,8 @@ export const taskSeries = pgTable(
     missPenalty: integer("miss_penalty").notNull().default(0),
     rewardId: uuid("reward_id").references(() => rewards.id, { onDelete: "set null" }),
     consequenceId: uuid("consequence_id").references(() => consequences.id, { onDelete: "set null" }),
+    /** Set when this one-off task is a consequence handed out on its own. */
+    assignedConsequenceId: uuid("assigned_consequence_id").references(() => consequences.id, { onDelete: "set null" }),
     proofRequired: boolean("proof_required").notNull().default(false),
     approvalRequired: boolean("approval_required").notNull().default(false),
     schedule: jsonb("schedule").$type<Schedule>().notNull(),

@@ -6,6 +6,7 @@ import type {
   EditOccurrence,
   HistoryEntry,
   TaskStats,
+  AssignConsequenceInput,
   WeekStart,
   Invite,
   LedgerEntry,
@@ -283,6 +284,14 @@ export function useReorder(rel: string, kind: "rules" | "protocols") {
       qc.setQueryData(keys.library(rel, kind), items.map((item, i) => ({ ...item, position: i + 1 })));
     },
     onSettled: () => invalidate(),
+  });
+}
+
+export function useAssignConsequence(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: AssignConsequenceInput }) => api<Task>(`/consequences/${id}/assign`, { method: "POST", body: input }),
+    onSuccess: () => invalidate(),
   });
 }
 

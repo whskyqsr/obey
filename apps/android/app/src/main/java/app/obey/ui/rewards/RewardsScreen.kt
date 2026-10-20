@@ -77,6 +77,7 @@ fun RewardsScreen(onOpenSettings: () -> Unit, vm: RewardsViewModel = hiltViewMod
     // null = dialog closed; Editing(null) = creating; Editing(x) = editing x.
     var editReward by remember { mutableStateOf<Editing<Reward>?>(null) }
     var editConsequence by remember { mutableStateOf<Editing<Consequence>?>(null) }
+    var assigning by remember { mutableStateOf<Consequence?>(null) }
     var adjusting by remember { mutableStateOf(false) }
     var confirmRedeem by remember { mutableStateOf<Reward?>(null) }
 
@@ -158,7 +159,12 @@ fun RewardsScreen(onOpenSettings: () -> Unit, vm: RewardsViewModel = hiltViewMod
                         modifier = if (canManage) Modifier.clickable { editConsequence = Editing(c) } else Modifier,
                         headlineContent = { Text(c.title) },
                         supportingContent = if (c.bodyMd.isNotBlank()) { { Text(c.bodyMd) } } else null,
-                        trailingContent = { Text("●".repeat(c.severity), color = MaterialTheme.colorScheme.error) },
+                        trailingContent = {
+                            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                Text("●".repeat(c.severity), color = MaterialTheme.colorScheme.error)
+                                if (canManage) TextButton(onClick = { assigning = c }) { Text("Assign") }
+                            }
+                        },
                     )
                 }
 
@@ -190,6 +196,13 @@ fun RewardsScreen(onOpenSettings: () -> Unit, vm: RewardsViewModel = hiltViewMod
             onSave = { vm.saveReward(existing, it); editReward = null },
             onDelete = existing?.let { r -> { vm.deleteReward(r); editReward = null } },
         )
+    }
+    assigning?.let { c ->
+        // Usually the one partner; with more, the first submissive.
+        val assignee = session?.partners?.let { p -> p.firstOrNull { it.role == app.obey.api.Role.Submissive } ?: p.firstOrNull() }?.userId ?: session?.userId
+        if (assignee != null) {
+            AssignConsequenceDialog(c, assignee, onDismiss = { assigning = null }, onAssign = { vm.assignConsequence(c, it); assigning = null })
+        }
     }
     editConsequence?.let { editing ->
         val existing = editing.item

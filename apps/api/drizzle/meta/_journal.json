@@ -50,6 +50,13 @@
       "when": 1792507949557,
       "tag": "0006_week_start",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792508470207,
+      "tag": "0007_assigned_consequences",
+      "breakpoints": true
     }
   ]
 }
