@@ -5,6 +5,7 @@ import { useCompleteOccurrence, useReviewOccurrence } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { fmtDate, fmtDateTime, fmtRelative, fmtTime, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
+import { ProofPhotos } from "./Proof";
 import { RescheduleSheet } from "./RescheduleSheet";
 import { StreakStrip } from "./StreakStrip";
 import { Badge, Button, Dialog, TextArea, cx, useSnackbar } from "./ui";
@@ -73,6 +74,11 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
         </div>
       </div>
       {o.noteMd && <p className="rounded-sm bg-surface-container px-3 py-2 text-body-medium whitespace-pre-wrap text-on-surface-variant">{o.noteMd}</p>}
+      {o.photoCount > 0 && (
+        <div className="relative z-10">
+          <ProofPhotos o={o} canAdd={mine && (o.status === "pending" || o.status === "submitted")} />
+        </div>
+      )}
 
       {(o.status === "pending" || (isDom && o.status === "submitted")) && (
         <div className="relative z-10 flex flex-wrap items-center gap-2">
@@ -136,6 +142,7 @@ export function CompleteDialog({ o, open, onClose }: { o: Occurrence; open: bool
   const snack = useSnackbar();
   const complete = useCompleteOccurrence(rel.id);
   const [note, setNote] = useState("");
+  const needsProof = o.proofRequired && o.photoCount === 0 && !note.trim();
   return (
     <Dialog
       open={open}
@@ -148,6 +155,7 @@ export function CompleteDialog({ o, open, onClose }: { o: Occurrence; open: bool
           </Button>
           <Button
             busy={complete.isPending}
+            disabled={needsProof}
             onClick={() =>
               complete.mutate(
                 { id: o.id, noteMd: note.trim() || undefined },
@@ -167,7 +175,11 @@ export function CompleteDialog({ o, open, onClose }: { o: Occurrence; open: bool
         </>
       }
     >
-      <TextArea label="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} maxLength={5000} />
+      <div className="flex flex-col gap-4">
+        {o.proofRequired && <p>This one needs proof: add a photo, a note, or both.</p>}
+        <ProofPhotos o={o} canAdd />
+        <TextArea label={o.proofRequired ? "Note" : "Note (optional)"} value={note} onChange={(e) => setNote(e.target.value)} maxLength={5000} />
+      </div>
     </Dialog>
   );
 }

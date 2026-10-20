@@ -35,6 +35,8 @@ export type Protocol = z.infer<typeof c.protocol>;
 export type ProtocolInput = z.infer<typeof c.protocolInput>;
 export type Note = c.Note;
 export type CalendarEvent = c.CalendarEvent;
+export type ProofPhoto = c.ProofPhoto;
+export type ReportReason = z.infer<typeof c.reportReason>;
 export type CalendarEventInput = z.input<typeof c.calendarEventInput>;
 export type NoteInput = z.infer<typeof c.noteInput>;
 

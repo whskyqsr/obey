@@ -5,7 +5,7 @@ import { useCompleteOccurrence, useEditOccurrence, useReviewOccurrence, useUndoC
 import { errorMessage } from "../api/client";
 import { fmtDate, fmtDateTime, fmtRelative, fmtTime, isAllDayDue, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
-import { isOpen, isOverdue } from "./OccurrenceCard";
+import { CompleteDialog, isOpen, isOverdue } from "./OccurrenceCard";
 import { RescheduleSheet } from "./RescheduleSheet";
 import { StreakStrip } from "./StreakStrip";
 import { Button, Icon, IconButton, cx, useSnackbar } from "./ui";
@@ -41,6 +41,8 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
   const { me, isDom, memberName, features } = useRel();
   const quickComplete = useQuickComplete();
   const [rescheduling, setRescheduling] = useState(false);
+  // A task that needs proof opens the Done sheet instead of completing in one tap.
+  const [completing, setCompleting] = useState(false);
   const mine = o.assigneeId === me.user.id;
   const overdue = isOverdue(o);
   const missed = o.status === "missed" || overdue;
@@ -82,7 +84,7 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
             label={`Mark “${o.title}” done`}
             data-action="done"
             className={missed ? "text-error" : "text-on-surface-variant"}
-            onClick={() => quickComplete(o)}
+            onClick={() => (o.proofRequired ? setCompleting(true) : quickComplete(o))}
           />
         ) : (
           <span className="flex size-10 items-center justify-center">
@@ -129,6 +131,7 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
         )}
       </div>
       <RescheduleSheet occurrence={o} open={rescheduling} onClose={() => setRescheduling(false)} />
+      {completing && <CompleteDialog o={o} open onClose={() => setCompleting(false)} />}
     </div>
   );
 }

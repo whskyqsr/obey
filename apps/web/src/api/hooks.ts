@@ -1,6 +1,8 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { api, apiObjectUrl } from "./client";
 import type {
+  ProofPhoto,
+  ReportReason,
   CalendarEvent,
   CalendarEventInput,
   InvitePreview,
@@ -87,7 +89,7 @@ export function useMe(enabled = true) {
 export function useUpdateMe() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { displayName?: string; weekStart?: WeekStart }) => api<User>("/me", { method: "PATCH", body }),
+    mutationFn: (body: { displayName?: string; weekStart?: WeekStart; revealProofs?: boolean }) => api<User>("/me", { method: "PATCH", body }),
     // Names appear in member lists and request cards across every relationship.
     onSuccess: () => qc.invalidateQueries(),
   });
@@ -175,6 +177,51 @@ export function useOccurrences(rel: string, from: string, to: string) {
   return useQuery({
     queryKey: keys.occurrences(rel, from, to),
     queryFn: () => api<Occurrence[]>(`/relationships/${rel}/occurrences`, { query: { from, to } }),
+  });
+}
+
+// ---- photo proof
+
+export function useAcceptProofTerms() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<User>("/me/proof-terms", { method: "POST", body: { adult: true, rules: true } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.me }),
+  });
+}
+
+export function useProofPhotos(occurrenceId: string, enabled = true) {
+  return useQuery({
+    queryKey: ["proof", occurrenceId],
+    queryFn: () => api<ProofPhoto[]>(`/occurrences/${occurrenceId}/photos`),
+    enabled,
+  });
+}
+
+/** A photo as an object URL; photos never change, so it's cached until the page goes. */
+export function useProofPhotoUrl(photoId: string) {
+  return useQuery({ queryKey: ["proof-photo", photoId], queryFn: () => apiObjectUrl(`/photos/${photoId}`), staleTime: Infinity });
+}
+
+export function useAddProofPhoto(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ occurrenceId, image }: { occurrenceId: string; image: Blob }) => api<ProofPhoto>(`/occurrences/${occurrenceId}/photos`, { method: "POST", body: image }),
+    onSuccess: (p) => invalidate(["proof", p.occurrenceId]),
+  });
+}
+
+export function useDeleteProofPhoto(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (p: ProofPhoto) => api(`/photos/${p.id}`, { method: "DELETE" }),
+    onSuccess: (_r, p) => invalidate(["proof", p.occurrenceId]),
+  });
+}
+
+export function useReport() {
+  return useMutation({
+    mutationFn: (body: { subjectId: string; photoId?: string; reason: ReportReason; details?: string }) => api<{ id: string }>("/reports", { method: "POST", body }),
   });
 }
 

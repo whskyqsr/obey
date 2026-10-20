@@ -177,6 +177,8 @@ export const occurrence = z.object({
   /** The first day the assignee may complete it (the day after the previous occurrence); null when any time is fine. */
   opensOn: plainDate.nullable().default(null),
   photoCount: z.number().int().default(0),
+  /** The task needs a photo or a note before it can be marked done. */
+  proofRequired: z.boolean().default(false),
 });
 export type Occurrence = z.infer<typeof occurrence>;
 

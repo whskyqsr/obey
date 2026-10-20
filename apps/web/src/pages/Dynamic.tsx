@@ -6,7 +6,8 @@ import type { DynamicDate, Features, Invite, ReschedulePolicy, Role } from "../a
 import { Avatar } from "../components/Avatar";
 import { CollarIcon } from "../components/CollarIcon";
 import { DynamicHero } from "../components/DynamicHero";
-import { Button, Chip, Dialog, Icon, IconButton, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
+import { Button, Chip, Dialog, Icon, IconButton, OverflowMenu, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
+import { ReportDialog } from "../components/Proof";
 import { fmtDate, fmtDateTime, localDateOf, today } from "../lib/dates";
 import { anniversary, describeDate } from "../lib/dynamicDates";
 import { inviteLink } from "../lib/invite";
@@ -136,6 +137,7 @@ export function DynamicPage() {
   const back = useBack(() => navigate({ to: "/settings" }));
   const title = useDynamicTitle();
   const [sheet, setSheet] = useState<"invite" | "name" | "deadlines" | null>(null);
+  const [reporting, setReporting] = useState<string | null>(null);
   // The date being edited: an existing one, or a blank new one.
   const [editingDate, setEditingDate] = useState<DynamicDate | null>(null);
   const now = today();
@@ -166,6 +168,7 @@ export function DynamicPage() {
             .join(" · ")}
         />
 
+        {reporting && <ReportDialog subjectId={reporting} onClose={() => setReporting(null)} />}
         <Label>People</Label>
         <Group>
           {rel.members.map((m) => (
@@ -174,6 +177,7 @@ export function DynamicPage() {
               leading={<Avatar userId={m.userId} name={m.displayName} version={m.avatarVersion} collared={isCollared(rel, m.userId)} />}
               headline={m.userId === me.user.id ? `${m.displayName} (you)` : m.displayName}
               supporting={ROLE_LABEL[m.role]}
+              trailing={m.userId !== me.user.id ? <OverflowMenu items={[{ label: "Report", icon: "flag", onClick: () => setReporting(m.userId) }]} /> : undefined}
             />
           ))}
           <Row

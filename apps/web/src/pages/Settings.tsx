@@ -4,7 +4,7 @@ import { errorMessage } from "../api/client";
 import type { WeekStart } from "../api/types";
 import { getSession, signOut } from "../auth/session";
 import { Avatar, squareJpeg } from "../components/Avatar";
-import { Button, Icon, PageHeader, Section, SegmentedButtons, TextField, cx, useSnackbar } from "../components/ui";
+import { Button, Dialog, Icon, PageHeader, Section, SegmentedButtons, Switch, TextField, cx, useSnackbar } from "../components/ui";
 import { isCollared, useRel } from "../lib/relationship";
 import { useDynamicTitle } from "./Dynamic";
 import { type PushState, pushState, registerPush } from "../push";
@@ -20,6 +20,7 @@ export function SettingsPage() {
   const snack = useSnackbar();
   const qc = useQueryClient();
   const [push, setPush] = useState<PushState>(pushState);
+  const [confirmReveal, setConfirmReveal] = useState(false);
   const updateMe = useUpdateMe();
   const [displayName, setDisplayName] = useState(me.user.displayName);
   const setAvatar = useSetAvatar();
@@ -160,6 +161,35 @@ export function SettingsPage() {
             <p className="mt-2 text-body-small text-on-surface-variant">The whole palette, light and dark, is generated from this color (Material 3 tonal spot).</p>
           </div>
         </div>
+      </Section>
+
+      <Section title="Privacy">
+        <div className="rounded-lg bg-surface-container-low px-4 py-2">
+          <Switch
+            checked={me.user.revealProofs}
+            onChange={(on) => (on ? setConfirmReveal(true) : updateMe.mutate({ revealProofs: false }, { onError: (e) => snack(errorMessage(e)) }))}
+            label="Show proof photos without blur"
+            help="Off: photos stay blurred until you open one."
+          />
+        </div>
+        <Dialog
+          open={confirmReveal}
+          onClose={() => setConfirmReveal(false)}
+          icon="visibility"
+          title="Show photos unblurred?"
+          actions={
+            <>
+              <Button variant="text" onClick={() => setConfirmReveal(false)}>
+                Keep blurred
+              </Button>
+              <Button onClick={() => updateMe.mutate({ revealProofs: true }, { onSuccess: () => setConfirmReveal(false), onError: (e) => snack(errorMessage(e)) })}>
+                Show them
+              </Button>
+            </>
+          }
+        >
+          Proof photos will show as soon as a task opens, on this account everywhere. Anyone who can see your screen will see them too.
+        </Dialog>
       </Section>
 
       <Section title="Notifications">
