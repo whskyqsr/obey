@@ -461,6 +461,47 @@ describe("rescheduling", () => {
     expect(res.status).toBe(404);
   });
 
+  it("sorts out a plan's clashes task by task: a sub's call-off goes to the Dom, who can reschedule instead", async () => {
+    const { dom, sub, relId, subId } = await withTask("allowance", 1);
+    await dom.post(`/relationships/${relId}/tasks`, task(subId, { title: "Gym", dueTime: "18:00" }));
+    const [gym, lines] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    const res = await sub.post(`/relationships/${relId}/reschedules/plan`, {
+      items: [
+        { occurrenceId: gym.id, action: "cancel" },
+        { occurrenceId: lines.id, action: "move", dueAt: "2026-10-17T15:00:00Z" },
+      ],
+      reason: "At the wedding",
+    });
+    // The move uses the allowance and applies; calling a task off always waits for the Dom.
+    expect(res.body.applied).toBe(false);
+    expect(res.body.requests.map((r: { kind: string; status: string }) => [r.kind, r.status])).toEqual([
+      ["cancel", "requested"],
+      ["move", "applied"],
+    ]);
+    expect(res.body.occurrences[1].dueAt).toBe("2026-10-17T15:00:00.000Z");
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Sub asked about a task that clashes with a plan");
+    expect((await sub.post(`/relationships/${relId}/reschedules/plan`, { items: [{ occurrenceId: gym.id, action: "move" }] })).status).toBe(400);
+
+    // The Dom moves it instead of calling it off.
+    const [asked] = (await dom.get(`/relationships/${relId}/reschedules?status=requested`)).body;
+    const decided = await dom.post(`/reschedules/${asked.id}/decide`, { approve: true, dueAt: "2026-10-17T22:00:00Z" });
+    expect(decided.body.request).toMatchObject({ kind: "move", status: "approved", toDueAt: "2026-10-17T22:00:00.000Z" });
+    expect(decided.body.occurrence).toMatchObject({ status: "pending", dueAt: "2026-10-17T22:00:00.000Z" });
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Gym was rescheduled instead");
+  });
+
+  it("calls a task off when the Dom approves, and lets a Dom call one off directly", async () => {
+    const { dom, sub, relId, first } = await withTask("request");
+    await sub.post(`/relationships/${relId}/reschedules/plan`, { items: [{ occurrenceId: first.id, action: "cancel" }] });
+    const [asked] = (await dom.get(`/relationships/${relId}/reschedules?status=requested`)).body;
+    expect((await dom.post(`/reschedules/${asked.id}/decide`, { approve: true })).body.occurrence.status).toBe("excused");
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Your request to call off a task was approved");
+
+    const [next] = (await dom.get(`/relationships/${relId}/occurrences?from=2026-10-19&to=2026-10-19`)).body;
+    const direct = await dom.post(`/relationships/${relId}/reschedules/plan`, { items: [{ occurrenceId: next.id, action: "cancel" }] });
+    expect(direct.body).toMatchObject({ applied: true, occurrences: [{ status: "excused" }] });
+  });
+
   it("rejects deadlines in the past", async () => {
     const { dom, first } = await withTask("dominant_only");
     expect((await dom.post(`/occurrences/${first.id}/reschedule`, { dueAt: "2026-10-15T00:00:00Z" })).status).toBe(400);

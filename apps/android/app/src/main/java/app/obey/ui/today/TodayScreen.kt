@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import app.obey.ui.plans.PlanDialog
 import app.obey.ui.plans.PlanHeadsUp
 import app.obey.ui.plans.firstDay
+import app.obey.ui.plans.iso
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.MoreTime
@@ -88,6 +89,7 @@ fun TodayScreen(
     var sendingBack by remember { mutableStateOf<Occurrence?>(null) }
     var plan by remember { mutableStateOf<CalendarEvent?>(null) }
     var dayTasks by remember { mutableStateOf<List<Occurrence>?>(null) }
+    var instead by remember { mutableStateOf<app.obey.api.RescheduleRequest?>(null) }
     val session = vm.session
 
     Scaffold(
@@ -166,6 +168,7 @@ fun TodayScreen(
                                 requester = if (rows.first().requestedBy == me) null else session?.nameOf(rows.first().requestedBy),
                                 canDecide = isDom && rows.first().requestedBy != me,
                                 onDecide = { vm.decide(rows, it) },
+                                onInstead = { instead = it },
                             )
                         }
                     }
@@ -234,6 +237,14 @@ fun TodayScreen(
     }
 
     commenting?.let { o -> CommentsSheet(o, onDismiss = { commenting = null }, onChanged = vm::refresh) }
+    instead?.let { r ->
+        val from = parseInstant(if (r.kind == "cancel") r.fromDueAt else r.toDueAt).local()
+        DeadlinePicker(
+            initial = if (r.kind == "cancel") from.plusDays(1) else from,
+            onPicked = { vm.decideInstead(r, it.iso()); instead = null },
+            onDismiss = { instead = null },
+        )
+    }
     sendingBack?.let { o ->
         SendBackDialog(o, onDismiss = { sendingBack = null }, onConfirm = { vm.review(o, false, it); sendingBack = null })
     }

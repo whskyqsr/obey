@@ -422,6 +422,8 @@ data class RescheduleRequest(
     val title: String = "",
     val requestedBy: String,
     val scope: RescheduleScope,
+    /** "move", or "cancel" when asking to call the task off. */
+    val kind: String = "move",
     val fromDueAt: String,
     val toDueAt: String,
     val reason: String? = null,
@@ -435,6 +437,16 @@ data class RescheduleResult(
     val request: RescheduleRequest? = null,
     val occurrence: Occurrence,
 )
+
+/** One task a plan runs into, sorted out: moved to [dueAt], or called off ("cancel"). */
+@Serializable
+data class PlanRescheduleItem(val occurrenceId: String, val action: String, @EncodeDefault(EncodeDefault.Mode.NEVER) val dueAt: String? = null)
+
+@Serializable
+data class PlanRescheduleInput(val items: List<PlanRescheduleItem>, @EncodeDefault(EncodeDefault.Mode.NEVER) val reason: String? = null)
+
+@Serializable
+data class PlanRescheduleResult(val applied: Boolean, val groupId: String, val requests: List<RescheduleRequest>, val occurrences: List<Occurrence>)
 
 /** "More time for today": delay several occurrences together, decided as one request. */
 @Serializable
@@ -453,7 +465,13 @@ data class RescheduleDayResult(
 )
 
 @Serializable
-data class DecideInput(val approve: Boolean)
+data class DecideInput(
+    val approve: Boolean,
+    /** "Reschedule instead": this one task moves here, whatever was asked. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val dueAt: String? = null,
+    /** Decide only this task, not its whole group. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val item: Boolean? = null,
+)
 
 @Serializable
 enum class LedgerKind {

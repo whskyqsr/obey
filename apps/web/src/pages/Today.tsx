@@ -8,8 +8,8 @@ import { DayRescheduleSheet } from "../components/DayRescheduleSheet";
 import { isOverdue } from "../components/OccurrenceCard";
 import { ExcuseAction, ReviewActions, RowGroup, RowLink, TaskRow } from "../components/TaskRow";
 import { KitPrompt } from "./Kits";
-import { Button, Empty, ErrorBox, Fab, Icon, Loading, PageHeader, Section, useSnackbar } from "../components/ui";
-import { addDays, fmtDate, fmtDateTime, fmtRelative, localDateOf, today } from "../lib/dates";
+import { Button, Dialog, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, Section, TextField, useSnackbar } from "../components/ui";
+import { addDays, fmtDate, fmtDateTime, fmtRelative, fromLocalInput, localDateOf, toLocalInput, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 import { WIDE, useMediaQuery } from "../lib/useMediaQuery";
 import { useNeedsYou, useTodayOccurrences } from "../lib/today";
@@ -324,6 +324,9 @@ function PendingRequests({ bare }: { bare?: boolean }) {
   if (!cards.length) return null;
   const mine = (r: RescheduleRequest) => r.requestedBy === me.user.id;
 
+  const [instead, setInstead] = useState<RescheduleRequest | null>(null);
+  const [insteadAt, setInsteadAt] = useState("");
+
   function act(r: RescheduleRequest, approve: boolean, n: number) {
     decide.mutate(
       { id: r.id, approve },
@@ -333,6 +336,19 @@ function PendingRequests({ bare }: { bare?: boolean }) {
       },
     );
   }
+  /** "Reschedule instead": the Dom picks the new deadline for this one task, whatever was asked. */
+  function openInstead(r: RescheduleRequest) {
+    setInsteadAt(toLocalInput(new Date(new Date(r.kind === "cancel" ? r.fromDueAt : r.toDueAt).getTime() + (r.kind === "cancel" ? 86_400_000 : 0)).toISOString()));
+    setInstead(r);
+  }
+  function moveInstead() {
+    if (!instead || !insteadAt) return;
+    decide.mutate(
+      { id: instead.id, approve: true, dueAt: fromLocalInput(insteadAt), item: true },
+      { onSuccess: () => (snack(`Moved “${instead.title}”`), setInstead(null)), onError: (e) => snack(errorMessage(e)) },
+    );
+  }
+  const change = (x: RescheduleRequest) => (x.kind === "cancel" ? "Call off" : `${fmtDateTime(x.fromDueAt)} → ${fmtDateTime(x.toDueAt)}`);
 
   const body = (
     <div className="flex flex-col gap-2">
@@ -340,13 +356,22 @@ function PendingRequests({ bare }: { bare?: boolean }) {
         const r = rows[0]!;
         const who = mine(r) ? "You asked" : `${memberName(r.requestedBy)} asks`;
         const single = rows.length === 1;
+        const canDecide = isDom && !mine(r);
         return (
           <div key={r.groupId ?? r.id} className="flex flex-col gap-3 rounded-md bg-tertiary-container p-4 text-on-tertiary-container">
             <div>
               <div className="text-title-medium">
-                {single ? (
+                {single && r.kind === "cancel" ? (
+                  <>
+                    {who} to call off “{r.title}”
+                  </>
+                ) : single ? (
                   <>
                     {who} for more time on “{r.title}”{r.scope === "following" ? " (this and following)" : ""}
+                  </>
+                ) : rows.some((x) => x.kind === "cancel") ? (
+                  <>
+                    {who} about {rows.length} tasks
                   </>
                 ) : (
                   <>
@@ -355,16 +380,15 @@ function PendingRequests({ bare }: { bare?: boolean }) {
                 )}
               </div>
               {single ? (
-                <div className="text-body-medium">
-                  {fmtDateTime(r.fromDueAt)} → {fmtDateTime(r.toDueAt)}
-                </div>
+                <div className="text-body-medium">{r.kind === "cancel" ? `Due ${fmtDateTime(r.fromDueAt)}` : change(r)}</div>
               ) : (
                 <ul className="mt-2 flex flex-col gap-1">
                   {rows.map((x) => (
-                    <li key={x.id} className="flex flex-wrap justify-between gap-x-3 text-body-medium">
+                    <li key={x.id} className="flex flex-wrap items-center justify-between gap-x-3 text-body-medium">
                       <span className="font-medium">{x.title}</span>
-                      <span>
-                        {fmtDateTime(x.fromDueAt)} → {fmtDateTime(x.toDueAt)}
+                      <span className="flex items-center gap-1">
+                        {change(x)}
+                        {canDecide && <IconButton icon="edit_calendar" label={`Pick a time for ${x.title}`} onClick={() => openInstead(x)} />}
                       </span>
                     </li>
                   ))}
@@ -372,11 +396,16 @@ function PendingRequests({ bare }: { bare?: boolean }) {
               )}
               {r.reason && <div className="mt-2 text-body-medium italic">“{r.reason}”</div>}
             </div>
-            {isDom && !mine(r) && (
-              <div className="flex gap-2">
+            {canDecide && (
+              <div className="flex flex-wrap gap-2">
                 <Button icon="check" disabled={decide.isPending} onClick={() => act(r, true, rows.length)}>
                   {single ? "Approve" : "Approve all"}
                 </Button>
+                {single && (
+                  <Button variant="tonal" icon="edit_calendar" disabled={decide.isPending} onClick={() => openInstead(r)}>
+                    {r.kind === "cancel" ? "Reschedule instead" : "Other time"}
+                  </Button>
+                )}
                 <Button variant="text" className="text-on-tertiary-container" disabled={decide.isPending} onClick={() => act(r, false, rows.length)}>
                   Decline
                 </Button>
@@ -387,7 +416,34 @@ function PendingRequests({ bare }: { bare?: boolean }) {
       })}
     </div>
   );
-  return bare ? body : <Section title={isDom ? "Extension requests" : "Waiting for approval"}>{body}</Section>;
+  const dialog = (
+    <Dialog
+      open={instead !== null}
+      onClose={() => setInstead(null)}
+      title={instead?.kind === "cancel" ? "Reschedule instead" : "Pick another time"}
+      actions={
+        <>
+          <Button variant="text" onClick={() => setInstead(null)}>
+            Cancel
+          </Button>
+          <Button busy={decide.isPending} disabled={!insteadAt} onClick={moveInstead}>
+            Move it
+          </Button>
+        </>
+      }
+    >
+      <p className="mb-3">
+        “{instead?.title}” moves to this deadline{instead?.kind === "cancel" ? " instead of being called off" : ""}. The rest of the request stays for you to decide.
+      </p>
+      <TextField type="datetime-local" label="New deadline" value={insteadAt} onChange={(e) => setInsteadAt(e.target.value)} />
+    </Dialog>
+  );
+  return (
+    <>
+      {bare ? body : <Section title={isDom ? "Extension requests" : "Waiting for approval"}>{body}</Section>}
+      {dialog}
+    </>
+  );
 }
 
 /** A heads-up for plans today or tomorrow that run into tasks, so they get moved before they're missed. */

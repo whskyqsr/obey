@@ -171,3 +171,35 @@ fun RescheduleSheet(
         )
     }
 }
+
+/** Pick a new deadline: a date, then a time. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DeadlinePicker(initial: ZonedDateTime, onPicked: (ZonedDateTime) -> Unit, onDismiss: () -> Unit) {
+    var date by remember { mutableStateOf<LocalDate?>(null) }
+    val picked = date
+    if (picked == null) {
+        val dateState = rememberDatePickerState(initialSelectedDateMillis = initial.toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+        DatePickerDialog(
+            onDismissRequest = onDismiss,
+            confirmButton = {
+                TextButton(onClick = {
+                    // DatePicker reports midnight UTC of the chosen day.
+                    dateState.selectedDateMillis?.let { date = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate() }
+                }) { Text("Next") }
+            },
+            dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        ) { DatePicker(state = dateState) }
+    } else {
+        val timeState = rememberTimePickerState(initialHour = initial.hour, initialMinute = initial.minute)
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("New time") },
+            text = { TimePicker(state = timeState) },
+            confirmButton = {
+                Button(onClick = { onPicked(ZonedDateTime.of(picked, LocalTime.of(timeState.hour, timeState.minute), ZoneId.systemDefault())) }) { Text("Set deadline") }
+            },
+            dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        )
+    }
+}

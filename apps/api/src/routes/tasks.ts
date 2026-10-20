@@ -5,8 +5,10 @@ import {
   type TaskStats,
   assignConsequence,
   completeOccurrence as completeBody,
+  decideRescheduleInput,
   editOccurrence as editBody,
   plainDate,
+  planRescheduleInput,
   rescheduleDayInput,
   rescheduleInput,
   reviewOccurrence as reviewBody,
@@ -26,6 +28,7 @@ import {
   editOccurrence,
   issueConsequence,
   requestGroupReschedule,
+  requestPlanReschedule,
   materializeRelationship,
   materializeSeries,
   requestReschedule,
@@ -411,6 +414,41 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     };
   });
 
+  // Sorting out the tasks a plan runs into: each moved or called off.
+  app.post<{ Params: { id: string } }>("/relationships/:id/reschedules/plan", async (req) => {
+    const body = planRescheduleInput.parse(req.body);
+    const m = await requireMember(db, req.params.id, req.user.id);
+    const [rel] = await db.select().from(relationships).where(eq(relationships.id, req.params.id));
+    const ids = body.items.map((i) => i.occurrenceId);
+    if (new Set(ids).size !== ids.length) throw new HttpError(400, "each task once");
+    const rows = await db
+      .select({ occ: occurrences, series: taskSeries })
+      .from(occurrences)
+      .innerJoin(taskSeries, eq(occurrences.seriesId, taskSeries.id))
+      .where(and(inArray(occurrences.id, ids), eq(taskSeries.relationshipId, req.params.id)));
+    if (rows.length !== ids.length) throw notFound("some tasks were not found");
+    const byId = new Map(rows.map((r) => [r.occ.id, r]));
+    const items = body.items.map((i) => ({ ...byId.get(i.occurrenceId)!, action: i.action, dueAt: i.dueAt ? new Date(i.dueAt) : undefined }));
+    const result = await db.transaction((tx) => requestPlanReschedule(tx, rel!, items, { userId: req.user.id, role: m.role }, body.reason, deps.now(), deps.materializeDays));
+    const titles = new Map(rows.map((r) => [r.occ.id, r.series.title]));
+    const series = new Map(rows.map((r) => [r.series.id, r.series]));
+    if (result.asked) {
+      await notifier.send(await managers(db, rel!.id, req.user.id), {
+        title: "Obey",
+        body: `${req.user.displayName} asked about ${result.asked === 1 ? "a task that clashes" : `${result.asked} tasks that clash`} with a plan`,
+        data: { type: "reschedule_requested", groupId: result.groupId },
+      });
+    }
+    const changedFor = [...new Set(items.filter((it, i) => result.requests[i]!.status === "applied" && it.series.assigneeId !== req.user.id).map((it) => it.series.assigneeId))];
+    if (changedFor.length) await notifier.send(changedFor, { title: "Obey", body: "Some of your tasks changed around a plan", data: { type: "rescheduled" } });
+    return {
+      applied: result.asked === 0,
+      groupId: result.groupId,
+      requests: result.requests.map((r) => rescheduleDto(r, titles.get(r.occurrenceId)!)),
+      occurrences: result.occurrences.map((o) => occurrenceDto(o, series.get(o.seriesId)!)),
+    };
+  });
+
   app.get<{ Params: { id: string }; Querystring: { status?: string } }>("/relationships/:id/reschedules", async (req) => {
     await requireMember(db, req.params.id, req.user.id);
     const status = z.enum(["requested", "approved", "declined", "applied"]).optional().parse(req.query.status);
@@ -425,16 +463,19 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   });
 
   app.post<{ Params: { id: string } }>("/reschedules/:id/decide", async (req) => {
-    const { approve } = z.object({ approve: z.boolean() }).parse(req.body);
+    const { approve, dueAt, item } = decideRescheduleInput.parse(req.body);
     const [request] = await db.select().from(reschedules).where(eq(reschedules.id, req.params.id));
     if (!request) throw notFound();
     const m = await requireMember(db, request.relationshipId, req.user.id);
     if (!canManage(m.role) || request.requestedBy === req.user.id) throw forbidden("only a Dominant can decide this");
-    const results = await db.transaction((tx) => decideReschedule(tx, request, req.user.id, approve, deps.now(), deps.materializeDays));
+    const results = await db.transaction((tx) =>
+      decideReschedule(tx, request, req.user.id, approve, deps.now(), deps.materializeDays, { dueAt: dueAt ? new Date(dueAt) : undefined, item }),
+    );
     const n = results.length;
+    const what = request.kind === "cancel" && n === 1 ? "request to call off a task" : `extension${n > 1 ? ` for ${n} tasks` : ""}`;
     await notifier.send([request.requestedBy], {
       title: "Obey",
-      body: `Your extension${n > 1 ? ` for ${n} tasks` : ""} was ${approve ? "approved" : "declined"}`,
+      body: dueAt && approve ? `${results[0]!.series.title} was rescheduled instead` : `Your ${what} was ${approve ? "approved" : "declined"}`,
       data: { type: "reschedule_decided", requestId: request.id },
     });
     const dtos = results.map((x) => ({ request: rescheduleDto(x.request, x.series.title), occurrence: occurrenceDto(x.occurrence, x.series) }));

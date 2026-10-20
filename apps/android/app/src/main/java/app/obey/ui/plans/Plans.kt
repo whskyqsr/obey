@@ -16,14 +16,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.EventBusy
-import androidx.compose.material.icons.outlined.MoreTime
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -59,15 +57,20 @@ import app.obey.api.CalendarEventInput
 import app.obey.api.ObeyApi
 import app.obey.api.Occurrence
 import app.obey.api.OccurrenceStatus
-import app.obey.api.RescheduleInput
+import app.obey.api.PlanRescheduleInput
+import app.obey.api.PlanRescheduleItem
+import app.obey.api.ReschedulePolicy
+import app.obey.api.RescheduleStatus
 import app.obey.data.Session
 import app.obey.data.SessionRepository
 import app.obey.ui.common.BaseViewModel
 import app.obey.ui.common.formatDate
+import app.obey.ui.common.formatDateTime
 import app.obey.ui.common.formatTime
 import app.obey.ui.common.local
 import app.obey.ui.common.parseInstant
-import app.obey.ui.today.RescheduleSheet
+import app.obey.ui.today.DeadlinePicker
+import androidx.compose.runtime.mutableStateMapOf
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Duration
 import java.time.Instant
@@ -159,11 +162,19 @@ class PlanViewModel @Inject constructor(
         onDone()
     }
 
-    fun reschedule(o: Occurrence, input: RescheduleInput, onDone: () -> Unit) = action {
-        val r = api.reschedule(o.id, input)
-        say(if (r.applied) "Rescheduled" else "Extension requested; waiting for approval")
-        // Moved, or asked to be: either way it's dealt with here.
-        _clashes.value = _clashes.value.filter { it.id != o.id }
+    /** Each clashing task its own way: moved or called off, in one go. */
+    fun sortOut(items: List<PlanRescheduleItem>, reason: String?, onDone: () -> Unit) = action {
+        val r = api.reschedulePlan(sessions.requireRelationshipId(), PlanRescheduleInput(items, reason?.takeIf { it.isNotBlank() }))
+        say(
+            when {
+                r.applied -> "Done"
+                r.requests.any { it.status == RescheduleStatus.Applied } -> "Moved what you could; the rest is waiting for approval"
+                else -> "Sent for approval"
+            },
+        )
+        // Moved, or asked about: either way it's dealt with here.
+        val sent = items.map { it.occurrenceId }.toSet()
+        _clashes.value = _clashes.value.filter { it.id !in sent }
         onDone()
     }
 }
@@ -462,13 +473,31 @@ private fun WhenRow(label: String, date: String, time: String?, onDate: () -> Un
     }
 }
 
-/** The tasks a plan runs into, each with the reschedule its viewer is allowed. */
+private enum class ClashChoice { Keep, Move, Cancel }
+
+/**
+ * The tasks a plan runs into, each sorted out its own way: kept, moved (after the plan unless changed), or called off.
+ * A Dominant's choices apply at once; a sub's go out as one request.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun Clashes(vm: PlanViewModel, e: CalendarEvent, onChanged: () -> Unit) {
     val items by vm.clashes.collectAsStateWithLifecycle()
     val session = vm.session ?: return
-    var moving by remember { mutableStateOf<Occurrence?>(null) }
+    val choices = remember { mutableStateMapOf<String, ClashChoice>() }
+    val times = remember { mutableStateMapOf<String, ZonedDateTime>() }
+    var reason by remember { mutableStateOf("") }
+    var picking by remember { mutableStateOf<Occurrence?>(null) }
     if (items.isEmpty()) return
+    val isDom = session.canManage
+    val policy = session.relationship?.reschedulePolicy
+    val subBlocked = !isDom && policy == ReschedulePolicy.DominantOnly
+    fun canAct(o: Occurrence) = !subBlocked && (isDom || o.assigneeId == session.userId)
+    fun choiceOf(o: Occurrence) = choices[o.id] ?: ClashChoice.Keep
+    fun timeOf(o: Occurrence) = times[o.id] ?: afterPlan(o.dueAt, e)
+    val picked = items.filter { canAct(it) && choiceOf(it) != ClashChoice.Keep }
+    val asks = !isDom && picked.any { choiceOf(it) == ClashChoice.Cancel || policy != ReschedulePolicy.Allowance }
+
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.WarningAmber, null, tint = MaterialTheme.colorScheme.error)
@@ -482,8 +511,8 @@ private fun Clashes(vm: PlanViewModel, e: CalendarEvent, onChanged: () -> Unit) 
         items.forEach { o ->
             val mine = o.assigneeId == session.userId
             Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(12.dp)) {
-                Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
+                Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column {
                         Text(o.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
                             "Due ${formatTime(o.dueAt)}" + if (mine) "" else " · ${session.nameOf(o.assigneeId)}",
@@ -491,18 +520,37 @@ private fun Clashes(vm: PlanViewModel, e: CalendarEvent, onChanged: () -> Unit) 
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    if (mine || session.canManage) {
-                        FilledTonalButton(onClick = { moving = o }) {
-                            Icon(Icons.Outlined.MoreTime, null, Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text(if (mine && !session.canManage) "More time" else "Move")
+                    if (canAct(o)) {
+                        val labels = listOf(ClashChoice.Keep to "Keep", ClashChoice.Move to "Move", ClashChoice.Cancel to if (isDom) "Call off" else "Ask off")
+                        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                            labels.forEachIndexed { i, (c, label) ->
+                                SegmentedButton(selected = choiceOf(o) == c, onClick = { choices[o.id] = c }, shape = SegmentedButtonDefaults.itemShape(i, labels.size)) { Text(label, maxLines = 1) }
+                            }
+                        }
+                        if (choiceOf(o) == ClashChoice.Move) {
+                            OutlinedButton(onClick = { picking = o }, modifier = Modifier.fillMaxWidth()) {
+                                Text("New deadline: ${formatDateTime(timeOf(o).iso())}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
                         }
                     }
                 }
             }
         }
+        if (subBlocked) Text("Only your Dominant can move or call off tasks in this dynamic.", style = MaterialTheme.typography.bodySmall)
+        if (picked.isNotEmpty()) {
+            if (asks) OutlinedTextField(reason, { reason = it.take(1000) }, label = { Text("Reason (optional)") }, modifier = Modifier.fillMaxWidth())
+            Button(
+                onClick = {
+                    val sent = picked.map { o ->
+                        if (choiceOf(o) == ClashChoice.Cancel) PlanRescheduleItem(o.id, "cancel") else PlanRescheduleItem(o.id, "move", timeOf(o).iso())
+                    }
+                    vm.sortOut(sent, reason) { choices.clear(); reason = ""; onChanged() }
+                },
+                modifier = Modifier.align(Alignment.End),
+            ) { Text("${if (asks) "Ask" else if (isDom) "Apply" else "Move"} (${picked.size})") }
+        }
     }
-    moving?.let { o ->
-        RescheduleSheet(o, onDismiss = { moving = null }, onSubmit = { vm.reschedule(o, it, onChanged) }, after = e)
+    picking?.let { o ->
+        DeadlinePicker(timeOf(o), onPicked = { times[o.id] = it; picking = null }, onDismiss = { picking = null })
     }
 }

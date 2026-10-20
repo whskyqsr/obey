@@ -142,8 +142,8 @@ export function WeekGrid({
 
   return (
     <div className="mx-6 overflow-hidden rounded-lg bg-surface-container-low">
-      {/* Day headings */}
-      <div className="grid grid-cols-[64px_repeat(7,1fr)] border-b border-outline-variant">
+      {/* Day headings; every row keeps room for the hours' scrollbar, so the columns line up. */}
+      <div className="grid grid-cols-[64px_repeat(7,1fr)] overflow-y-hidden border-b border-outline-variant [scrollbar-gutter:stable]">
         <div />
         {days.map((d) => (
           <div key={d} className="flex items-baseline gap-2 px-2 py-2">
@@ -157,7 +157,7 @@ export function WeekGrid({
 
       {/* All-day strip */}
       {stripHeight > 0 && (
-        <div className="grid grid-cols-[64px_repeat(7,1fr)] border-b border-outline-variant py-1">
+        <div className="grid grid-cols-[64px_repeat(7,1fr)] overflow-y-hidden border-b border-outline-variant py-1 [scrollbar-gutter:stable]">
           <div className="px-2 pt-1 text-right text-label-small text-on-surface-variant">All day</div>
           <div className="col-span-7 grid grid-cols-7 gap-y-1" style={{ gridTemplateRows: `repeat(${stripHeight}, 26px)` }}>
             {strip.map((bar) =>
@@ -191,7 +191,7 @@ export function WeekGrid({
       )}
 
       {/* Hours */}
-      <div ref={scroller} className="max-h-[calc(100dvh-290px)] min-h-96 overflow-y-auto">
+      <div ref={scroller} className="max-h-[calc(100dvh-290px)] min-h-96 overflow-y-auto [scrollbar-gutter:stable]">
         <div className="relative grid grid-cols-[64px_repeat(7,1fr)]" style={{ height: 24 * HOUR }}>
           <div className="relative">
             {Array.from({ length: 23 }, (_, h) => (
@@ -324,7 +324,11 @@ export function MonthWeeks({
               const tasks = occurrences.filter((o) => localDateOf(new Date(o.dueAt)) === d);
               const shown = 3;
               return (
-                <span key={`l-${d}`} style={{ gridColumn: i + 1, gridRow: rows + 2 }} className="pointer-events-none relative z-10 flex min-w-0 flex-col gap-0.5 px-1.5 pt-0.5 pb-1.5">
+                <span
+                  key={`l-${d}`}
+                  style={{ gridColumn: i + 1, gridRow: rows + 2 }}
+                  className="pointer-events-none relative z-10 flex min-w-0 flex-col gap-0.5 px-1.5 pt-0.5 pb-1.5"
+                >
                   {timed.slice(0, shown).map((e) => (
                     <span key={e.id} className="truncate rounded-xs bg-tertiary-container/60 px-1 text-label-small text-on-tertiary-container">
                       {fmtTime(e.startsAt)} {e.title}

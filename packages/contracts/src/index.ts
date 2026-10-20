@@ -295,6 +295,30 @@ export const rescheduleDayInput = z.object({
 });
 export type RescheduleDayInput = z.input<typeof rescheduleDayInput>;
 
+/**
+ * Sorting out the tasks a plan runs into, each its own way: moved to a new deadline or called off. Moves follow the
+ * dynamic's reschedule policy; calling a task off always needs a Dominant, unless one is asking.
+ */
+export const planRescheduleInput = z.object({
+  items: z
+    .array(
+      z
+        .object({ occurrenceId: id, action: z.enum(["move", "cancel"]), dueAt: z.string().datetime({ offset: true }).optional() })
+        .refine((i) => i.action === "cancel" || i.dueAt, { message: "a move needs a new deadline" }),
+    )
+    .min(1)
+    .max(50),
+  reason: z.string().max(1_000).optional(),
+});
+export type PlanRescheduleInput = z.input<typeof planRescheduleInput>;
+
+/** A Dominant's answer: approve or decline (the whole group unless `item`), or move this one task to `dueAt` instead. */
+export const decideRescheduleInput = z.object({
+  approve: z.boolean(),
+  dueAt: z.string().datetime({ offset: true }).optional(),
+  item: z.boolean().optional(),
+});
+
 export const rescheduleRequest = z.object({
   id,
   groupId: id.nullable(),
@@ -302,6 +326,8 @@ export const rescheduleRequest = z.object({
   title: z.string(),
   requestedBy: id,
   scope: z.enum(["this", "following"]),
+  /** `cancel` asks to call the occurrence off; approving it excuses the task. */
+  kind: z.enum(["move", "cancel"]),
   fromDueAt: z.string(),
   toDueAt: z.string(),
   reason: z.string().nullable(),

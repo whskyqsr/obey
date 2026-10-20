@@ -259,6 +259,8 @@ export const reschedules = pgTable("reschedules", {
     .references(() => users.id),
   decidedBy: uuid("decided_by").references(() => users.id),
   scope: text("scope", { enum: ["this", "following"] }).notNull(),
+  /** `cancel` asks to call this occurrence off (it becomes excused); its toDueAt is just fromDueAt. */
+  kind: text("kind", { enum: ["move", "cancel"] }).notNull().default("move"),
   fromDueAt: ts("from_due_at").notNull(),
   toDueAt: ts("to_due_at").notNull(),
   reason: text("reason"),

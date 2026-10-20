@@ -57,6 +57,7 @@ export const rescheduleDto = (r: typeof reschedules.$inferSelect, title: string)
   title,
   requestedBy: r.requestedBy,
   scope: r.scope,
+  kind: r.kind,
   fromDueAt: iso(r.fromDueAt),
   toDueAt: iso(r.toDueAt),
   reason: r.reason,

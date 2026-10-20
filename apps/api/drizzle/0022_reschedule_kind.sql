@@ -1,0 +1,1 @@
+ALTER TABLE "reschedules" ADD COLUMN "kind" text DEFAULT 'move' NOT NULL;

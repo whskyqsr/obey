@@ -9,6 +9,11 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.EditCalendar
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -103,6 +108,7 @@ fun DayRescheduleSheet(
 }
 
 /** One pending extension request. A whole-day request lists every task it covers. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun ExtensionRequestCard(
     rows: List<RescheduleRequest>,
@@ -110,7 +116,10 @@ fun ExtensionRequestCard(
     requester: String?,
     canDecide: Boolean,
     onDecide: (approve: Boolean) -> Unit,
+    /** "Reschedule instead": the Dominant picks a new deadline for one task. */
+    onInstead: (RescheduleRequest) -> Unit = {},
 ) {
+    fun change(x: RescheduleRequest) = if (x.kind == "cancel") "Call off" else "${formatDateTime(x.fromDueAt)} → ${formatDateTime(x.toDueAt)}"
     val r = rows.first()
     val who = requester?.let { "$it asks" } ?: "You asked"
     Card(
@@ -122,23 +131,31 @@ fun ExtensionRequestCard(
         ),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (rows.size == 1) {
+            if (rows.size == 1 && r.kind == "cancel") {
+                Text("$who to call off “${r.title}”", style = MaterialTheme.typography.titleMedium)
+                Text("Due ${formatDateTime(r.fromDueAt)}", style = MaterialTheme.typography.bodyMedium)
+            } else if (rows.size == 1) {
                 val following = if (r.scope == RescheduleScope.Following) " (this and following)" else ""
                 Text("$who for more time on “${r.title}”$following", style = MaterialTheme.typography.titleMedium)
-                Text("${formatDateTime(r.fromDueAt)} → ${formatDateTime(r.toDueAt)}", style = MaterialTheme.typography.bodyMedium)
+                Text(change(r), style = MaterialTheme.typography.bodyMedium)
             } else {
-                Text("$who for more time on ${rows.size} tasks today", style = MaterialTheme.typography.titleMedium)
+                val title = if (rows.any { it.kind == "cancel" }) "$who about ${rows.size} tasks" else "$who for more time on ${rows.size} tasks today"
+                Text(title, style = MaterialTheme.typography.titleMedium)
                 rows.forEach { x ->
-                    Column {
-                        Text(x.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                        Text("${formatDateTime(x.fromDueAt)} → ${formatDateTime(x.toDueAt)}", style = MaterialTheme.typography.bodySmall)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(x.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                            Text(change(x), style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (canDecide) IconButton(onClick = { onInstead(x) }) { Icon(Icons.Outlined.EditCalendar, "Pick a time for ${x.title}") }
                     }
                 }
             }
             r.reason?.let { Text("“$it”", style = MaterialTheme.typography.bodyMedium) }
             if (canDecide) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { onDecide(true) }) { Text(if (rows.size == 1) "Approve" else "Approve all") }
+                    if (rows.size == 1) FilledTonalButton(onClick = { onInstead(r) }) { Text(if (r.kind == "cancel") "Reschedule instead" else "Other time") }
                     TextButton(onClick = { onDecide(false) }) { Text("Decline") }
                 }
             }

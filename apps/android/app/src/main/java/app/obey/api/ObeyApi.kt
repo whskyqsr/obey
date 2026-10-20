@@ -175,6 +175,9 @@ interface ObeyApi {
         @Query("status") status: String = "requested",
     ): List<RescheduleRequest>
 
+    @POST("relationships/{id}/reschedules/plan")
+    suspend fun reschedulePlan(@Path("id") relationshipId: String, @Body body: PlanRescheduleInput): PlanRescheduleResult
+
     @POST("reschedules/{id}/decide")
     suspend fun decideReschedule(@Path("id") requestId: String, @Body body: DecideInput)
 

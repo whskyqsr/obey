@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import type { CalendarEvent, Occurrence } from "../api/types";
-import { useDeleteEvent, useOccurrences, useSaveEvent } from "../api/hooks";
+import { useDeleteEvent, useOccurrences, usePlanReschedule, useSaveEvent } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { addDays, fmtDate, fmtTime, fromLocalInput, localDateOf, toLocalInput, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
-import { RescheduleSheet } from "./RescheduleSheet";
+import { afterEvent } from "./RescheduleSheet";
 import { Button, Dialog, Icon, SegmentedButtons, Switch, TextArea, TextField, useSnackbar } from "./ui";
 
 /** "Sat, Oct 18, 7:00 – 11:00 PM", or the dates for an all-day plan (its end is the next midnight, so show the day before). */
@@ -225,16 +225,49 @@ export function EventDialog({ event, day, open, onClose }: { event: CalendarEven
   );
 }
 
-/** The tasks a plan runs into, each with the reschedule its viewer is allowed. */
+type ClashChoice = "keep" | "move" | "cancel";
+
+/**
+ * The tasks a plan runs into, each sorted out its own way: kept, moved to after the plan, or called off. A Dominant's
+ * choices apply at once; a sub's go out as one request (moves may apply straight away, depending on the dynamic's rules).
+ */
 function Clashes({ event }: { event: CalendarEvent }) {
   const { rel, me, isDom, memberName } = useRel();
+  const snack = useSnackbar();
   const from = localDateOf(new Date(event.startsAt));
   const to = localDateOf(new Date(event.endsAt));
   const occ = useOccurrences(rel.id, from, to);
-  const [moving, setMoving] = useState<Occurrence | null>(null);
+  const plan = usePlanReschedule(rel.id);
+  const [choices, setChoices] = useState<Record<string, ClashChoice>>({});
+  const [times, setTimes] = useState<Record<string, string>>({});
+  const [reason, setReason] = useState("");
   if (!event.conflictIds.length) return null;
   const items = (occ.data ?? []).filter((o) => event.conflictIds.includes(o.id) && o.status === "pending");
   if (!items.length && !occ.isLoading) return null;
+  const subBlocked = !isDom && rel.reschedulePolicy === "dominant_only";
+  const canAct = (o: Occurrence) => !subBlocked && (isDom || o.assigneeId === me.user.id);
+  const choiceOf = (o: Occurrence): ClashChoice => choices[o.id] ?? "keep";
+  const timeOf = (o: Occurrence) => times[o.id] ?? toLocalInput(afterEvent(o.dueAt, event));
+  const picked = items.filter((o) => canAct(o) && choiceOf(o) !== "keep");
+  const asks = !isDom && picked.some((o) => choiceOf(o) === "cancel" || rel.reschedulePolicy !== "allowance");
+
+  function submit() {
+    plan.mutate(
+      {
+        items: picked.map((o) => (choiceOf(o) === "cancel" ? { occurrenceId: o.id, action: "cancel" } : { occurrenceId: o.id, action: "move", dueAt: fromLocalInput(timeOf(o)) })),
+        ...(reason.trim() && { reason: reason.trim() }),
+      },
+      {
+        onSuccess: (r) => {
+          setChoices({});
+          setReason("");
+          snack(r.applied ? "Done" : r.requests.some((x) => x.status === "applied") ? "Moved what you could; the rest is waiting for approval" : "Sent for approval");
+        },
+        onError: (e) => snack(errorMessage(e)),
+      },
+    );
+  }
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2 text-title-small text-error">
@@ -243,24 +276,41 @@ function Clashes({ event }: { event: CalendarEvent }) {
       </div>
       {items.map((o) => {
         const mine = o.assigneeId === me.user.id;
+        const choice = choiceOf(o);
         return (
-          <div key={o.id} className="flex items-center gap-3 rounded-md bg-surface-container px-3 py-2">
-            <div className="min-w-0 flex-1">
+          <div key={o.id} className="flex flex-col gap-2 rounded-md bg-surface-container px-3 py-2">
+            <div className="min-w-0">
               <div className="truncate text-body-large text-on-surface">{o.title}</div>
               <div className="text-body-small">
                 Due {fmtTime(o.dueAt)}
                 {!mine && ` · ${memberName(o.assigneeId)}`}
               </div>
             </div>
-            {(mine || isDom) && (
-              <Button variant="tonal" icon="more_time" onClick={() => setMoving(o)}>
-                {mine && !isDom ? "More time" : "Reschedule"}
-              </Button>
+            {canAct(o) && (
+              <SegmentedButtons<ClashChoice>
+                value={choice}
+                onChange={(v) => setChoices((c) => ({ ...c, [o.id]: v }))}
+                className="w-full"
+                options={[
+                  { value: "keep", label: "Keep" },
+                  { value: "move", label: "Move" },
+                  { value: "cancel", label: isDom ? "Call off" : "Ask off" },
+                ]}
+              />
             )}
+            {choice === "move" && <TextField type="datetime-local" label="New deadline" value={timeOf(o)} onChange={(e) => setTimes((t) => ({ ...t, [o.id]: e.target.value }))} />}
           </div>
         );
       })}
-      {moving && <RescheduleSheet occurrence={moving} open onClose={() => setMoving(null)} after={event} />}
+      {subBlocked && <p className="px-1 text-body-small">Only your Dominant can move or call off tasks in this dynamic.</p>}
+      {picked.length > 0 && (
+        <>
+          {asks && <TextField label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} />}
+          <Button icon={asks ? "send" : "check"} busy={plan.isPending} onClick={submit} className="self-end">
+            {asks ? "Ask" : isDom ? "Apply" : "Move"} ({picked.length})
+          </Button>
+        </>
+      )}
     </div>
   );
 }

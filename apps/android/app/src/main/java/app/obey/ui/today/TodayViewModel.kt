@@ -153,6 +153,13 @@ class TodayViewModel @Inject constructor(
         refresh()
     }
 
+    /** "Reschedule instead": move just this task to [dueAt], whatever was asked. */
+    fun decideInstead(r: RescheduleRequest, dueAt: String) = action {
+        api.decideReschedule(r.id, DecideInput(approve = true, dueAt = dueAt, item = true))
+        say("Moved “${r.title}”")
+        refresh()
+    }
+
     /** Deciding any row of a whole-day request decides all of it. */
     fun decide(rows: List<RescheduleRequest>, approve: Boolean) = action {
         api.decideReschedule(rows.first().id, DecideInput(approve))

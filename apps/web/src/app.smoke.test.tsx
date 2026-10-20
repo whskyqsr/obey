@@ -39,7 +39,7 @@ const routes: Record<string, unknown> = {
     { id: "o2", seriesId: "s1", title: "Stretch", assigneeId: SUB, points: 3, originalDate: "2026-01-01", dueAt: iso(-30), rescheduled: false, status: "submitted", completedAt: iso(-29), noteMd: "done!" },
   ],
   [`/relationships/${REL}/reschedules`]: [
-    { id: "r1", groupId: null, occurrenceId: "o1", title: "Write lines", requestedBy: SUB, scope: "this", fromDueAt: iso(2), toDueAt: iso(26), reason: "Late shift", status: "requested", createdAt: iso(-1) },
+    { id: "r1", groupId: null, occurrenceId: "o1", title: "Write lines", requestedBy: SUB, scope: "this", kind: "move", fromDueAt: iso(2), toDueAt: iso(26), reason: "Late shift", status: "requested", createdAt: iso(-1) },
   ],
   [`/relationships/${REL}/tasks`]: [
     {

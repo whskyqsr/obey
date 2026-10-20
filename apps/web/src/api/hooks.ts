@@ -372,6 +372,21 @@ export function useRescheduleDay(rel: string) {
   });
 }
 
+export type PlanRescheduleItem = { occurrenceId: string; action: "move" | "cancel"; dueAt?: string };
+
+/** Sorting out the tasks a plan runs into: each moved or called off, in one go. */
+export function usePlanReschedule(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (input: { items: PlanRescheduleItem[]; reason?: string }) =>
+      api<{ applied: boolean; groupId: string; requests: RescheduleRequest[]; occurrences: Occurrence[] }>(`/relationships/${rel}/reschedules/plan`, {
+        method: "POST",
+        body: input,
+      }),
+    onSuccess: () => invalidate(),
+  });
+}
+
 export function usePendingReschedules(rel: string) {
   return useQuery({
     queryKey: keys.reschedules(rel),
@@ -382,10 +397,10 @@ export function usePendingReschedules(rel: string) {
 export function useDecideReschedule(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({
-    mutationFn: ({ id, approve }: { id: string; approve: boolean }) =>
+    mutationFn: ({ id, ...body }: { id: string; approve: boolean; dueAt?: string; item?: boolean }) =>
       api<{ request: RescheduleRequest; occurrence: Occurrence | null; requests: RescheduleRequest[]; occurrences: Occurrence[] }>(`/reschedules/${id}/decide`, {
         method: "POST",
-        body: { approve },
+        body,
       }),
     onSuccess: () => invalidate(),
   });
