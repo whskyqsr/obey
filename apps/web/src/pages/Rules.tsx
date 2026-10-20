@@ -39,7 +39,7 @@ export function RulesPage() {
     <>
       <PageHeader
         title="Rules"
-        subtitle={`${rules.length} rule${rules.length === 1 ? "" : "s"}${isDom && rules.length > 1 && !category ? " · drag to reorder" : ""}`}
+        subtitle={`${rules.length} rule${rules.length === 1 ? "" : "s"}`}
       />
       {categories.length > 0 && (
         <div className="flex gap-2 overflow-x-auto px-4 pb-4 md:px-6">
