@@ -4,6 +4,7 @@ import { useCreateInvite, useUpdateRelationship } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { DynamicDate, Features, Invite, ReschedulePolicy, Role } from "../api/types";
 import { Avatar } from "../components/Avatar";
+import { CollarIcon } from "../components/CollarIcon";
 import { DynamicHero } from "../components/DynamicHero";
 import { Button, Chip, Dialog, Icon, IconButton, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
 import { fmtDate, fmtDateTime, localDateOf, today } from "../lib/dates";
@@ -27,7 +28,7 @@ const FEATURE_ROWS: { key: keyof Features; label: string; help: string }[] = [
 ];
 
 const DATE_PRESETS = ["Anniversary", "Collaring", "First met"];
-const DATE_ICON: Record<string, string> = { Anniversary: "favorite", Collaring: "diamond", "First met": "waving_hand" };
+const DATE_ICON: Record<string, string> = { Anniversary: "favorite", "First met": "waving_hand" };
 
 /** Add or change one of the dynamic's dates; a preset label or any other. */
 function DateDialog({ value, onClose, onSave, onDelete }: { value: DynamicDate | null; onClose(): void; onSave(d: DynamicDate): void; onDelete(id: string): void }) {
@@ -193,7 +194,9 @@ export function DynamicPage() {
               {dates.map((d) => (
                 <Row
                   key={d.id}
-                  leading={<Icon name={DATE_ICON[d.label] ?? "event"} className="text-on-surface-variant" />}
+                  leading={
+                    d.label === "Collaring" ? <CollarIcon className="text-on-surface-variant" /> : <Icon name={DATE_ICON[d.label] ?? "event"} className="text-on-surface-variant" />
+                  }
                   headline={d.label}
                   supporting={describeDate(d.date, now)}
                   trailing={isDom && <Icon name="edit" className="text-on-surface-variant" />}

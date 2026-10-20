@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Diamond
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.WavingHand
@@ -28,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import app.obey.api.DynamicDate
+import app.obey.ui.common.CollarIcon
 import app.obey.ui.common.formatDate
 import java.time.Instant
 import java.time.LocalDate
@@ -38,7 +38,7 @@ val DATE_PRESETS = listOf("Anniversary", "Collaring", "First met")
 
 fun dateIcon(label: String): ImageVector = when (label) {
     "Anniversary" -> Icons.Outlined.FavoriteBorder
-    "Collaring" -> Icons.Outlined.Diamond
+    "Collaring" -> CollarIcon
     "First met" -> Icons.Outlined.WavingHand
     else -> Icons.Outlined.Event
 }
