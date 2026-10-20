@@ -5,6 +5,7 @@ export type Me = c.Me;
 export type User = c.User;
 export type DeviceStatus = c.DeviceStatus;
 export type AdminReport = c.AdminReport;
+export type OccurrenceComment = c.OccurrenceComment;
 export type WeekStart = c.WeekStart;
 export type Relationship = c.Relationship;
 export type DynamicDate = c.DynamicDate;

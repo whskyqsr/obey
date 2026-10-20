@@ -4,7 +4,8 @@ import type { Occurrence, OccurrenceStatus } from "@obey/contracts";
 import { useCompleteOccurrence, useReviewOccurrence } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { fmtDate, fmtDateTime, fmtRelative, fmtTime, localDateOf, today } from "../lib/dates";
-import { useRel } from "../lib/relationship";
+import { useReadOnly, useRel } from "../lib/relationship";
+import { Comments, SendBackDialog } from "./Comments";
 import { ProofPhotos } from "./Proof";
 import { RescheduleSheet } from "./RescheduleSheet";
 import { StreakStrip } from "./StreakStrip";
@@ -31,10 +32,13 @@ export function isOverdue(o: Occurrence, now = Date.now()) {
 /** One due date of a task. Its title opens the task, except on the task's own page. */
 export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence; showDate?: boolean; linkTask?: boolean }) {
   const { rel, me, isDom, memberName, features } = useRel();
+  const readOnly = useReadOnly();
   const snack = useSnackbar();
   const review = useReviewOccurrence(rel.id);
   const [completing, setCompleting] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
+  const [sendingBack, setSendingBack] = useState(false);
+  const [commenting, setCommenting] = useState(false);
 
   const mine = o.assigneeId === me.user.id;
   const overdue = isOverdue(o);
@@ -80,6 +84,10 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
         </div>
       )}
 
+      <div className="relative z-10">
+        <Comments o={o} open={commenting} onOpen={() => setCommenting(true)} />
+      </div>
+
       {(o.status === "pending" || (isDom && o.status === "submitted")) && (
         <div className="relative z-10 flex flex-wrap items-center gap-2">
           {o.status === "pending" && mine && isOpen(o) && (
@@ -97,13 +105,8 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
               >
                 Approve
               </Button>
-              <Button
-                variant="outlined"
-                icon="thumb_down"
-                disabled={review.isPending}
-                onClick={() => review.mutate({ id: o.id, approve: false }, { onSuccess: () => snack("Sent back"), onError: (e) => snack(errorMessage(e)) })}
-              >
-                Reject
+              <Button variant="outlined" icon="undo" disabled={review.isPending} onClick={() => setSendingBack(true)}>
+                Send back
               </Button>
             </>
           )}
@@ -112,8 +115,19 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
               {mine ? "More time" : "Reschedule"}
             </Button>
           )}
+          {!commenting && o.commentCount === 0 && !readOnly && (
+            <Button variant="text" icon="add_comment" onClick={() => setCommenting(true)}>
+              Comment
+            </Button>
+          )}
         </div>
       )}
+      {!(o.status === "pending" || (isDom && o.status === "submitted")) && !commenting && o.commentCount === 0 && !readOnly && (
+        <Button variant="text" icon="add_comment" className="relative z-10 self-start" onClick={() => setCommenting(true)}>
+          Comment
+        </Button>
+      )}
+      <SendBackDialog o={o} open={sendingBack} onClose={() => setSendingBack(false)} />
 
       <CompleteDialog o={o} open={completing} onClose={() => setCompleting(false)} />
 

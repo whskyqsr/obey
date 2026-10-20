@@ -2,6 +2,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey 
 import { api, apiObjectUrl } from "./client";
 import type {
   AdminReport,
+  OccurrenceComment,
   DeviceStatus,
   ProofPhoto,
   ReportReason,
@@ -309,11 +310,40 @@ export function useUndoComplete(rel: string) {
   });
 }
 
+export function useComments(occurrenceId: string, enabled: boolean) {
+  return useQuery({ queryKey: ["comments", occurrenceId], queryFn: () => api<OccurrenceComment[]>(`/occurrences/${occurrenceId}/comments`), enabled });
+}
+
+export function useAddComment(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ occurrenceId, body }: { occurrenceId: string; body: string }) =>
+      api<OccurrenceComment>(`/occurrences/${occurrenceId}/comments`, { method: "POST", body: { body } }),
+    onSuccess: (c) => {
+      void qc.invalidateQueries({ queryKey: ["comments", c.occurrenceId] });
+      invalidate();
+    },
+  });
+}
+
+export function useDeleteComment(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (c: OccurrenceComment) => api(`/comments/${c.id}`, { method: "DELETE" }),
+    onSuccess: (_, c) => {
+      void qc.invalidateQueries({ queryKey: ["comments", c.occurrenceId] });
+      invalidate();
+    },
+  });
+}
+
 export function useReviewOccurrence(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({
-    mutationFn: ({ id, approve, noteMd }: { id: string; approve: boolean; noteMd?: string }) =>
-      api<Occurrence>(`/occurrences/${id}/review`, { method: "POST", body: { approve, ...(noteMd ? { noteMd } : {}) } }),
+    mutationFn: ({ id, approve, noteMd, comment }: { id: string; approve: boolean; noteMd?: string; comment?: string }) =>
+      api<Occurrence>(`/occurrences/${id}/review`, { method: "POST", body: { approve, ...(noteMd ? { noteMd } : {}), ...(comment?.trim() ? { comment: comment.trim() } : {}) } }),
     onSuccess: () => invalidate(),
   });
 }

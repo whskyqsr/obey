@@ -6,6 +6,7 @@ import { errorMessage } from "../api/client";
 import { fmtDate, fmtDateTime, fmtRelative, fmtTime, isAllDayDue, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 import { CompleteDialog, isOpen, isOverdue } from "./OccurrenceCard";
+import { SendBackDialog } from "./Comments";
 import { RescheduleSheet } from "./RescheduleSheet";
 import { StreakStrip } from "./StreakStrip";
 import { Button, Icon, IconButton, cx, useSnackbar } from "./ui";
@@ -116,6 +117,12 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
         <div className={cx("flex flex-wrap items-center gap-x-2 text-body-medium", missed ? "text-error" : "text-on-surface-variant")}>
           <StreakStrip taskId={o.seriesId} compact />
           <span className="truncate">{parts.join(" · ")}</span>
+          {o.commentCount > 0 && (
+            <span className="inline-flex items-center gap-0.5" aria-label={`${o.commentCount} comment${o.commentCount === 1 ? "" : "s"}`}>
+              <Icon name="chat_bubble" size={14} />
+              {o.commentCount}
+            </span>
+          )}
         </div>
       </Link>
       <div className="relative z-10 flex items-center gap-1">
@@ -146,12 +153,14 @@ export function ReviewActions({ o }: { o: Occurrence }) {
   const { rel } = useRel();
   const snack = useSnackbar();
   const review = useReviewOccurrence(rel.id);
+  const [sendingBack, setSendingBack] = useState(false);
   const act = (approve: boolean) => review.mutate({ id: o.id, approve }, { onSuccess: () => snack(approve ? "Approved" : "Sent back"), onError: (e) => snack(errorMessage(e)) });
   return (
     <>
-      <Button variant="text" disabled={review.isPending} onClick={() => act(false)}>
+      <Button variant="text" disabled={review.isPending} onClick={() => setSendingBack(true)}>
         Send back
       </Button>
+      <SendBackDialog o={o} open={sendingBack} onClose={() => setSendingBack(false)} />
       <Button variant="tonal" busy={review.isPending} onClick={() => act(true)}>
         Approve
       </Button>
