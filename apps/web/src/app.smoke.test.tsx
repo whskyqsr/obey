@@ -33,10 +33,10 @@ const routes: Record<string, unknown> = {
     ],
   },
   [`/relationships/${REL}/occurrences`]: [
-    { id: "o1", seriesId: "s1", title: "Write lines", assigneeId: SUB, points: 5, originalDate: "2026-01-01", dueAt: iso(2), rescheduled: false, status: "pending", completedAt: null, noteMd: null },
+    { id: "o1", seriesId: "s1", title: "Write lines", assigneeId: SUB, points: 5, originalDate: "2026-01-01", dueAt: iso(2), rescheduled: false, status: "pending", completedAt: null, noteMd: null, steps: [], stepsDone: [], opensAt: null },
     // All day (due at the end of a local day), and not today: shown with its date.
-    { id: "o3", seriesId: "t1", title: "Write lines", assigneeId: SUB, points: 5, originalDate: "2026-01-01", dueAt: endOfDayIn(2), rescheduled: false, status: "pending", completedAt: null, noteMd: null },
-    { id: "o2", seriesId: "s1", title: "Stretch", assigneeId: SUB, points: 3, originalDate: "2026-01-01", dueAt: iso(-30), rescheduled: false, status: "submitted", completedAt: iso(-29), noteMd: "done!" },
+    { id: "o3", seriesId: "t1", title: "Write lines", assigneeId: SUB, points: 5, originalDate: "2026-01-01", dueAt: endOfDayIn(2), rescheduled: false, status: "pending", completedAt: null, noteMd: null, steps: [], stepsDone: [], opensAt: null },
+    { id: "o2", seriesId: "s1", title: "Stretch", assigneeId: SUB, points: 3, originalDate: "2026-01-01", dueAt: iso(-30), rescheduled: false, status: "submitted", completedAt: iso(-29), noteMd: "done!", steps: [], stepsDone: [], opensAt: null },
   ],
   [`/relationships/${REL}/reschedules`]: [
     { id: "r1", groupId: null, occurrenceId: "o1", title: "Write lines", requestedBy: SUB, scope: "this", kind: "move", fromDueAt: iso(2), toDueAt: iso(26), reason: "Late shift", status: "requested", createdAt: iso(-1) },
@@ -45,7 +45,7 @@ const routes: Record<string, unknown> = {
     {
       id: "t1", relationshipId: REL, title: "Write lines", bodyMd: "", assigneeId: SUB, points: 5, missPenalty: 0, rewardId: null, consequenceId: null,
       proofRequired: false, approvalRequired: true, schedule: { start: "2026-10-01", rule: { freq: "weekly", interval: 2, byWeekday: ["MO", "TH"] } },
-      dueTime: "21:00", timezone: "UTC", graceMinutes: 0, summary: "Every 2 weeks on Mon, Thu", active: true, createdBy: ME, createdAt: iso(-100),
+      dueTime: "21:00", timezone: "UTC", graceMinutes: 0, steps: [], windowMinutes: null, summary: "Every 2 weeks on Mon, Thu", active: true, createdBy: ME, createdAt: iso(-100),
     },
   ],
   ["/tasks/t1/stats"]: { done: 4, missed: 1, excused: 0, rate: 0.8, streak: 2, bestStreak: 3, lastDoneAt: iso(-20) },
