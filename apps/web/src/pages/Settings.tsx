@@ -1,45 +1,24 @@
 import { useEffect, useRef, useState } from "react";
-import { useCreateInvite, useSetAvatar, useUpdateMe, useUpdateRelationship } from "../api/hooks";
+import { useSetAvatar, useUpdateMe } from "../api/hooks";
 import { errorMessage } from "../api/client";
-import type { Features, ReschedulePolicy, Role, WeekStart } from "../api/types";
+import type { WeekStart } from "../api/types";
 import { getSession, signOut } from "../auth/session";
 import { Avatar, squareJpeg } from "../components/Avatar";
-import { Button, Divider, Icon, PageHeader, Section, SegmentedButtons, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
-import { fmtDateTime } from "../lib/dates";
-import { inviteLink } from "../lib/invite";
-import { ROLE_LABEL, relTitle, useRel } from "../lib/relationship";
+import { Button, Icon, PageHeader, Section, SegmentedButtons, TextField, cx, useSnackbar } from "../components/ui";
+import { useRel } from "../lib/relationship";
+import { useDynamicTitle } from "./Dynamic";
 import { type PushState, pushState, registerPush } from "../push";
 import { type ThemeMode, useTheme } from "../theme/ThemeProvider";
 import { SEED_PRESETS } from "../theme/tokens";
-import { useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 
-const POLICIES: { value: ReschedulePolicy; label: string; help: string }[] = [
-  { value: "dominant_only", label: "Dominant only", help: "Only a Dominant can move deadlines." },
-  { value: "request", label: "Sub may request", help: "The sub asks; a Dominant approves or declines." },
-  { value: "allowance", label: "Weekly allowance", help: "The sub gets a number of free delays each week; more need approval." },
-];
-
-const FEATURE_ROWS: { key: keyof Features; label: string; help: string }[] = [
-  { key: "points", label: "Points and rewards", help: "Tasks earn points that can be spent on rewards." },
-  { key: "consequences", label: "Consequences", help: "A list of consequences, and one per task if it's missed." },
-  { key: "rules", label: "Rules", help: "A shared list of standing rules." },
-  { key: "protocols", label: "Protocols", help: "Exactly what's expected, and when and how it's done." },
-  { key: "journal", label: "Journal", help: "Dated entries with a mood." },
-];
-
 export function SettingsPage() {
-  const { me, rel, self, isDom, select, title, features } = useRel();
+  const { me, rel } = useRel();
+  const dynamicTitle = useDynamicTitle();
   const theme = useTheme();
   const snack = useSnackbar();
-  const navigate = useNavigate();
   const qc = useQueryClient();
-  const update = useUpdateRelationship(rel.id);
-  const invite = useCreateInvite(rel.id);
-  // A Dominant usually invites a submissive and the other way round; a Switch leaves it open.
-  const [inviteRole, setInviteRole] = useState<Role | "">(self?.role === "dominant" ? "submissive" : self?.role === "submissive" ? "dominant" : "");
-  const [name, setName] = useState(rel.name ?? "");
-  const [allowance, setAllowance] = useState(String(rel.weeklyDelayAllowance));
   const [push, setPush] = useState<PushState>(pushState);
   const updateMe = useUpdateMe();
   const [displayName, setDisplayName] = useState(me.user.displayName);
@@ -58,16 +37,27 @@ export function SettingsPage() {
 
   useEffect(() => setDisplayName(me.user.displayName), [me.user.displayName]);
 
-  useEffect(() => {
-    setName(rel.name ?? "");
-    setAllowance(String(rel.weeklyDelayAllowance));
-  }, [rel.id, rel.name, rel.weeklyDelayAllowance]);
-
-  const patch = (body: Parameters<typeof update.mutate>[0], msg = "Saved") => update.mutate(body, { onSuccess: () => snack(msg), onError: (e) => snack(errorMessage(e)) });
-
   return (
     <>
       <PageHeader title="Settings" subtitle={me.user.email ?? me.user.displayName} />
+
+      {/* The relationship has its own page; Settings is about you. */}
+      <div className="px-4 pb-6 md:px-6">
+        <Link to="/dynamic" className="state-layer flex items-center gap-4 rounded-xl bg-primary-container p-4 text-on-primary-container">
+          <span className="flex">
+            {rel.members.slice(0, 3).map((m, i) => (
+              <span key={m.userId} className={cx("rounded-full ring-4 ring-primary-container", i > 0 && "-ml-3")}>
+                <Avatar userId={m.userId} name={m.displayName} version={m.avatarVersion} size={48} />
+              </span>
+            ))}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-title-large">{dynamicTitle}</span>
+            <span className="block text-body-medium opacity-80">Your dynamic · people, invites, how it works, features</span>
+          </span>
+          <Icon name="chevron_right" />
+        </Link>
+      </div>
 
       <Section title="Profile">
         <div className="flex flex-col gap-4 rounded-lg bg-surface-container-low p-4" style={{ ["--field-bg" as string]: "var(--md-surface-container-low)" }}>
@@ -163,164 +153,6 @@ export function SettingsPage() {
             </div>
             <p className="mt-2 text-body-small text-on-surface-variant">The whole palette, light and dark, is generated from this color (Material 3 tonal spot).</p>
           </div>
-        </div>
-      </Section>
-
-      <Section title="Relationship">
-        <div className="flex flex-col gap-5 rounded-lg bg-surface-container-low p-4" style={{ ["--field-bg" as string]: "var(--md-surface-container-low)" }}>
-          {me.relationships.length > 1 && (
-            <Select label="Current relationship" value={rel.id} onChange={(e) => select(e.target.value)}>
-              {me.relationships.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {relTitle(r, me.user.id)}
-                </option>
-              ))}
-            </Select>
-          )}
-          <div className="flex flex-wrap items-start gap-2">
-            <TextField
-              label="Name (optional)"
-              placeholder={title}
-              help={rel.name ? undefined : "Without a name, the app shows your partner's name."}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={80}
-              className="min-w-48 flex-1"
-              disabled={!isDom}
-            />
-            {isDom && name.trim() !== (rel.name ?? "") && (
-              <Button variant="tonal" className="mt-2" busy={update.isPending} onClick={() => patch({ name: name.trim() || null })}>
-                Save
-              </Button>
-            )}
-          </div>
-          <div>
-            <div className="mb-1 text-label-large text-on-surface-variant">Members</div>
-            {rel.members.map((m) => (
-              <div key={m.userId} className="flex items-center gap-3 py-1.5">
-                <Avatar userId={m.userId} name={m.displayName} version={m.avatarVersion} size={36} />
-                <span className="flex-1 text-body-large text-on-surface">
-                  {m.displayName}
-                  {m.userId === me.user.id && " (you)"}
-                </span>
-                <span className="text-body-medium text-on-surface-variant">{ROLE_LABEL[m.role]}</span>
-              </div>
-            ))}
-            {self && <p className="mt-1 text-body-small text-on-surface-variant">You are the {ROLE_LABEL[self.role]} here.</p>}
-          </div>
-          <Divider />
-          <div>
-            <div className="mb-2 text-title-small text-on-surface">Invite a partner</div>
-            {invite.data ? (
-              <div className="flex flex-col gap-3 rounded-md bg-primary-container p-4 text-on-primary-container">
-                <span className="text-body-large break-all">{inviteLink(invite.data.code)}</span>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    variant="filled"
-                    icon="content_copy"
-                    onClick={() =>
-                      navigator.clipboard?.writeText(inviteLink(invite.data!.code)).then(
-                        () => snack("Link copied"),
-                        () => snack("Couldn't copy"),
-                      )
-                    }
-                  >
-                    Copy link
-                  </Button>
-                  {"share" in navigator && (
-                    <Button
-                      variant="text"
-                      icon="share"
-                      className="text-on-primary-container"
-                      onClick={() => navigator.share({ title: "Join me on Obey", url: inviteLink(invite.data!.code) }).catch(() => {})}
-                    >
-                      Share
-                    </Button>
-                  )}
-                </div>
-                <span className="text-body-small">
-                  {invite.data.role ? `They'll join as ${ROLE_LABEL[invite.data.role]}` : "They'll choose their role"} · code {invite.data.code} · expires{" "}
-                  {fmtDateTime(invite.data.expiresAt)}
-                </span>
-              </div>
-            ) : (
-              <div className="flex flex-wrap items-start gap-3">
-                <Select label="They'll join as" value={inviteRole} onChange={(e) => setInviteRole(e.target.value as Role | "")} className="w-56">
-                  <option value="submissive">{ROLE_LABEL.submissive}</option>
-                  <option value="dominant">{ROLE_LABEL.dominant}</option>
-                  <option value="switch">{ROLE_LABEL.switch}</option>
-                  <option value="">Let them choose</option>
-                </Select>
-                <Button
-                  variant="tonal"
-                  icon="add_link"
-                  className="mt-2"
-                  busy={invite.isPending}
-                  onClick={() => invite.mutate(inviteRole || null, { onError: (e) => snack(errorMessage(e)) })}
-                >
-                  Create invite link
-                </Button>
-              </div>
-            )}
-            <p className="mt-2 text-body-small text-on-surface-variant">The link opens Obey, where they sign in or create an account, then accept.</p>
-          </div>
-          <Divider />
-          <div>
-            <div className="mb-2 text-title-small text-on-surface">Rescheduling</div>
-            <Select
-              label="Who can move deadlines"
-              value={rel.reschedulePolicy}
-              disabled={!isDom || update.isPending}
-              onChange={(e) => patch({ reschedulePolicy: e.target.value as ReschedulePolicy })}
-            >
-              {POLICIES.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </Select>
-            <p className="mt-2 px-1 text-body-small text-on-surface-variant">{POLICIES.find((p) => p.value === rel.reschedulePolicy)?.help}</p>
-            {rel.reschedulePolicy === "allowance" && (
-              <div className="mt-4 flex flex-wrap items-start gap-2">
-                <TextField
-                  label="Free delays per week"
-                  type="number"
-                  min={0}
-                  max={50}
-                  value={allowance}
-                  onChange={(e) => setAllowance(e.target.value)}
-                  disabled={!isDom}
-                  className="w-48"
-                />
-                {isDom && Number(allowance) !== rel.weeklyDelayAllowance && allowance !== "" && (
-                  <Button variant="tonal" className="mt-2" onClick={() => patch({ weeklyDelayAllowance: Math.max(0, Math.min(50, Math.trunc(Number(allowance)))) })}>
-                    Save
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
-          <Divider />
-          <Button variant="outlined" icon="add_link" onClick={() => navigate({ to: "/onboarding" })} className="self-start">
-            Join or start another relationship
-          </Button>
-        </div>
-      </Section>
-
-      <Section title="Features">
-        <div className="flex flex-col rounded-lg bg-surface-container-low px-4 py-2">
-          {FEATURE_ROWS.map((f) => (
-            <Switch
-              key={f.key}
-              checked={features[f.key]}
-              onChange={(on) => isDom && patch({ features: { [f.key]: on } }, on ? `${f.label} on` : `${f.label} off`)}
-              label={f.label}
-              help={f.help}
-            />
-          ))}
-          <p className="pb-2 text-body-small text-on-surface-variant">
-            {isDom ? "Switched-off features are hidden for everyone in this relationship. Nothing is deleted." : "Only a Dominant can change these."}
-          </p>
         </div>
       </Section>
 

@@ -1,18 +1,20 @@
 import { useEffect, useState } from "react";
-import { useInvitePreview, useJoinRelationship } from "../api/hooks";
+import { useInvitePreview, useJoinRelationship, useMe } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { Role } from "../api/types";
+import { DynamicHero } from "../components/DynamicHero";
 import { Button, ErrorBox, Icon, Loading, SegmentedButtons } from "../components/ui";
 import { clearPendingInvite } from "../lib/invite";
 import { ROLE_LABEL } from "../lib/relationship";
 import { storage } from "../lib/storage";
 
 const ROLES: { value: Role; label: string }[] = (["dominant", "submissive", "switch"] as const).map((r) => ({ value: r, label: ROLE_LABEL[r] }));
-const article = (role: Role) => (role === "switch" ? "a Switch" : `their ${ROLE_LABEL[role]}`);
+const article = (role: Role) => (role === "switch" ? "a Switch" : `the ${ROLE_LABEL[role]}`);
 
 /** An opened invite link, after sign-in: who it's from and what you'd be, then Accept or Not now. */
 export function AcceptInvite({ code, onDone }: { code: string; onDone(): void }) {
   const preview = useInvitePreview(code);
+  const me = useMe();
   const join = useJoinRelationship();
   const [role, setRole] = useState<Role>("submissive");
 
@@ -32,7 +34,7 @@ export function AcceptInvite({ code, onDone }: { code: string; onDone(): void })
   return (
     <div className="flex min-h-dvh items-center justify-center bg-surface-container-low p-4">
       <div className="w-full max-w-md rounded-xl bg-surface p-8 shadow-elev-1">
-        <Icon name="mail" filled size={40} className="mb-4 text-primary" />
+        {!p && <Icon name="mail" filled size={40} className="mb-4 text-primary" />}
         {preview.isLoading && <Loading />}
         {preview.error && (
           <>
@@ -45,8 +47,12 @@ export function AcceptInvite({ code, onDone }: { code: string; onDone(): void })
         )}
         {p && (
           <>
-            <h1 className="text-headline-medium text-on-surface">{p.inviterName} invited you</h1>
-            <p className="mt-2 mb-6 text-body-large text-on-surface-variant">{p.role ? `You'll join as ${article(p.role)}.` : "Choose your role to join their dynamic."}</p>
+            <DynamicHero
+              className="mb-8"
+              people={[{ userId: "inviter", displayName: p.inviterName, avatarVersion: null }, ...(me.data ? [{ ...me.data.user, userId: me.data.user.id }] : [])]}
+              title={`${p.inviterName} invited you`}
+              sub={p.role ? `You'll join their dynamic as ${article(p.role)}.` : "Choose your role to join their dynamic."}
+            />
             {!p.role && (
               <div className="mb-6">
                 <div className="mb-2 text-label-large text-on-surface-variant">Your role</div>
