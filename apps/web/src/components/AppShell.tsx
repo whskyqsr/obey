@@ -89,7 +89,6 @@ function DrawerItem({ d, active, badge }: { d: Dest; active: boolean; badge?: nu
 export function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { title, me, rel } = useRel();
-  const partner = rel.members.find((m) => m.userId !== me.user.id);
   const todayBadge = useNeedsYou().count;
   const { all, bar, more } = useDestinations();
   // The editor's Save is the only action that matters while editing, so the phone bar steps aside.
@@ -97,7 +96,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-dvh bg-surface">
-      {/* Navigation drawer (large): grouped, with Settings and who you are at the bottom */}
+      {/* Navigation drawer (large): one list, with Settings at the bottom */}
       <nav className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col gap-1 overflow-y-auto border-r border-outline-variant/40 bg-surface px-3 py-4 lg:flex">
         <Link to="/" className="mb-3 flex items-center gap-3 px-3" title={title}>
           <span className="flex size-10 items-center justify-center rounded-md bg-primary-container text-on-primary-container">
@@ -116,10 +115,6 @@ export function AppShell() {
           .map((d) => (
             <DrawerItem key={d.to} d={d} active={isActive(pathname, d.to, [])} />
           ))}
-        <div className="truncate px-4 pt-2 text-body-medium text-on-surface-variant">
-          {me.user.displayName}
-          {partner ? ` · with ${partner.displayName}` : ""}
-        </div>
       </nav>
 
       {/* Navigation rail (medium) */}
