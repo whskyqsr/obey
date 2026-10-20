@@ -136,15 +136,12 @@ private data class TopLevel(
 
 private val writingRoutes = setOf<Any>(NotesRoute, JournalRoute)
 
-/** The destinations this dynamic uses, in bar order. Rewards stays as a home for consequences when points are off. */
+/** The destinations this dynamic uses, in bar order. Rewards and Consequences are separate pages, as on the web. */
 private fun topLevels(f: Features) = listOfNotNull(
     TopLevel(TodayRoute, "Today", Icons.Outlined.Today) { it.hasRoute<TodayRoute>() },
     TopLevel(UpcomingRoute, "Calendar", Icons.Outlined.CalendarMonth) { it.hasRoute<UpcomingRoute>() },
-    when {
-        f.points -> TopLevel(RewardsRoute, "Rewards", Icons.Outlined.EmojiEvents) { it.hasRoute<RewardsRoute>() }
-        f.consequences -> TopLevel(RewardsRoute, "Consequences", Icons.Outlined.Bolt) { it.hasRoute<RewardsRoute>() }
-        else -> null
-    },
+    if (f.points) TopLevel(RewardsRoute, "Rewards", Icons.Outlined.EmojiEvents) { it.hasRoute<RewardsRoute>() } else null,
+    if (f.consequences) TopLevel(ConsequencesRoute, "Consequences", Icons.Outlined.Bolt) { it.hasRoute<ConsequencesRoute>() } else null,
     if (f.rules) TopLevel(RulesRoute, "Rules", Icons.Outlined.Gavel) { it.hasRoute<RulesRoute>() } else null,
     if (f.protocols) TopLevel(ProtocolsRoute, "Protocols", Icons.Outlined.FactCheck) { it.hasRoute<ProtocolsRoute>() } else null,
     TopLevel(NotesRoute, "Notes", Icons.AutoMirrored.Outlined.Notes) { it.hasRoute<NotesRoute>() },
@@ -175,7 +172,7 @@ private fun MainScaffold() {
     var moreOpen by remember { mutableStateOf(false) }
     // A tab the dynamic just switched off (say, from Settings) shouldn't stay reachable underneath.
     val switchedOff = destination != null && !isTopLevel && destination.hierarchy.any {
-        it.hasRoute<RewardsRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<ProtocolsRoute>() || it.hasRoute<JournalRoute>()
+        it.hasRoute<RewardsRoute>() || it.hasRoute<ConsequencesRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<ProtocolsRoute>() || it.hasRoute<JournalRoute>()
     }
     LaunchedEffect(switchedOff) { if (switchedOff) nav.navigate(TodayRoute) { popUpTo(nav.graph.findStartDestination().id) } }
 
@@ -273,6 +270,7 @@ private fun ObeyNavHost(nav: NavHostController) {
             )
         }
         composable<RewardsRoute> { RewardsScreen(onOpenSettings = settings) }
+        composable<ConsequencesRoute> { RewardsScreen(onOpenSettings = settings, consequences = true) }
         composable<RulesRoute> { RulesScreen(onOpenSettings = settings, onOpenProtocol = { nav.navigate(ProtocolEditorRoute(protocolId = it)) }) }
         composable<ProtocolsRoute> {
             ProtocolsScreen(

@@ -65,14 +65,15 @@ private data class Editing<T>(val item: T?)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RewardsScreen(onOpenSettings: () -> Unit, vm: RewardsViewModel = hiltViewModel()) {
+fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm: RewardsViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     MessageEffect(message, snackbar, vm::messageShown)
     val session = vm.session
     val canManage = session?.canManage == true
-    val features = LocalFeatures.current
+    // Rewards and Consequences are separate pages that share this screen and its data, as on the web.
+    val features = LocalFeatures.current.let { if (consequences) it.copy(points = false) else it.copy(consequences = false) }
 
     // null = dialog closed; Editing(null) = creating; Editing(x) = editing x.
     var editReward by remember { mutableStateOf<Editing<Reward>?>(null) }
@@ -84,7 +85,7 @@ fun RewardsScreen(onOpenSettings: () -> Unit, vm: RewardsViewModel = hiltViewMod
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (features.points) "Rewards & points" else "Consequences") },
+                title = { Text(if (consequences) "Consequences" else "Rewards & points") },
                 actions = {
                     if (canManage && features.points) IconButton(onClick = { adjusting = true }) { Icon(Icons.Outlined.Exposure, "Adjust points") }
                     SettingsAction(onOpenSettings)
@@ -97,6 +98,13 @@ fun RewardsScreen(onOpenSettings: () -> Unit, vm: RewardsViewModel = hiltViewMod
                     onClick = { editReward = Editing(null) },
                     icon = { Icon(Icons.Outlined.Add, null) },
                     text = { Text("Reward") },
+                )
+            }
+            if (canManage && features.consequences) {
+                ExtendedFloatingActionButton(
+                    onClick = { editConsequence = Editing(null) },
+                    icon = { Icon(Icons.Outlined.Add, null) },
+                    text = { Text("Consequence") },
                 )
             }
         },
@@ -148,12 +156,14 @@ fun RewardsScreen(onOpenSettings: () -> Unit, vm: RewardsViewModel = hiltViewMod
                 }
 
                 if (features.consequences) item(key = "h-cons") {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                        SectionHeader("Consequences", Modifier.weight(1f))
-                        if (canManage) TextButton(onClick = { editConsequence = Editing(null) }) { Text("Add") }
-                    }
+                    Text(
+                        "Attach one to a task for when it's missed, or hand one out on its own.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
                 }
-                if (features.consequences && d.consequences.isEmpty()) item(key = "e-cons") { EmptyBox("No consequences defined") }
+                if (features.consequences && d.consequences.isEmpty()) item(key = "e-cons") { EmptyBox("No consequences yet") }
                 items(if (features.consequences) d.consequences else emptyList(), key = { "c-" + it.id }) { c ->
                     ListItem(
                         modifier = if (canManage) Modifier.clickable { editConsequence = Editing(c) } else Modifier,
