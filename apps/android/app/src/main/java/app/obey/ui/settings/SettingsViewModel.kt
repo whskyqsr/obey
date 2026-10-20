@@ -93,6 +93,13 @@ class SettingsViewModel @Inject constructor(
         sessions.refresh()
     }
 
+    /** Saved in this phone's time zone; null turns quiet hours off. */
+    fun setQuietHours(start: String?, end: String?) = action {
+        val q = if (start != null && end != null) app.obey.api.QuietHours(start, end, java.time.ZoneId.systemDefault().id) else null
+        api.setQuietHours(app.obey.api.QuietHoursInput(q))
+        sessions.refresh()
+    }
+
     fun selectRelationship(id: String) = action { sessions.select(id) }
 
     /** Ends the dynamic for everyone in it (it stays read-only); the people in [block] can't pair with you again. */

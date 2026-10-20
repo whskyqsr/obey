@@ -22,6 +22,8 @@ self.addEventListener("push", (event) => {
     icon: n.icon || "/icon.svg",
     badge: "/icon.svg",
     tag: data.tag || payload.fcmMessageId || undefined,
+    // Quiet hours: still shown, but without sound or vibration.
+    silent: data.quiet === "1",
     data: { url: data.url || (payload.fcmOptions && payload.fcmOptions.link) || "/" },
   };
   event.waitUntil(Promise.all([self.registration.showNotification(title, options), markReceived()]));

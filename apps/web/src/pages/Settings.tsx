@@ -8,6 +8,7 @@ import { Button, Dialog, Icon, PageHeader, Section, SegmentedButtons, Switch, Te
 import { isCollared, useRel } from "../lib/relationship";
 import { useDynamicTitle } from "./Dynamic";
 import { PushHealth } from "../components/PushHealth";
+import { QuietHoursSetting } from "../components/QuietHours";
 import { type PushState, pushState, registerPush } from "../push";
 import { type ThemeMode, useTheme } from "../theme/ThemeProvider";
 import { SEED_PRESETS } from "../theme/tokens";
@@ -221,6 +222,7 @@ export function SettingsPage() {
           )}
         </div>
         {push === "granted" && <PushHealth />}
+        <QuietHoursSetting />
       </Section>
 
       {me.admin && (

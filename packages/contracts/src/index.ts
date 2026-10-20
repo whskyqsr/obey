@@ -47,6 +47,10 @@ export const allFeatures = (stored: Partial<Features> = {}): Features => Object.
 export const weekStart = z.enum(["sun", "mon"]);
 export type WeekStart = z.infer<typeof weekStart>;
 
+/** When pushes arrive without sound or vibration; start may be after end, which spans midnight. */
+export const quietHours = z.object({ start: timeOfDay, end: timeOfDay, timezone: z.string().min(1).max(64) });
+export type QuietHours = z.infer<typeof quietHours>;
+
 export const user = z.object({
   id,
   displayName: z.string(),
@@ -57,6 +61,7 @@ export const user = z.object({
   proofTermsAccepted: z.boolean().default(false),
   /** Show proof photos without the blur. */
   revealProofs: z.boolean().default(false),
+  quietHours: quietHours.nullable().default(null),
 });
 export type User = z.infer<typeof user>;
 
@@ -98,6 +103,8 @@ export const updateMe = z.object({
   displayName: z.string().trim().min(1).max(40).optional(),
   weekStart: weekStart.optional(),
   revealProofs: z.boolean().optional(),
+  /** null turns quiet hours off. */
+  quietHours: quietHours.nullable().optional(),
 });
 /** Both boxes must be ticked; there is no way to upload a proof photo without them. */
 export const acceptProofTerms = z.object({ adult: z.literal(true), rules: z.literal(true) });

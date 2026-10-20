@@ -7,6 +7,7 @@ export type DeviceStatus = c.DeviceStatus;
 export type AdminReport = c.AdminReport;
 export type OccurrenceComment = c.OccurrenceComment;
 export type WeekStart = c.WeekStart;
+export type QuietHours = c.QuietHours;
 export type Relationship = c.Relationship;
 export type DynamicDate = c.DynamicDate;
 export type Features = c.Features;

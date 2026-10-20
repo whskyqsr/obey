@@ -1,4 +1,5 @@
 import { randomInt } from "node:crypto";
+import { DateTime } from "luxon";
 import { and, desc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { allFeatures, createInvite, createRelationship, id, joinRelationship, leaveRelationship, registerDevice, updateMe, updateRelationship } from "@obey/contracts";
@@ -21,6 +22,9 @@ export const userDto = (u: {
   weekStart: string;
   proofTermsAcceptedAt: Date | null;
   revealProofs: boolean;
+  quietStart: string | null;
+  quietEnd: string | null;
+  timezone: string | null;
 }) => ({
   id: u.id,
   displayName: u.displayName,
@@ -29,6 +33,7 @@ export const userDto = (u: {
   weekStart: u.weekStart === "mon" ? "mon" : "sun",
   proofTermsAccepted: u.proofTermsAcceptedAt !== null,
   revealProofs: u.revealProofs,
+  quietHours: u.quietStart && u.quietEnd && u.timezone ? { start: u.quietStart, end: u.quietEnd, timezone: u.timezone } : null,
 });
 
 const AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -80,9 +85,14 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
   });
 
   app.patch("/me", async (req) => {
-    const body = updateMe.parse(req.body);
-    if (!Object.keys(body).length) return userDto(req.user);
-    const [updated] = await db.update(users).set(body).where(eq(users.id, req.user.id)).returning();
+    const { quietHours, ...body } = updateMe.parse(req.body);
+    const set = {
+      ...body,
+      ...(quietHours !== undefined && { quietStart: quietHours?.start ?? null, quietEnd: quietHours?.end ?? null, timezone: quietHours?.timezone ?? null }),
+    };
+    if (quietHours && !DateTime.now().setZone(quietHours.timezone).isValid) throw new HttpError(400, "unknown time zone");
+    if (!Object.keys(set).length) return userDto(req.user);
+    const [updated] = await db.update(users).set(set).where(eq(users.id, req.user.id)).returning();
     return userDto(updated!);
   });
 

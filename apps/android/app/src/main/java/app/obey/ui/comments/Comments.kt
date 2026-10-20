@@ -169,7 +169,7 @@ fun SendBackDialog(occurrence: Occurrence, onDismiss: () -> Unit, onConfirm: (co
                 OutlinedTextField(
                     value = text,
                     onValueChange = { if (it.length <= 2000) text = it },
-                    label = { Text("What to fix (optional)") },
+                    label = { Text("What needs fixing? (optional)") },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2,
                     maxLines = 5,

@@ -15,6 +15,12 @@ class ObeyApp : Application() {
             getString(R.string.notification_channel_name),
             NotificationManager.IMPORTANCE_DEFAULT,
         )
-        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        // Quiet hours: the same notifications, without sound or vibration.
+        val quiet = NotificationChannel(
+            getString(R.string.notification_channel_quiet),
+            getString(R.string.notification_channel_quiet_name),
+            NotificationManager.IMPORTANCE_LOW,
+        )
+        getSystemService(NotificationManager::class.java).createNotificationChannels(listOf(channel, quiet))
     }
 }

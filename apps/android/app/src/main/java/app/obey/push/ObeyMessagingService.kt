@@ -51,7 +51,10 @@ class ObeyMessagingService : FirebaseMessagingService() {
 
         val intent = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
         val pending = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
-        val notification = NotificationCompat.Builder(this, getString(R.string.notification_channel_default))
+        val quiet = message.data["quiet"] == "1"
+        val channel = getString(if (quiet) R.string.notification_channel_quiet else R.string.notification_channel_default)
+        val notification = NotificationCompat.Builder(this, channel)
+            .setSilent(quiet)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(body)

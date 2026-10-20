@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { initialDisplayName } from "../src/auth.js";
 import { runJobs } from "../src/jobs.js";
-import { fcmMessages } from "../src/notify.js";
+import { fcmMessages, isQuiet } from "../src/notify.js";
 import { setup } from "./helpers.js";
 
 let ctx: Awaited<ReturnType<typeof setup>>;
@@ -730,6 +730,36 @@ describe("push payloads", () => {
     );
     expect(web).toMatchObject({ tokens: ["w"], notification: { title: "Obey", body: "A task is due soon" } });
     expect(android).toEqual({ tokens: ["a"], data: { type: "reminder", body: "A task is due soon" }, android: { priority: "high" } });
+  });
+
+  it("sends silently to devices in quiet hours", () => {
+    const [web, android] = fcmMessages(
+      [
+        { token: "w", platform: "web", quiet: true },
+        { token: "a", platform: "android", quiet: true },
+      ],
+      { title: "Obey", body: "A task is due soon" },
+    );
+    expect(web).toMatchObject({ tokens: ["w"], webpush: { notification: { silent: true } } });
+    expect(android!.data).toMatchObject({ quiet: "1" });
+  });
+
+  it("works out quiet hours in the person's own time zone, across midnight", () => {
+    const night = { start: "22:00", end: "07:00", timezone: "America/New_York" };
+    expect(isQuiet(night, new Date("2026-10-17T03:30:00Z"))).toBe(true); // 23:30 in New York
+    expect(isQuiet(night, new Date("2026-10-17T10:59:00Z"))).toBe(true); // 06:59
+    expect(isQuiet(night, new Date("2026-10-17T11:00:00Z"))).toBe(false); // 07:00
+    expect(isQuiet({ ...night, start: "13:00", end: "14:00" }, new Date("2026-10-17T17:30:00Z"))).toBe(true);
+    expect(isQuiet(null, new Date())).toBe(false);
+  });
+
+  it("saves quiet hours on the account", async () => {
+    const { dom } = await ctx.pair();
+    const q = { start: "22:00", end: "07:00", timezone: "America/New_York" };
+    expect((await dom.patch("/me", { quietHours: q })).body.quietHours).toEqual(q);
+    expect((await dom.get("/me")).body.user.quietHours).toEqual(q);
+    expect((await dom.patch("/me", { quietHours: { ...q, timezone: "Mars/Olympus" } })).status).toBe(400);
+    expect((await dom.patch("/me", { quietHours: null })).body.quietHours).toBeNull();
   });
 });
 

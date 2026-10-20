@@ -1,8 +1,9 @@
 import { eq, inArray } from "drizzle-orm";
+import { DateTime } from "luxon";
 import type { App as FirebaseApp } from "firebase-admin/app";
 import { type MulticastMessage, getMessaging } from "firebase-admin/messaging";
 import type { Db } from "./db/index.js";
-import { devices } from "./db/schema.js";
+import { devices, users } from "./db/schema.js";
 
 export interface Push {
   /** Kept discreet by default: the lock screen shows this, so no task titles. */
@@ -23,16 +24,41 @@ export function memoryNotifier(): Notifier & { sent: { userIds: string[]; push: 
   return { sent, send: async (userIds, push) => void sent.push({ userIds, push }) };
 }
 
+const minutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+
+/** Whether [now] falls in someone's quiet hours; a start after the end spans midnight. */
+export function isQuiet(q: { start: string; end: string; timezone: string } | null, now: Date): boolean {
+  if (!q) return false;
+  const local = DateTime.fromJSDate(now).setZone(q.timezone);
+  if (!local.isValid) return false;
+  const t = local.hour * 60 + local.minute;
+  const [s, e] = [minutes(q.start), minutes(q.end)];
+  if (s === e) return false;
+  return s < e ? t >= s && t < e : t >= s || t < e;
+}
+
 /**
  * Web gets a normal notification. Android gets data only, so the app always draws the
  * notification itself and can title it with the discreet-mode name instead of "Obey".
+ * Devices in quiet hours still get the push, but without sound or vibration.
  */
-export function fcmMessages(rows: { token: string; platform: "android" | "web" }[], push: Push): MulticastMessage[] {
-  const web = rows.filter((r) => r.platform === "web").map((r) => r.token);
-  const android = rows.filter((r) => r.platform === "android").map((r) => r.token);
+export function fcmMessages(rows: { token: string; platform: "android" | "web"; quiet?: boolean }[], push: Push): MulticastMessage[] {
   const messages: MulticastMessage[] = [];
-  if (web.length) messages.push({ tokens: web, notification: { title: push.title, body: push.body }, data: push.data });
-  if (android.length) messages.push({ tokens: android, data: { ...push.data, body: push.body }, android: { priority: "high" } });
+  for (const quiet of [false, true]) {
+    const mine = rows.filter((r) => !!r.quiet === quiet);
+    const web = mine.filter((r) => r.platform === "web").map((r) => r.token);
+    const android = mine.filter((r) => r.platform === "android").map((r) => r.token);
+    if (web.length) {
+      messages.push({
+        tokens: web,
+        notification: { title: push.title, body: push.body },
+        // Our service worker draws the notification, so it reads the flag from data.
+        data: quiet ? { ...push.data, quiet: "1" } : push.data,
+        ...(quiet && { webpush: { notification: { silent: true } } }),
+      });
+    }
+    if (android.length) messages.push({ tokens: android, data: { ...push.data, body: push.body, ...(quiet && { quiet: "1" }) }, android: { priority: "high" } });
+  }
   return messages;
 }
 
@@ -41,9 +67,19 @@ export function fcmNotifier(db: Db, app: FirebaseApp, log: (msg: string) => void
   return {
     async send(userIds, push) {
       if (userIds.length === 0) return;
-      const rows = await db.select().from(devices).where(inArray(devices.userId, userIds));
+      const rows = await db
+        .select({ token: devices.token, platform: devices.platform, quietStart: users.quietStart, quietEnd: users.quietEnd, timezone: users.timezone })
+        .from(devices)
+        .innerJoin(users, eq(users.id, devices.userId))
+        .where(inArray(devices.userId, userIds));
       if (rows.length === 0) return;
-      for (const message of fcmMessages(rows, push)) {
+      const now = new Date();
+      const targets = rows.map((r) => ({
+        token: r.token,
+        platform: r.platform,
+        quiet: r.quietStart && r.quietEnd && r.timezone ? isQuiet({ start: r.quietStart, end: r.quietEnd, timezone: r.timezone }, now) : false,
+      }));
+      for (const message of fcmMessages(targets, push)) {
         const res = await messaging.sendEachForMulticast(message);
         const stale = res.responses
           .map((r, i) => (r.error?.code === "messaging/registration-token-not-registered" ? message.tokens[i]! : null))

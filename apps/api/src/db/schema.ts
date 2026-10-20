@@ -22,6 +22,10 @@ export const users = pgTable("users", {
   proofTermsAcceptedAt: ts("proof_terms_accepted_at"),
   /** Proof photos show blurred until tapped unless this is on (it takes a switch and a confirmation). */
   revealProofs: boolean("reveal_proofs").notNull().default(false),
+  /** Quiet hours as "HH:mm" in [timezone]; pushes then arrive silently. All null when off. */
+  quietStart: text("quiet_start"),
+  quietEnd: text("quiet_end"),
+  timezone: text("timezone"),
   createdAt: createdAt(),
 });
 

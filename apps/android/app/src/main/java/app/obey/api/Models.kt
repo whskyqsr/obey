@@ -85,7 +85,16 @@ data class User(
     val proofTermsAccepted: Boolean = false,
     /** Show proof photos without the blur. */
     val revealProofs: Boolean = false,
+    val quietHours: QuietHours? = null,
 )
+
+/** When pushes arrive without sound or vibration, as "HH:mm" in [timezone]; start after end spans midnight. */
+@Serializable
+data class QuietHours(val start: String, val end: String, val timezone: String)
+
+/** A null [quietHours] turns them off, so it is always sent. */
+@Serializable
+data class QuietHoursInput(val quietHours: QuietHours?)
 
 @Serializable
 data class AcceptProofTermsInput(val adult: Boolean = true, val rules: Boolean = true)
