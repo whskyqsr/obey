@@ -18,6 +18,11 @@ const STATUS: Record<OccurrenceStatus, { label: string; tone: "primary" | "error
   cancelled: { label: "Cancelled", tone: "neutral" },
 };
 
+/** Whether the assignee may complete it yet: not before the day after the previous occurrence (tomorrow's daily task waits). */
+export function isOpen(o: Occurrence) {
+  return !o.opensOn || o.opensOn <= today();
+}
+
 export function isOverdue(o: Occurrence, now = Date.now()) {
   return o.status === "pending" && new Date(o.dueAt).getTime() < now;
 }
@@ -77,10 +82,13 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
 
       {(o.status === "pending" || (isDom && o.status === "submitted")) && (
         <div className="relative z-10 flex flex-wrap items-center gap-2">
-          {o.status === "pending" && mine && (
+          {o.status === "pending" && mine && isOpen(o) && (
             <Button variant="filled" icon="check" onClick={() => setCompleting(true)}>
               Done
             </Button>
+          )}
+          {o.status === "pending" && mine && !isOpen(o) && (
+            <span className="text-body-medium text-on-surface-variant">Opens {fmtDate(o.opensOn!, { weekday: "long" })}</span>
           )}
           {o.status === "submitted" && isDom && (
             <>

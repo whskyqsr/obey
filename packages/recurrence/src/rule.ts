@@ -214,6 +214,27 @@ export function nextOccurrence(schedule: Schedule, after: PlainDate): PlainDate 
   return null;
 }
 
+/** The last occurrence strictly before `before`; null for the first one, a one-off or a completion-anchored schedule. */
+export function previousOccurrence(schedule: Schedule, before: PlainDate): PlainDate | null {
+  if (!schedule.rule || schedule.anchor === "completion") return null;
+  const beforeDay = toDayNumber(before);
+  let prev: PlainDate | null = null;
+  for (const date of occurrences(schedule)) {
+    if (toDayNumber(date) >= beforeDay) break;
+    prev = date;
+  }
+  return prev;
+}
+
+/**
+ * The first day the occurrence on `date` may be completed: the day after the one before it, so a daily task
+ * opens on its own day and a weekly one any time that week. Null when it may be completed any time.
+ */
+export function opensOn(schedule: Schedule, date: PlainDate): PlainDate | null {
+  const prev = previousOccurrence(schedule, date);
+  return prev ? addDays(prev, 1) : null;
+}
+
 /**
  * For completion-anchored schedules: the next due date given the local date the previous
  * occurrence was completed (or excused/missed, depending on the task's policy).

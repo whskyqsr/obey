@@ -6,6 +6,7 @@ import {
   nextAfterCompletion,
   nextOccurrence,
   occurrencesBetween,
+  opensOn,
   splitSeries,
   validateSchedule,
   weekdayOf,
@@ -184,5 +185,17 @@ group("describe", () => {
     expect(describe({ start: "2026-10-16", anchor: "completion", rule: { freq: "daily", interval: 3 } })).toBe(
       "Every 3 days after completion",
     );
+  });
+});
+
+group("opensOn", () => {
+  it("opens the day after the previous occurrence", () => {
+    const daily: Schedule = { start: "2026-10-16", rule: { freq: "daily" } };
+    expect(opensOn(daily, "2026-10-16")).toBeNull();
+    expect(opensOn(daily, "2026-10-18")).toBe("2026-10-18");
+    expect(opensOn({ start: "2026-10-16", rule: { freq: "daily", interval: 3 } }, "2026-10-19")).toBe("2026-10-17");
+    expect(opensOn({ start: "2026-10-12", rule: { freq: "weekly" } }, "2026-10-19")).toBe("2026-10-13");
+    expect(opensOn({ start: "2026-10-16" }, "2026-10-16")).toBeNull();
+    expect(opensOn({ start: "2026-10-16", anchor: "completion", rule: { freq: "daily", interval: 3 } }, "2026-10-19")).toBeNull();
   });
 });

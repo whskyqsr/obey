@@ -137,6 +137,16 @@ describe("tasks and occurrences", () => {
     expect((await dom.post(`/relationships/${relId}/tasks`, bad)).status).toBe(400);
   });
 
+  it("doesn't let a sub complete a daily task before its day", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    await dom.post(`/relationships/${relId}/tasks`, task(subId, { schedule: { start: "2026-10-16", rule: { freq: "daily" } } }));
+    const [today, tomorrow] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-17`)).body;
+    expect([today.opensOn, tomorrow.opensOn]).toEqual([null, "2026-10-17"]);
+    expect((await sub.post(`/occurrences/${tomorrow.id}/complete`)).status).toBe(409);
+    expect((await sub.post(`/occurrences/${today.id}/complete`)).body.status).toBe("completed");
+    expect((await dom.post(`/occurrences/${tomorrow.id}/complete`)).body.status).toBe("completed");
+  });
+
   it("awards points on completion exactly once", async () => {
     const { dom, sub, relId, subId } = await ctx.pair();
     await dom.post(`/relationships/${relId}/tasks`, task(subId));

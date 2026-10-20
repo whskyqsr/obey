@@ -10,6 +10,7 @@ import {
   localTime,
   nextAfterCompletion,
   occurrencesBetween,
+  opensOn,
   splitSeries,
 } from "@obey/recurrence";
 import type { Tx } from "../db/index.js";
@@ -123,6 +124,10 @@ export async function completeOccurrence(
   const isAssignee = actor.userId === series.assigneeId;
   if (!isAssignee && !canManage(actor.role)) throw forbidden("only the assignee can complete this");
   if (occ.status !== "pending") throw new HttpError(409, `occurrence is ${occ.status}`);
+  // The assignee can't work ahead into the next occurrence's turn (tomorrow's daily check-in today); a Dominant can.
+  const opens = opensOn(series.schedule, occ.originalDate);
+  if (isAssignee && !canManage(actor.role) && opens && localDate(now, series.timezone) < opens)
+    throw new HttpError(409, `this one opens on ${opens}`);
   if (noteMd !== undefined) await db.update(occurrences).set({ noteMd }).where(eq(occurrences.id, occ.id));
   if (series.approvalRequired && isAssignee && !canManage(actor.role)) {
     const [submitted] = await db

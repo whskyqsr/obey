@@ -80,7 +80,7 @@ fun OccurrenceRow(
         modifier = if (onOpen != null) modifier.clickable(onClick = onOpen) else modifier,
         colors = ListItemDefaults.colors(),
         leadingContent = {
-            val canComplete = actions.onComplete != null && occurrence.status == OccurrenceStatus.Pending
+            val canComplete = actions.onComplete != null && occurrence.status == OccurrenceStatus.Pending && occurrence.isOpen()
             IconButton(onClick = { actions.onComplete?.invoke() }, enabled = canComplete) {
                 when (occurrence.status) {
                     OccurrenceStatus.Completed -> Icon(Icons.Outlined.CheckCircle, "Completed", tint = MaterialTheme.colorScheme.primary)
@@ -110,7 +110,7 @@ fun OccurrenceRow(
                     IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "More") }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         if (occurrence.status == OccurrenceStatus.Pending) {
-                            actions.onCompleteWithNote?.let {
+                            if (occurrence.isOpen()) actions.onCompleteWithNote?.let {
                                 DropdownMenuItem(
                                     text = { Text("Done, with a note") },
                                     leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Notes, null) },

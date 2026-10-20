@@ -225,7 +225,12 @@ data class Occurrence(
     val status: OccurrenceStatus,
     val completedAt: String? = null,
     val noteMd: String? = null,
-)
+    /** "YYYY-MM-DD": the first day the assignee may complete it; null when any time is fine. */
+    val opensOn: String? = null,
+) {
+    /** Tomorrow's daily task waits for its day; the API refuses it before then. */
+    fun isOpen(today: java.time.LocalDate = java.time.LocalDate.now()) = opensOn == null || !java.time.LocalDate.parse(opensOn).isAfter(today)
+}
 
 /** A past occurrence in a task's history, with the points it earned or cost. */
 @Serializable

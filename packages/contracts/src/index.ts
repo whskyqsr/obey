@@ -133,6 +133,8 @@ export const occurrence = z.object({
   status: occurrenceStatus,
   completedAt: z.string().nullable(),
   noteMd: z.string().nullable(),
+  /** The first day the assignee may complete it (the day after the previous occurrence); null when any time is fine. */
+  opensOn: plainDate.nullable().default(null),
 });
 export type Occurrence = z.infer<typeof occurrence>;
 
