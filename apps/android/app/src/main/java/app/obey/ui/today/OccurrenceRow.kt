@@ -48,6 +48,8 @@ data class OccurrenceActions(
     val onEditTask: (() -> Unit)? = null,
     val onApprove: (() -> Unit)? = null,
     val onReject: (() -> Unit)? = null,
+    /** A Dominant excusing a miss: no penalty, and the streak holds. */
+    val onExcuse: (() -> Unit)? = null,
 )
 
 @Composable
@@ -100,7 +102,9 @@ fun OccurrenceRow(
             }
         },
         trailingContent = {
-            if (actions.onApprove != null || actions.onReject != null) {
+            if (actions.onExcuse != null) {
+                androidx.compose.material3.TextButton(onClick = actions.onExcuse) { Text("Excuse") }
+            } else if (actions.onApprove != null || actions.onReject != null) {
                 Row {
                     actions.onReject?.let { IconButton(onClick = it) { Icon(Icons.Outlined.Close, "Send back") } }
                     actions.onApprove?.let { IconButton(onClick = it) { Icon(Icons.Outlined.TaskAlt, "Approve") } }

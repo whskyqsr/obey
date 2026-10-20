@@ -3,6 +3,7 @@ package app.obey.ui.today
 import androidx.lifecycle.viewModelScope
 import app.obey.api.CompleteOccurrenceInput
 import app.obey.api.DecideInput
+import app.obey.api.EditOccurrenceInput
 import app.obey.api.ObeyApi
 import app.obey.api.Occurrence
 import app.obey.api.OccurrenceStatus
@@ -31,10 +32,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 data class TodayData(
+    /** Before today and still open (not yet marked missed). */
     val overdue: List<Occurrence>,
+    /** Everything due today, any status, by due time. */
     val today: List<Occurrence>,
     val awaitingReview: List<Occurrence>,
-    val done: List<Occurrence>,
+    /** Misses from today and yesterday, for a Dominant to excuse. */
+    val recentMisses: List<Occurrence>,
+    /** The next few days with something pending. */
+    val later: List<Pair<LocalDate, List<Occurrence>>>,
     /** Pending extension requests, one entry per request; a whole-day request's rows share an entry. */
     val requests: List<List<RescheduleRequest>>,
     /** By task id; empty if streaks couldn't load, so the rest of Today still shows. */
@@ -66,25 +72,21 @@ class TodayViewModel @Inject constructor(
         val relId = sessions.requireRelationshipId()
         val today = LocalDate.now()
         // Overdue items can be up to the grace window old; two weeks back is plenty for a Today view.
-        val occ = async { api.occurrences(relId, today.minusDays(14).toString(), today.toString()) }
+        val occ = async { api.occurrences(relId, today.minusDays(14).toString(), today.plusDays(7).toString()) }
         val reqs = async { api.reschedules(relId) }
         val streaks = async { runCatching { api.streaks(relId) }.getOrDefault(emptyList()) }
         val all = occ.await()
         val now = Instant.now()
         fun dueDate(o: Occurrence) = parseInstant(o.dueAt).local().toLocalDate()
         val byDue = compareBy<Occurrence> { parseInstant(it.dueAt) }
+        val live = all.filter { it.status != OccurrenceStatus.Cancelled }
         TodayData(
-            overdue = all.filter {
-                (it.status == OccurrenceStatus.Pending && parseInstant(it.dueAt).isBefore(now)) ||
-                    it.status == OccurrenceStatus.Missed && dueDate(it) == today
-            }.sortedWith(byDue),
-            today = all.filter {
-                it.status == OccurrenceStatus.Pending && dueDate(it) == today && !parseInstant(it.dueAt).isBefore(now)
-            }.sortedWith(byDue),
-            awaitingReview = all.filter { it.status == OccurrenceStatus.Submitted }.sortedWith(byDue),
-            done = all.filter {
-                it.status == OccurrenceStatus.Completed && it.completedAt?.let { c -> parseInstant(c).local().toLocalDate() == today } == true
-            },
+            overdue = live.filter { it.status == OccurrenceStatus.Pending && parseInstant(it.dueAt).isBefore(now) && dueDate(it) < today }.sortedWith(byDue),
+            today = live.filter { dueDate(it) == today }.sortedWith(byDue),
+            awaitingReview = live.filter { it.status == OccurrenceStatus.Submitted }.sortedWith(byDue),
+            recentMisses = live.filter { it.status == OccurrenceStatus.Missed && !dueDate(it).isBefore(today.minusDays(1)) }.sortedWith(byDue),
+            later = live.filter { it.status == OccurrenceStatus.Pending && dueDate(it) > today }
+                .sortedWith(byDue).groupBy { dueDate(it) }.toList().take(3),
             requests = reqs.await()
                 // A Dom decides other people's requests; everyone else sees only their own, as "waiting".
                 .filter { sessions.session?.canManage == true || it.requestedBy == sessions.session?.userId }
@@ -94,9 +96,25 @@ class TodayViewModel @Inject constructor(
         )
     }
 
+    private val _completed = MutableStateFlow<Occurrence?>(null)
+    /** The occurrence just completed, for the screen's snackbar with Undo. */
+    val completed: StateFlow<Occurrence?> = _completed.asStateFlow()
+    fun completedShown() { _completed.value = null }
+
     fun complete(o: Occurrence, note: String? = null) = action {
-        api.complete(o.id, CompleteOccurrenceInput(noteMd = note?.takeIf { it.isNotBlank() }))
-        say("Marked “${o.title}” done")
+        val r = api.complete(o.id, CompleteOccurrenceInput(noteMd = note?.takeIf { it.isNotBlank() }))
+        _completed.value = r.copy(title = o.title)
+        refresh()
+    }
+
+    fun undoComplete(o: Occurrence) = action {
+        api.undoComplete(o.id)
+        refresh()
+    }
+
+    fun excuse(o: Occurrence) = action {
+        api.editOccurrence(o.id, EditOccurrenceInput(status = OccurrenceStatus.Excused))
+        say("Excused")
         refresh()
     }
 

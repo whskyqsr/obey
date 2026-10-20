@@ -18,13 +18,16 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -112,34 +115,53 @@ fun TodayScreen(
                     onEditTask = if (session?.canManage == true) ({ onEditTask(o.seriesId) }) else null,
                 )
 
+                val isDom = session?.canManage == true
+                val reviewIds = d.awaitingReview.map { it.id }.toSet()
+                val missIds = d.recentMisses.map { it.id }.toSet()
+                val needs = if (isDom) d.requests.size + d.awaitingReview.size + d.recentMisses.size else 0
+                val restOfToday = if (isDom) d.today.filter { it.id !in reviewIds && it.id !in missIds } else d.today
+                fun row(o: Occurrence, actions: OccurrenceActions = actionsFor(o)): @Composable () -> Unit = {
+                    SwipeableRow(
+                        o,
+                        onDone = if (o.assigneeId == me && o.status == OccurrenceStatus.Pending && o.isOpen()) ({ vm.complete(o) }) else null,
+                        onMoreTime = if (o.assigneeId == me && o.status == OccurrenceStatus.Pending) ({ rescheduling = o }) else null,
+                    ) {
+                        OccurrenceRow(o, nameFor(o), actions, onOpen = { onOpenTask(o.seriesId) }, streak = d.streaks[o.seriesId])
+                    }
+                }
+
                 LazyColumn(Modifier.fillMaxSize()) {
+                    if (!isDom) {
+                        val counted = d.today.filter { it.status != OccurrenceStatus.Excused }
+                        if (counted.isNotEmpty()) item(key = "progress") { ProgressCard(counted) }
+                    }
+                    if (isDom && needs > 0) {
+                        item(key = "h-needs") { SectionHeader("Needs you · $needs") }
+                    }
                     if (d.requests.isNotEmpty()) {
-                        item(key = "h-req") { SectionHeader(if (session?.canManage == true) "Extension requests" else "Waiting for approval") }
+                        if (!isDom) item(key = "h-req") { SectionHeader("Waiting for approval") }
                         items(d.requests, key = { "r-" + (it.first().groupId ?: it.first().id) }) { rows ->
                             ExtensionRequestCard(
                                 rows = rows,
                                 requester = if (rows.first().requestedBy == me) null else session?.nameOf(rows.first().requestedBy),
-                                canDecide = session?.canManage == true && rows.first().requestedBy != me,
+                                canDecide = isDom && rows.first().requestedBy != me,
                                 onDecide = { vm.decide(rows, it) },
                             )
                         }
                     }
-                    if (session?.canManage == true && d.awaitingReview.isNotEmpty()) {
-                        item(key = "h-rev") { SectionHeader("Needs your approval") }
+                    if (isDom) {
                         items(d.awaitingReview, key = { "v-" + it.id }) { o ->
-                            OccurrenceRow(
-                                o, nameFor(o),
-                                OccurrenceActions(onApprove = { vm.review(o, true) }, onReject = { vm.review(o, false) }),
-                                onOpen = { onOpenTask(o.seriesId) },
-                                streak = d.streaks[o.seriesId],
-                            )
+                            row(o, OccurrenceActions(onApprove = { vm.review(o, true) }, onReject = { vm.review(o, false) }))()
+                        }
+                        items(d.recentMisses, key = { "m-" + it.id }) { o ->
+                            OccurrenceRow(o, nameFor(o), OccurrenceActions(onExcuse = { vm.excuse(o) }), onOpen = { onOpenTask(o.seriesId) }, streak = d.streaks[o.seriesId])
                         }
                     }
                     if (d.overdue.isNotEmpty()) {
                         item(key = "h-over") { SectionHeader("Overdue") }
-                        items(d.overdue, key = { "o-" + it.id }) { o -> OccurrenceRow(o, nameFor(o), actionsFor(o), onOpen = { onOpenTask(o.seriesId) }, streak = d.streaks[o.seriesId]) }
+                        items(d.overdue, key = { "o-" + it.id }) { o -> row(o)() }
                     }
-                    item(key = "h-today") { SectionHeader("Today") }
+                    item(key = "h-today") { SectionHeader(if (isDom && needs > 0) "Rest of today" else "Today") }
                     // Whole-day extension: the user's own open tasks for today, plus today's that already slipped.
                     // Tasks that already have a request waiting aren't offered again.
                     val asked = d.requests.flatten().map { it.occurrenceId }.toSet()
@@ -155,26 +177,37 @@ fun TodayScreen(
                             }
                         }
                     }
-                    if (d.today.isEmpty()) {
+                    if (restOfToday.isEmpty()) {
                         item(key = "e-today") {
                             EmptyBox("Nothing else due today", if (d.overdue.isEmpty()) "Enjoy it, or ask for more." else null)
                         }
                     } else {
-                        items(d.today, key = { "t-" + it.id }) { o -> OccurrenceRow(o, nameFor(o), actionsFor(o), onOpen = { onOpenTask(o.seriesId) }, streak = d.streaks[o.seriesId]) }
+                        items(restOfToday, key = { "t-" + it.id }) { o -> row(o)() }
                     }
-                    val waiting = if (session?.canManage == true) emptyList() else d.awaitingReview
-                    if (waiting.isNotEmpty()) {
-                        item(key = "h-wait") { SectionHeader("Waiting for approval") }
-                        items(waiting, key = { "w-" + it.id }) { o -> OccurrenceRow(o, nameFor(o), OccurrenceActions(), onOpen = { onOpenTask(o.seriesId) }, streak = d.streaks[o.seriesId]) }
-                    }
-                    if (d.done.isNotEmpty()) {
-                        item(key = "h-done") { SectionHeader("Done today") }
-                        items(d.done, key = { "d-" + it.id }) { o -> OccurrenceRow(o, nameFor(o), OccurrenceActions(), onOpen = { onOpenTask(o.seriesId) }, streak = d.streaks[o.seriesId]) }
+                    if (d.later.isNotEmpty()) {
+                        item(key = "h-later") { SectionHeader("Later") }
+                        items(d.later, key = { "l-" + it.first }) { (day, list) ->
+                            LaterDay(day, list) { o -> OccurrenceRow(o, nameFor(o), actionsFor(o), onOpen = { onOpenTask(o.seriesId) }, streak = d.streaks[o.seriesId]) }
+                        }
                     }
                     item(key = "spacer") { androidx.compose.foundation.layout.Spacer(Modifier.padding(48.dp)) }
                 }
             }
         }
+    }
+
+    // A completion gets a snackbar with Undo, like a swipe in Gmail.
+    val completed by vm.completed.collectAsStateWithLifecycle()
+    LaunchedEffect(completed) {
+        val o = completed ?: return@LaunchedEffect
+        vm.completedShown()
+        val sent = o.status == OccurrenceStatus.Submitted
+        val result = snackbar.showSnackbar(
+            "${if (sent) "Sent for approval" else "Done"}: ${o.title}",
+            actionLabel = "Undo",
+            duration = SnackbarDuration.Long,
+        )
+        if (result == SnackbarResult.ActionPerformed) vm.undoComplete(o)
     }
 
     rescheduling?.let { o ->
