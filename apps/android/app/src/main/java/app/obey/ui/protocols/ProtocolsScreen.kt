@@ -1,5 +1,6 @@
 package app.obey.ui.protocols
 
+import androidx.compose.material.icons.outlined.History
 import app.obey.ui.notes.MarkdownPreview
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.draw.clipToBounds
@@ -107,7 +108,7 @@ class ProtocolsViewModel @Inject constructor(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProtocolsScreen(onOpen: (String) -> Unit, onNew: () -> Unit, onOpenSettings: () -> Unit, vm: ProtocolsViewModel = hiltViewModel()) {
+fun ProtocolsScreen(onOpen: (String) -> Unit, onNew: () -> Unit, onOpenSettings: () -> Unit, onOpenLog: () -> Unit, vm: ProtocolsViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -121,7 +122,15 @@ fun ProtocolsScreen(onOpen: (String) -> Unit, onNew: () -> Unit, onOpenSettings:
     var expanded by remember { mutableStateOf(setOf<String>()) }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Protocols") }, actions = { SettingsAction(onOpenSettings) }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Protocols") },
+                actions = {
+                    IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.History, "Broken-rule log") }
+                    SettingsAction(onOpenSettings)
+                },
+            )
+        },
         floatingActionButton = {
             if (canManage) ExtendedFloatingActionButton(onClick = onNew, icon = { Icon(Icons.Outlined.Add, null) }, text = { Text("Protocol") })
         },

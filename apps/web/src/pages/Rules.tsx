@@ -45,7 +45,15 @@ export function RulesPage() {
 
   return (
     <>
-      <PageHeader title="Rules" subtitle={`${rules.length} rule${rules.length === 1 ? "" : "s"}`} />
+      <PageHeader
+        title="Rules"
+        subtitle={`${rules.length} rule${rules.length === 1 ? "" : "s"}`}
+        actions={
+          <Link to="/rule-log" className="state-layer flex h-10 items-center gap-2 rounded-full border border-outline px-4 text-label-large text-primary">
+            <Icon name="history" size={18} /> Broken-rule log
+          </Link>
+        }
+      />
       {categories.length > 0 && (
         <div className="flex gap-2 overflow-x-auto px-4 pb-4 md:px-6">
           <Chip selected={!category} onClick={() => setCategory(null)}>

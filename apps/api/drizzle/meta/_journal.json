@@ -141,6 +141,13 @@
       "when": 1792523793248,
       "tag": "0019_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792524054735,
+      "tag": "0020_rule_log",
+      "breakpoints": true
     }
   ]
 }

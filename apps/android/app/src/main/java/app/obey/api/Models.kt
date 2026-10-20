@@ -661,3 +661,32 @@ data class Limit(
 
 @Serializable
 data class LimitInput(val title: String, val kind: LimitKind, val note: String = "")
+
+/** A broken rule or protocol; [title] is what it was called when logged. */
+@Serializable
+data class RuleLogEntry(
+    val id: String,
+    val relationshipId: String,
+    val subjectId: String,
+    val loggedBy: String,
+    val ruleId: String? = null,
+    val protocolId: String? = null,
+    val title: String,
+    val note: String = "",
+    val occurredOn: String,
+    val consequenceTaskId: String? = null,
+    val createdAt: String,
+)
+
+@Serializable
+data class RuleLogConsequence(val consequenceId: String, val date: String, val dueTime: String?, val timezone: String, val approvalRequired: Boolean)
+
+@Serializable
+data class RuleLogInput(
+    val subjectId: String,
+    val ruleId: String?,
+    val protocolId: String?,
+    val note: String,
+    val occurredOn: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val consequence: RuleLogConsequence? = null,
+)

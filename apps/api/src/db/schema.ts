@@ -147,6 +147,31 @@ export const limits = pgTable(
   (t) => [index("limits_relationship_idx").on(t.relationshipId)],
 );
 
+/** Broken rules and protocols, newest first; the title is a snapshot so entries outlive renames and deletions. */
+export const ruleLog = pgTable(
+  "rule_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    subjectId: uuid("subject_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    loggedBy: uuid("logged_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    ruleId: uuid("rule_id").references(() => rules.id, { onDelete: "set null" }),
+    protocolId: uuid("protocol_id").references(() => protocols.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    note: text("note").notNull().default(""),
+    occurredOn: date("occurred_on", { mode: "string" }).notNull(),
+    consequenceTaskId: uuid("consequence_task_id").references((): AnyPgColumn => taskSeries.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("rule_log_relationship_idx").on(t.relationshipId, t.occurredOn)],
+);
+
 export const taskSeries = pgTable(
   "task_series",
   {

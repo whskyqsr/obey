@@ -136,6 +136,15 @@ interface ObeyApi {
     @POST("occurrences/{id}/review")
     suspend fun review(@Path("id") occurrenceId: String, @Body body: ReviewOccurrenceInput): Occurrence
 
+    @GET("relationships/{id}/rule-log")
+    suspend fun ruleLog(@Path("id") relationshipId: String): List<RuleLogEntry>
+
+    @POST("relationships/{id}/rule-log")
+    suspend fun addRuleLog(@Path("id") relationshipId: String, @Body body: RuleLogInput): RuleLogEntry
+
+    @DELETE("rule-log/{id}")
+    suspend fun deleteRuleLog(@Path("id") id: String)
+
     @GET("relationships/{id}/limits")
     suspend fun limits(@Path("id") relationshipId: String): List<Limit>
 

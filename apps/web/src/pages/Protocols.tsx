@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { Suspense, lazy, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useLibrary, useReorder } from "../api/hooks";
@@ -36,6 +37,11 @@ export function ProtocolsPage() {
       <PageHeader
         title="Protocols"
         subtitle={`${protocols.length} protocol${protocols.length === 1 ? "" : "s"}`}
+        actions={
+          <Link to="/rule-log" className="state-layer flex h-10 items-center gap-2 rounded-full border border-outline px-4 text-label-large text-primary">
+            <Icon name="history" size={18} /> Broken-rule log
+          </Link>
+        }
       />
       <ol className="flex flex-col gap-2 px-4 md:px-6">
         {list.isLoading && <Loading />}

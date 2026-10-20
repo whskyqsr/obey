@@ -736,6 +736,43 @@ describe("limits", () => {
   });
 });
 
+describe("broken-rule log", () => {
+  it("logs a broken rule with a consequence, and lets a sub own up to one", async () => {
+    const { dom, sub, relId, subId, domId } = await ctx.pair();
+    const rule = (await dom.post(`/relationships/${relId}/rules`, { title: "Ask before buying anything over $50" })).body;
+    const proto = (await dom.post(`/relationships/${relId}/protocols`, { title: "Kneel when greeting", ruleId: null })).body;
+    const c = (await dom.post(`/relationships/${relId}/consequences`, { title: "Write lines" })).body;
+
+    const logged = await dom.post(`/relationships/${relId}/rule-log`, {
+      subjectId: subId,
+      ruleId: rule.id,
+      note: "New headphones",
+      occurredOn: "2026-10-16",
+      consequence: { consequenceId: c.id, date: "2026-10-17", dueTime: "20:00", timezone: "America/New_York" },
+    });
+    expect(logged.status).toBe(201);
+    expect(logged.body).toMatchObject({ subjectId: subId, loggedBy: domId, title: "Ask before buying anything over $50", note: "New headphones" });
+    expect(logged.body.consequenceTaskId).toBeTruthy();
+    expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [subId], push: { body: "Dom logged a broken rule and gave you a consequence" } });
+    expect((await sub.get(`/relationships/${relId}/tasks`)).body.some((t: { id: string }) => t.id === logged.body.consequenceTaskId)).toBe(true);
+
+    // A sub owns up to their own, can't log a partner's, and can't hand out consequences.
+    const own = await sub.post(`/relationships/${relId}/rule-log`, { subjectId: subId, protocolId: proto.id, occurredOn: "2026-10-17" });
+    expect(own.body.title).toBe("Kneel when greeting");
+    expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [domId], push: { body: "Sub owned up to a broken rule" } });
+    expect((await sub.post(`/relationships/${relId}/rule-log`, { subjectId: domId, ruleId: rule.id, occurredOn: "2026-10-17" })).status).toBe(403);
+    expect((await sub.post(`/relationships/${relId}/rule-log`, { subjectId: subId, occurredOn: "2026-10-17" })).status).toBe(400);
+
+    // Newest first; the title survives the rule being deleted.
+    await dom.del(`/rules/${rule.id}`);
+    const log = (await sub.get(`/relationships/${relId}/rule-log`)).body;
+    expect(log.map((e: { title: string }) => e.title)).toEqual(["Kneel when greeting", "Ask before buying anything over $50"]);
+    expect(log[1].ruleId).toBeNull();
+    expect((await sub.del(`/rule-log/${logged.body.id}`)).status).toBe(403);
+    expect((await sub.del(`/rule-log/${own.body.id}`)).status).toBe(204);
+  });
+});
+
 describe("push payloads", () => {
   it("sends Android data only, so the app titles it with the discreet-mode name", () => {
     const [web, android] = fcmMessages(

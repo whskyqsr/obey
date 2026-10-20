@@ -10,6 +10,7 @@ export type WeekStart = c.WeekStart;
 export type QuietHours = c.QuietHours;
 export type Limit = c.Limit;
 export type LimitKind = c.LimitKind;
+export type RuleLogEntry = c.RuleLogEntry;
 export type Relationship = c.Relationship;
 export type DynamicDate = c.DynamicDate;
 export type Features = c.Features;

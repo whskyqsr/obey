@@ -1,5 +1,7 @@
 package app.obey.ui.rules
 
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -114,7 +116,7 @@ private data class Editing(val rule: Rule?)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, vm: RulesViewModel = hiltViewModel()) {
+fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, onOpenLog: () -> Unit, vm: RulesViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -130,7 +132,15 @@ fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, vm
     var editing by remember { mutableStateOf<Editing?>(null) }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Rules") }, actions = { SettingsAction(onOpenSettings) }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Rules") },
+                actions = {
+                    IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.History, "Broken-rule log") }
+                    SettingsAction(onOpenSettings)
+                },
+            )
+        },
         floatingActionButton = {
             if (canManage) FloatingActionButton(onClick = { editing = Editing(null) }) { Icon(Icons.Outlined.Add, "New rule") }
         },

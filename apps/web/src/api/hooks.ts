@@ -20,6 +20,7 @@ import type {
   QuietHours,
   Limit,
   LimitKind,
+  RuleLogEntry,
   Invite,
   LedgerEntry,
   LibraryKind,
@@ -477,6 +478,29 @@ export function useSaveLimit(rel: string) {
 export function useDeleteLimit(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({ mutationFn: (id: string) => api(`/limits/${id}`, { method: "DELETE" }), onSuccess: () => invalidate() });
+}
+
+export function useRuleLog(rel: string) {
+  return useQuery({ queryKey: ["rel", rel, "rule-log"], queryFn: () => api<RuleLogEntry[]>(`/relationships/${rel}/rule-log`) });
+}
+
+export type RuleLogInput = {
+  subjectId: string;
+  ruleId: string | null;
+  protocolId: string | null;
+  note: string;
+  occurredOn: string;
+  consequence?: { consequenceId: string; date: string; dueTime: string | null; timezone: string; approvalRequired: boolean };
+};
+
+export function useAddRuleLog(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({ mutationFn: (input: RuleLogInput) => api<RuleLogEntry>(`/relationships/${rel}/rule-log`, { method: "POST", body: input }), onSuccess: () => invalidate() });
+}
+
+export function useDeleteRuleLog(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({ mutationFn: (id: string) => api(`/rule-log/${id}`, { method: "DELETE" }), onSuccess: () => invalidate() });
 }
 
 export function useDeleteLibraryItem(rel: string, kind: LibraryKind) {

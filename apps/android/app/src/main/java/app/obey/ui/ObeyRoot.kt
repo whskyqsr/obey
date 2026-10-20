@@ -77,6 +77,7 @@ import app.obey.ui.rewards.RewardsScreen
 import app.obey.ui.protocols.ProtocolEditorScreen
 import app.obey.ui.protocols.ProtocolsScreen
 import app.obey.ui.limits.LimitsScreen
+import app.obey.ui.rulelog.RuleLogScreen
 import androidx.compose.material.icons.outlined.Shield
 import app.obey.ui.rules.RulesScreen
 import app.obey.ui.settings.DynamicScreen
@@ -274,12 +275,16 @@ private fun ObeyNavHost(nav: NavHostController) {
         }
         composable<RewardsRoute> { RewardsScreen(onOpenSettings = settings) }
         composable<ConsequencesRoute> { RewardsScreen(onOpenSettings = settings, consequences = true) }
-        composable<RulesRoute> { RulesScreen(onOpenSettings = settings, onOpenProtocol = { nav.navigate(ProtocolEditorRoute(protocolId = it)) }) }
+        composable<RulesRoute> {
+            RulesScreen(onOpenSettings = settings, onOpenProtocol = { nav.navigate(ProtocolEditorRoute(protocolId = it)) }, onOpenLog = { nav.navigate(RuleLogRoute) })
+        }
+        composable<RuleLogRoute> { RuleLogScreen(onBack = { nav.popBackStack() }, onOpenTask = openTask) }
         composable<ProtocolsRoute> {
             ProtocolsScreen(
                 onOpen = { nav.navigate(ProtocolEditorRoute(protocolId = it)) },
                 onNew = { nav.navigate(ProtocolEditorRoute()) },
                 onOpenSettings = settings,
+                onOpenLog = { nav.navigate(RuleLogRoute) },
             )
         }
         composable<LimitsRoute> { LimitsScreen(onOpenSettings = settings) }

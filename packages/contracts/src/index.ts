@@ -371,6 +371,35 @@ export const limitInput = z.object({
 export const limit = limitInput.extend({ id, relationshipId: id, ownerId: id, createdAt: z.string(), updatedAt: z.string() });
 export type Limit = z.infer<typeof limit>;
 
+/** A rule or protocol someone broke, logged by a Dominant or owned up to by the person themselves. */
+export const ruleLogInput = z
+  .object({
+    subjectId: id,
+    ruleId: id.nullable().default(null),
+    protocolId: id.nullable().default(null),
+    note: z.string().trim().max(2_000).default(""),
+    occurredOn: plainDate,
+    /** A Dominant may hand out a consequence in the same step; it becomes a task like any assigned consequence. */
+    consequence: assignConsequence.omit({ assigneeId: true, reason: true }).extend({ consequenceId: id }).optional(),
+  })
+  .refine((v) => v.ruleId || v.protocolId, "pick the rule or protocol that was broken");
+export const ruleLogEntry = z.object({
+  id,
+  relationshipId: id,
+  subjectId: id,
+  loggedBy: id,
+  ruleId: id.nullable(),
+  protocolId: id.nullable(),
+  /** What it was called when logged, so the entry still reads right if the rule is renamed or deleted. */
+  title: z.string(),
+  note: z.string(),
+  occurredOn: plainDate,
+  /** The consequence task given for it, if any. */
+  consequenceTaskId: id.nullable(),
+  createdAt: z.string(),
+});
+export type RuleLogEntry = z.infer<typeof ruleLogEntry>;
+
 /** A full ordering of a relationship's rules or protocols, top first. */
 export const reorderInput = z.object({ ids: z.array(id).max(1000) });
 
