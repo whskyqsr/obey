@@ -49,6 +49,7 @@ private val HistoryEntry.label: String
         OccurrenceStatus.Completed -> "Done"
         OccurrenceStatus.Missed -> "Missed"
         OccurrenceStatus.Excused -> "Excused"
+        OccurrenceStatus.Cancelled -> "Called off"
         OccurrenceStatus.Submitted -> "Awaiting review"
         else -> status.name
     }
@@ -68,7 +69,7 @@ fun TaskHistorySection(history: List<HistoryEntry>, onEdit: ((HistoryEntry, Occu
     }
     history.forEach { h ->
         ListItem(
-            modifier = if (onEdit != null) Modifier.clickable { editing = h } else Modifier,
+            modifier = if (onEdit != null && h.status != OccurrenceStatus.Cancelled) Modifier.clickable { editing = h } else Modifier,
             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
             headlineContent = { Text(formatDate(LocalDate.parse(h.originalDate))) },
             supportingContent = {

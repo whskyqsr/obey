@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lt, lte, or, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
@@ -228,7 +228,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       .where(
         and(
           inArray(occurrences.seriesId, ids),
-          inArray(occurrences.status, ["submitted", "completed", "missed", "excused"]),
+          or(inArray(occurrences.status, ["submitted", "completed", "missed", "excused"]), eq(occurrences.calledOff, true)),
           q.before ? lt(occurrences.dueAt, new Date(q.before)) : undefined,
         ),
       )

@@ -494,12 +494,21 @@ describe("rescheduling", () => {
     const { dom, sub, relId, first } = await withTask("request");
     await sub.post(`/relationships/${relId}/reschedules/plan`, { items: [{ occurrenceId: first.id, action: "cancel" }] });
     const [asked] = (await dom.get(`/relationships/${relId}/reschedules?status=requested`)).body;
-    expect((await dom.post(`/reschedules/${asked.id}/decide`, { approve: true })).body.occurrence.status).toBe("excused");
+    expect((await dom.post(`/reschedules/${asked.id}/decide`, { approve: true })).body.occurrence.status).toBe("cancelled");
     expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Your request to call off a task was approved");
 
     const [next] = (await dom.get(`/relationships/${relId}/occurrences?from=2026-10-19&to=2026-10-19`)).body;
     const direct = await dom.post(`/relationships/${relId}/reschedules/plan`, { items: [{ occurrenceId: next.id, action: "cancel" }] });
-    expect(direct.body).toMatchObject({ applied: true, occurrences: [{ status: "excused" }] });
+    expect(direct.body).toMatchObject({ applied: true, occurrences: [{ status: "cancelled" }] });
+    // Called-off occurrences leave the schedule but stay in the task's history.
+    expect((await dom.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-19`)).body.map((o: { id: string }) => o.id)).not.toContain(next.id);
+    const history = (await dom.get(`/tasks/${next.seriesId}/history`)).body as { id: string; status: string }[];
+    expect(
+      history
+        .filter((o) => o.status === "cancelled")
+        .map((o) => o.id)
+        .sort(),
+    ).toEqual([first.id, next.id].sort());
   });
 
   it("rejects deadlines in the past", async () => {

@@ -1,0 +1,1 @@
+ALTER TABLE "occurrences" ADD COLUMN "called_off" boolean DEFAULT false NOT NULL;

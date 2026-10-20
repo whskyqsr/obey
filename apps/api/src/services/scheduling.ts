@@ -530,11 +530,15 @@ export async function requestGroupReschedule(
 }
 
 /** Decides a request, or every pending request in its group. Returns the decided rows and their occurrences. */
-/** Calls an occurrence off: it becomes excused, with any miss consequence and points undone. */
-export async function excuseOccurrence(db: Tx, series: Series, occ: Occurrence, editorId: string, now: Date): Promise<Occurrence> {
+/**
+ * Calls an occurrence off. One still to come is cancelled, so it drops out of Today and the calendar as if deleted
+ * (the row stays so the series doesn't recreate it) and shows only in history. A missed one becomes excused, with any
+ * miss consequence and points undone.
+ */
+export async function callOffOccurrence(db: Tx, series: Series, occ: Occurrence, editorId: string, now: Date): Promise<Occurrence> {
   if (occ.status === "missed") return editOccurrence(db, series, occ, editorId, { status: "excused" }, now);
   if (occ.status !== "pending") throw new HttpError(409, `occurrence is ${occ.status}`);
-  const [updated] = await db.update(occurrences).set({ status: "excused", editedBy: editorId, editedAt: now }).where(eq(occurrences.id, occ.id)).returning();
+  const [updated] = await db.update(occurrences).set({ status: "cancelled", calledOff: true, editedBy: editorId, editedAt: now }).where(eq(occurrences.id, occ.id)).returning();
   return updated!;
 }
 
@@ -586,7 +590,7 @@ export async function requestPlanReschedule(
       .returning();
     requests.push(request!);
     if (!now_) result.push(occ);
-    else if (action === "cancel") result.push(await excuseOccurrence(db, series, occ, actor.userId, now));
+    else if (action === "cancel") result.push(await callOffOccurrence(db, series, occ, actor.userId, now));
     else result.push(await applyReschedule(db, series, occ, "this", dueAt!, now, materializeDays));
   }
   return { groupId, requests, occurrences: result, asked: requests.filter((r) => r.status === "requested").length };
@@ -638,7 +642,7 @@ export async function decideReschedule(
     if (approve && (occurrence.status === "pending" || occurrence.status === "missed"))
       occurrence =
         r.kind === "cancel"
-          ? await excuseOccurrence(db, row!.series, occurrence, deciderId, now)
+          ? await callOffOccurrence(db, row!.series, occurrence, deciderId, now)
           : await applyReschedule(db, row!.series, occurrence, r.scope, r.toDueAt, now, materializeDays);
     results.push({ request: r, occurrence, series: row!.series });
   }
