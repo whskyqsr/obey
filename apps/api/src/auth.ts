@@ -12,6 +12,8 @@ export interface Identity {
   email: string | null;
   /** The email only when the provider vouches for it; admin rights hang on this, never on a typed address. */
   verifiedEmail: string | null;
+  /** An email-and-password account that hasn't confirmed its address yet; only a few routes accept it. */
+  unverified?: boolean;
 }
 
 /** Turns a request into the caller's identity, or throws 401. */
@@ -35,24 +37,26 @@ export function createAuthenticator(opts: { devAuth: boolean; firebase: Firebase
       } catch {
         throw new HttpError(401, "invalid token");
       }
-      // Email-and-password sign-ups must confirm their address before using the app; Google vouches for its own.
-      if (token.firebase?.sign_in_provider === "password" && token.email_verified !== true) throw new HttpError(403, "verify your email");
       return {
         uid: `firebase:${token.uid}`,
         displayName: initialDisplayName(token.name as string | undefined, token.email),
         email: token.email ?? null,
         verifiedEmail: token.email && token.email_verified === true ? token.email : null,
+        // Email-and-password sign-ups must confirm their address before using the app; Google vouches for its own.
+        unverified: token.firebase?.sign_in_provider === "password" && token.email_verified !== true,
       };
     }
     const dev = req.headers["x-dev-user"];
     if (opts.devAuth && typeof dev === "string" && UUID.test(dev)) {
       const name = req.headers["x-dev-name"];
       const email = req.headers["x-dev-email"];
+      const unverified = req.headers["x-dev-unverified"] === "1";
       return {
         uid: `dev:${dev.toLowerCase()}`,
         displayName: typeof name === "string" ? name : `Dev ${dev.slice(0, 4)}`,
-        email: null,
-        verifiedEmail: typeof email === "string" ? email : null,
+        email: typeof email === "string" ? email : null,
+        verifiedEmail: typeof email === "string" && !unverified ? email : null,
+        unverified,
       };
     }
     throw new HttpError(401, "sign in required");

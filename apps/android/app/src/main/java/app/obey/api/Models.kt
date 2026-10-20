@@ -105,6 +105,13 @@ data class QuietHoursInput(val quietHours: QuietHours?)
 data class AcceptProofTermsInput(val adult: Boolean = true, val rules: Boolean = true)
 
 @Serializable
+data class VerificationEmailInput(val unused: Boolean? = null)
+
+/** [sent] false: the server can't send its own email, so the app asks Firebase to send its stock one. */
+@Serializable
+data class VerificationEmailResult(val sent: Boolean)
+
+@Serializable
 data class RevealProofsInput(val revealProofs: Boolean)
 
 @Serializable

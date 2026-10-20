@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { RouterProvider } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMe } from "./api/hooks";
-import { ApiError } from "./api/client";
-import { needsVerification, signOut } from "./auth/session";
+import { ApiError, isUnverified } from "./api/client";
+import { getSession, needsVerification, signOut } from "./auth/session";
 import { useSession } from "./auth/useSession";
 import { Button, ErrorBox, Loading } from "./components/ui";
 import { RelationshipProvider } from "./lib/relationship";
@@ -12,6 +12,7 @@ import { AcceptInvite } from "./pages/AcceptInvite";
 import { Onboarding } from "./pages/Onboarding";
 import { SignInPage } from "./pages/SignIn";
 import { VerifyEmailPage } from "./pages/VerifyEmail";
+import { ConfirmEmailPage } from "./pages/ConfirmEmail";
 import { registerPush } from "./push";
 import { router } from "./router";
 import { AppLockGate } from "./components/AppLock";
@@ -24,6 +25,8 @@ export function App() {
   }, [session, qc]);
 
   if (session === undefined) return <Splash />;
+  // The link in our verification email works signed in or not, and in a different browser.
+  if (location.pathname === "/verify-email") return <ConfirmEmailPage />;
   if (session === null) return <SignInPage />;
   if (needsVerification(session)) return <VerifyEmailPage email={session.kind === "firebase" ? session.email : null} />;
   return (
@@ -43,6 +46,11 @@ function SignedIn() {
   }, [me.data?.user.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (me.isLoading) return <Splash />;
+  // The server has the last word, e.g. when the browser's copy of the account hasn't caught up yet.
+  if (isUnverified(me.error)) {
+    const s = getSession();
+    return <VerifyEmailPage email={s?.kind === "firebase" ? s.email : null} onVerified={() => void me.refetch()} />;
+  }
   if (me.error || !me.data)
     return (
       <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 p-4">

@@ -4,7 +4,7 @@ import { errorMessage } from "../api/client";
 import { Button, Icon } from "../components/ui";
 
 /** Shown to email-and-password accounts until they click the link Firebase emailed them. */
-export function VerifyEmailPage({ email }: { email: string | null }) {
+export function VerifyEmailPage({ email, onVerified }: { email: string | null; onVerified?: () => void }) {
   const [busy, setBusy] = useState<"check" | "resend" | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
@@ -12,7 +12,8 @@ export function VerifyEmailPage({ email }: { email: string | null }) {
     if (!quiet) setBusy("check");
     try {
       const ok = await refreshVerification();
-      if (!ok && !quiet) setNote("Not verified yet. Open the link in the email, then try again.");
+      if (ok) onVerified?.();
+      else if (!quiet) setNote("Not verified yet. Open the link in the email, then try again.");
     } catch (e) {
       if (!quiet) setNote(authErrorMessage(e) ?? errorMessage(e));
     } finally {

@@ -80,11 +80,11 @@ class AuthManager @Inject constructor(
 
     suspend fun createAccount(email: String, password: String) {
         val a = auth ?: error("Firebase isn't configured in this build")
-        val result = a.createUserWithEmailAndPassword(email.trim(), password).await()
-        result.user?.sendEmailVerification()?.await()
+        a.createUserWithEmailAndPassword(email.trim(), password).await()
     }
 
-    suspend fun resendVerification() {
+    /** Firebase's stock email, for when the server can't send our own. */
+    suspend fun sendFirebaseVerification() {
         auth?.currentUser?.sendEmailVerification()?.await()
     }
 

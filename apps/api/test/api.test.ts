@@ -966,4 +966,20 @@ describe("calendar events", () => {
     expect((await dom.post(`/events/${together.body.id}/dismiss`, { occurrenceIds: [timed.id] })).body.conflictIds).toEqual([]);
     expect((await sub.get(`/relationships/${relId}/events?from=2026-10-16&to=2026-10-16`)).body.every((e: { conflictIds: string[] }) => !e.conflictIds.length)).toBe(true);
   });
+
+  describe("email verification", () => {
+    it("keeps unconfirmed email sign-ups out until they verify, but lets them ask for the email", async () => {
+      const headers = { "x-dev-user": crypto.randomUUID(), "x-dev-email": "new@example.com", "x-dev-unverified": "1" };
+      const me = await ctx.app.inject({ method: "GET", url: "/me", headers });
+      expect(me.statusCode).toBe(403);
+      expect(JSON.parse(me.body).details).toEqual({ code: "email_unverified" });
+
+      const send = () => ctx.app.inject({ method: "POST", url: "/me/verification-email", headers, payload: {} });
+      expect(JSON.parse((await send()).body)).toEqual({ sent: true });
+      expect(ctx.verificationEmails.at(-1)).toBe("new@example.com");
+      expect((await send()).statusCode).toBe(429);
+      ctx.clock.now = new Date(ctx.clock.now.getTime() + 61_000);
+      expect((await send()).statusCode).toBe(200);
+    });
+  });
 });

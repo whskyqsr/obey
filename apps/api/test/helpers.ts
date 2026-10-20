@@ -16,6 +16,7 @@ export async function setup() {
 
   const clock = { now: new Date("2026-10-16T12:00:00Z") };
   const notifier = memoryNotifier();
+  const verificationEmails: string[] = [];
   const app = buildApp({
     db,
     authenticate: createAuthenticator({ devAuth: true, firebase: null }),
@@ -23,6 +24,7 @@ export async function setup() {
     now: () => clock.now,
     materializeDays: 14,
     adminEmails: ["mod@example.com"],
+    sendVerification: async (email) => void verificationEmails.push(email),
   });
   await app.ready();
 
@@ -53,5 +55,5 @@ export async function setup() {
     return { dom, sub, relId: rel.id as string, domId: await me(dom), subId: await me(sub) };
   }
 
-  return { app, db, clock, notifier, as, pair, close: async () => (await app.close(), await close()) };
+  return { app, db, clock, notifier, verificationEmails, as, pair, close: async () => (await app.close(), await close()) };
 }
