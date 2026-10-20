@@ -307,7 +307,7 @@ export const planRescheduleInput = z.object({
         .refine((i) => i.action === "cancel" || i.dueAt, { message: "a move needs a new deadline" }),
     )
     .min(1)
-    .max(50),
+    .max(200),
   reason: z.string().max(1_000).optional(),
 });
 export type PlanRescheduleInput = z.input<typeof planRescheduleInput>;

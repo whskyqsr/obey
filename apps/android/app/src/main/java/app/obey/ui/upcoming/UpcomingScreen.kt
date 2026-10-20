@@ -55,6 +55,8 @@ import app.obey.ui.common.parseInstant
 import app.obey.ui.plans.PlanChip
 import app.obey.ui.plans.PlanDialog
 import app.obey.ui.plans.PlanRow
+import app.obey.ui.plans.PlanLegend
+import app.obey.ui.plans.planTone
 import app.obey.ui.plans.isLong
 import java.time.Instant
 import java.time.DayOfWeek
@@ -106,10 +108,10 @@ fun UpcomingScreen(
     }
 
     val planRow: @Composable (CalendarEvent, LocalDate) -> Unit = { e, day ->
-        PlanRow(e, day, if (e.authorId == session?.userId || e.withPartner) null else session?.nameOf(e.authorId)) { plan = e to day }
+        PlanRow(e, day, if (e.authorId == session?.userId || e.withPartner) null else session?.nameOf(e.authorId), planTone(e, session?.relationship)) { plan = e to day }
     }
     val planChip: @Composable (CalendarEvent, LocalDate) -> Unit = { e, day ->
-        PlanChip(e, day, onOpen = { plan = e to day }, modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
+        PlanChip(e, day, planTone(e, session?.relationship), onOpen = { plan = e to day }, modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
     }
 
     Scaffold(
@@ -164,6 +166,7 @@ fun UpcomingScreen(
                 TextButton(onClick = vm::goToday) { Text("Today") }
                 IconButton(onClick = { vm.step(1) }) { Icon(Icons.AutoMirrored.Outlined.ArrowForward, "Next $unit") }
             }
+            PlanLegend(session?.relationship, session?.userId, Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp))
             when (val s = state) {
                 Load.Loading -> LoadingBox()
                 is Load.Failed -> ErrorBox(s.message, vm::refresh)
@@ -172,7 +175,7 @@ fun UpcomingScreen(
                     val events = s.value.eventsOn(selected)
                     LazyColumn(Modifier.fillMaxSize()) {
                         item(key = "grid") {
-                            MonthGrid(s.value, selected, today, onSelect = vm::select, Modifier.padding(horizontal = 8.dp))
+                            MonthGrid(s.value, selected, today, session?.relationship, onSelect = vm::select, Modifier.padding(horizontal = 8.dp))
                         }
                         item(key = "h-selected") {
                             Text(

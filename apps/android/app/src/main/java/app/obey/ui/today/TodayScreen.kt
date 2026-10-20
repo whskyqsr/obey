@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import app.obey.ui.plans.PlanDialog
 import app.obey.ui.plans.PlanHeadsUp
+import app.obey.ui.plans.planTone
 import app.obey.ui.plans.firstDay
 import app.obey.ui.plans.iso
 import androidx.compose.material.icons.Icons
@@ -151,7 +152,7 @@ fun TodayScreen(
 
                 LazyColumn(Modifier.fillMaxSize()) {
                     if (session?.readOnly == true) item(key = "ended") { EndedBanner(onOpenSettings) }
-                    items(d.clashingPlans, key = { "plan-${it.id}" }) { e -> PlanHeadsUp(e) { plan = e } }
+                    items(d.clashingPlans, key = { "plan-${it.id}" }) { e -> PlanHeadsUp(e, planTone(e, session?.relationship)) { plan = e } }
                     if (isDom && d.noTasks && session?.readOnly != true) item(key = "kits") { KitPrompt(onKits) }
                     if (!isDom) {
                         val counted = d.today.filter { it.status != OccurrenceStatus.Excused }

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CalendarEvent, Occurrence } from "../api/types";
 import { fmtDate, fmtTime, isAllDayDue, localDateOf, today } from "../lib/dates";
+import { useRel } from "../lib/relationship";
+import { planTone } from "../lib/planColors";
 import { Icon, cx } from "./ui";
 
 const HOUR = 48; // px per hour
@@ -92,6 +94,7 @@ export function WeekGrid({
   onOpenEvent(e: CalendarEvent): void;
 }) {
   const t = today();
+  const { rel } = useRel();
   const scroller = useRef<HTMLDivElement>(null);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -167,7 +170,7 @@ export function WeekGrid({
                   type="button"
                   onClick={() => onOpenEvent(bar.e!)}
                   style={{ gridColumn: `${bar.from + 1} / ${bar.to + 2}`, gridRow: bar.row + 1 }}
-                  className="state-layer mx-1 flex min-w-0 items-center gap-1 rounded-sm bg-tertiary-container px-2 text-left text-label-large text-on-tertiary-container"
+                  className={cx("state-layer mx-1 flex min-w-0 items-center gap-1 rounded-sm px-2 text-left text-label-large", planTone(bar.e, rel).bg, planTone(bar.e, rel).text)}
                 >
                   <Icon name="event" size={16} className="shrink-0" />
                   <span className="truncate">{bar.e.title}</span>
@@ -215,7 +218,7 @@ export function WeekGrid({
                     type="button"
                     onClick={() => onOpenEvent(b.e)}
                     style={style}
-                    className="state-layer absolute z-10 flex flex-col overflow-hidden rounded-sm bg-tertiary-container px-2 py-1 text-left text-on-tertiary-container"
+                    className={cx("state-layer absolute z-10 flex flex-col overflow-hidden rounded-sm px-2 py-1 text-left", planTone(b.e, rel).bg, planTone(b.e, rel).text)}
                   >
                     <span className="truncate text-label-large">{b.e.title}</span>
                     {height > 40 && (
@@ -277,6 +280,7 @@ export function MonthWeeks({
   onOpenEvent(e: CalendarEvent): void;
 }) {
   const t = today();
+  const { rel } = useRel();
   const weeks = Array.from({ length: days.length / 7 }, (_, i) => days.slice(i * 7, i * 7 + 7));
   const long = events.filter(inTopStrip);
   return (
@@ -314,7 +318,11 @@ export function MonthWeeks({
                 type="button"
                 onClick={() => onOpenEvent(bar.e!)}
                 style={{ gridColumn: `${bar.from + 1} / ${bar.to + 2}`, gridRow: bar.row + 2 }}
-                className="state-layer relative z-10 mx-1 my-0.5 flex min-w-0 items-center gap-1 rounded-xs bg-tertiary-container px-1.5 text-left text-label-medium text-on-tertiary-container"
+                className={cx(
+                  "state-layer relative z-10 mx-1 my-0.5 flex min-w-0 items-center gap-1 rounded-xs px-1.5 text-left text-label-medium",
+                  planTone(bar.e!, rel).bg,
+                  planTone(bar.e!, rel).text,
+                )}
               >
                 <span className="truncate">{bar.e!.title}</span>
               </button>
@@ -330,7 +338,7 @@ export function MonthWeeks({
                   className="pointer-events-none relative z-10 flex min-w-0 flex-col gap-0.5 px-1.5 pt-0.5 pb-1.5"
                 >
                   {timed.slice(0, shown).map((e) => (
-                    <span key={e.id} className="truncate rounded-xs bg-tertiary-container/60 px-1 text-label-small text-on-tertiary-container">
+                    <span key={e.id} className={cx("truncate rounded-xs px-1 text-label-small", planTone(e, rel).bg, planTone(e, rel).text)}>
                       {fmtTime(e.startsAt)} {e.title}
                     </span>
                   ))}

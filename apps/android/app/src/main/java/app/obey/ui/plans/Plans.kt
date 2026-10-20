@@ -4,6 +4,8 @@ import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.EventBusy
 import androidx.compose.material.icons.outlined.WarningAmber
@@ -22,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -187,11 +191,11 @@ class PlanViewModel @Inject constructor(
 
 /** A plan in a day's list: an event icon, its title, and when on that day. */
 @Composable
-fun PlanRow(e: CalendarEvent, day: LocalDate, who: String?, onOpen: () -> Unit) {
+fun PlanRow(e: CalendarEvent, day: LocalDate, who: String?, tone: PlanTone, onOpen: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     ListItem(
         modifier = Modifier.clickable(onClick = onOpen),
-        leadingContent = { Icon(Icons.Outlined.Event, null, tint = colors.tertiary) },
+        leadingContent = { Icon(Icons.Outlined.Event, null, tint = tone.dot) },
         headlineContent = { Text(e.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         supportingContent = { Text(listOfNotNull(e.dayLabel(day), who).joinToString(" · ")) },
         trailingContent = if (e.conflictIds.isNotEmpty()) ({ Icon(Icons.Outlined.WarningAmber, "Overlaps a task", tint = colors.error) }) else null,
@@ -201,12 +205,12 @@ fun PlanRow(e: CalendarEvent, day: LocalDate, who: String?, onOpen: () -> Unit) 
 
 /** A short tinted bar for all-day and multi-day plans, shown above a day's tasks. */
 @Composable
-fun PlanChip(e: CalendarEvent, day: LocalDate, onOpen: () -> Unit, modifier: Modifier = Modifier) {
+fun PlanChip(e: CalendarEvent, day: LocalDate, tone: PlanTone, onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
     Surface(
         onClick = onOpen,
-        color = colors.tertiaryContainer,
-        contentColor = colors.onTertiaryContainer,
+        color = tone.container,
+        contentColor = tone.onContainer,
         shape = RoundedCornerShape(8.dp),
         modifier = modifier.fillMaxWidth(),
     ) {
@@ -228,11 +232,10 @@ fun PlanChip(e: CalendarEvent, day: LocalDate, onOpen: () -> Unit, modifier: Mod
 
 /** Today's heads-up for a plan that runs into tasks, with a way into the plan to move them. */
 @Composable
-fun PlanHeadsUp(e: CalendarEvent, onOpen: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
+fun PlanHeadsUp(e: CalendarEvent, tone: PlanTone, onOpen: () -> Unit) {
     Surface(
-        color = colors.tertiaryContainer,
-        contentColor = colors.onTertiaryContainer,
+        color = tone.container,
+        contentColor = tone.onContainer,
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
     ) {
@@ -485,7 +488,7 @@ private enum class ClashChoice { Keep, Move, Cancel }
  * The tasks a plan runs into, each sorted out its own way: kept, moved (after the plan unless changed), or called off.
  * A Dominant's choices apply at once; a sub's go out as one request.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun Clashes(vm: PlanViewModel, e: CalendarEvent, onChanged: () -> Unit) {
     val items by vm.clashes.collectAsStateWithLifecycle()
@@ -506,6 +509,15 @@ private fun Clashes(vm: PlanViewModel, e: CalendarEvent, onChanged: () -> Unit) 
     val picked = items.filter { canAct(it) && choiceOf(it) != null }
     val changed = picked.filter { choiceOf(it) != ClashChoice.Keep }
     val asks = !isDom && changed.any { choiceOf(it) == ClashChoice.Cancel || policy != ReschedulePolicy.Allowance }
+    // One tap for the lot: a long plan can run into dozens of tasks.
+    val actionable = items.filter { canAct(it) }
+    val allMovable = actionable.all { canMove(it) }
+    fun allAre(c: ClashChoice) = actionable.isNotEmpty() && actionable.all { choiceOf(it) == c }
+    fun setAll(c: ClashChoice) {
+        val clear = allAre(c)
+        choices.clear()
+        if (!clear) actionable.forEach { choices[it.id] = c }
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -516,6 +528,20 @@ private fun Clashes(vm: PlanViewModel, e: CalendarEvent, onChanged: () -> Unit) 
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.error,
             )
+        }
+        if (actionable.size > 1) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val all = listOf(ClashChoice.Keep to "Keep all") +
+                    if (allMovable) listOf(ClashChoice.Move to "Move all after", ClashChoice.Cancel to if (isDom) "Call off all" else "Ask off all") else emptyList()
+                all.forEach { (c, label) ->
+                    FilterChip(
+                        selected = allAre(c),
+                        onClick = { setAll(c) },
+                        label = { Text(label) },
+                        leadingIcon = if (allAre(c)) ({ Icon(Icons.Filled.Check, null, Modifier.size(18.dp)) }) else null,
+                    )
+                }
+            }
         }
         items.forEach { o ->
             val mine = o.assigneeId == session.userId

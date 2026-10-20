@@ -23,6 +23,18 @@
   --color-on-tertiary: var(--md-on-tertiary);
   --color-tertiary-container: var(--md-tertiary-container);
   --color-on-tertiary-container: var(--md-on-tertiary-container);
+  --color-plan-1: var(--md-plan-1);
+  --color-plan-1-container: var(--md-plan-1-container);
+  --color-on-plan-1-container: var(--md-on-plan-1-container);
+  --color-plan-2: var(--md-plan-2);
+  --color-plan-2-container: var(--md-plan-2-container);
+  --color-on-plan-2-container: var(--md-on-plan-2-container);
+  --color-plan-3: var(--md-plan-3);
+  --color-plan-3-container: var(--md-plan-3-container);
+  --color-on-plan-3-container: var(--md-on-plan-3-container);
+  --color-plan-4: var(--md-plan-4);
+  --color-plan-4-container: var(--md-plan-4-container);
+  --color-on-plan-4-container: var(--md-on-plan-4-container);
   --color-error: var(--md-error);
   --color-on-error: var(--md-on-error);
   --color-error-container: var(--md-error-container);

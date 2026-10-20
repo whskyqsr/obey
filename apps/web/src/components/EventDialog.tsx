@@ -5,7 +5,7 @@ import { errorMessage } from "../api/client";
 import { addDays, fmtDate, fmtTime, fromLocalInput, localDateOf, toLocalInput, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 import { afterEvent } from "./RescheduleSheet";
-import { Button, Dialog, Icon, SegmentedButtons, Switch, TextArea, TextField, useSnackbar } from "./ui";
+import { Button, Chip, Dialog, Icon, SegmentedButtons, Switch, TextArea, TextField, useSnackbar } from "./ui";
 
 /** "Sat, Oct 18, 7:00 – 11:00 PM", or the dates for an all-day plan (its end is the next midnight, so show the day before). */
 export function eventWhen(e: CalendarEvent) {
@@ -256,6 +256,11 @@ function Clashes({ event }: { event: CalendarEvent }) {
   const kept = picked.filter((o) => choiceOf(o) === "keep");
   const changed = picked.filter((o) => choiceOf(o) !== "keep");
   const asks = !isDom && changed.some((o) => choiceOf(o) === "cancel" || rel.reschedulePolicy !== "allowance");
+  // One tap for the lot: a long plan can run into dozens of tasks.
+  const actionable = items.filter(canAct);
+  const allMovable = actionable.every(canMove);
+  const allAre = (c: ClashChoice) => actionable.length > 0 && actionable.every((o) => choiceOf(o) === c);
+  const setAll = (c: ClashChoice) => setChoices(allAre(c) ? {} : Object.fromEntries(actionable.map((o) => [o.id, c])));
 
   async function submit() {
     try {
@@ -282,6 +287,23 @@ function Clashes({ event }: { event: CalendarEvent }) {
         <Icon name="warning" size={20} />
         {items.length === 1 ? "Overlaps a task" : `Overlaps ${items.length} tasks`}
       </div>
+      {actionable.length > 1 && (
+        <div className="flex flex-wrap gap-2">
+          <Chip icon="done_all" selected={allAre("keep")} onClick={() => setAll("keep")}>
+            Keep all
+          </Chip>
+          {allMovable && (
+            <>
+              <Chip selected={allAre("move")} onClick={() => setAll("move")}>
+                Move all after
+              </Chip>
+              <Chip selected={allAre("cancel")} onClick={() => setAll("cancel")}>
+                {isDom ? "Call off all" : "Ask off all"}
+              </Chip>
+            </>
+          )}
+        </div>
+      )}
       {items.map((o) => {
         const mine = o.assigneeId === me.user.id;
         const choice = choiceOf(o);

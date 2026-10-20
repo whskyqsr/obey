@@ -10,6 +10,7 @@ import { Button, Dialog, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, S
 import { addDays, addMonths, daysBetween, fmtDate, fmtMonth, fmtTime, localDateOf, monthGrid, startOfWeek, today } from "../lib/dates";
 import { storage } from "../lib/storage";
 import { useRel } from "../lib/relationship";
+import { planLegend, planTone } from "../lib/planColors";
 import type { WeekStart } from "../api/types";
 
 type View = "week" | "month";
@@ -72,6 +73,7 @@ export function CalendarPage() {
   const detail = occ.data?.find((o) => o.id === detailId);
   // Like a new calendar event: on the picked day in month view, else today if it's on screen, else the week's first day.
   const newTaskDay = view === "month" ? selected : days.includes(t) ? t : from;
+  const legend = planLegend(rel, me.user.id);
 
   return (
     <>
@@ -114,6 +116,16 @@ export function CalendarPage() {
           Today
         </Button>
       </div>
+      {legend.length > 0 && (
+        <div className="-mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 px-6 pb-3 text-label-medium text-on-surface-variant md:px-8">
+          {legend.map((l) => (
+            <span key={l.label} className="flex items-center gap-1.5">
+              <span className={cx("size-2.5 rounded-full", l.tone.dot)} />
+              {l.label}
+            </span>
+          ))}
+        </div>
+      )}
       {occ.error && <ErrorBox error={occ.error} onRetry={() => occ.refetch()} />}
 
       {view === "month" ? (
@@ -160,7 +172,13 @@ export function CalendarPage() {
                       {Number(d.slice(8))}
                     </span>
                     {/* compact: a bar for plans and dots for tasks; wide: titles */}
-                    {dayEvents.length > 0 && <span className="mx-1 h-1 rounded-full bg-tertiary md:hidden" />}
+                    {dayEvents.length > 0 && (
+                      <span className="mx-1 flex gap-0.5 md:hidden">
+                        {[...new Set(dayEvents.map((e) => planTone(e, rel).dot))].slice(0, 3).map((dot) => (
+                          <span key={dot} className={cx("h-1 flex-1 rounded-full", dot)} />
+                        ))}
+                      </span>
+                    )}
                     <span className="flex flex-wrap justify-center gap-0.5 md:hidden">
                       {items.slice(0, 4).map((o) => (
                         <span key={o.id} className={cx("size-1.5 rounded-full", dotClass(o))} />
@@ -168,7 +186,7 @@ export function CalendarPage() {
                     </span>
                     <span className="hidden flex-col gap-0.5 md:flex">
                       {dayEvents.slice(0, 2).map((e) => (
-                        <span key={e.id} className="truncate rounded-xs bg-tertiary-container px-1 text-label-small text-on-tertiary-container">
+                        <span key={e.id} className={cx("truncate rounded-xs px-1 text-label-small", planTone(e, rel).bg, planTone(e, rel).text)}>
                           {e.title}
                         </span>
                       ))}
@@ -262,13 +280,15 @@ export function CalendarPage() {
   );
 }
 
-/** A plan in the week or day list: tertiary, so it never reads as a task. */
+/** A plan in the week or day list: tinted in its person's colour, so it never reads as a task. */
 function EventItem({ e, onOpen, large }: { e: CalendarEvent; onOpen(): void; large?: boolean }) {
+  const { rel } = useRel();
+  const tone = planTone(e, rel);
   return (
     <button
       type="button"
       onClick={onOpen}
-      className={cx("state-layer flex w-full items-start gap-2 rounded-sm bg-tertiary-container text-left text-on-tertiary-container", large ? "rounded-md p-4" : "px-2 py-1.5")}
+      className={cx("state-layer flex w-full items-start gap-2 rounded-sm text-left", tone.bg, tone.text, large ? "rounded-md p-4" : "px-2 py-1.5")}
     >
       <Icon name="event" size={large ? 24 : 16} className="mt-0.5 shrink-0" />
       <span className="min-w-0 flex-1">
