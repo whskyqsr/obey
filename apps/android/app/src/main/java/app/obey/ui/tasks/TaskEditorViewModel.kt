@@ -31,13 +31,19 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** Grace chips. [Midnight] follows the due time, so moving the time keeps it meaning "until midnight". */
+enum class Grace(val label: String) { None("None"), Quarter("15 min"), Hour("1 hour"), Midnight("Until midnight"), Custom("Custom") }
+
 data class TaskForm(
     val title: String = "",
     val bodyMd: String = "",
     val assigneeId: String = "",
     val points: String = "10",
     val missPenalty: String = "0",
-    val graceMinutes: String = "0",
+    val grace: Grace = Grace.None,
+    /** Only used for [Grace.Custom]. */
+    val graceMinutes: String = "30",
+    val timezone: String = ZoneId.systemDefault().id,
     val approvalRequired: Boolean = false,
     val proofRequired: Boolean = false,
     val allDay: Boolean = false,
@@ -51,7 +57,25 @@ data class TaskForm(
 ) {
     val titleError: String? get() = if (title.isBlank()) "Give it a title" else null
     val valid: Boolean get() = titleError == null && assigneeId.isNotEmpty() &&
-        points.toIntOrNull() != null && missPenalty.toIntOrNull() != null && graceMinutes.toIntOrNull() != null
+        points.toIntOrNull() != null && missPenalty.toIntOrNull() != null && (grace != Grace.Custom || graceMinutes.toIntOrNull() != null)
+
+    val effectiveGrace: Int get() = when (grace) {
+        Grace.None -> 0
+        Grace.Quarter -> 15
+        Grace.Hour -> 60
+        Grace.Midnight -> if (allDay) 0 else minutesToMidnight(dueTime)
+        Grace.Custom -> graceMinutes.toIntOrNull()?.coerceAtLeast(0) ?: 0
+    }
+}
+
+fun minutesToMidnight(t: LocalTime) = 24 * 60 - (t.hour * 60 + t.minute)
+
+private fun graceOf(t: Task): Grace = when {
+    t.graceMinutes == 0 -> Grace.None
+    t.graceMinutes == 15 -> Grace.Quarter
+    t.graceMinutes == 60 -> Grace.Hour
+    t.dueTime != null && t.graceMinutes == minutesToMidnight(LocalTime.parse(t.dueTime)) -> Grace.Midnight
+    else -> Grace.Custom
 }
 
 data class EditorData(val members: List<Member>, val consequences: List<Consequence>, val original: Task?)
@@ -114,7 +138,9 @@ class TaskEditorViewModel @Inject constructor(
         assigneeId = t.assigneeId,
         points = t.points.toString(),
         missPenalty = t.missPenalty.toString(),
+        grace = graceOf(t),
         graceMinutes = t.graceMinutes.toString(),
+        timezone = t.timezone,
         approvalRequired = t.approvalRequired,
         proofRequired = t.proofRequired,
         allDay = t.dueTime == null,
@@ -149,20 +175,12 @@ class TaskEditorViewModel @Inject constructor(
             approvalRequired = f.approvalRequired,
             schedule = f.recurrence.toSchedule(f.start),
             dueTime = if (f.allDay) null else f.dueTime.format(DateTimeFormatter.ofPattern("HH:mm")),
-            timezone = original?.timezone ?: ZoneId.systemDefault().id,
-            graceMinutes = f.graceMinutes.toInt(),
+            timezone = f.timezone,
+            graceMinutes = f.effectiveGrace,
         )
         action {
             if (original == null) api.createTask(sessions.requireRelationshipId(), input)
             else api.updateTask(original.id, input)
-            _done.trySend(Unit)
-        }
-    }
-
-    fun delete() {
-        val original = (_data.value as? Load.Ready)?.value?.original ?: return
-        action {
-            api.deleteTask(original.id)
             _done.trySend(Unit)
         }
     }
