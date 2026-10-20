@@ -14,7 +14,7 @@ import {
   uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
-import type { Features } from "@obey/contracts";
+import type { DynamicDate, Features } from "@obey/contracts";
 import type { Schedule } from "@obey/recurrence";
 
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
@@ -47,6 +47,8 @@ export const relationships = pgTable("relationships", {
   features: jsonb("features").$type<Partial<Features>>().notNull().default({}),
   /** Whether a submissive may write notes of their own. */
   subNotes: boolean("sub_notes").notNull().default(true),
+  /** Anniversaries and other dates the dynamic marks. */
+  dates: jsonb("dates").$type<DynamicDate[]>().notNull().default([]),
   createdAt: createdAt(),
 });
 

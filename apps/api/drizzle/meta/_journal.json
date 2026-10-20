@@ -85,6 +85,13 @@
       "when": 1792515352972,
       "tag": "0011_note_permissions",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792516083954,
+      "tag": "0012_dynamic_dates",
+      "breakpoints": true
     }
   ]
 }

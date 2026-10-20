@@ -83,6 +83,10 @@ data class User(
     val weekStart: String = "sun",
 )
 
+/** A date the dynamic marks; [date] is YYYY-MM-DD. */
+@Serializable
+data class DynamicDate(val id: String, val label: String, val date: String)
+
 @Serializable
 data class Member(val userId: String, val displayName: String, val role: Role, val avatarVersion: String? = null)
 
@@ -98,6 +102,7 @@ data class Relationship(
     val features: Features = Features(),
     /** Whether a submissive may write notes of their own. */
     val subNotes: Boolean = true,
+    val dates: List<DynamicDate> = emptyList(),
 )
 
 /** Parts of the app a dynamic can switch off; switched-off parts are hidden for everyone in it. Tasks and notes are always on. */
@@ -160,6 +165,8 @@ data class UpdateRelationshipInput(
     @EncodeDefault(EncodeDefault.Mode.NEVER) val weeklyDelayAllowance: Int? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER) val features: Features? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER) val subNotes: Boolean? = null,
+    /** The whole list, replacing what's stored. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val dates: List<DynamicDate>? = null,
 )
 
 @Serializable

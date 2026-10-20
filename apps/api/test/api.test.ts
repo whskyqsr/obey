@@ -208,10 +208,7 @@ describe("tasks and occurrences", () => {
 
   it("schedules completion-anchored tasks from the completion date", async () => {
     const { dom, sub, relId, subId } = await ctx.pair();
-    await dom.post(
-      `/relationships/${relId}/tasks`,
-      task(subId, { schedule: { start: "2026-10-16", anchor: "completion", rule: { freq: "daily", interval: 3 } } }),
-    );
+    await dom.post(`/relationships/${relId}/tasks`, task(subId, { schedule: { start: "2026-10-16", anchor: "completion", rule: { freq: "daily", interval: 3 } } }));
     const [first] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-30`)).body;
     ctx.clock.now = new Date("2026-10-17T15:00:00Z"); // completed a day late
     await sub.post(`/occurrences/${first.id}/complete`);
@@ -309,10 +306,7 @@ describe("rescheduling", () => {
 
     const decided = await dom.post(`/reschedules/${pending[0].id}/decide`, { approve: true });
     expect(decided.body.requests).toHaveLength(2);
-    expect(decided.body.occurrences.map((o: { dueAt: string }) => o.dueAt).sort()).toEqual([
-      "2026-10-17T22:00:00.000Z",
-      "2026-10-18T01:00:00.000Z",
-    ]);
+    expect(decided.body.occurrences.map((o: { dueAt: string }) => o.dueAt).sort()).toEqual(["2026-10-17T22:00:00.000Z", "2026-10-18T01:00:00.000Z"]);
     expect((await dom.get(`/relationships/${relId}/reschedules?status=requested`)).body).toHaveLength(0);
     expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Your extension for 2 tasks was approved");
   });
@@ -394,6 +388,15 @@ describe("points, rewards and notes", () => {
     expect(updated).toMatchObject({ title: "Title", visibility: "private", tags: ["a"], bodyMd: "# Mine" });
   });
 
+  it("keeps a dynamic's dates, editable only by a Dominant", async () => {
+    const { dom, sub, relId } = await ctx.pair();
+    const dates = [{ id: "a", label: "Anniversary", date: "2023-03-04" }];
+    expect((await sub.patch(`/relationships/${relId}`, { dates })).status).toBe(403);
+    expect((await dom.patch(`/relationships/${relId}`, { dates })).body.dates).toEqual(dates);
+    expect((await dom.patch(`/relationships/${relId}`, { dates: [{ id: "b", label: "", date: "2023-03-04" }] })).status).toBe(400);
+    expect((await sub.get("/me")).body.relationships[0].dates).toEqual(dates);
+  });
+
   it("lets a Dominant decide what a sub can write in notes", async () => {
     const { dom, sub, relId } = await ctx.pair();
     const domNote = (await dom.post(`/relationships/${relId}/notes`, { bodyMd: "House list" })).body;
@@ -434,8 +437,7 @@ describe("task history", () => {
     const { dom, sub, relId, subId } = await ctx.pair();
     const t = (await dom.post(`/relationships/${relId}/tasks`, task(subId, { points: 10, missPenalty: 4, schedule: { start: "2026-10-16", rule: { freq: "daily" } } }))).body;
     await dom.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-18`);
-    const balance = async () =>
-      ((await sub.get(`/relationships/${relId}/balances`)).body.find((b: { userId: string }) => b.userId === subId)?.balance ?? 0) as number;
+    const balance = async () => ((await sub.get(`/relationships/${relId}/balances`)).body.find((b: { userId: string }) => b.userId === subId)?.balance ?? 0) as number;
     try {
       ctx.clock.now = new Date("2026-10-17T12:00:00Z"); // the 16th's 21:00 deadline has passed
       await runJobs(ctx.db, ctx.notifier, ctx.clock.now, { materializeDays: 14, reminderLeadMinutes: 30 });
@@ -475,7 +477,13 @@ describe("assigned consequences", () => {
     expect((await sub.post(`/consequences/${c.id}/assign`, input)).status).toBe(403);
     const res = await dom.post(`/consequences/${c.id}/assign`, input);
     expect(res.status).toBe(201);
-    expect(res.body).toMatchObject({ title: "Write lines", assigneeId: subId, assignedConsequenceId: c.id, bodyMd: "**Why:** Talked back\n\n100 lines, by hand.", schedule: { start: "2026-10-17" } });
+    expect(res.body).toMatchObject({
+      title: "Write lines",
+      assigneeId: subId,
+      assignedConsequenceId: c.id,
+      bodyMd: "**Why:** Talked back\n\n100 lines, by hand.",
+      schedule: { start: "2026-10-17" },
+    });
     expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [subId] });
 
     const occ = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-20`)).body.filter((o: { seriesId: string }) => o.seriesId === res.body.id);
@@ -490,16 +498,28 @@ describe("assigned consequences", () => {
   it("are handed out once when a task carrying one is missed, and taken back if the miss is undone", async () => {
     const { dom, sub, relId, subId } = await ctx.pair();
     const c = (await dom.post(`/relationships/${relId}/consequences`, { title: "Corner time" })).body;
-    const t = (await dom.post(`/relationships/${relId}/tasks`, task(subId, { consequenceId: c.id, consequenceDueDays: 0, consequenceDueTime: "22:00", schedule: { start: "2026-10-16", rule: { freq: "daily" } } }))).body;
+    const t = (
+      await dom.post(
+        `/relationships/${relId}/tasks`,
+        task(subId, { consequenceId: c.id, consequenceDueDays: 0, consequenceDueTime: "22:00", schedule: { start: "2026-10-16", rule: { freq: "daily" } } }),
+      )
+    ).body;
     await dom.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-18`);
-    const issued = async () => ((await sub.get(`/relationships/${relId}/tasks`)).body as { assignedConsequenceId: string | null }[]).filter((x) => x.assignedConsequenceId === c.id);
+    const issued = async () =>
+      ((await sub.get(`/relationships/${relId}/tasks`)).body as { assignedConsequenceId: string | null }[]).filter((x) => x.assignedConsequenceId === c.id);
     try {
       ctx.clock.now = new Date("2026-10-17T12:00:00Z"); // the 16th's 21:00 New York deadline has passed
       await runJobs(ctx.db, ctx.notifier, ctx.clock.now, { materializeDays: 14, reminderLeadMinutes: 30 });
       await runJobs(ctx.db, ctx.notifier, ctx.clock.now, { materializeDays: 14, reminderLeadMinutes: 30 });
       const [given, ...extra] = await issued();
       expect(extra).toHaveLength(0);
-      expect(given).toMatchObject({ title: "Corner time", assigneeId: subId, bodyMd: "**Why:** Missed “Kneel and write lines” on Oct 16", schedule: { start: "2026-10-17" }, dueTime: "22:00" });
+      expect(given).toMatchObject({
+        title: "Corner time",
+        assigneeId: subId,
+        bodyMd: "**Why:** Missed “Kneel and write lines” on Oct 16",
+        schedule: { start: "2026-10-17" },
+        dueTime: "22:00",
+      });
       expect(ctx.notifier.sent.some((n) => n.push.body === "A task was missed, and a consequence was added")).toBe(true);
 
       const [miss] = (await sub.get(`/tasks/${t.id}/history`)).body;

@@ -81,6 +81,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.obey.api.DynamicDate
 import app.obey.api.Features
 import app.obey.api.Member
 import app.obey.api.Relationship
@@ -154,6 +155,7 @@ fun DynamicScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
     val context = LocalContext.current
     var dialog by rememberSaveable { mutableStateOf<String?>(null) } // "relname" | "create" | "join" | "invite"
     val session = (sessionState as? SessionState.Ready)?.session
+    var editingDate by remember { mutableStateOf<DynamicDate?>(null) }
 
     Scaffold(
         topBar = {
@@ -195,6 +197,34 @@ fun DynamicScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
                     leadingContent = { Icon(Icons.Outlined.PersonAdd, null) },
                     headlineContent = { Text("Invite someone") },
                 )
+
+                val today = java.time.LocalDate.now()
+                val dates = rel.dates.sortedBy { d -> runCatching { daysUntilNext(java.time.LocalDate.parse(d.date), today) }.getOrDefault(Long.MAX_VALUE) }
+                if (s.canManage || dates.isNotEmpty()) {
+                    SectionHeader("Dates")
+                    dates.forEach { d ->
+                        ListItem(
+                            modifier = if (s.canManage) Modifier.clickable { editingDate = d } else Modifier,
+                            leadingContent = { Icon(dateIcon(d.label), null) },
+                            headlineContent = { Text(d.label) },
+                            supportingContent = { Text(runCatching { describeDate(java.time.LocalDate.parse(d.date), today) }.getOrDefault(d.date)) },
+                            trailingContent = { if (s.canManage) Icon(Icons.Outlined.Edit, "Edit ${d.label}") },
+                        )
+                    }
+                    if (s.canManage) {
+                        val hint: (@Composable () -> Unit)? = if (dates.isEmpty()) {
+                            { Text("An anniversary, a collaring, the day you met") }
+                        } else {
+                            null
+                        }
+                        ListItem(
+                            modifier = Modifier.clickable { editingDate = DynamicDate("", "", "") },
+                            leadingContent = { Icon(Icons.Outlined.Add, null) },
+                            headlineContent = { Text("Add a date") },
+                            supportingContent = hint,
+                        )
+                    }
+                }
 
                 SectionHeader("How it works")
                 ListItem(
@@ -338,6 +368,15 @@ fun DynamicScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
                 }
             }
         }
+    }
+
+    editingDate?.let { d ->
+        DynamicDateDialog(
+            d,
+            onDismiss = { editingDate = null },
+            onSave = { vm.saveDate(it); editingDate = null },
+            onDelete = { vm.saveDate(null, removeId = d.id); editingDate = null },
+        )
     }
 
     when (dialog) {

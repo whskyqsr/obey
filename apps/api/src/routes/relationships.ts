@@ -53,6 +53,7 @@ export async function relationshipDto(db: Tx, ids: string[]) {
     weeklyDelayAllowance: r.weeklyDelayAllowance,
     features: allFeatures(r.features),
     subNotes: r.subNotes,
+    dates: r.dates,
     createdAt: r.createdAt.toISOString(),
     members: members
       .filter((m) => m.relationshipId === r.id)

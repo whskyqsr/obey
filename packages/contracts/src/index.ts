@@ -50,6 +50,10 @@ export type WeekStart = z.infer<typeof weekStart>;
 export const user = z.object({ id, displayName: z.string(), email: z.string().nullable(), avatarVersion, weekStart });
 export type User = z.infer<typeof user>;
 
+/** A date the dynamic marks: an anniversary, a collaring, or anything else it names. */
+export const dynamicDate = z.object({ id: z.string().min(1).max(40), label: z.string().trim().min(1).max(40), date: plainDate });
+export type DynamicDate = z.infer<typeof dynamicDate>;
+
 export const member = z.object({ userId: id, displayName: z.string(), role, avatarVersion });
 export const relationship = z.object({
   id,
@@ -61,6 +65,7 @@ export const relationship = z.object({
   features,
   /** Whether a submissive may write notes of their own. Dominants always can. */
   subNotes: z.boolean(),
+  dates: z.array(dynamicDate),
   createdAt: z.string(),
 });
 export type Relationship = z.infer<typeof relationship>;
@@ -97,6 +102,8 @@ export const updateRelationship = z.object({
   weeklyDelayAllowance: z.number().int().min(0).max(50).optional(),
   features: features.partial().optional(),
   subNotes: z.boolean().optional(),
+  /** The whole list, replacing what's stored. */
+  dates: z.array(dynamicDate).max(20).optional(),
 });
 
 export const taskInput = z.object({

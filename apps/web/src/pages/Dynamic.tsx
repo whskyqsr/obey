@@ -2,11 +2,12 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useCreateInvite, useUpdateRelationship } from "../api/hooks";
 import { errorMessage } from "../api/client";
-import type { Features, Invite, ReschedulePolicy, Role } from "../api/types";
+import type { DynamicDate, Features, Invite, ReschedulePolicy, Role } from "../api/types";
 import { Avatar } from "../components/Avatar";
 import { DynamicHero } from "../components/DynamicHero";
 import { Button, Chip, Dialog, Icon, IconButton, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
-import { fmtDate, fmtDateTime, localDateOf } from "../lib/dates";
+import { fmtDate, fmtDateTime, localDateOf, today } from "../lib/dates";
+import { anniversary, describeDate } from "../lib/dynamicDates";
 import { inviteLink } from "../lib/invite";
 import { ROLE_LABEL, relTitle, useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
@@ -24,6 +25,69 @@ const FEATURE_ROWS: { key: keyof Features; label: string; help: string }[] = [
   { key: "protocols", label: "Protocols", help: "Exactly what's expected, and when and how it's done." },
   { key: "journal", label: "Journal", help: "Dated entries with a mood." },
 ];
+
+const DATE_PRESETS = ["Anniversary", "Collaring", "First met"];
+const DATE_ICON: Record<string, string> = { Anniversary: "favorite", Collaring: "diamond", "First met": "waving_hand" };
+
+/** Add or change one of the dynamic's dates; a preset label or any other. */
+function DateDialog({ value, onClose, onSave, onDelete }: { value: DynamicDate | null; onClose(): void; onSave(d: DynamicDate): void; onDelete(id: string): void }) {
+  const [label, setLabel] = useState("");
+  const [date, setDate] = useState("");
+  useEffect(() => {
+    if (!value) return;
+    setLabel(value.label || "Anniversary");
+    setDate(value.date);
+  }, [value]);
+  const isNew = !value?.id;
+  const valid = label.trim().length > 0 && /^\d{4}-\d{2}-\d{2}$/.test(date);
+  return (
+    <Dialog
+      open={!!value}
+      onClose={onClose}
+      title={isNew ? "Add a date" : "Edit date"}
+      actions={
+        <>
+          {!isNew && (
+            <Button
+              variant="text"
+              onClick={() => {
+                onDelete(value!.id);
+                onClose();
+              }}
+            >
+              Remove
+            </Button>
+          )}
+          <div className="flex-1" />
+          <Button variant="text" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            disabled={!valid}
+            onClick={() => {
+              onSave({ id: value!.id, label: label.trim(), date });
+              onClose();
+            }}
+          >
+            Save
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap gap-2">
+          {DATE_PRESETS.map((p) => (
+            <Chip key={p} selected={label === p} onClick={() => setLabel(p)}>
+              {p}
+            </Chip>
+          ))}
+        </div>
+        <TextField label="Name" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={40} />
+        <TextField label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-48" />
+      </div>
+    </Dialog>
+  );
+}
 
 /** "Jake & Kitten": the relationship's own name, or everyone in it with you first. */
 export function useDynamicTitle() {
@@ -71,6 +135,12 @@ export function DynamicPage() {
   const back = useBack(() => navigate({ to: "/settings" }));
   const title = useDynamicTitle();
   const [sheet, setSheet] = useState<"invite" | "name" | "deadlines" | null>(null);
+  // The date being edited: an existing one, or a blank new one.
+  const [editingDate, setEditingDate] = useState<DynamicDate | null>(null);
+  const now = today();
+  // Soonest to come round first.
+  const dates = [...rel.dates].sort((a, b) => (a.date > now ? 0 : anniversary(a.date, now).daysUntil) - (b.date > now ? 0 : anniversary(b.date, now).daysUntil));
+  const saveDates = (next: DynamicDate[], msg: string) => patch({ dates: next }, msg);
   const patch = (body: Parameters<typeof update.mutate>[0], msg = "Saved") => update.mutate(body, { onSuccess: () => snack(msg), onError: (e) => snack(errorMessage(e)) });
   const partner = rel.members.find((m) => m.userId !== me.user.id);
   const policy = POLICIES.find((p) => p.value === rel.reschedulePolicy);
@@ -115,6 +185,32 @@ export function DynamicPage() {
             onClick={() => setSheet("invite")}
           />
         </Group>
+
+        {(isDom || dates.length > 0) && (
+          <>
+            <Label>Dates</Label>
+            <Group>
+              {dates.map((d) => (
+                <Row
+                  key={d.id}
+                  leading={<Icon name={DATE_ICON[d.label] ?? "event"} className="text-on-surface-variant" />}
+                  headline={d.label}
+                  supporting={describeDate(d.date, now)}
+                  trailing={isDom && <Icon name="edit" className="text-on-surface-variant" />}
+                  onClick={isDom ? () => setEditingDate(d) : undefined}
+                />
+              ))}
+              {isDom && (
+                <Row
+                  leading={<Icon name="add" className="text-on-surface-variant" />}
+                  headline="Add a date"
+                  supporting={dates.length ? undefined : "An anniversary, a collaring, the day you met"}
+                  onClick={() => setEditingDate({ id: "", label: "", date: "" })}
+                />
+              )}
+            </Group>
+          </>
+        )}
 
         <Label>How it works</Label>
         <Group>
@@ -180,6 +276,20 @@ export function DynamicPage() {
 
       <InviteSheet open={sheet === "invite"} onClose={() => setSheet(null)} />
       <NameDialog open={sheet === "name"} onClose={() => setSheet(null)} onSave={(name) => patch({ name }, "Name saved")} />
+      <DateDialog
+        value={editingDate}
+        onClose={() => setEditingDate(null)}
+        onSave={(d) => {
+          const exists = rel.dates.some((x) => x.id === d.id);
+          saveDates(exists ? rel.dates.map((x) => (x.id === d.id ? d : x)) : [...rel.dates, { ...d, id: crypto.randomUUID() }], "Date saved");
+        }}
+        onDelete={(id) =>
+          saveDates(
+            rel.dates.filter((x) => x.id !== id),
+            "Date removed",
+          )
+        }
+      />
       <DeadlinesDialog open={sheet === "deadlines"} onClose={() => setSheet(null)} onSave={(body) => patch(body)} />
     </div>
   );

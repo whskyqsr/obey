@@ -5,6 +5,7 @@ export type Me = c.Me;
 export type User = c.User;
 export type WeekStart = c.WeekStart;
 export type Relationship = c.Relationship;
+export type DynamicDate = c.DynamicDate;
 export type Features = c.Features;
 export type Member = z.infer<typeof c.member>;
 export type Role = c.Role;

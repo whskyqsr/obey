@@ -1,5 +1,6 @@
 package app.obey.ui.settings
 
+import app.obey.api.DynamicDate
 import app.obey.api.Features
 import android.content.Context
 import android.graphics.Bitmap
@@ -170,6 +171,18 @@ class SettingsViewModel @Inject constructor(
         sessions.onRelationshipChanged(
             api.updateRelationship(rel, UpdateRelationshipInput(reschedulePolicy = policy, weeklyDelayAllowance = allowance)),
         )
+    }
+
+    /** Saves [date] (a blank id adds it), or with null removes the date [removeId]. The API takes the whole list. */
+    fun saveDate(date: DynamicDate?, removeId: String? = null) = action {
+        val rel = sessions.session?.relationship ?: return@action
+        val next = when {
+            date == null -> rel.dates.filter { it.id != removeId }
+            date.id.isEmpty() -> rel.dates + date.copy(id = java.util.UUID.randomUUID().toString())
+            else -> rel.dates.map { if (it.id == date.id) date else it }
+        }
+        sessions.onRelationshipChanged(api.updateRelationship(rel.id, UpdateRelationshipInput(dates = next)))
+        say(if (date == null) "Date removed" else "Date saved")
     }
 
     fun setSubNotes(on: Boolean) = action {
