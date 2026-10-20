@@ -147,6 +147,10 @@ export const updateRelationship = z.object({
   dates: z.array(dynamicDate).max(20).optional(),
 });
 
+/** One step of a ritual. Ids are made by the client and only need to be unique within the task. */
+export const taskStep = z.object({ id: z.string().min(1).max(40), title: z.string().trim().min(1).max(200) });
+export type TaskStep = z.infer<typeof taskStep>;
+
 export const taskInput = z.object({
   title: z.string().min(1).max(200),
   bodyMd: z.string().max(20_000).default(""),
@@ -169,6 +173,20 @@ export const taskInput = z.object({
     .min(0)
     .max(60 * 24 * 7)
     .default(0),
+  /** A ritual's steps, done in order in a run view. Empty for an ordinary task. */
+  steps: z
+    .array(taskStep)
+    .max(30)
+    .refine((a) => new Set(a.map((s) => s.id)).size === a.length, "step ids must be unique")
+    .default([]),
+  /** Only doable in the last this-many minutes before it's due ("opens 30 minutes before"); null for any time. */
+  windowMinutes: z
+    .number()
+    .int()
+    .min(5)
+    .max(60 * 24)
+    .nullable()
+    .default(null),
 });
 export type TaskInput = z.input<typeof taskInput>;
 
@@ -205,6 +223,11 @@ export const occurrence = z.object({
   commentCount: z.number().int().default(0),
   /** The task needs a photo or a note before it can be marked done. */
   proofRequired: z.boolean().default(false),
+  /** The ritual's steps (empty for an ordinary task) and the ids ticked off so far. */
+  steps: z.array(taskStep).default([]),
+  stepsDone: z.array(z.string()).default([]),
+  /** The moment the assignee may start it, when the task has a window; null when any time that day is fine. */
+  opensAt: z.string().nullable().default(null),
 });
 export type Occurrence = z.infer<typeof occurrence>;
 
@@ -256,6 +279,7 @@ export const editOccurrence = z.object({
 });
 
 export const completeOccurrence = z.object({ noteMd: z.string().max(5_000).optional() });
+export const tickStep = z.object({ stepId: z.string().min(1).max(40), done: z.boolean() });
 export const reviewOccurrence = z.object({
   approve: z.boolean(),
   noteMd: z.string().max(5_000).optional(),

@@ -2,8 +2,9 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useLibrary, useSaveTask, useTasks } from "../api/hooks";
 import { errorMessage } from "../api/client";
-import type { Task, TaskInput } from "../api/types";
+import type { Task, TaskInput, TaskStep } from "../api/types";
 import { RecurrencePicker } from "../components/RecurrencePicker";
+import { SortableList } from "../components/SortableList";
 import { MarkdownEditor } from "../components/MarkdownEditor";
 import { Button, Chip, ErrorBox, Icon, IconButton, Loading, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
 import { type PickerState, defaultPicker, fromSchedule, preview, toSchedule } from "../recurrence/picker";
@@ -30,6 +31,8 @@ interface Form {
   timezone: string;
   grace: Grace;
   graceMinutes: number;
+  steps: TaskStep[];
+  windowMinutes: number | null;
 }
 
 /** Grace chips. "midnight" follows the due time, so moving the time keeps it meaning "until midnight". */
@@ -86,6 +89,8 @@ function formFrom(task: Task | undefined, defaultAssignee: string, start?: strin
     timezone: task?.timezone ?? browserTimeZone(),
     grace: graceOf(task),
     graceMinutes: task?.graceMinutes ?? 0,
+    steps: task?.steps ?? [],
+    windowMinutes: task?.windowMinutes ?? null,
   };
 }
 
@@ -106,8 +111,14 @@ function toInput(f: Form): TaskInput {
     dueTime: f.allDay ? null : f.dueTime || null,
     timezone: f.timezone,
     graceMinutes: graceMinutes(f),
+    steps: f.steps.map((s) => ({ ...s, title: s.title.trim() })).filter((s) => s.title),
+    // A window counts back from a due time, so an all-day task has none.
+    windowMinutes: f.allDay ? null : f.windowMinutes,
   };
 }
+
+const WINDOWS = [null, 15, 30, 60, 120, 240];
+const windowLabel = (m: number | null) => (m === null ? "Any time" : m < 60 ? `${m} min before` : `${m / 60} hour${m === 60 ? "" : "s"} before`);
 
 const dueDaysLabel = (d: number) => (d === 0 ? "Same day" : d === 1 ? "Next day" : `${d} days later`);
 
@@ -180,7 +191,13 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
   const scheduleTitle = form.picker.kind === "once" ? `Once, ${fmtDate(form.picker.start)}${when}` : `${sched.summary || "Schedule"}${when}`;
   const scheduleSub = sched.errors.length
     ? (sched.errors[0] ?? "")
-    : [form.picker.kind !== "once" && sched.dates.length ? `Next ${sched.dates.map(shortDay).join(", ")}` : null, `${tzName(form.timezone)} time`].filter(Boolean).join(" · ");
+    : [
+        form.picker.kind !== "once" && sched.dates.length ? `Next ${sched.dates.map(shortDay).join(", ")}` : null,
+        !form.allDay && form.windowMinutes ? `opens ${windowLabel(form.windowMinutes)}` : null,
+        `${tzName(form.timezone)} time`,
+      ]
+        .filter(Boolean)
+        .join(" · ");
 
   const reward = rewards.data?.find((r) => r.id === form.rewardId)?.title;
   const consequence = consequences.data?.find((c) => c.id === form.consequenceId)?.title;
@@ -267,6 +284,20 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
                 <Switch checked={form.allDay} onChange={(allDay) => set({ allDay })} label="All day" help="Due by the end of the day" />
               </div>
               {!form.allDay && <TextField label="Due at" type="time" value={form.dueTime} onChange={(e) => set({ dueTime: e.target.value })} className="w-36" />}
+              {!form.allDay && (
+                <Select
+                  label="Can be done"
+                  value={form.windowMinutes ?? ""}
+                  onChange={(e) => set({ windowMinutes: e.target.value ? Number(e.target.value) : null })}
+                  className="w-48"
+                >
+                  {[...new Set([...WINDOWS, form.windowMinutes])].map((m) => (
+                    <option key={m ?? "any"} value={m ?? ""}>
+                      {windowLabel(m)}
+                    </option>
+                  ))}
+                </Select>
+              )}
             </div>
             {changingZone ? (
               <Select label="Time zone" value={form.timezone} onChange={(e) => set({ timezone: e.target.value })}>
@@ -293,6 +324,8 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
               </div>
             )}
           </Fold>
+
+          <StepsFold steps={form.steps} onChange={(steps) => set({ steps })} readOnly={readOnly} />
 
           {(features.points || features.consequences) && (
             <Fold icon="balance" title={stakesTitle} sub={stakesSub} open={readOnly}>
@@ -382,6 +415,68 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
         </div>
       </fieldset>
     </form>
+  );
+}
+
+/** A ritual's steps: done in order, one at a time, from a run view. A task with none is an ordinary task. */
+function StepsFold({ steps, onChange, readOnly }: { steps: TaskStep[]; onChange(steps: TaskStep[]): void; readOnly: boolean }) {
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    const title = draft.trim();
+    if (!title || steps.length >= 30) return;
+    onChange([...steps, { id: crypto.randomUUID().slice(0, 8), title }]);
+    setDraft("");
+  };
+  const named = steps.filter((s) => s.title.trim());
+  return (
+    <Fold
+      icon="format_list_numbered"
+      title={named.length ? `Ritual: ${named.length} step${named.length === 1 ? "" : "s"}` : "No steps"}
+      sub={named.length ? named.map((s) => s.title.trim()).join(" → ") : "Add steps to make it a routine done in order"}
+      open={readOnly && steps.length > 0}
+    >
+      {steps.length > 0 && (
+        <ol className="flex flex-col gap-1">
+          <SortableList items={steps} enabled={!readOnly} onReorder={onChange}>
+            {(s, i, handle) => (
+              <li className="flex items-center gap-2">
+                {handle}
+                <span className="w-6 text-center text-label-large text-on-surface-variant tabular-nums">{i + 1}</span>
+                <TextField
+                  aria-label={`Step ${i + 1}`}
+                  value={s.title}
+                  maxLength={200}
+                  onChange={(e) => onChange(steps.map((x) => (x.id === s.id ? { ...x, title: e.target.value } : x)))}
+                  className="flex-1"
+                />
+                {!readOnly && <IconButton icon="close" label={`Remove step ${i + 1}`} onClick={() => onChange(steps.filter((x) => x.id !== s.id))} />}
+              </li>
+            )}
+          </SortableList>
+        </ol>
+      )}
+      {!readOnly && steps.length < 30 && (
+        <div className="flex items-center gap-2">
+          <TextField
+            label="Add a step"
+            value={draft}
+            maxLength={200}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                add();
+              }
+            }}
+            className="flex-1"
+          />
+          <Button variant="tonal" icon="add" disabled={!draft.trim()} onClick={add}>
+            Add
+          </Button>
+        </div>
+      )}
+      {steps.length > 0 && <p className="text-body-small text-on-surface-variant">They're done one at a time from Start, and the task is finished when the last one is.</p>}
+    </Fold>
   );
 }
 

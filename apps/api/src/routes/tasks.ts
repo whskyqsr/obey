@@ -13,6 +13,7 @@ import {
   rescheduleInput,
   reviewOccurrence as reviewBody,
   taskInput,
+  tickStep as tickStepBody,
 } from "@obey/contracts";
 import { addDays, dueInstant, localDate } from "@obey/recurrence";
 import type { Deps } from "../app.js";
@@ -33,6 +34,7 @@ import {
   materializeSeries,
   requestReschedule,
   reviewOccurrence,
+  tickStep,
   undoCompletion,
 } from "../services/scheduling.js";
 
@@ -338,6 +340,13 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         data: { type: submitted ? "occurrence_submitted" : "occurrence_completed", occurrenceId: occ.id },
       });
     }
+    return occurrenceDto(updated, series);
+  });
+
+  app.post<{ Params: { id: string } }>("/occurrences/:id/steps", async (req) => {
+    const body = tickStepBody.parse(req.body);
+    const { occ, series } = await loadOccurrence(db, req.params.id, req.user.id);
+    const updated = await tickStep(db, series, occ, req.user.id, body.stepId, body.done, deps.now());
     return occurrenceDto(updated, series);
   });
 

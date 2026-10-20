@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useTasks } from "../api/hooks";
 import type { Occurrence } from "../api/types";
 import { CompleteDialog, isOverdue } from "../components/OccurrenceCard";
+import { RitualDialog, isRitual } from "../components/Ritual";
 import { Badge, Button, Chip, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, TextField } from "../components/ui";
 import { useCurrentOccurrences } from "../lib/currentOccurrences";
 import { StreakStrip } from "../components/StreakStrip";
@@ -65,7 +66,19 @@ export function TasksPage() {
               className="state-layer flex min-w-0 flex-1 items-center gap-4 rounded-md p-4 text-left"
             >
               <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-container text-on-primary-container">
-                <Icon name={t.assignedConsequenceId ? "bolt" : t.schedule.rule ? (t.schedule.anchor === "completion" ? "autorenew" : "event_repeat") : "event"} />
+                <Icon
+                  name={
+                    t.assignedConsequenceId
+                      ? "bolt"
+                      : t.steps.length
+                        ? "format_list_numbered"
+                        : t.schedule.rule
+                          ? t.schedule.anchor === "completion"
+                            ? "autorenew"
+                            : "event_repeat"
+                          : "event"
+                  }
+                />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-title-medium text-on-surface">{t.title}</div>
@@ -85,7 +98,8 @@ export function TasksPage() {
           </div>
         ))}
       </div>
-      {completing && <CompleteDialog o={completing} open onClose={() => setCompleting(null)} />}
+      {completing && !isRitual(completing) && <CompleteDialog o={completing} open onClose={() => setCompleting(null)} />}
+      {completing && isRitual(completing) && <RitualDialog o={completing} open onClose={() => setCompleting(null)} />}
       {isDom && <Fab icon="add" label="New task" onClick={() => navigate({ to: "/tasks/$taskId", params: { taskId: "new" } })} />}
     </>
   );
@@ -96,7 +110,14 @@ function NowStatus({ occurrences, mine, onComplete }: { occurrences: Occurrence[
   const t = today();
   const open = occurrences.find((o) => o.status === "pending" && (isOverdue(o) || localDateOf(new Date(o.dueAt)) === t));
   if (open && mine)
-    return <IconButton icon="check_circle" label={`Mark “${open.title}” done`} className={isOverdue(open) ? "text-error" : "text-primary"} onClick={() => onComplete(open)} />;
+    return (
+      <IconButton
+        icon={isRitual(open) ? "play_circle" : "check_circle"}
+        label={`${isRitual(open) ? "Start" : "Mark"} “${open.title}”${isRitual(open) ? "" : " done"}`}
+        className={isOverdue(open) ? "text-error" : "text-primary"}
+        onClick={() => onComplete(open)}
+      />
+    );
   const todays = occurrences.find((o) => localDateOf(new Date(o.dueAt)) === t);
   if (todays?.status === "completed") return <Icon name="check_circle" filled className="m-2 text-primary" />;
   if (occurrences.some((o) => o.status === "submitted")) return <Icon name="hourglass_top" className="m-2 text-tertiary" />;
