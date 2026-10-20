@@ -492,3 +492,13 @@ export function useDeleteLibraryItem(rel: string, kind: LibraryKind) {
     onSuccess: () => invalidate(),
   });
 }
+
+export type ApplyKitInput = { kit: string; items: string[]; assigneeId?: string; timezone: string; start: string };
+
+export function useApplyKit(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ kit, ...body }: ApplyKitInput) => api<{ tasks: number; rules: number; protocols: number }>(`/relationships/${rel}/kits/${kit}`, { method: "POST", body }),
+    onSuccess: () => invalidate(),
+  });
+}

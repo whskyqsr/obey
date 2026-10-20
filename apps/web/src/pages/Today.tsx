@@ -7,6 +7,7 @@ import { EventDialog, eventOn, eventWhen } from "../components/EventDialog";
 import { DayRescheduleSheet } from "../components/DayRescheduleSheet";
 import { isOverdue } from "../components/OccurrenceCard";
 import { ExcuseAction, ReviewActions, RowGroup, RowLink, TaskRow } from "../components/TaskRow";
+import { KitPrompt } from "./Kits";
 import { Button, Empty, ErrorBox, Fab, Icon, Loading, PageHeader, Section, useSnackbar } from "../components/ui";
 import { addDays, fmtDate, fmtDateTime, fmtRelative, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
@@ -76,6 +77,7 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
           />
           {!isDom && occ.data && todays.length > 0 && <Progress today={todays} done={doneToday} points={features.points} />}
           <PlanClashes />
+          <KitPrompt />
           {isDom ? (
             <>
               {needs.count > 0 && (

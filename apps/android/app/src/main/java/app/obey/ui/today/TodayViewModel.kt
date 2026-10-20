@@ -49,6 +49,8 @@ data class TodayData(
     val streaks: Map<String, TaskStreak> = emptyMap(),
     /** Plans today or tomorrow that run into a task, for a heads-up at the top. */
     val clashingPlans: List<CalendarEvent> = emptyList(),
+    /** A Dominant with no tasks set yet gets a nudge towards the starter kits. */
+    val noTasks: Boolean = false,
 )
 
 @HiltViewModel
@@ -80,6 +82,7 @@ class TodayViewModel @Inject constructor(
         val reqs = async { api.reschedules(relId) }
         val streaks = async { runCatching { api.streaks(relId) }.getOrDefault(emptyList()) }
         val events = async { runCatching { api.events(relId, today.toString(), today.plusDays(1).toString()) }.getOrDefault(emptyList()) }
+        val noTasks = async { sessions.session?.canManage == true && runCatching { api.tasks(relId).isEmpty() }.getOrDefault(false) }
         val all = occ.await()
         val now = Instant.now()
         fun dueDate(o: Occurrence) = parseInstant(o.dueAt).local().toLocalDate()
@@ -98,6 +101,7 @@ class TodayViewModel @Inject constructor(
                 .groupBy { it.groupId ?: it.id }
                 .values.toList(),
             streaks = streaks.await().associateBy { it.taskId },
+            noTasks = noTasks.await(),
             clashingPlans = events.await().filter {
                 // The server pads the range by a day; keep only today's and tomorrow's, and only ones not over yet.
                 it.conflictIds.isNotEmpty() && parseInstant(it.endsAt).isAfter(now) && (it.covers(today) || it.covers(today.plusDays(1)))

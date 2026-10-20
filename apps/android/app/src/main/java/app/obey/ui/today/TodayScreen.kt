@@ -46,6 +46,7 @@ import app.obey.api.CalendarEvent
 import app.obey.api.Occurrence
 import app.obey.api.OccurrenceStatus
 import app.obey.ui.common.EmptyBox
+import app.obey.ui.kits.KitPrompt
 import app.obey.ui.common.ErrorBox
 import app.obey.ui.common.Load
 import app.obey.ui.common.LoadingBox
@@ -67,6 +68,7 @@ fun TodayScreen(
     onEditTask: (String) -> Unit,
     onOpenTask: (String) -> Unit,
     onOpenSettings: () -> Unit,
+    onKits: () -> Unit,
     vm: TodayViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -148,6 +150,7 @@ fun TodayScreen(
                 LazyColumn(Modifier.fillMaxSize()) {
                     if (session?.readOnly == true) item(key = "ended") { EndedBanner(onOpenSettings) }
                     items(d.clashingPlans, key = { "plan-${it.id}" }) { e -> PlanHeadsUp(e) { plan = e } }
+                    if (isDom && d.noTasks && session?.readOnly != true) item(key = "kits") { KitPrompt(onKits) }
                     if (!isDom) {
                         val counted = d.today.filter { it.status != OccurrenceStatus.Excused }
                         if (counted.isNotEmpty()) item(key = "progress") { ProgressCard(counted) }

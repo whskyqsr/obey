@@ -77,6 +77,8 @@ import app.obey.ui.rewards.RewardsScreen
 import app.obey.ui.protocols.ProtocolEditorScreen
 import app.obey.ui.protocols.ProtocolsScreen
 import app.obey.ui.rulelog.RuleLogScreen
+import app.obey.ui.kits.KitsScreen
+import app.obey.ui.kits.describe
 import app.obey.ui.rules.RulesScreen
 import app.obey.ui.settings.DynamicScreen
 import app.obey.ui.settings.SettingsScreen
@@ -259,6 +261,7 @@ private fun ObeyNavHost(nav: NavHostController) {
                 onEditTask = { nav.navigate(TaskEditorRoute(taskId = it)) },
                 onOpenTask = openTask,
                 onOpenSettings = settings,
+                onKits = { nav.navigate(KitsRoute) },
             )
         }
         composable<UpcomingRoute> {
@@ -306,6 +309,17 @@ private fun ObeyNavHost(nav: NavHostController) {
                 onOpen = openTask,
                 onNew = { nav.navigate(TaskEditorRoute()) },
                 onOpenSettings = settings,
+                onKits = { nav.navigate(KitsRoute) },
+            )
+        }
+        composable<KitsRoute> {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            KitsScreen(
+                onBack = { nav.popBackStack() },
+                onAdded = { r ->
+                    android.widget.Toast.makeText(context, r.describe(), android.widget.Toast.LENGTH_SHORT).show()
+                    nav.navigate(if (r.tasks > 0) TaskListRoute else if (r.rules > 0) RulesRoute else ProtocolsRoute) { popUpTo<KitsRoute> { inclusive = true } }
+                },
             )
         }
         composable<TaskDetailRoute> {

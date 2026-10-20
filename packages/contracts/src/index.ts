@@ -491,3 +491,88 @@ export const adminReport = z.object({
 });
 export type AdminReport = z.infer<typeof adminReport>;
 export const resolveReport = z.object({ removePhoto: z.boolean().default(false) });
+
+/** One thing a starter kit can add: a recurring task, a rule, or a protocol (optionally spelling out one of the kit's rules). */
+export interface KitItem {
+  key: string;
+  kind: "task" | "rule" | "protocol";
+  title: string;
+  bodyMd?: string;
+  /** Tasks: how often, and by when. */
+  repeat?: { freq: "daily" | "weekly"; interval?: number; byWeekday?: ("MO" | "TU" | "WE" | "TH" | "FR" | "SA" | "SU")[] };
+  dueTime?: string;
+  /** Protocols: the key of the kit rule it spells out. */
+  ruleKey?: string;
+}
+export interface StarterKit {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  items: KitItem[];
+}
+
+/** Ready-made sets to start from; a Dominant picks what to add, and everything stays editable afterwards. */
+export const starterKits: StarterKit[] = [
+  {
+    id: "daily-basics",
+    title: "Daily basics",
+    description: "A simple daily rhythm to start with.",
+    icon: "wb_sunny",
+    items: [
+      { key: "morning", kind: "task", title: "Morning check-in", bodyMd: "A quick message: how you slept and your plan for the day.", repeat: { freq: "daily" }, dueTime: "09:00" },
+      { key: "bed", kind: "task", title: "Make the bed", repeat: { freq: "daily" }, dueTime: "10:00" },
+      { key: "journal", kind: "task", title: "One line in your journal", bodyMd: "One good thing, one thing to do better.", repeat: { freq: "daily" }, dueTime: "21:30" },
+      { key: "lights", kind: "task", title: "Lights out", repeat: { freq: "daily" }, dueTime: "23:00" },
+    ],
+  },
+  {
+    id: "health",
+    title: "Health and self-care",
+    description: "Looking after yourself, on a schedule.",
+    icon: "favorite",
+    items: [
+      { key: "water", kind: "task", title: "Drink 64 oz of water", repeat: { freq: "daily" }, dueTime: "20:00" },
+      { key: "vitamins", kind: "task", title: "Take your vitamins", repeat: { freq: "daily" }, dueTime: "09:00" },
+      { key: "walk", kind: "task", title: "30-minute walk", repeat: { freq: "daily", interval: 2 }, dueTime: "19:00" },
+      { key: "stretch", kind: "task", title: "Stretch for 10 minutes", repeat: { freq: "daily" }, dueTime: "22:00" },
+      { key: "skincare", kind: "task", title: "Skincare routine", repeat: { freq: "daily" }, dueTime: "22:30" },
+    ],
+  },
+  {
+    id: "home",
+    title: "Service and home",
+    description: "Keeping the home in order.",
+    icon: "home",
+    items: [
+      { key: "tidy", kind: "task", title: "Tidy the living room", repeat: { freq: "daily" }, dueTime: "19:00" },
+      { key: "dishes", kind: "task", title: "Dishes done before bed", repeat: { freq: "daily" }, dueTime: "22:00" },
+      { key: "laundry", kind: "task", title: "Laundry", repeat: { freq: "weekly", byWeekday: ["SU"] }, dueTime: "18:00" },
+      { key: "outfit", kind: "task", title: "Lay out tomorrow's outfit", repeat: { freq: "daily" }, dueTime: "21:00" },
+    ],
+  },
+  {
+    id: "rules",
+    title: "Rules to start from",
+    description: "A few common rules, with the protocols that spell them out.",
+    icon: "gavel",
+    items: [
+      { key: "honest", kind: "rule", title: "Be honest, always" },
+      { key: "ask", kind: "rule", title: "Ask before buying anything over $50" },
+      { key: "hydrated", kind: "rule", title: "Stay hydrated" },
+      { key: "hydrated-p", kind: "protocol", title: "64 oz of water a day", bodyMd: "Spread through the day; the last glass before 8 pm.", ruleKey: "hydrated" },
+      { key: "address", kind: "rule", title: "Address me properly" },
+      { key: "address-p", kind: "protocol", title: "How to address me", bodyMd: "Write down the title or name to use, and when.", ruleKey: "address" },
+    ],
+  },
+];
+
+export const applyKit = z.object({
+  /** Keys of the kit's items to add; defaults to all of them. */
+  items: z.array(z.string()).max(50).optional(),
+  /** Who the kit's tasks are for; needed when any task is picked. */
+  assigneeId: id.optional(),
+  timezone: z.string().min(1).max(64),
+  start: plainDate,
+});
+export const applyKitResult = z.object({ tasks: z.number(), rules: z.number(), protocols: z.number() });

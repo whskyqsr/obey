@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useTasks } from "../api/hooks";
 import type { Occurrence } from "../api/types";
 import { CompleteDialog, isOverdue } from "../components/OccurrenceCard";
-import { Badge, Chip, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, TextField } from "../components/ui";
+import { Badge, Button, Chip, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, TextField } from "../components/ui";
 import { useCurrentOccurrences } from "../lib/currentOccurrences";
 import { StreakStrip } from "../components/StreakStrip";
 import { fmtClock, fmtDate, localDateOf, today } from "../lib/dates";
@@ -28,7 +28,17 @@ export function TasksPage() {
 
   return (
     <>
-      <PageHeader title="Tasks" subtitle={isDom ? "Everything you've set, recurring or one-off." : "What's been set for you."} />
+      <PageHeader
+        title="Tasks"
+        subtitle={isDom ? "Everything you've set, recurring or one-off." : "What's been set for you."}
+        actions={
+          isDom ? (
+            <Button variant="text" icon="widgets" onClick={() => navigate({ to: "/kits" })}>
+              Starter kits
+            </Button>
+          ) : undefined
+        }
+      />
       <div className="flex flex-wrap items-center gap-2 px-4 pb-4 md:px-6">
         <TextField placeholder="Search tasks" value={q} onChange={(e) => setQ(e.target.value)} className="min-w-0 flex-1" aria-label="Search tasks" />
         <Chip selected={mineOnly} onClick={() => setMineOnly((v) => !v)}>
@@ -85,11 +95,16 @@ export function TasksPage() {
 function NowStatus({ occurrences, mine, onComplete }: { occurrences: Occurrence[]; mine: boolean; onComplete(o: Occurrence): void }) {
   const t = today();
   const open = occurrences.find((o) => o.status === "pending" && (isOverdue(o) || localDateOf(new Date(o.dueAt)) === t));
-  if (open && mine) return <IconButton icon="check_circle" label={`Mark “${open.title}” done`} className={isOverdue(open) ? "text-error" : "text-primary"} onClick={() => onComplete(open)} />;
+  if (open && mine)
+    return <IconButton icon="check_circle" label={`Mark “${open.title}” done`} className={isOverdue(open) ? "text-error" : "text-primary"} onClick={() => onComplete(open)} />;
   const todays = occurrences.find((o) => localDateOf(new Date(o.dueAt)) === t);
   if (todays?.status === "completed") return <Icon name="check_circle" filled className="m-2 text-primary" />;
   if (occurrences.some((o) => o.status === "submitted")) return <Icon name="hourglass_top" className="m-2 text-tertiary" />;
   if (open) return <Icon name="radio_button_unchecked" className={isOverdue(open) ? "m-2 text-error" : "m-2 text-on-surface-variant"} />;
   const next = occurrences.find((o) => o.status === "pending");
-  return next ? <span className="w-10 text-center text-label-small text-on-surface-variant">{fmtDate(localDateOf(new Date(next.dueAt)), { weekday: "short" })}</span> : <span className="w-10" />;
+  return next ? (
+    <span className="w-10 text-center text-label-small text-on-surface-variant">{fmtDate(localDateOf(new Date(next.dueAt)), { weekday: "short" })}</span>
+  ) : (
+    <span className="w-10" />
+  );
 }

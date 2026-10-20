@@ -15,6 +15,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object SettingsRoute
 @Serializable data object DynamicRoute
 @Serializable data object TaskListRoute
+@Serializable data object KitsRoute
 
 /** [taskId] null = new task; [date] (YYYY-MM-DD) pre-fills the start date. */
 @Serializable data class TaskEditorRoute(val taskId: String? = null, val date: String? = null)

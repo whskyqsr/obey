@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.HourglassTop
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
+import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -105,6 +106,7 @@ fun TaskListScreen(
     onOpen: (String) -> Unit,
     onNew: () -> Unit,
     onOpenSettings: () -> Unit,
+    onKits: () -> Unit,
     vm: TaskListViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -122,7 +124,10 @@ fun TaskListScreen(
         topBar = {
             TopAppBar(
                 title = { Text("All tasks") },
-                actions = { SettingsAction(onOpenSettings) },
+                actions = {
+                    if (vm.session?.canManage == true && vm.session?.readOnly != true) IconButton(onClick = onKits) { Icon(Icons.Outlined.Widgets, "Starter kits") }
+                    SettingsAction(onOpenSettings)
+                },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },

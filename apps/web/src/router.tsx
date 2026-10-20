@@ -14,6 +14,7 @@ import { Onboarding } from "./pages/Onboarding";
 import { RewardsPage } from "./pages/Rewards";
 import { ProtocolsPage } from "./pages/Protocols";
 import { RuleLogPage } from "./pages/RuleLog";
+import { KitsPage } from "./pages/Kits";
 import { RulesPage } from "./pages/Rules";
 import { SettingsPage } from "./pages/Settings";
 import { TaskEditorPage } from "./pages/TaskEditor";
@@ -184,6 +185,7 @@ const routeTree = rootRoute.addChildren([
   page("/rules", gated("rules", RulesPage)),
   page("/protocols", gated("protocols", ProtocolsPage)),
   page("/rule-log", RuleLogPage),
+  page("/kits", KitsPage),
   protocolRoute,
   page("/notes", () => <NotesPage kind="note" />),
   noteRoute,

@@ -672,3 +672,33 @@ data class RuleLogInput(
     val occurredOn: String,
     @EncodeDefault(EncodeDefault.Mode.NEVER) val consequence: RuleLogConsequence? = null,
 )
+
+/** A ready-made set of tasks, rules and protocols; the catalog lives on the server. */
+@Serializable
+data class StarterKit(val id: String, val title: String, val description: String, val icon: String, val items: List<KitItem>)
+
+@Serializable
+data class KitItem(
+    val key: String,
+    /** "task", "rule" or "protocol". */
+    val kind: String,
+    val title: String,
+    val bodyMd: String? = null,
+    val repeat: KitRepeat? = null,
+    val dueTime: String? = null,
+    val ruleKey: String? = null,
+)
+
+@Serializable
+data class KitRepeat(val freq: String, val interval: Int? = null, val byWeekday: List<String>? = null)
+
+@Serializable
+data class ApplyKitInput(
+    val items: List<String>,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val assigneeId: String? = null,
+    val timezone: String,
+    val start: String,
+)
+
+@Serializable
+data class ApplyKitResult(val tasks: Int, val rules: Int, val protocols: Int)
