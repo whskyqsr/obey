@@ -74,6 +74,7 @@ import app.obey.ui.common.LoadingBox
 import app.obey.ui.common.LocalFeatures
 import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.SectionHeader
+import app.obey.ui.common.formatClock
 import app.obey.ui.common.formatDate
 import app.obey.ui.common.formatDue
 import app.obey.ui.common.loadCatching
@@ -224,7 +225,7 @@ fun TaskDetailScreen(
                 Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(rememberScrollState())) {
                     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            listOfNotNull(task.summary + (task.dueTime?.let { " at $it" } ?: ", all day"), session?.nameOf(task.assigneeId)).joinToString(" · "),
+                            listOfNotNull(task.summary + (task.dueTime?.let { " at ${formatClock(it)}" } ?: ", all day"), session?.nameOf(task.assigneeId)).joinToString(" · "),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

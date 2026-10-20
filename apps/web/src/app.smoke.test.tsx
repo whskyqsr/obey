@@ -100,7 +100,7 @@ describe("app smoke test (dev auth, mocked API)", () => {
       await waitFor(() => expect(screen.getAllByText(text).length).toBeGreaterThan(0));
     };
     await visit("/calendar", "Calendar");
-    await visit("/tasks", /Every 2 weeks on Mon, Thu at 21:00/);
+    await visit("/tasks", /Every 2 weeks on Mon, Thu at 9:00\s?PM/);
     await visit("/tasks/t1", "Streak");
     await visit("/tasks/t1/edit", "Edit task");
     await visit("/tasks/t1/history", "History");

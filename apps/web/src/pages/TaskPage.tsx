@@ -7,7 +7,7 @@ import { OccurrenceCard } from "../components/OccurrenceCard";
 import { useCurrentOccurrences } from "../lib/currentOccurrences";
 import { TaskHistory } from "../components/TaskHistory";
 import { Badge, ErrorBox, IconButton, Loading, OverflowMenu, useSnackbar } from "../components/ui";
-import { fmtRelative } from "../lib/dates";
+import { fmtClock, fmtRelative } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
 import { useConfirm } from "../lib/useConfirm";
@@ -74,7 +74,7 @@ function TaskView({ task }: { task: Task }) {
         <h1 className="text-headline-medium text-on-surface">{task.title}</h1>
         <p className="text-body-large text-on-surface-variant">
           {task.summary}
-          {task.dueTime ? ` at ${task.dueTime}` : ", all day"} · {memberName(task.assigneeId)}
+          {task.dueTime ? ` at ${fmtClock(task.dueTime)}` : ", all day"} · {memberName(task.assigneeId)}
         </p>
         <div className="flex flex-wrap gap-2 empty:hidden">
           {!task.active && <Badge tone="neutral">Paused</Badge>}

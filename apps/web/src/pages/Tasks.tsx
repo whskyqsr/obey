@@ -5,7 +5,7 @@ import type { Occurrence } from "../api/types";
 import { CompleteDialog, isOverdue } from "../components/OccurrenceCard";
 import { Badge, Chip, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, TextField } from "../components/ui";
 import { useCurrentOccurrences } from "../lib/currentOccurrences";
-import { fmtDate, localDateOf, today } from "../lib/dates";
+import { fmtClock, fmtDate, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 
 export function TasksPage() {
@@ -60,7 +60,7 @@ export function TasksPage() {
                 <div className="truncate text-title-medium text-on-surface">{t.title}</div>
                 <div className="truncate text-body-medium text-on-surface-variant">
                   {t.summary}
-                  {t.dueTime ? ` at ${t.dueTime}` : ""} · {memberName(t.assigneeId)}
+                  {t.dueTime ? ` at ${fmtClock(t.dueTime)}` : ""} · {memberName(t.assigneeId)}
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1">

@@ -43,6 +43,7 @@ import app.obey.ui.common.ErrorBox
 import app.obey.ui.common.Load
 import app.obey.ui.common.LoadingBox
 import app.obey.ui.common.MessageEffect
+import app.obey.ui.common.formatClock
 import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.local
 import app.obey.ui.common.parseInstant
@@ -133,7 +134,7 @@ fun TaskListScreen(
                             Text(
                                 listOfNotNull(
                                     t.summary,
-                                    t.dueTime?.let { "at $it" },
+                                    t.dueTime?.let { "at ${formatClock(it)}" },
                                     who,
                                     if (LocalFeatures.current.points && t.points != 0) "${signed(t.points)} pts" else null,
                                     if (!t.active) "paused" else null,

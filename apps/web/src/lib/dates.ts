@@ -63,6 +63,12 @@ export function isAllDayDue(iso: string) {
   return d.getHours() === 23 && d.getMinutes() === 59 && d.getSeconds() === 59;
 }
 
+/** A task's wall-clock due time ("21:00") in the same style as other times, e.g. "9:00 PM". */
+export function fmtClock(hhmm: string) {
+  const [h, m] = hhmm.split(":").map(Number);
+  return new Date(2000, 0, 1, h, m).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
 export function fmtTime(iso: string) {
   if (isAllDayDue(iso)) return "All day";
   return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });

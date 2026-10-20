@@ -21,6 +21,9 @@ private val dateTimeFmt = DateTimeFormatter.ofPattern("EEE d MMM, ")
 private fun ZonedDateTime.timeLabel(): String =
     if (hour == 23 && minute == 59 && second == 59) "all day" else format(timeFmt)
 
+/** A task's wall-clock due time ("21:00") in the same style as other times. */
+fun formatClock(hhmm: String): String = java.time.LocalTime.parse(hhmm).format(timeFmt)
+
 fun formatTime(iso: String): String = parseInstant(iso).local().timeLabel().replaceFirstChar { it.uppercase() }
 
 /** "Today 18:00", "Tomorrow 09:00", "Mon 3 Nov, 18:00". */
