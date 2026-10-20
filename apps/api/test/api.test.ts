@@ -719,6 +719,23 @@ describe("feature switches", () => {
   });
 });
 
+describe("limits", () => {
+  it("lets each person keep their own limits, which partners see but can't change", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    const hard = await sub.post(`/relationships/${relId}/limits`, { title: "Public humiliation", kind: "hard" });
+    expect(hard.status).toBe(201);
+    expect(hard.body).toMatchObject({ ownerId: subId, kind: "hard", note: "" });
+    await dom.post(`/relationships/${relId}/limits`, { title: "Rope", kind: "curious", note: "Start simple" });
+    expect((await dom.get(`/relationships/${relId}/limits`)).body.map((l: { title: string }) => l.title)).toEqual(["Public humiliation", "Rope"]);
+    expect((await dom.patch(`/limits/${hard.body.id}`, { kind: "soft" })).status).toBe(403);
+    expect((await dom.del(`/limits/${hard.body.id}`)).status).toBe(403);
+    expect((await sub.patch(`/limits/${hard.body.id}`, { note: "Not even in private" })).body).toMatchObject({ kind: "hard", note: "Not even in private" });
+    expect((await sub.post(`/relationships/${relId}/limits`, { title: "x", kind: "maybe" })).status).toBe(400);
+    expect((await sub.del(`/limits/${hard.body.id}`)).status).toBe(204);
+    expect((await sub.get(`/relationships/${relId}/limits`)).body).toHaveLength(1);
+  });
+});
+
 describe("push payloads", () => {
   it("sends Android data only, so the app titles it with the discreet-mode name", () => {
     const [web, android] = fcmMessages(

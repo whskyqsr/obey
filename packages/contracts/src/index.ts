@@ -359,6 +359,18 @@ export const protocolInput = z.object({
 });
 export const protocol = protocolInput.extend({ id, relationshipId: id, createdAt: z.string() });
 
+/** Hard: never. Soft: only with care, or ask first. Curious: open to trying, carefully. */
+export const limitKind = z.enum(["hard", "soft", "curious"]);
+export type LimitKind = z.infer<typeof limitKind>;
+/** One person's limit. Everyone in the dynamic sees it; only its owner changes it. */
+export const limitInput = z.object({
+  title: z.string().trim().min(1).max(200),
+  kind: limitKind,
+  note: z.string().trim().max(2_000).default(""),
+});
+export const limit = limitInput.extend({ id, relationshipId: id, ownerId: id, createdAt: z.string(), updatedAt: z.string() });
+export type Limit = z.infer<typeof limit>;
+
 /** A full ordering of a relationship's rules or protocols, top first. */
 export const reorderInput = z.object({ ids: z.array(id).max(1000) });
 

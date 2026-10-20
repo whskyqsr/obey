@@ -134,6 +134,13 @@
       "when": 1792523537842,
       "tag": "0018_quiet_hours",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792523793248,
+      "tag": "0019_limits",
+      "breakpoints": true
     }
   ]
 }

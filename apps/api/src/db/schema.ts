@@ -127,6 +127,26 @@ export const protocols = pgTable("protocols", {
   createdAt: createdAt(),
 });
 
+/** Each person's hard and soft limits and things they're curious about; only the owner changes them. */
+export const limits = pgTable(
+  "limits",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    kind: text("kind", { enum: ["hard", "soft", "curious"] }).notNull(),
+    note: text("note").notNull().default(""),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [index("limits_relationship_idx").on(t.relationshipId)],
+);
+
 export const taskSeries = pgTable(
   "task_series",
   {

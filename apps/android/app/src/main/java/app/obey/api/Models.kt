@@ -638,3 +638,26 @@ data class CalendarEvent(
     /** Tasks still to do that fall due during the plan, for the people it involves. */
     val conflictIds: List<String> = emptyList(),
 )
+
+@Serializable
+enum class LimitKind {
+    @SerialName("hard") Hard,
+    @SerialName("soft") Soft,
+    @SerialName("curious") Curious,
+}
+
+/** One person's limit; everyone in the dynamic sees it, only its owner changes it. */
+@Serializable
+data class Limit(
+    val id: String,
+    val relationshipId: String,
+    val ownerId: String,
+    val title: String,
+    val kind: LimitKind,
+    val note: String = "",
+    val createdAt: String,
+    val updatedAt: String,
+)
+
+@Serializable
+data class LimitInput(val title: String, val kind: LimitKind, val note: String = "")

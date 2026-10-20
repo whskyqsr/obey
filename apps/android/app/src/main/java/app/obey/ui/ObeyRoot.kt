@@ -76,6 +76,8 @@ import app.obey.ui.onboarding.SignInScreen
 import app.obey.ui.rewards.RewardsScreen
 import app.obey.ui.protocols.ProtocolEditorScreen
 import app.obey.ui.protocols.ProtocolsScreen
+import app.obey.ui.limits.LimitsScreen
+import androidx.compose.material.icons.outlined.Shield
 import app.obey.ui.rules.RulesScreen
 import app.obey.ui.settings.DynamicScreen
 import app.obey.ui.settings.SettingsScreen
@@ -144,6 +146,7 @@ private fun topLevels(f: Features) = listOfNotNull(
     if (f.consequences) TopLevel(ConsequencesRoute, "Consequences", Icons.Outlined.Bolt) { it.hasRoute<ConsequencesRoute>() } else null,
     if (f.rules) TopLevel(RulesRoute, "Rules", Icons.Outlined.Gavel) { it.hasRoute<RulesRoute>() } else null,
     if (f.protocols) TopLevel(ProtocolsRoute, "Protocols", Icons.Outlined.FactCheck) { it.hasRoute<ProtocolsRoute>() } else null,
+    TopLevel(LimitsRoute, "Limits", Icons.Outlined.Shield) { it.hasRoute<LimitsRoute>() },
     TopLevel(NotesRoute, "Notes", Icons.AutoMirrored.Outlined.Notes) { it.hasRoute<NotesRoute>() },
     if (f.journal) TopLevel(JournalRoute, "Journal", Icons.Outlined.AutoStories) { it.hasRoute<JournalRoute>() } else null,
     // Tasks open from Today and Calendar; the full list is for managing them, so it sits under More.
@@ -279,6 +282,7 @@ private fun ObeyNavHost(nav: NavHostController) {
                 onOpenSettings = settings,
             )
         }
+        composable<LimitsRoute> { LimitsScreen(onOpenSettings = settings) }
         composable<ProtocolEditorRoute> { ProtocolEditorScreen(onDone = { nav.popBackStack() }) }
         composable<NotesRoute> {
             NotesScreen(
