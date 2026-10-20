@@ -264,7 +264,7 @@ private fun ObeyNavHost(nav: NavHostController) {
             )
         }
         composable<RewardsRoute> { RewardsScreen(onOpenSettings = settings) }
-        composable<RulesRoute> { RulesScreen(onOpenSettings = settings) }
+        composable<RulesRoute> { RulesScreen(onOpenSettings = settings, onOpenProtocol = { nav.navigate(ProtocolEditorRoute(protocolId = it)) }) }
         composable<ProtocolsRoute> {
             ProtocolsScreen(
                 onOpen = { nav.navigate(ProtocolEditorRoute(protocolId = it)) },

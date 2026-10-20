@@ -3,11 +3,17 @@ package app.obey.ui.rules
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.FactCheck
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -30,9 +36,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.obey.api.ObeyApi
+import app.obey.api.Protocol
 import app.obey.api.Rule
 import app.obey.api.ReorderInput
 import app.obey.api.RuleInput
@@ -40,6 +48,7 @@ import app.obey.data.Session
 import app.obey.data.SessionRepository
 import app.obey.ui.common.BaseViewModel
 import app.obey.ui.common.EmptyBox
+import app.obey.ui.common.LocalFeatures
 import app.obey.ui.common.ErrorBox
 import app.obey.ui.common.Load
 import app.obey.ui.common.LoadingBox
@@ -63,14 +72,24 @@ class RulesViewModel @Inject constructor(
     val state: StateFlow<Load<List<Rule>>> = _state.asStateFlow()
     val session: Session? get() = sessions.session
 
-    init {
-        refresh()
-    }
+    /** Protocols linked to each rule, keyed by rule id, in the protocols' own order. */
+    private val _protocols = MutableStateFlow<Map<String, List<Protocol>>>(emptyMap())
+    val protocols: StateFlow<Map<String, List<Protocol>>> = _protocols.asStateFlow()
 
-    fun refresh() {
+    fun refresh(withProtocols: Boolean = true) {
         viewModelScope.launch {
             if (_state.value !is Load.Ready) _state.value = Load.Loading
             _state.value = loadCatching { api.rules(sessions.requireRelationshipId()).inOrder() }
+        }
+        if (withProtocols) {
+            viewModelScope.launch {
+                // The rules still show if this fails; they just lose their protocol links.
+                runCatching { api.protocols(sessions.requireRelationshipId()) }.onSuccess { list ->
+                    _protocols.value = list.sortedWith(compareBy({ it.position }, { it.createdAt }))
+                        .filter { it.ruleId != null }
+                        .groupBy { it.ruleId!! }
+                }
+            }
         }
     }
 
@@ -93,13 +112,20 @@ internal fun List<Rule>.inOrder() = sortedWith(compareBy({ it.position }, { it.c
 
 private data class Editing(val rule: Rule?)
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun RulesScreen(onOpenSettings: () -> Unit, vm: RulesViewModel = hiltViewModel()) {
+fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, vm: RulesViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     MessageEffect(message, snackbar, vm::messageShown)
+    val showProtocols = LocalFeatures.current.protocols
+    val protocols by vm.protocols.collectAsStateWithLifecycle()
+    // Refreshes on return from a protocol, which may have been relinked.
+    LifecycleResumeEffect(showProtocols) {
+        vm.refresh(withProtocols = showProtocols)
+        onPauseOrDispose { }
+    }
     val canManage = vm.session?.canManage == true
     var editing by remember { mutableStateOf<Editing?>(null) }
 
@@ -125,6 +151,7 @@ fun RulesScreen(onOpenSettings: () -> Unit, vm: RulesViewModel = hiltViewModel()
                         onReorder = vm::reorder,
                         modifier = Modifier.padding(padding).fillMaxSize(),
                     ) { r, index, handle ->
+                        val linked = if (showProtocols) protocols[r.id].orEmpty() else emptyList()
                         ListItem(
                             modifier = if (canManage) Modifier.clickable { editing = Editing(r) } else Modifier,
                             leadingContent = {
@@ -132,7 +159,24 @@ fun RulesScreen(onOpenSettings: () -> Unit, vm: RulesViewModel = hiltViewModel()
                             },
                             overlineContent = r.category?.takeIf { it.isNotBlank() }?.let { c -> { Text(c) } },
                             headlineContent = { Text(r.title) },
-                            supportingContent = if (r.bodyMd.isNotBlank()) { { Text(r.bodyMd) } } else null,
+                            supportingContent = if (r.bodyMd.isNotBlank() || linked.isNotEmpty()) {
+                                {
+                                    Column {
+                                        if (r.bodyMd.isNotBlank()) Text(r.bodyMd)
+                                        if (linked.isNotEmpty()) {
+                                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                linked.forEach { p ->
+                                                    AssistChip(
+                                                        onClick = { onOpenProtocol(p.id) },
+                                                        label = { Text(p.title) },
+                                                        leadingIcon = { Icon(Icons.Outlined.FactCheck, null, Modifier.size(AssistChipDefaults.IconSize)) },
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } else null,
                             trailingContent = handle,
                         )
                     }

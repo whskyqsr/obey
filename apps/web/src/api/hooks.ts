@@ -248,10 +248,11 @@ export function useRedeemReward(rel: string) {
 
 // ---- rewards, consequences, rules, notes
 
-export function useLibrary<K extends LibraryKind>(rel: string, kind: K) {
+export function useLibrary<K extends LibraryKind>(rel: string, kind: K, enabled = true) {
   return useQuery({
     queryKey: keys.library(rel, kind),
     queryFn: () => api<LibraryTypes[K]["item"][]>(`/relationships/${rel}/${kind}`),
+    enabled,
   });
 }
 
