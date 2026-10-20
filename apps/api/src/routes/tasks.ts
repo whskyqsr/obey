@@ -1,7 +1,17 @@
 import { and, asc, desc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { type TaskStats, assignConsequence, completeOccurrence as completeBody, editOccurrence as editBody, plainDate, rescheduleDayInput, rescheduleInput, reviewOccurrence as reviewBody, taskInput } from "@obey/contracts";
+import {
+  type TaskStats,
+  assignConsequence,
+  completeOccurrence as completeBody,
+  editOccurrence as editBody,
+  plainDate,
+  rescheduleDayInput,
+  rescheduleInput,
+  reviewOccurrence as reviewBody,
+  taskInput,
+} from "@obey/contracts";
 import { addDays, dueInstant, localDate } from "@obey/recurrence";
 import type { Deps } from "../app.js";
 import type { Tx } from "../db/index.js";
@@ -47,7 +57,11 @@ export async function loadOccurrence(db: Tx, id: string, userId: string) {
 
 /** Rows oldest first. Excused occurrences neither count against the rate nor break a streak. */
 export function taskStats(rows: { status: string; completedAt: Date | null }[]): TaskStats {
-  let done = 0, missed = 0, excused = 0, streak = 0, bestStreak = 0;
+  let done = 0,
+    missed = 0,
+    excused = 0,
+    streak = 0,
+    bestStreak = 0;
   let lastDoneAt: Date | null = null;
   for (const r of rows) {
     if (r.status === "completed") {
@@ -131,8 +145,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     await requireManager(db, series.relationshipId, req.user.id);
     const body = parsePatch(taskInput.partial(), req.body);
     if (body.timezone) validZone(body.timezone);
-    if (body.assigneeId && !(await membership(db, series.relationshipId, body.assigneeId)))
-      throw new HttpError(400, "assignee is not in this relationship");
+    if (body.assigneeId && !(await membership(db, series.relationshipId, body.assigneeId))) throw new HttpError(400, "assignee is not in this relationship");
     const timingChanged = body.schedule !== undefined || body.dueTime !== undefined || body.timezone !== undefined;
     const updated = await db.transaction(async (tx) => {
       const [s] = await tx
@@ -169,41 +182,36 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     reply.status(204);
   });
 
-  app.get<{ Params: { id: string }; Querystring: { from?: string; to?: string } }>(
-    "/relationships/:id/occurrences",
-    async (req) => {
-      await requireMember(db, req.params.id, req.user.id);
-      const q = z.object({ from: plainDate, to: plainDate }).parse(req.query);
-      const span = (Date.parse(q.to) - Date.parse(q.from)) / 86_400_000;
-      if (span < 0 || span > MAX_RANGE_DAYS) throw new HttpError(400, `range must be 0..${MAX_RANGE_DAYS} days`);
-      await materializeRelationship(db, req.params.id, q.to, deps.now());
-      // Pad by a day each side: due instants are compared in UTC but dates are local to each series.
-      const rows = await db
-        .select({ occ: occurrences, series: taskSeries })
-        .from(occurrences)
-        .innerJoin(taskSeries, eq(occurrences.seriesId, taskSeries.id))
-        .where(
-          and(
-            eq(taskSeries.relationshipId, req.params.id),
-            gte(occurrences.dueAt, new Date(Date.parse(q.from) - 86_400_000)),
-            lte(occurrences.dueAt, new Date(Date.parse(q.to) + 2 * 86_400_000)),
-          ),
-        )
-        .orderBy(asc(occurrences.dueAt));
-      return rows
-        .filter(({ occ, series }) => {
-          const d = localDate(occ.dueAt, series.timezone);
-          return d >= q.from && d <= q.to && occ.status !== "cancelled";
-        })
-        .map(({ occ, series }) => occurrenceDto(occ, series));
-    },
-  );
+  app.get<{ Params: { id: string }; Querystring: { from?: string; to?: string } }>("/relationships/:id/occurrences", async (req) => {
+    await requireMember(db, req.params.id, req.user.id);
+    const q = z.object({ from: plainDate, to: plainDate }).parse(req.query);
+    const span = (Date.parse(q.to) - Date.parse(q.from)) / 86_400_000;
+    if (span < 0 || span > MAX_RANGE_DAYS) throw new HttpError(400, `range must be 0..${MAX_RANGE_DAYS} days`);
+    await materializeRelationship(db, req.params.id, q.to, deps.now());
+    // Pad by a day each side: due instants are compared in UTC but dates are local to each series.
+    const rows = await db
+      .select({ occ: occurrences, series: taskSeries })
+      .from(occurrences)
+      .innerJoin(taskSeries, eq(occurrences.seriesId, taskSeries.id))
+      .where(
+        and(
+          eq(taskSeries.relationshipId, req.params.id),
+          gte(occurrences.dueAt, new Date(Date.parse(q.from) - 86_400_000)),
+          lte(occurrences.dueAt, new Date(Date.parse(q.to) + 2 * 86_400_000)),
+        ),
+      )
+      .orderBy(asc(occurrences.dueAt));
+    return rows
+      .filter(({ occ, series }) => {
+        const d = localDate(occ.dueAt, series.timezone);
+        return d >= q.from && d <= q.to && occ.status !== "cancelled";
+      })
+      .map(({ occ, series }) => occurrenceDto(occ, series));
+  });
 
   /** Finished occurrences of a task, newest first, including those from before a "this and following" split. */
   app.get<{ Params: { id: string }; Querystring: { before?: string; limit?: string } }>("/tasks/:id/history", async (req) => {
-    const q = z
-      .object({ before: z.string().datetime({ offset: true }).optional(), limit: z.coerce.number().int().min(1).max(100).default(50) })
-      .parse(req.query);
+    const q = z.object({ before: z.string().datetime({ offset: true }).optional(), limit: z.coerce.number().int().min(1).max(100).default(50) }).parse(req.query);
     const ids = await lineage(req.params.id, req.user.id);
     const rows = await db
       .select({
@@ -250,7 +258,15 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const rows = await db
       .select({ seriesId: occurrences.seriesId, status: occurrences.status, completedAt: occurrences.completedAt })
       .from(occurrences)
-      .where(and(inArray(occurrences.seriesId, series.map((s) => s.id)), inArray(occurrences.status, ["completed", "missed", "excused"])))
+      .where(
+        and(
+          inArray(
+            occurrences.seriesId,
+            series.map((s) => s.id),
+          ),
+          inArray(occurrences.status, ["completed", "missed", "excused"]),
+        ),
+      )
       .orderBy(asc(occurrences.dueAt));
     const byTask = new Map<string, typeof rows>();
     for (const r of rows) {
@@ -309,9 +325,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   app.post<{ Params: { id: string } }>("/occurrences/:id/complete", async (req) => {
     const body = completeBody.parse(req.body ?? {});
     const { occ, series, member } = await loadOccurrence(db, req.params.id, req.user.id);
-    const updated = await db.transaction((tx) =>
-      completeOccurrence(tx, series, occ, { userId: req.user.id, role: member.role }, body.noteMd, deps.now()),
-    );
+    const updated = await db.transaction((tx) => completeOccurrence(tx, series, occ, { userId: req.user.id, role: member.role }, body.noteMd, deps.now()));
     if (req.user.id === series.assigneeId) {
       const submitted = updated.status === "submitted";
       await notifier.send(await managers(db, series.relationshipId, req.user.id), {
@@ -340,9 +354,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   app.post<{ Params: { id: string } }>("/occurrences/:id/reschedule", async (req) => {
     const change = rescheduleInput.parse(req.body);
     const { occ, series, member, rel } = await loadOccurrence(db, req.params.id, req.user.id);
-    const result = await db.transaction((tx) =>
-      requestReschedule(tx, rel, series, occ, { userId: req.user.id, role: member.role }, change, deps.now(), deps.materializeDays),
-    );
+    const result = await db.transaction((tx) => requestReschedule(tx, rel, series, occ, { userId: req.user.id, role: member.role }, change, deps.now(), deps.materializeDays));
     const [current] = await db.select().from(taskSeries).where(eq(taskSeries.id, result.occurrence.seriesId));
     if (!result.applied) {
       await notifier.send(await managers(db, rel.id, req.user.id), {
@@ -422,5 +434,4 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const tapped = dtos.find((d) => d.request.id === request.id) ?? dtos[0]!;
     return { ...tapped, requests: dtos.map((d) => d.request), occurrences: dtos.map((d) => d.occurrence) };
   });
-
 };

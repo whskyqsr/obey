@@ -37,9 +37,7 @@ export async function materializeSeries(db: Tx, series: Series, through: PlainDa
     dates = [schedule.start];
   } else if (schedule.anchor === "completion") {
     // One pending occurrence at a time; the rest come from completions and misses.
-    const [{ n }] = (await db.select({ n: count() }).from(occurrences).where(eq(occurrences.seriesId, series.id))) as [
-      { n: number },
-    ];
+    const [{ n }] = (await db.select({ n: count() }).from(occurrences).where(eq(occurrences.seriesId, series.id))) as [{ n: number }];
     dates = n === 0 ? [schedule.start] : [];
   } else {
     const today = localDate(now, series.timezone);
@@ -73,9 +71,7 @@ export async function materializeAll(db: Tx, days: number, now: Date) {
 /** For completion-anchored series: queue the next occurrence counted from `basis`. */
 async function advanceCompletionSeries(db: Tx, series: Series, basis: PlainDate) {
   if (series.schedule.anchor !== "completion" || !series.active) return;
-  const [{ n }] = (await db.select({ n: count() }).from(occurrences).where(eq(occurrences.seriesId, series.id))) as [
-    { n: number },
-  ];
+  const [{ n }] = (await db.select({ n: count() }).from(occurrences).where(eq(occurrences.seriesId, series.id))) as [{ n: number }];
   const next = nextAfterCompletion(series.schedule, basis, n);
   if (!next) return;
   const due = dueInstant(next, series.dueTime, series.timezone);
@@ -126,18 +122,13 @@ export async function completeOccurrence(
   if (occ.status !== "pending") throw new HttpError(409, `occurrence is ${occ.status}`);
   // The assignee can't work ahead into the next occurrence's turn (tomorrow's daily check-in today); a Dominant can.
   const opens = opensOn(series.schedule, occ.originalDate);
-  if (isAssignee && !canManage(actor.role) && opens && localDate(now, series.timezone) < opens)
-    throw new HttpError(409, `this one opens on ${opens}`);
+  if (isAssignee && !canManage(actor.role) && opens && localDate(now, series.timezone) < opens) throw new HttpError(409, `this one opens on ${opens}`);
   // "Proof required" means a photo or a note; a Dominant marking it done needs neither.
   if (series.proofRequired && isAssignee && !canManage(actor.role) && occ.photoCount === 0 && !(noteMd ?? occ.noteMd ?? "").trim())
     throw new HttpError(409, "add a photo or a note as proof");
   if (noteMd !== undefined) await db.update(occurrences).set({ noteMd }).where(eq(occurrences.id, occ.id));
   if (series.approvalRequired && isAssignee && !canManage(actor.role)) {
-    const [submitted] = await db
-      .update(occurrences)
-      .set({ status: "submitted", completedAt: now })
-      .where(eq(occurrences.id, occ.id))
-      .returning();
+    const [submitted] = await db.update(occurrences).set({ status: "submitted", completedAt: now }).where(eq(occurrences.id, occ.id)).returning();
     return submitted!;
   }
   return finalizeCompletion(db, series, occ, now, isAssignee ? null : actor.userId);
@@ -154,17 +145,11 @@ export async function undoCompletion(db: Tx, series: Series, occ: Occurrence, ac
     const recent = occ.completedAt && now.getTime() - occ.completedAt.getTime() <= UNDO_MINUTES * 60_000;
     if (!recent || occ.reviewedBy) throw new HttpError(409, "too late to undo");
   }
-  const [reopened] = await db
-    .update(occurrences)
-    .set({ status: "pending", completedAt: null, reviewedBy: null, reviewedAt: null })
-    .where(eq(occurrences.id, occ.id))
-    .returning();
+  const [reopened] = await db.update(occurrences).set({ status: "pending", completedAt: null, reviewedBy: null, reviewedAt: null }).where(eq(occurrences.id, occ.id)).returning();
   await db.delete(pointsLedger).where(and(eq(pointsLedger.occurrenceId, occ.id), eq(pointsLedger.kind, "completion")));
   // A completion-anchored task made its next occurrence on completion; it goes with the undo.
   if (series.schedule.anchor === "completion")
-    await db
-      .delete(occurrences)
-      .where(and(eq(occurrences.seriesId, series.id), eq(occurrences.status, "pending"), sql`${occurrences.originalDate} > ${occ.originalDate}`));
+    await db.delete(occurrences).where(and(eq(occurrences.seriesId, series.id), eq(occurrences.status, "pending"), sql`${occurrences.originalDate} > ${occ.originalDate}`));
   return reopened!;
 }
 
@@ -193,8 +178,7 @@ export async function editOccurrence(
 ): Promise<Occurrence> {
   if (occ.status === "pending" || occ.status === "cancelled") throw new HttpError(409, `occurrence is ${occ.status}`);
   const status = change.status ?? occ.status;
-  const completedAt =
-    status === "completed" ? (change.completedAt ?? occ.completedAt ?? occ.dueAt) : status === "submitted" ? occ.completedAt : null;
+  const completedAt = status === "completed" ? (change.completedAt ?? occ.completedAt ?? occ.dueAt) : status === "submitted" ? occ.completedAt : null;
   const [updated] = await db
     .update(occurrences)
     .set({
@@ -209,9 +193,7 @@ export async function editOccurrence(
   if (status !== occ.status) {
     if (status === "missed") await issueMissConsequence(db, series, updated!, now);
     if (occ.status === "missed") await withdrawMissConsequence(db, occ);
-    await db
-      .delete(pointsLedger)
-      .where(and(eq(pointsLedger.occurrenceId, occ.id), inArray(pointsLedger.kind, ["completion", "miss"])));
+    await db.delete(pointsLedger).where(and(eq(pointsLedger.occurrenceId, occ.id), inArray(pointsLedger.kind, ["completion", "miss"])));
     const earned = status === "completed" ? series.points : status === "missed" ? -series.missPenalty : 0;
     const delta = (await pointsEnabled(db, series.relationshipId)) ? earned : 0;
     if (delta !== 0) {
@@ -301,7 +283,15 @@ async function withdrawMissConsequence(db: Tx, occ: Occurrence) {
     await db
       .update(occurrences)
       .set({ status: "cancelled" })
-      .where(and(inArray(occurrences.seriesId, issued.map((s) => s.id)), eq(occurrences.status, "pending")));
+      .where(
+        and(
+          inArray(
+            occurrences.seriesId,
+            issued.map((s) => s.id),
+          ),
+          eq(occurrences.status, "pending"),
+        ),
+      );
 }
 
 /** Marks pending occurrences past due + grace as missed, applies penalties and hands out any consequence. Returns what changed. */
@@ -310,12 +300,7 @@ export async function markMissed(db: Tx, now: Date) {
     .select({ occ: occurrences, series: taskSeries })
     .from(occurrences)
     .innerJoin(taskSeries, eq(occurrences.seriesId, taskSeries.id))
-    .where(
-      and(
-        eq(occurrences.status, "pending"),
-        sql`${occurrences.dueAt} + make_interval(mins => ${taskSeries.graceMinutes}) <= ${now.toISOString()}::timestamptz`,
-      ),
-    );
+    .where(and(eq(occurrences.status, "pending"), sql`${occurrences.dueAt} + make_interval(mins => ${taskSeries.graceMinutes}) <= ${now.toISOString()}::timestamptz`));
   const missed: { occ: Occurrence; series: Series; consequence: Series | null }[] = [];
   for (const { occ, series } of overdue) {
     const [updated] = await db
@@ -350,14 +335,7 @@ export async function claimReminders(db: Tx, now: Date, leadMinutes: number) {
   const due = await db
     .update(occurrences)
     .set({ reminderSentAt: now })
-    .where(
-      and(
-        eq(occurrences.status, "pending"),
-        isNull(occurrences.reminderSentAt),
-        lte(occurrences.dueAt, horizon),
-        gte(occurrences.dueAt, now),
-      ),
-    )
+    .where(and(eq(occurrences.status, "pending"), isNull(occurrences.reminderSentAt), lte(occurrences.dueAt, horizon), gte(occurrences.dueAt, now)))
     .returning();
   if (due.length === 0) return [];
   const series = await db
@@ -402,31 +380,18 @@ async function reopenIfMissed(db: Tx, series: Series, occ: Occurrence) {
 }
 
 /** Moves an occurrence (or it and the rest of its series). Returns the occurrence now holding that slot. */
-export async function applyReschedule(
-  db: Tx,
-  series: Series,
-  occ: Occurrence,
-  scope: "this" | "following",
-  toDue: Date,
-  now: Date,
-  materializeDays: number,
-): Promise<Occurrence> {
+export async function applyReschedule(db: Tx, series: Series, occ: Occurrence, scope: "this" | "following", toDue: Date, now: Date, materializeDays: number): Promise<Occurrence> {
   await reopenIfMissed(db, series, occ);
   const followingApplies = scope === "following" && series.schedule.rule && series.schedule.anchor !== "completion";
   if (!followingApplies) {
-    const [moved] = await db
-      .update(occurrences)
-      .set({ dueAt: toDue, status: "pending", reminderSentAt: null })
-      .where(eq(occurrences.id, occ.id))
-      .returning();
+    const [moved] = await db.update(occurrences).set({ dueAt: toDue, status: "pending", reminderSentAt: null }).where(eq(occurrences.id, occ.id)).returning();
     return moved!;
   }
 
   const zone = series.timezone;
   const newStart = localDate(toDue, zone);
   const newDueTime = series.dueTime === null && isEndOfLocalDay(toDue, zone) ? null : localTime(toDue, zone);
-  if (newStart < occ.originalDate)
-    throw new HttpError(400, "moving a series earlier isn't supported; edit the task's schedule instead");
+  if (newStart < occ.originalDate) throw new HttpError(400, "moving a series earlier isn't supported; edit the task's schedule instead");
   const { before, after } = splitSeries(series.schedule, occ.originalDate, newStart);
 
   const { id: _id, createdAt: _c, updatedAt: _u, supersededBy: _s, ...copy } = series;
@@ -441,13 +406,7 @@ export async function applyReschedule(
   await db
     .update(occurrences)
     .set({ status: "cancelled" })
-    .where(
-      and(
-        eq(occurrences.seriesId, series.id),
-        gte(occurrences.originalDate, occ.originalDate),
-        inArray(occurrences.status, ["pending", "missed"]),
-      ),
-    );
+    .where(and(eq(occurrences.seriesId, series.id), gte(occurrences.originalDate, occ.originalDate), inArray(occurrences.status, ["pending", "missed"])));
   await materializeSeries(db, next!, addDays(maxDate(newStart, localDate(now, zone)), materializeDays), now);
   const [first] = await db
     .select()
@@ -566,20 +525,12 @@ export async function requestGroupReschedule(
     .returning();
   if (!direct) return { applied: false, groupId, requests, occurrences: items.map((i) => i.occ) };
   const moved: Occurrence[] = [];
-  for (const [i, { series, occ }] of items.entries())
-    moved.push(await applyReschedule(db, series, occ, "this", requests[i]!.toDueAt, now, materializeDays));
+  for (const [i, { series, occ }] of items.entries()) moved.push(await applyReschedule(db, series, occ, "this", requests[i]!.toDueAt, now, materializeDays));
   return { applied: true, groupId, requests, occurrences: moved };
 }
 
 /** Decides a request, or every pending request in its group. Returns the decided rows and their occurrences. */
-export async function decideReschedule(
-  db: Tx,
-  request: typeof reschedules.$inferSelect,
-  deciderId: string,
-  approve: boolean,
-  now: Date,
-  materializeDays: number,
-) {
+export async function decideReschedule(db: Tx, request: typeof reschedules.$inferSelect, deciderId: string, approve: boolean, now: Date, materializeDays: number) {
   if (request.status !== "requested") throw new HttpError(409, `request is ${request.status}`);
   const pending = request.groupId
     ? await db
@@ -590,7 +541,12 @@ export async function decideReschedule(
   const decided = await db
     .update(reschedules)
     .set({ status: approve ? "approved" : "declined", decidedBy: deciderId, decidedAt: now })
-    .where(inArray(reschedules.id, pending.map((r) => r.id)))
+    .where(
+      inArray(
+        reschedules.id,
+        pending.map((r) => r.id),
+      ),
+    )
     .returning();
   const results: { request: typeof reschedules.$inferSelect; occurrence: Occurrence; series: Series }[] = [];
   for (const r of decided) {

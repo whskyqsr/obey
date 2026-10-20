@@ -7,6 +7,7 @@ import { Avatar, squareJpeg } from "../components/Avatar";
 import { Button, Dialog, Icon, PageHeader, Section, SegmentedButtons, Switch, TextField, cx, useSnackbar } from "../components/ui";
 import { isCollared, useRel } from "../lib/relationship";
 import { useDynamicTitle } from "./Dynamic";
+import { PushHealth } from "../components/PushHealth";
 import { type PushState, pushState, registerPush } from "../push";
 import { type ThemeMode, useTheme } from "../theme/ThemeProvider";
 import { SEED_PRESETS } from "../theme/tokens";
@@ -208,6 +209,7 @@ export function SettingsPage() {
                 registerPush({ prompt: true }).then(
                   (s) => {
                     setPush(s);
+                    void qc.invalidateQueries({ queryKey: ["me", "devices"] });
                     if (s === "granted") snack("Notifications on");
                   },
                   (e) => snack(errorMessage(e)),
@@ -218,6 +220,7 @@ export function SettingsPage() {
             </Button>
           )}
         </div>
+        {push === "granted" && <PushHealth />}
       </Section>
 
       <Section title="Account">

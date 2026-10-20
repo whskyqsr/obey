@@ -359,6 +359,17 @@ export const note = noteInput.extend({
 export type Note = z.infer<typeof note>;
 
 export const registerDevice = z.object({ token: z.string().min(10), platform: z.enum(["android", "web"]) });
+/** A device this account gets push on. Only the token's end is shown, enough for a client to spot its own. */
+export const deviceStatus = z.object({
+  platform: z.enum(["android", "web"]),
+  tokenTail: z.string(),
+  registeredAt: z.string(),
+  /** The last push FCM accepted for it; null if none has been sent since it registered. */
+  lastSentAt: z.string().nullable(),
+  /** Why the last push to it failed, if it did. */
+  lastError: z.string().nullable(),
+});
+export type DeviceStatus = z.infer<typeof deviceStatus>;
 
 export const apiError = z.object({ error: z.string(), details: z.unknown().optional() });
 

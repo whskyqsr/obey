@@ -12,6 +12,7 @@ import androidx.core.content.ContextCompat
 import app.obey.MainActivity
 import app.obey.R
 import app.obey.data.AppIcons
+import app.obey.data.SettingsStore
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.android.AndroidEntryPoint
@@ -30,6 +31,7 @@ import kotlinx.coroutines.launch
 class ObeyMessagingService : FirebaseMessagingService() {
     @Inject lateinit var registrar: DeviceRegistrar
     @Inject lateinit var appIcons: AppIcons
+    @Inject lateinit var settings: SettingsStore
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -39,6 +41,7 @@ class ObeyMessagingService : FirebaseMessagingService() {
 
     @SuppressLint("MissingPermission") // checked just below for API 33+
     override fun onMessageReceived(message: RemoteMessage) {
+        scope.launch { settings.markPushReceived() }
         // Always the launcher name, so a discreet icon isn't given away by an "Obey" title.
         val title = appIcons.currentLabel()
         val body = message.notification?.body ?: message.data["body"] ?: "You have an update"

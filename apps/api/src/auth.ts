@@ -54,11 +54,7 @@ const { avatar: _avatar, ...userColumns } = getTableColumns(users);
 export async function upsertUser(db: Db, identity: Identity) {
   const [existing] = await db.select(userColumns).from(users).where(eq(users.authUid, identity.uid));
   if (existing) return existing;
-  const [created] = await db
-    .insert(users)
-    .values({ authUid: identity.uid, displayName: identity.displayName, email: identity.email })
-    .onConflictDoNothing()
-    .returning(userColumns);
+  const [created] = await db.insert(users).values({ authUid: identity.uid, displayName: identity.displayName, email: identity.email }).onConflictDoNothing().returning(userColumns);
   if (created) return created;
   const [raced] = await db.select(userColumns).from(users).where(eq(users.authUid, identity.uid));
   return raced!;

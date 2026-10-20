@@ -53,6 +53,15 @@ describe("relationships", () => {
     expect(res.headers["access-control-allow-methods"]).toContain("DELETE");
   });
 
+  it("lists this account's push devices and sends a test", async () => {
+    const { dom, domId } = await ctx.pair();
+    expect((await dom.get("/me/devices")).body).toEqual([]);
+    expect((await dom.post("/devices", { token: "web-token-0123456789abc", platform: "web" })).status).toBe(204);
+    const sent = await dom.post("/me/test-push", {});
+    expect(sent.body).toEqual([{ platform: "web", tokenTail: "0123456789abc".slice(-12), registeredAt: expect.any(String), lastSentAt: null, lastError: null }]);
+    expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [domId], push: { data: { type: "test" } } });
+  });
+
   it("lets people change their display name", async () => {
     const { dom, relId, domId } = await ctx.pair();
     expect((await dom.patch("/me", { displayName: "  Sir  " })).body.displayName).toBe("Sir");

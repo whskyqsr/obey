@@ -1,4 +1,4 @@
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { App as FirebaseApp } from "firebase-admin/app";
 import { type MulticastMessage, getMessaging } from "firebase-admin/messaging";
 import type { Db } from "./db/index.js";
@@ -50,6 +50,13 @@ export function fcmNotifier(db: Db, app: FirebaseApp, log: (msg: string) => void
           .filter((t): t is string => t !== null);
         if (stale.length) await db.delete(devices).where(inArray(devices.token, stale));
         if (res.failureCount > stale.length) log(`FCM: ${res.failureCount - stale.length} sends failed`);
+        // Kept per device so Settings can say whether push is actually getting through.
+        const sent = message.tokens.filter((_, i) => res.responses[i]!.success);
+        if (sent.length) await db.update(devices).set({ lastSentAt: new Date(), lastError: null }).where(inArray(devices.token, sent));
+        for (const [i, r] of res.responses.entries()) {
+          const token = message.tokens[i]!;
+          if (r.error && !stale.includes(token)) await db.update(devices).set({ lastError: r.error.code }).where(eq(devices.token, token));
+        }
       }
     },
   };

@@ -3,6 +3,7 @@ import type * as c from "@obey/contracts";
 
 export type Me = c.Me;
 export type User = c.User;
+export type DeviceStatus = c.DeviceStatus;
 export type WeekStart = c.WeekStart;
 export type Relationship = c.Relationship;
 export type DynamicDate = c.DynamicDate;

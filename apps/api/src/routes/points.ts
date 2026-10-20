@@ -13,12 +13,7 @@ export const pointsRoutes = (deps: Deps) => async (app: FastifyInstance) => {
 
   app.get<{ Params: { id: string } }>("/relationships/:id/ledger", async (req) => {
     await requireMember(db, req.params.id, req.user.id);
-    const rows = await db
-      .select()
-      .from(pointsLedger)
-      .where(eq(pointsLedger.relationshipId, req.params.id))
-      .orderBy(desc(pointsLedger.createdAt))
-      .limit(500);
+    const rows = await db.select().from(pointsLedger).where(eq(pointsLedger.relationshipId, req.params.id)).orderBy(desc(pointsLedger.createdAt)).limit(500);
     return rows.map(ledgerDto);
   });
 
@@ -56,9 +51,7 @@ export const pointsRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       const [{ balance }] = (await tx
         .select({ balance: sql<number>`coalesce(sum(${pointsLedger.delta}), 0)::int` })
         .from(pointsLedger)
-        .where(and(eq(pointsLedger.relationshipId, reward.relationshipId), eq(pointsLedger.userId, req.user.id)))) as [
-        { balance: number },
-      ];
+        .where(and(eq(pointsLedger.relationshipId, reward.relationshipId), eq(pointsLedger.userId, req.user.id)))) as [{ balance: number }];
       if (balance < reward.cost) throw new HttpError(409, `not enough points (${balance} of ${reward.cost})`);
       const [entry] = await tx
         .insert(pointsLedger)

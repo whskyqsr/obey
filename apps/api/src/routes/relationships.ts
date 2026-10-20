@@ -1,16 +1,7 @@
 import { randomInt } from "node:crypto";
-import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import {
-  allFeatures,
-  createInvite,
-  createRelationship,
-  id,
-  joinRelationship,
-  registerDevice,
-  updateMe,
-  updateRelationship,
-} from "@obey/contracts";
+import { allFeatures, createInvite, createRelationship, id, joinRelationship, registerDevice, updateMe, updateRelationship } from "@obey/contracts";
 import type { Deps } from "../app.js";
 import type { Tx } from "../db/index.js";
 import { devices, invites, memberships, relationships, users } from "../db/schema.js";
@@ -78,7 +69,10 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
     const mine = await db.select().from(memberships).where(eq(memberships.userId, req.user.id));
     return {
       user: userDto(req.user),
-      relationships: await relationshipDto(db, mine.map((m) => m.relationshipId)),
+      relationships: await relationshipDto(
+        db,
+        mine.map((m) => m.relationshipId),
+      ),
     };
   });
 
@@ -156,10 +150,7 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
     // Unless told otherwise, a Dominant invites a submissive and a submissive invites a Dominant; a Switch leaves it open.
     const role = body.role !== undefined ? body.role : me.role === "dominant" ? "submissive" : me.role === "submissive" ? "dominant" : null;
     const expiresAt = new Date(deps.now().getTime() + 7 * 86_400_000);
-    const [invite] = await db
-      .insert(invites)
-      .values({ code: inviteCode(), relationshipId: req.params.id, createdBy: req.user.id, expiresAt, role })
-      .returning();
+    const [invite] = await db.insert(invites).values({ code: inviteCode(), relationshipId: req.params.id, createdBy: req.user.id, expiresAt, role }).returning();
     reply.status(201);
     return { code: invite!.code, expiresAt: invite!.expiresAt.toISOString(), role: invite!.role };
   });
@@ -191,9 +182,7 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
       const [invite] = await tx
         .update(invites)
         .set({ usedBy: req.user.id })
-        .where(
-          and(eq(invites.code, body.code.trim().toUpperCase()), isNull(invites.usedBy), gt(invites.expiresAt, deps.now())),
-        )
+        .where(and(eq(invites.code, body.code.trim().toUpperCase()), isNull(invites.usedBy), gt(invites.expiresAt, deps.now())))
         .returning();
       if (!invite) throw notFound("invite not found or expired");
       const role = invite.role ?? body.role;
@@ -221,5 +210,22 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
       .values({ token: body.token, userId: req.user.id, platform: body.platform })
       .onConflictDoUpdate({ target: devices.token, set: { userId: req.user.id, platform: body.platform, updatedAt: deps.now() } });
     reply.status(204);
+  });
+
+  const myDevices = async (userId: string) =>
+    (await db.select().from(devices).where(eq(devices.userId, userId)).orderBy(desc(devices.updatedAt))).map((d) => ({
+      platform: d.platform,
+      tokenTail: d.token.slice(-12),
+      registeredAt: d.updatedAt.toISOString(),
+      lastSentAt: d.lastSentAt?.toISOString() ?? null,
+      lastError: d.lastError,
+    }));
+
+  app.get("/me/devices", async (req) => myDevices(req.user.id));
+
+  /** Sends a test push to every device on this account, then reports how each went. */
+  app.post("/me/test-push", async (req) => {
+    await deps.notifier.send([req.user.id], { title: "Obey", body: "Test notification: push works on this device.", data: { type: "test" } });
+    return myDevices(req.user.id);
   });
 };

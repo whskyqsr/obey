@@ -24,8 +24,16 @@ self.addEventListener("push", (event) => {
     tag: data.tag || payload.fcmMessageId || undefined,
     data: { url: data.url || (payload.fcmOptions && payload.fcmOptions.link) || "/" },
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(Promise.all([self.registration.showNotification(title, options), markReceived()]));
 });
+
+/** Notes when a push last arrived, for the notification check in Settings. The page reads it back from the cache. */
+function markReceived() {
+  return caches
+    .open("obey-push")
+    .then((c) => c.put("/__last-push", new Response(new Date().toISOString())))
+    .catch(() => {});
+}
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();

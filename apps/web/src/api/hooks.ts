@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { api, apiObjectUrl } from "./client";
 import type {
+  DeviceStatus,
   ProofPhoto,
   ReportReason,
   CalendarEvent,
@@ -33,6 +34,7 @@ import type {
 
 export const keys = {
   me: ["me"] as const,
+  devices: ["me", "devices"] as const,
   tasks: (rel: string) => ["rel", rel, "tasks"] as const,
   occurrences: (rel: string, from: string, to: string) => ["rel", rel, "occurrences", from, to] as const,
   events: (rel: string, from: string, to: string) => ["rel", rel, "events", from, to] as const,
@@ -92,6 +94,19 @@ export function useUpdateMe() {
     mutationFn: (body: { displayName?: string; weekStart?: WeekStart; revealProofs?: boolean }) => api<User>("/me", { method: "PATCH", body }),
     // Names appear in member lists and request cards across every relationship.
     onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export function useDevices(enabled = true) {
+  return useQuery({ queryKey: keys.devices, queryFn: () => api<DeviceStatus[]>("/me/devices"), enabled });
+}
+
+/** Pushes a test notification to every device on the account; resolves with how each went. */
+export function useTestPush() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<DeviceStatus[]>("/me/test-push", { method: "POST" }),
+    onSuccess: (devices) => qc.setQueryData(keys.devices, devices),
   });
 }
 

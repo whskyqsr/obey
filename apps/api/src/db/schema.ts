@@ -280,6 +280,9 @@ export const devices = pgTable("devices", {
     .references(() => users.id, { onDelete: "cascade" }),
   platform: text("platform", { enum: ["android", "web"] }).notNull(),
   updatedAt: ts("updated_at").notNull().defaultNow(),
+  /** The last push FCM accepted for this token, and the error from the last one it refused (cleared on success). */
+  lastSentAt: ts("last_sent_at"),
+  lastError: text("last_error"),
 });
 
 /** A photo attached to an occurrence as proof. Deleting the row is the purge; nothing is kept elsewhere. */

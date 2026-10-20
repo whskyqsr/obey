@@ -171,6 +171,9 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, vm: SettingsVi
                     }
                 }
 
+                SectionHeader("Notifications")
+                PushHealthSection()
+
                 SectionHeader("Privacy")
                 app.obey.ui.proof.ProofBlurSetting()
 

@@ -235,4 +235,10 @@ interface ObeyApi {
     // Push
     @POST("devices")
     suspend fun registerDevice(@Body body: RegisterDeviceInput)
+
+    @GET("me/devices")
+    suspend fun devices(): List<DeviceStatus>
+
+    @POST("me/test-push")
+    suspend fun testPush(): List<DeviceStatus>
 }

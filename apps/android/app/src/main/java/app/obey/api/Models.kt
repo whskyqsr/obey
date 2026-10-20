@@ -562,6 +562,16 @@ data class Note(
     fun toInput() = NoteInput(kind, title, bodyMd, visibility, tags, pinned, mood, subCanEdit)
 }
 
+/** A device this account gets push on; only the token's end is sent, enough to spot this one. */
+@Serializable
+data class DeviceStatus(
+    val platform: String,
+    val tokenTail: String,
+    val registeredAt: String,
+    val lastSentAt: String? = null,
+    val lastError: String? = null,
+)
+
 @Serializable
 data class RegisterDeviceInput(val token: String, val platform: String = "android")
 

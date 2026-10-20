@@ -22,6 +22,8 @@ class SettingsStore @Inject constructor(@ApplicationContext private val context:
     private val devUserKey = stringPreferencesKey("dev_user_id")
     private val relationshipKey = stringPreferencesKey("selected_relationship_id")
     private val calendarViewKey = stringPreferencesKey("calendar_view")
+    private val pushTokenKey = stringPreferencesKey("push_token")
+    private val pushReceivedKey = stringPreferencesKey("push_received_at")
 
     /** Dev-auth user id (sent as X-Dev-User). Always null in release builds. */
     val devUserId: Flow<String?> = context.dataStore.data.map { prefs ->
@@ -35,6 +37,20 @@ class SettingsStore @Inject constructor(@ApplicationContext private val context:
 
     suspend fun setCalendarView(view: String) {
         context.dataStore.edit { it[calendarViewKey] = view }
+    }
+
+    /** This device's FCM token as last registered, to find it among the account's devices. */
+    suspend fun pushToken(): String? = context.dataStore.data.first()[pushTokenKey]
+
+    suspend fun setPushToken(token: String) {
+        context.dataStore.edit { it[pushTokenKey] = token }
+    }
+
+    /** When a push last reached this device (ISO instant), for the notification check in Settings. */
+    val pushReceivedAt: Flow<String?> = context.dataStore.data.map { it[pushReceivedKey] }
+
+    suspend fun markPushReceived() {
+        context.dataStore.edit { it[pushReceivedKey] = java.time.Instant.now().toString() }
     }
 
     suspend fun currentDevUserId(): String? = devUserId.first()
