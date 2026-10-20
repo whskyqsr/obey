@@ -61,7 +61,7 @@ export function Welcome() {
               Skip setup
             </Button>
           )}
-          <Button onClick={next}>{last ? (step === "kits" ? "Start from scratch" : "Open Obey") : "Next"}</Button>
+          <Button onClick={next}>{last ? (step === "kits" ? "Start from scratch" : "Open Fealty") : "Next"}</Button>
         </div>
       </div>
     </div>
@@ -104,7 +104,7 @@ function FeaturesStep() {
 function PrivacyStep({ uid }: { uid: string }) {
   return (
     <>
-      <Heading icon="visibility_off" title="Keep it private" body="Obey is built to be discreet. Here's what's already on, and what you can add." />
+      <Heading icon="visibility_off" title="Keep it private" body="Fealty is built to be discreet. Here's what's already on, and what you can add." />
       <div className="mb-3 flex items-start gap-3 rounded-lg bg-surface-container-low px-4 py-3">
         <Icon name="notifications" className="mt-0.5 text-on-surface-variant" />
         <div>
@@ -182,7 +182,7 @@ function InviteStep() {
               Copy link
             </Button>
             {"share" in navigator && (
-              <Button variant="tonal" icon="share" onClick={() => navigator.share({ title: "Join me on Obey", url: link }).catch(() => {})}>
+              <Button variant="tonal" icon="share" onClick={() => navigator.share({ title: "Join me on Fealty", url: link }).catch(() => {})}>
                 Share
               </Button>
             )}

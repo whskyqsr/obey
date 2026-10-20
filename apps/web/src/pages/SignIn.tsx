@@ -42,7 +42,7 @@ export function SignInPage() {
         <div className="mb-6 flex size-16 items-center justify-center rounded-lg bg-primary-container text-on-primary-container">
           <Icon name="link" filled size={32} />
         </div>
-        <h1 className="text-headline-large text-on-surface">Obey</h1>
+        <h1 className="text-headline-large text-on-surface">Fealty</h1>
         <p className="mt-2 mb-8 text-body-large text-on-surface-variant">Tasks, rules and rewards for the two (or more) of you.</p>
         {pendingInvite() && (
           <div className="-mt-4 mb-6 flex items-center gap-3 rounded-md bg-secondary-container p-3 text-body-medium text-on-secondary-container">

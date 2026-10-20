@@ -174,7 +174,7 @@ export function ReportDialog({ subjectId, photoId, onClose }: { subjectId: strin
       }
     >
       <div className="flex flex-col gap-4">
-        <p>Reports go to the Obey team, not to your partner.</p>
+        <p>Reports go to the Fealty team, not to your partner.</p>
         <Select label="What's wrong?" value={reason} onChange={(e) => setReason(e.target.value as ReportReason)}>
           {REASONS.map((r) => (
             <option key={r.value} value={r.value}>

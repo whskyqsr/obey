@@ -167,7 +167,7 @@ export function DynamicPage() {
           title={title}
           sub={[
             self ? `You're the ${ROLE_LABEL[self.role]}` : null,
-            `together in Obey since ${fmtDate(localDateOf(new Date(rel.createdAt)), { month: "short", day: "numeric", year: "numeric" })}`,
+            `together in Fealty since ${fmtDate(localDateOf(new Date(rel.createdAt)), { month: "short", day: "numeric", year: "numeric" })}`,
           ]
             .filter(Boolean)
             .join(" · ")}
@@ -450,7 +450,7 @@ export function InviteSheet({ open, onClose }: { open: boolean; onClose(): void 
               Copy
             </Button>
             {"share" in navigator && (
-              <Button icon="share" onClick={() => navigator.share({ title: "Join me on Obey", url: link }).catch(() => {})}>
+              <Button icon="share" onClick={() => navigator.share({ title: "Join me on Fealty", url: link }).catch(() => {})}>
                 Share
               </Button>
             )}

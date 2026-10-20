@@ -72,7 +72,7 @@ fun SignInScreen(vm: SettingsViewModel = hiltViewModel()) {
                     .padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("Obey", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
+                Text("Fealty", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
                 Text("Tasks, rules and rewards for the two of you.", style = MaterialTheme.typography.bodyLarge)
 
                 if (vm.firebaseAvailable) {

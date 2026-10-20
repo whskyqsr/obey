@@ -68,7 +68,7 @@ export const pointsRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       return entry!;
     });
     await deps.notifier.send(await managers(db, reward.relationshipId, req.user.id), {
-      title: "Obey",
+      title: "Fealty",
       body: `${req.user.displayName} redeemed a reward`,
       data: { type: "reward_redeemed", rewardId: reward.id },
     });

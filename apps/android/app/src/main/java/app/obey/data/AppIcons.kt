@@ -29,7 +29,8 @@ enum class AppIcon(
 class AppIcons @Inject constructor(@ApplicationContext private val context: Context) {
     private val pm = context.packageManager
 
-    private fun component(icon: AppIcon) = ComponentName(context, "${context.packageName}.${icon.alias}")
+    // Aliases are named after the code namespace (app.obey), which differs from the application id.
+    private fun component(icon: AppIcon) = ComponentName(context, "${R::class.java.name.substringBeforeLast('.')}.${icon.alias}")
 
     /** The alias the launcher shows now. The manifest default counts when nothing was changed. */
     fun current(): AppIcon = AppIcon.entries.firstOrNull { icon ->
@@ -40,7 +41,7 @@ class AppIcons @Inject constructor(@ApplicationContext private val context: Cont
         }
     } ?: AppIcon.Default
 
-    /** The name shown under the current icon, used where the app would otherwise say "Obey". */
+    /** The name shown under the current icon, used where the app would otherwise say "Fealty". */
     fun currentLabel(): String = context.getString(current().label)
 
     /**

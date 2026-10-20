@@ -133,7 +133,7 @@ export const proofRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       .values({ reporterId: req.user.id, subjectId: body.subjectId, photoId: body.photoId ?? null, reason: body.reason, details: body.details ?? null })
       .returning({ id: reports.id });
     app.log.warn({ reportId: report!.id, reason: body.reason }, "content report filed");
-    await deps.notifier.send(await adminUserIds(deps), { title: "Obey", body: "A new report needs review", data: { type: "report", url: "/admin/reports" } });
+    await deps.notifier.send(await adminUserIds(deps), { title: "Fealty", body: "A new report needs review", data: { type: "report", url: "/admin/reports" } });
     return reply.status(201).send({ id: report!.id });
   });
 };

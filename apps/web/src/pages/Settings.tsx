@@ -232,7 +232,7 @@ export function SettingsPage() {
       </Section>
 
       {me.admin && (
-        <Section title="Obey team">
+        <Section title="Fealty team">
           <Link to="/admin/reports" className="state-layer flex items-center gap-3 rounded-lg bg-surface-container-low p-4">
             <Icon name="flag" className="text-on-surface-variant" />
             <span className="flex-1 text-body-large text-on-surface">Reports to review</span>

@@ -43,7 +43,7 @@ export const commentRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       .filter((id) => id !== req.user.id);
     // Discreet like every push: who, not what.
     await deps.notifier.send(others, {
-      title: "Obey",
+      title: "Fealty",
       body: `${req.user.displayName} commented on a task`,
       data: { type: "occurrence_comment", occurrenceId: occ.id },
     });

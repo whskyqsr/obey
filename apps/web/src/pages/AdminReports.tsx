@@ -66,7 +66,7 @@ function ReportCard({ r }: { r: AdminReport }) {
   );
 }
 
-/** The Obey team's queue of reports. Only people on the API's admin list ever reach it. */
+/** The Fealty team's queue of reports. Only people on the API's admin list ever reach it. */
 export function AdminReportsPage() {
   const navigate = useNavigate();
   const back = useBack(() => navigate({ to: "/settings" }));

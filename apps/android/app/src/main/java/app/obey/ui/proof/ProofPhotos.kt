@@ -200,7 +200,7 @@ private fun PhotoViewer(
     if (reporting) ReportDialog(photo = true, onDismiss = { reporting = false }, onSubmit = { r, d -> onReport(r, d); reporting = false })
 }
 
-/** Reports go to the people running Obey, never to the partner. */
+/** Reports go to the people running Fealty, never to the partner. */
 @Composable
 fun ReportDialog(photo: Boolean, onDismiss: () -> Unit, onSubmit: (ReportReason, String) -> Unit) {
     var reason by remember { mutableStateOf(ReportReason.Other) }
@@ -210,7 +210,7 @@ fun ReportDialog(photo: Boolean, onDismiss: () -> Unit, onSubmit: (ReportReason,
         title = { Text(if (photo) "Report this photo" else "Report") },
         text = {
             Column {
-                Text("Reports go to the Obey team, not to your partner.", style = MaterialTheme.typography.bodyMedium)
+                Text("Reports go to the Fealty team, not to your partner.", style = MaterialTheme.typography.bodyMedium)
                 ReportReason.entries.forEach { r ->
                     Row(Modifier.fillMaxWidth().clickable { reason = r }.padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = reason == r, onClick = { reason = r })

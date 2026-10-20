@@ -2,6 +2,7 @@ package app.obey.auth
 
 import android.content.Context
 import app.obey.BuildConfig
+import app.obey.R
 import app.obey.data.SettingsStore
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
@@ -110,7 +111,7 @@ class AuthManager @Inject constructor(
     fun googleWebClientId(): String? {
         val res = context.resources
         @Suppress("DiscouragedApi")
-        val id = res.getIdentifier("default_web_client_id", "string", context.packageName)
+        val id = res.getIdentifier("default_web_client_id", "string", res.getResourcePackageName(R.string.app_name))
         return if (id == 0) null else res.getString(id)
     }
 

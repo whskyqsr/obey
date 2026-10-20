@@ -74,7 +74,7 @@ export function isQuiet(q: { start: string; end: string; timezone: string } | nu
 
 /**
  * Web gets a normal notification. Android gets data only, so the app always draws the
- * notification itself and can title it with the discreet-mode name instead of "Obey".
+ * notification itself and can title it with the discreet-mode name instead of "Fealty".
  * Devices in quiet hours still get the push, but without sound or vibration.
  */
 export function fcmMessages(rows: { token: string; platform: "android" | "web"; quiet?: boolean }[], push: Push): MulticastMessage[] {

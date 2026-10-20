@@ -121,7 +121,7 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
     const { ended } = await deleteAccount(db, req.user.id, deps.now());
     for (const { relationshipId, others } of ended) {
       await deps.notifier.send(others, {
-        title: "Obey",
+        title: "Fealty",
         body: `${name} deleted their account, so your dynamic has ended`,
         data: { type: "relationship_ended", relationshipId },
       });
@@ -246,7 +246,7 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
       return invite.relationshipId;
     });
     await deps.notifier.send(await managers(db, relId, req.user.id), {
-      title: "Obey",
+      title: "Fealty",
       body: `${req.user.displayName} joined`,
       data: { type: "member_joined", relationshipId: relId },
     });
@@ -282,7 +282,7 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
     });
     if (ended) {
       await deps.notifier.send(others, {
-        title: "Obey",
+        title: "Fealty",
         body: `${req.user.displayName} ended your dynamic`,
         data: { type: "relationship_ended", relationshipId: req.params.id },
       });
@@ -303,7 +303,7 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
 
   /** Sends a test push to every device on this account, then reports how each went. */
   app.post("/me/test-push", async (req) => {
-    await deps.notifier.send([req.user.id], { title: "Obey", body: "Test notification: push works on this device.", data: { type: "test" } });
+    await deps.notifier.send([req.user.id], { title: "Fealty", body: "Test notification: push works on this device.", data: { type: "test" } });
     return myDevices(req.user.id);
   });
 };

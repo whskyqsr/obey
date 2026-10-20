@@ -102,7 +102,7 @@ export function AppShell() {
           <span className="flex size-10 items-center justify-center rounded-md bg-primary-container text-on-primary-container">
             <Icon name="link" filled />
           </span>
-          <span className="text-title-large text-on-surface">Obey</span>
+          <span className="text-title-large text-on-surface">Fealty</span>
         </Link>
         {all
           .filter((d) => !DRAWER_BOTTOM.includes(d.to))
