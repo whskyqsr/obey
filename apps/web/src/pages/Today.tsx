@@ -8,9 +8,10 @@ import { DayRescheduleSheet } from "../components/DayRescheduleSheet";
 import { isOverdue } from "../components/OccurrenceCard";
 import { ExcuseAction, ReviewActions, RowGroup, RowLink, TaskRow } from "../components/TaskRow";
 import { KitPrompt } from "./Kits";
-import { Button, Dialog, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, Section, TextField, useSnackbar } from "../components/ui";
+import { Button, Dialog, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, Section, TextField, useSnackbar, cx } from "../components/ui";
 import { addDays, fmtDate, fmtDateTime, fmtRelative, fromLocalInput, localDateOf, toLocalInput, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
+import { planTone } from "../lib/planColors";
 import { WIDE, useMediaQuery } from "../lib/useMediaQuery";
 import { useNeedsYou, useTodayOccurrences } from "../lib/today";
 
@@ -457,7 +458,7 @@ function PlanClashes() {
   return (
     <div className="mx-4 mb-2 flex flex-col gap-2 md:mx-6">
       {clashing.map((e) => (
-        <div key={e.id} className="flex items-center gap-3 rounded-md bg-tertiary-container px-4 py-3 text-on-tertiary-container">
+        <div key={e.id} className={cx("flex items-center gap-3 rounded-md px-4 py-3", planTone(e, rel).bg, planTone(e, rel).text)}>
           <Icon name="event_busy" />
           <div className="min-w-0 flex-1">
             <div className="truncate text-title-small">{e.title}</div>

@@ -145,7 +145,7 @@ export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
 
   /** "That's fine": either partner keeps a clashing task as it is, and it stops counting as a clash. A "Just me" plan still clashes with tasks the partner may manage. */
   app.post<{ Params: { id: string } }>("/events/:id/dismiss", async (req) => {
-    const { occurrenceIds } = z.object({ occurrenceIds: z.array(z.string().uuid()).min(1).max(50) }).parse(req.body);
+    const { occurrenceIds } = z.object({ occurrenceIds: z.array(z.string().uuid()).min(1).max(200) }).parse(req.body);
     if (!z.string().uuid().safeParse(req.params.id).success) throw notFound();
     const [e] = await db.select().from(calendarEvents).where(eq(calendarEvents.id, req.params.id));
     if (!e) throw notFound();

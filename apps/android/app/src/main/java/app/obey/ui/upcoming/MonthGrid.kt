@@ -28,10 +28,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.obey.api.Occurrence
+import app.obey.api.Relationship
 import app.obey.api.OccurrenceStatus
 import app.obey.ui.common.formatDate
 import app.obey.ui.common.parseInstant
 import app.obey.ui.plans.isLong
+import app.obey.ui.plans.planTone
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.TextStyle
@@ -39,7 +41,7 @@ import java.util.Locale
 
 /** A month as a grid of whole weeks, with a dot per task and a bar for plans. Tapping a day shows its tasks below, as on the web. */
 @Composable
-fun MonthGrid(data: CalendarData, selected: LocalDate, today: LocalDate, onSelect: (LocalDate) -> Unit, modifier: Modifier = Modifier) {
+fun MonthGrid(data: CalendarData, selected: LocalDate, today: LocalDate, rel: Relationship?, onSelect: (LocalDate) -> Unit, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
     val month = data.anchor.month
     val now = Instant.now()
@@ -99,14 +101,16 @@ fun MonthGrid(data: CalendarData, selected: LocalDate, today: LocalDate, onSelec
                             }
                             if (plans.isNotEmpty()) {
                                 // A full-width bar for all-day and multi-day plans, so they read as spanning; a short one for timed plans.
-                                Box(
+                                // One bar per person whose plans fall on the day, in their colour.
+                                val tones = plans.map { planTone(it, rel).dot }.distinct().take(3)
+                                Row(
                                     Modifier
                                         .padding(top = 4.dp)
-                                        .then(if (plans.any { it.isLong }) Modifier.fillMaxWidth() else Modifier.width(14.dp))
-                                        .height(4.dp)
-                                        .clip(RoundedCornerShape(2.dp))
-                                        .background(colors.tertiary),
-                                )
+                                        .then(if (plans.any { it.isLong }) Modifier.fillMaxWidth() else Modifier.width(if (tones.size == 1) 14.dp else 24.dp)),
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                ) {
+                                    tones.forEach { dot -> Box(Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(dot)) }
+                                }
                             }
                             Row(
                                 Modifier.padding(top = 4.dp),

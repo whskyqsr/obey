@@ -1,12 +1,4 @@
-import {
-  type DynamicColor,
-  type DynamicScheme,
-  Hct,
-  MaterialDynamicColors,
-  SchemeTonalSpot,
-  argbFromHex,
-  hexFromArgb,
-} from "@material/material-color-utilities";
+import { type DynamicColor, type DynamicScheme, Hct, MaterialDynamicColors, SchemeTonalSpot, TonalPalette, argbFromHex, hexFromArgb } from "@material/material-color-utilities";
 
 export const DEFAULT_SEED = "#8b3a62";
 
@@ -70,8 +62,27 @@ export function schemeTokens(seedHex: string, dark: boolean, contrast = 0): Colo
   return out;
 }
 
-function declarations(tokens: ColorTokens): string {
-  return COLOR_ROLES.map((r) => `--md-${r}:${tokens[r]};`).join("");
+/**
+ * Hue turns from the seed for each person's plans on the calendar, chosen to sit well clear of primary (tasks) and
+ * tertiary (plans for both). Index 0 is the first person, usually the Dominant.
+ */
+export const PLAN_HUE_TURNS = [150, 270, 210, 330];
+
+/** `plan-<n>` (a dot), `plan-<n>-container` and `on-plan-<n>-container`, as M3 tonal roles in the seed's chroma. */
+export function planTokens(seedHex: string, dark: boolean): Record<string, string> {
+  const seed = Hct.fromInt(argbFromHex(isHexColor(seedHex) ? seedHex : DEFAULT_SEED));
+  const out: Record<string, string> = {};
+  PLAN_HUE_TURNS.forEach((turn, i) => {
+    const p = TonalPalette.fromHueAndChroma((seed.hue + turn) % 360, 36);
+    out[`plan-${i + 1}`] = hexFromArgb(p.tone(dark ? 80 : 40));
+    out[`plan-${i + 1}-container`] = hexFromArgb(p.tone(dark ? 30 : 90));
+    out[`on-plan-${i + 1}-container`] = hexFromArgb(p.tone(dark ? 90 : 10));
+  });
+  return out;
+}
+
+function declarations(tokens: ColorTokens, plans: Record<string, string>): string {
+  return [...COLOR_ROLES.map((r) => `--md-${r}:${tokens[r]};`), ...Object.entries(plans).map(([k, v]) => `--md-${k}:${v};`)].join("");
 }
 
 /**
@@ -79,8 +90,8 @@ function declarations(tokens: ColorTokens): string {
  * unless the user forced light, and `data-theme` on <html> forces either.
  */
 export function themeCss(seedHex: string): string {
-  const light = declarations(schemeTokens(seedHex, false));
-  const dark = declarations(schemeTokens(seedHex, true));
+  const light = declarations(schemeTokens(seedHex, false), planTokens(seedHex, false));
+  const dark = declarations(schemeTokens(seedHex, true), planTokens(seedHex, true));
   return [
     `:root{${light}color-scheme:light;}`,
     `@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){${dark}color-scheme:dark;}}`,
