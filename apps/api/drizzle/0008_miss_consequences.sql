@@ -1,0 +1,3 @@
+ALTER TABLE "task_series" ADD COLUMN "caused_by_occurrence_id" uuid;--> statement-breakpoint
+ALTER TABLE "task_series" ADD CONSTRAINT "task_series_caused_by_occurrence_id_occurrences_id_fk" FOREIGN KEY ("caused_by_occurrence_id") REFERENCES "public"."occurrences"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE UNIQUE INDEX "task_series_caused_by_uq" ON "task_series" USING btree ("caused_by_occurrence_id");

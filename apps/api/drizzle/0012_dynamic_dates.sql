@@ -1,0 +1,1 @@
+ALTER TABLE "relationships" ADD COLUMN "dates" jsonb DEFAULT '[]'::jsonb NOT NULL;

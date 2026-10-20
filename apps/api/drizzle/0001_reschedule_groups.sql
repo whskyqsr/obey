@@ -1,0 +1,1 @@
+ALTER TABLE "reschedules" ADD COLUMN "group_id" uuid;
