@@ -48,7 +48,7 @@ export function MarkdownEditor({
   }, [editor, editable]);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-outline-variant bg-surface-container-lowest focus-within:border-primary">
+    <div className="rounded-lg border border-outline-variant bg-surface-container-lowest focus-within:border-primary">
       {editable && editor && <Toolbar editor={editor} />}
       <EditorContent editor={editor} />
     </div>
@@ -126,7 +126,7 @@ function Toolbar({ editor }: { editor: Editor }) {
   }
 
   return (
-    <div role="toolbar" aria-label="Formatting" className="sticky top-0 z-10 flex flex-wrap items-center gap-0.5 border-b border-outline-variant bg-surface-container px-1 py-1">
+    <div role="toolbar" aria-label="Formatting" className="sticky top-14 z-10 flex flex-wrap items-center gap-0.5 rounded-t-lg border-b border-outline-variant bg-surface-container px-1 py-1">
       {groups.map((g, i) => (
         <div key={i} className={cx("flex items-center gap-0.5", i > 0 && "border-l border-outline-variant pl-0.5")}>
           {g.map((b) => (

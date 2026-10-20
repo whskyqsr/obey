@@ -9,9 +9,9 @@ import { useConfirm } from "../lib/useConfirm";
 
 const FIELDS: FieldDef[] = [
   { key: "title", label: "Rule", type: "text", required: true, max: 200 },
-  { key: "bodyMd", label: "Details", type: "textarea", max: 5000 },
-  { key: "category", label: "Category", type: "text", max: 60, help: "e.g. Speech, Protocol, Health" },
-  { key: "position", label: "Number", type: "number", min: 0 },
+  { key: "bodyMd", label: "Details (optional)", type: "textarea", max: 5000 },
+  { key: "category", label: "Category (optional)", type: "text", max: 60, help: "e.g. Speech, Protocol, Health" },
+  { key: "position", label: "Number", type: "number", min: 0, help: "Filled in for you; change it to reorder." },
 ];
 
 export function RulesPage() {

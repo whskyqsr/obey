@@ -68,7 +68,8 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
 
   return (
     <div className="flex flex-col">
-      <header className="sticky top-0 z-20 flex items-center gap-1 bg-surface px-2 py-2 md:px-4">
+      {/* h-14 matches the formatting toolbar's sticky offset (top-14) in MarkdownEditor. */}
+      <header className="sticky top-0 z-20 flex h-14 items-center gap-1 bg-surface px-2 md:px-4">
         <IconButton icon="arrow_back" label="Back" onClick={() => (dirty ? confirm("Discard unsaved changes?", back) : back())} />
         <div className="flex-1" />
         {canEdit && (

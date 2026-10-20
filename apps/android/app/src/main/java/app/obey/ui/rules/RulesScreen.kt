@@ -150,7 +150,7 @@ fun RulesScreen(onOpenSettings: () -> Unit, vm: RulesViewModel = hiltViewModel()
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(title, { title = it.take(200) }, label = { Text("Rule") })
-                    OutlinedTextField(body, { body = it.take(5000) }, label = { Text("Details") }, minLines = 2)
+                    OutlinedTextField(body, { body = it.take(5000) }, label = { Text("Details (optional)") }, minLines = 2)
                     OutlinedTextField(category, { category = it.take(60) }, label = { Text("Category (optional)") }, singleLine = true)
                 }
             },
