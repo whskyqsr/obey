@@ -4,6 +4,7 @@ import { useDeleteTask, useLibrary, useSaveTask, useTasks } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { Task, TaskInput } from "../api/types";
 import { RecurrencePicker } from "../components/RecurrencePicker";
+import { TaskHistory } from "../components/TaskHistory";
 import { Button, Dialog, ErrorBox, IconButton, Loading, Select, Switch, TextArea, TextField, useSnackbar } from "../components/ui";
 import { type PickerState, defaultPicker, fromSchedule, toSchedule } from "../recurrence/picker";
 import { validateSchedule } from "@obey/recurrence";
@@ -177,6 +178,8 @@ function Editor({ task, readOnly, defaultAssignee }: { task?: Task; readOnly: bo
           <Switch checked={form.proofRequired} onChange={(proofRequired) => set({ proofRequired })} label="Proof required" help="A note or photo must accompany the completion." />
         </div>
       </fieldset>
+
+      {task && <TaskHistory taskId={task.id} />}
 
       <Dialog
         open={confirmDelete}

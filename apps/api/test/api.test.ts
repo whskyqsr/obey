@@ -346,6 +346,41 @@ describe("points, rewards and notes", () => {
   });
 });
 
+describe("task history", () => {
+  it("lists finished occurrences and lets a Dominant correct them, rebooking points", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    const t = (await dom.post(`/relationships/${relId}/tasks`, task(subId, { points: 10, missPenalty: 4, schedule: { start: "2026-10-16", rule: { freq: "daily" } } }))).body;
+    await dom.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-18`);
+    const balance = async () =>
+      ((await sub.get(`/relationships/${relId}/balances`)).body.find((b: { userId: string }) => b.userId === subId)?.balance ?? 0) as number;
+    try {
+      ctx.clock.now = new Date("2026-10-17T12:00:00Z"); // the 16th's 21:00 deadline has passed
+      await runJobs(ctx.db, ctx.notifier, ctx.clock.now, { materializeDays: 14, reminderLeadMinutes: 30 });
+
+      const history = (await sub.get(`/tasks/${t.id}/history`)).body;
+      expect(history.map((h: { originalDate: string; status: string }) => [h.originalDate, h.status])).toEqual([["2026-10-16", "missed"]]);
+      expect(history[0].pointsDelta).toBe(-4);
+      const before = await balance();
+
+      const id = history[0].id;
+      expect((await sub.patch(`/occurrences/${id}`, { status: "completed" })).status).toBe(403);
+      const fixed = await dom.patch(`/occurrences/${id}`, { status: "completed", completedAt: "2026-10-16T22:30:00-04:00" });
+      expect(fixed.status).toBe(200);
+      expect(await balance()).toBe(before + 4 + 10);
+
+      const [after] = (await sub.get(`/tasks/${t.id}/history`)).body;
+      expect(after).toMatchObject({ status: "completed", pointsDelta: 10, completedAt: "2026-10-17T02:30:00.000Z" });
+      expect(after.editedBy).toBeTruthy();
+
+      await dom.patch(`/occurrences/${id}`, { status: "excused" });
+      expect(await balance()).toBe(before + 4);
+      expect((await dom.patch(`/occurrences/${id}`, { status: "pending" })).status).toBe(400);
+    } finally {
+      ctx.clock.now = new Date("2026-10-16T12:00:00Z");
+    }
+  });
+});
+
 describe("push payloads", () => {
   it("sends Android data only, so the app titles it with the discreet-mode name", () => {
     const [web, android] = fcmMessages(

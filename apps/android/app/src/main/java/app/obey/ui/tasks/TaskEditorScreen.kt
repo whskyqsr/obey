@@ -72,6 +72,7 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
     val data by vm.data.collectAsStateWithLifecycle()
     val form by vm.form.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
+    val history by vm.history.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     MessageEffect(message, snackbar, vm::messageShown)
@@ -186,6 +187,8 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                     LabeledSwitch("Proof required", "A photo or text must be attached", form.proofRequired) { v ->
                         vm.update { it.copy(proofRequired = v) }
                     }
+
+                    if (!vm.isNew) TaskHistorySection(history, vm::editHistory)
                 }
             }
         }

@@ -1,7 +1,9 @@
-import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { api, apiObjectUrl } from "./client";
 import type {
   Balance,
+  EditOccurrence,
+  HistoryEntry,
   Invite,
   LedgerEntry,
   LibraryKind,
@@ -36,6 +38,28 @@ function useInvalidateRel(rel: string | undefined) {
     if (rel) void qc.invalidateQueries({ queryKey: ["rel", rel] });
     for (const k of extra) void qc.invalidateQueries({ queryKey: k });
   };
+}
+
+// ---- task history
+
+const HISTORY_PAGE = 30;
+
+export function useTaskHistory(rel: string, taskId: string) {
+  return useInfiniteQuery({
+    queryKey: ["rel", rel, "history", taskId],
+    queryFn: ({ pageParam }) =>
+      api<HistoryEntry[]>(`/tasks/${taskId}/history`, { query: { before: pageParam, limit: String(HISTORY_PAGE) } }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => (last.length === HISTORY_PAGE ? last.at(-1)!.dueAt : undefined),
+  });
+}
+
+export function useEditOccurrence(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ id, change }: { id: string; change: EditOccurrence }) => api<Occurrence>(`/occurrences/${id}`, { method: "PATCH", body: change }),
+    onSuccess: () => invalidate(),
+  });
 }
 
 // ---- me & relationships

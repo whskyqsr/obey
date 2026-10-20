@@ -66,6 +66,12 @@ interface ObeyApi {
         @Query("to") to: String,
     ): List<Occurrence>
 
+    @GET("tasks/{id}/history")
+    suspend fun taskHistory(@Path("id") taskId: String, @Query("limit") limit: Int = 100): List<HistoryEntry>
+
+    @PATCH("occurrences/{id}")
+    suspend fun editOccurrence(@Path("id") occurrenceId: String, @Body body: EditOccurrenceInput): Occurrence
+
     @POST("occurrences/{id}/complete")
     suspend fun complete(@Path("id") occurrenceId: String, @Body body: CompleteOccurrenceInput): Occurrence
 

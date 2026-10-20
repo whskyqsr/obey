@@ -197,6 +197,27 @@ data class Occurrence(
     val noteMd: String? = null,
 )
 
+/** A past occurrence in a task's history, with the points it earned or cost. */
+@Serializable
+data class HistoryEntry(
+    val id: String,
+    val originalDate: String,
+    val dueAt: String,
+    val status: OccurrenceStatus,
+    val completedAt: String? = null,
+    val noteMd: String? = null,
+    val pointsDelta: Int = 0,
+    val editedBy: String? = null,
+)
+
+/** A Dominant's correction from the history. Only completed, missed and excused are accepted. */
+@Serializable
+data class EditOccurrenceInput(
+    val status: OccurrenceStatus,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val completedAt: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val noteMd: String? = null,
+)
+
 @Serializable
 data class CompleteOccurrenceInput(@EncodeDefault(EncodeDefault.Mode.NEVER) val noteMd: String? = null)
 

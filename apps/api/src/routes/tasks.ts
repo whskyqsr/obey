@@ -1,17 +1,18 @@
-import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { completeOccurrence as completeBody, plainDate, rescheduleDayInput, rescheduleInput, reviewOccurrence as reviewBody, taskInput } from "@obey/contracts";
+import { completeOccurrence as completeBody, editOccurrence as editBody, plainDate, rescheduleDayInput, rescheduleInput, reviewOccurrence as reviewBody, taskInput } from "@obey/contracts";
 import { addDays, dueInstant, localDate } from "@obey/recurrence";
 import type { Deps } from "../app.js";
 import type { Tx } from "../db/index.js";
-import { occurrences, relationships, reschedules, taskSeries } from "../db/schema.js";
+import { occurrences, pointsLedger, relationships, reschedules, taskSeries } from "../db/schema.js";
 import { HttpError, forbidden, notFound, parsePatch } from "../errors.js";
 import { occurrenceDto, rescheduleDto, taskDto } from "../serialize.js";
 import { canManage, managers, membership, requireManager, requireMember } from "../services/access.js";
 import {
   completeOccurrence,
   decideReschedule,
+  editOccurrence,
   requestGroupReschedule,
   materializeRelationship,
   materializeSeries,
@@ -147,6 +148,69 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         .map(({ occ, series }) => occurrenceDto(occ, series));
     },
   );
+
+  /** Finished occurrences of a task, newest first, including those from before a "this and following" split. */
+  app.get<{ Params: { id: string }; Querystring: { before?: string; limit?: string } }>("/tasks/:id/history", async (req) => {
+    const q = z
+      .object({ before: z.string().datetime({ offset: true }).optional(), limit: z.coerce.number().int().min(1).max(100).default(50) })
+      .parse(req.query);
+    const [series] = await db.select().from(taskSeries).where(eq(taskSeries.id, req.params.id));
+    if (!series) throw notFound();
+    await requireMember(db, series.relationshipId, req.user.id);
+    const ids = [series.id];
+    for (let frontier = [series.id]; frontier.length; ) {
+      const older = await db.select({ id: taskSeries.id }).from(taskSeries).where(inArray(taskSeries.supersededBy, frontier));
+      frontier = older.map((r) => r.id).filter((id) => !ids.includes(id));
+      ids.push(...frontier);
+    }
+    const rows = await db
+      .select({
+        occ: occurrences,
+        series: taskSeries,
+        pointsDelta: sql<number>`coalesce((select sum(${pointsLedger.delta}) from ${pointsLedger} where ${pointsLedger.occurrenceId} = ${occurrences.id} and ${pointsLedger.kind} in ('completion', 'miss')), 0)::int`,
+      })
+      .from(occurrences)
+      .innerJoin(taskSeries, eq(occurrences.seriesId, taskSeries.id))
+      .where(
+        and(
+          inArray(occurrences.seriesId, ids),
+          inArray(occurrences.status, ["submitted", "completed", "missed", "excused"]),
+          q.before ? lt(occurrences.dueAt, new Date(q.before)) : undefined,
+        ),
+      )
+      .orderBy(desc(occurrences.dueAt))
+      .limit(q.limit);
+    return rows.map(({ occ, series: s, pointsDelta }) => ({
+      ...occurrenceDto(occ, s),
+      pointsDelta,
+      editedBy: occ.editedBy,
+      editedAt: occ.editedAt?.toISOString() ?? null,
+    }));
+  });
+
+  app.patch<{ Params: { id: string } }>("/occurrences/:id", async (req) => {
+    const body = editBody.parse(req.body);
+    const { occ, series, member } = await loadOccurrence(db, req.params.id, req.user.id);
+    if (!canManage(member.role)) throw forbidden("only a Dominant can edit history");
+    const updated = await db.transaction((tx) =>
+      editOccurrence(
+        tx,
+        series,
+        occ,
+        req.user.id,
+        { status: body.status, completedAt: body.completedAt ? new Date(body.completedAt) : undefined, noteMd: body.noteMd },
+        deps.now(),
+      ),
+    );
+    if (updated.status !== occ.status && series.assigneeId !== req.user.id) {
+      await notifier.send([series.assigneeId], {
+        title: "Obey",
+        body: `${req.user.displayName} updated your task history`,
+        data: { type: "occurrence_edited", occurrenceId: occ.id },
+      });
+    }
+    return occurrenceDto(updated, series);
+  });
 
   app.post<{ Params: { id: string } }>("/occurrences/:id/complete", async (req) => {
     const body = completeBody.parse(req.body ?? {});

@@ -158,6 +158,9 @@ export const occurrences = pgTable(
     noteMd: text("note_md"),
     reviewedBy: uuid("reviewed_by").references(() => users.id),
     reviewedAt: ts("reviewed_at"),
+    /** Who last corrected this by hand from the task's history, and when. */
+    editedBy: uuid("edited_by").references(() => users.id),
+    editedAt: ts("edited_at"),
     createdAt: createdAt(),
   },
   (t) => [

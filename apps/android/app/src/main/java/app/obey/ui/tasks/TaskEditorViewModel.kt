@@ -4,8 +4,11 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import app.obey.api.Consequence
+import app.obey.api.EditOccurrenceInput
+import app.obey.api.HistoryEntry
 import app.obey.api.Member
 import app.obey.api.ObeyApi
+import app.obey.api.OccurrenceStatus
 import app.obey.api.Role
 import app.obey.api.Task
 import app.obey.api.TaskInput
@@ -16,6 +19,7 @@ import app.obey.ui.common.BaseViewModel
 import app.obey.ui.common.Load
 import app.obey.ui.common.loadCatching
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -65,6 +69,9 @@ class TaskEditorViewModel @Inject constructor(
     private val _data = MutableStateFlow<Load<EditorData>>(Load.Loading)
     val data: StateFlow<Load<EditorData>> = _data.asStateFlow()
 
+    private val _history = MutableStateFlow<List<HistoryEntry>>(emptyList())
+    val history: StateFlow<List<HistoryEntry>> = _history.asStateFlow()
+
     private val _form = MutableStateFlow(TaskForm())
     val form: StateFlow<TaskForm> = _form.asStateFlow()
 
@@ -90,6 +97,7 @@ class TaskEditorViewModel @Inject constructor(
         val members = session.relationship?.members.orEmpty()
         if (task != null) {
             _form.value = formFrom(task)
+            _history.value = runCatching { api.taskHistory(task.id) }.getOrDefault(emptyList())
         } else {
             // Default to a submissive partner, else myself.
             val assignee = members.firstOrNull { it.role == Role.Submissive && it.userId != session.userId }
@@ -149,6 +157,23 @@ class TaskEditorViewModel @Inject constructor(
             if (original == null) api.createTask(sessions.requireRelationshipId(), input)
             else api.updateTask(original.id, input)
             _done.trySend(Unit)
+        }
+    }
+
+    /** [completedAt] only matters when [status] is completed; points are rebooked by the server. */
+    fun editHistory(entry: HistoryEntry, status: OccurrenceStatus, completedAt: Instant?, note: String) {
+        val taskId = route.taskId ?: return
+        action {
+            api.editOccurrence(
+                entry.id,
+                EditOccurrenceInput(
+                    status = status,
+                    completedAt = if (status == OccurrenceStatus.Completed) completedAt?.toString() else null,
+                    noteMd = note.takeIf { it != entry.noteMd.orEmpty() },
+                ),
+            )
+            _history.value = api.taskHistory(taskId)
+            say("History updated")
         }
     }
 

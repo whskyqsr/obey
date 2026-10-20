@@ -139,6 +139,53 @@ export async function reviewOccurrence(db: Tx, series: Series, occ: Occurrence, 
   return reopened!;
 }
 
+/**
+ * A Dominant's correction from a task's history. Points are rebooked to match the new status:
+ * completed earns the task's points, missed costs its penalty, excused is neutral.
+ */
+export async function editOccurrence(
+  db: Tx,
+  series: Series,
+  occ: Occurrence,
+  editorId: string,
+  change: { status?: "completed" | "missed" | "excused"; completedAt?: Date; noteMd?: string | null },
+  now: Date,
+): Promise<Occurrence> {
+  if (occ.status === "pending" || occ.status === "cancelled") throw new HttpError(409, `occurrence is ${occ.status}`);
+  const status = change.status ?? occ.status;
+  const completedAt =
+    status === "completed" ? (change.completedAt ?? occ.completedAt ?? occ.dueAt) : status === "submitted" ? occ.completedAt : null;
+  const [updated] = await db
+    .update(occurrences)
+    .set({
+      status,
+      completedAt,
+      ...(change.noteMd !== undefined ? { noteMd: change.noteMd } : {}),
+      editedBy: editorId,
+      editedAt: now,
+    })
+    .where(eq(occurrences.id, occ.id))
+    .returning();
+  if (status !== occ.status) {
+    await db
+      .delete(pointsLedger)
+      .where(and(eq(pointsLedger.occurrenceId, occ.id), inArray(pointsLedger.kind, ["completion", "miss"])));
+    const delta = status === "completed" ? series.points : status === "missed" ? -series.missPenalty : 0;
+    if (delta !== 0) {
+      await db.insert(pointsLedger).values({
+        relationshipId: series.relationshipId,
+        userId: series.assigneeId,
+        delta,
+        kind: status === "completed" ? "completion" : "miss",
+        note: series.title,
+        occurrenceId: occ.id,
+        createdBy: editorId,
+      });
+    }
+  }
+  return updated!;
+}
+
 /** Marks pending occurrences past due + grace as missed and applies penalties. Returns what changed. */
 export async function markMissed(db: Tx, now: Date) {
   const overdue = await db

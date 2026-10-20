@@ -118,6 +118,22 @@ export const occurrence = z.object({
 });
 export type Occurrence = z.infer<typeof occurrence>;
 
+/** One past occurrence in a task's history, with the points it earned or cost. */
+export const historyEntry = occurrence.extend({
+  pointsDelta: z.number().int(),
+  /** Set when a Dominant corrected the entry by hand. */
+  editedBy: id.nullable(),
+  editedAt: z.string().nullable(),
+});
+export type HistoryEntry = z.infer<typeof historyEntry>;
+
+/** A Dominant's correction to a past occurrence. Points follow the new status. */
+export const editOccurrence = z.object({
+  status: z.enum(["completed", "missed", "excused"]).optional(),
+  completedAt: z.string().datetime({ offset: true }).optional(),
+  noteMd: z.string().max(5_000).nullable().optional(),
+});
+
 export const completeOccurrence = z.object({ noteMd: z.string().max(5_000).optional() });
 export const reviewOccurrence = z.object({ approve: z.boolean(), noteMd: z.string().max(5_000).optional() });
 
