@@ -9,7 +9,6 @@ const KINDS: { value: RepeatKind; label: string }[] = [
   { value: "days", label: "Every N days" },
   { value: "weeks", label: "Weekly" },
   { value: "months", label: "Monthly" },
-  { value: "years", label: "Yearly" },
   { value: "cycle", label: "On / off cycle" },
 ];
 
@@ -23,7 +22,7 @@ const DAY_NAME: Record<Weekday, string> = {
   SA: "Saturday",
   SU: "Sunday",
 };
-const UNIT: Partial<Record<RepeatKind, string>> = { days: "day", weeks: "week", months: "month", years: "year" };
+const UNIT: Partial<Record<RepeatKind, string>> = { days: "day", weeks: "week", months: "month" };
 
 function NumberField({ label, value, onChange, min = 1, max = 365, suffix }: { label: string; value: number; onChange(n: number): void; min?: number; max?: number; suffix?: string }) {
   return (
@@ -61,7 +60,7 @@ export function RecurrencePicker({ value, onChange }: { value: PickerState; onCh
       <div className="flex flex-wrap items-start gap-4">
         <TextField label={s.kind === "once" ? "Date" : "Starts"} type="date" value={s.start} onChange={(e) => e.target.value && set({ start: e.target.value })} className="w-44" />
         {unit && (
-          <NumberField label={`Every N ${unit}s`} value={s.interval} onChange={(n) => set({ interval: n })} max={unit === "day" ? 365 : 52} suffix={s.interval === 1 ? `every ${unit}` : `every ${s.interval || "?"} ${unit}s`} />
+          <NumberField label={`Every N ${unit}s`} value={s.interval} onChange={(n) => set({ interval: n })} max={unit === "day" ? 365 : unit === "month" ? 120 : 52} suffix={s.interval === 1 ? `every ${unit}` : `every ${s.interval || "?"} ${unit}s`} />
         )}
         {s.kind === "cycle" && (
           <>

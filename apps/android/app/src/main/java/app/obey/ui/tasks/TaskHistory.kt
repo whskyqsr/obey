@@ -53,9 +53,9 @@ private val HistoryEntry.label: String
         else -> status.name
     }
 
-/** Past occurrences of a task; tapping one opens a correction dialog. */
+/** Past occurrences of a task; with [onEdit] (a Dominant), tapping one opens a correction dialog. */
 @Composable
-fun TaskHistorySection(history: List<HistoryEntry>, onEdit: (HistoryEntry, OccurrenceStatus, Instant?, String) -> Unit) {
+fun TaskHistorySection(history: List<HistoryEntry>, onEdit: ((HistoryEntry, OccurrenceStatus, Instant?, String) -> Unit)?) {
     var editing by remember { mutableStateOf<HistoryEntry?>(null) }
     val showPoints = LocalFeatures.current.points
     SectionHeader("History", horizontalPadding = 0.dp)
@@ -68,7 +68,7 @@ fun TaskHistorySection(history: List<HistoryEntry>, onEdit: (HistoryEntry, Occur
     }
     history.forEach { h ->
         ListItem(
-            modifier = Modifier.clickable { editing = h },
+            modifier = if (onEdit != null) Modifier.clickable { editing = h } else Modifier,
             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
             headlineContent = { Text(formatDate(LocalDate.parse(h.originalDate))) },
             supportingContent = {
@@ -86,7 +86,7 @@ fun TaskHistorySection(history: List<HistoryEntry>, onEdit: (HistoryEntry, Occur
             },
         )
     }
-    editing?.let { h -> EditHistoryDialog(h, onDismiss = { editing = null }) { s, at, note -> onEdit(h, s, at, note); editing = null } }
+    editing?.let { h -> EditHistoryDialog(h, onDismiss = { editing = null }) { s, at, note -> onEdit?.invoke(h, s, at, note); editing = null } }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

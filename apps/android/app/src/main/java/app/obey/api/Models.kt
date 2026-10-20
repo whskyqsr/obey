@@ -74,7 +74,14 @@ data class Schedule(
 )
 
 @Serializable
-data class User(val id: String, val displayName: String, val email: String? = null, val avatarVersion: String? = null)
+data class User(
+    val id: String,
+    val displayName: String,
+    val email: String? = null,
+    val avatarVersion: String? = null,
+    /** "sun" or "mon": where calendars start the week. */
+    val weekStart: String = "sun",
+)
 
 @Serializable
 data class Member(val userId: String, val displayName: String, val role: Role, val avatarVersion: String? = null)
@@ -117,6 +124,9 @@ data class Me(val user: User, val relationships: List<Relationship>)
 
 @Serializable
 data class UpdateMeInput(val displayName: String)
+
+@Serializable
+data class WeekStartInput(val weekStart: String)
 
 @Serializable
 data class CreateRelationshipInput(val name: String?, val role: Role)
@@ -210,6 +220,18 @@ data class Occurrence(
 )
 
 /** A past occurrence in a task's history, with the points it earned or cost. */
+@Serializable
+data class TaskStats(
+    val done: Int,
+    val missed: Int,
+    val excused: Int,
+    /** done / (done + missed); null before anything was due. */
+    val rate: Double? = null,
+    val streak: Int,
+    val bestStreak: Int,
+    val lastDoneAt: String? = null,
+)
+
 @Serializable
 data class HistoryEntry(
     val id: String,

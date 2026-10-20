@@ -54,6 +54,7 @@ import java.time.format.DateTimeFormatter
 fun TodayScreen(
     onNewTask: () -> Unit,
     onEditTask: (String) -> Unit,
+    onOpenTask: (String) -> Unit,
     onOpenSettings: () -> Unit,
     vm: TodayViewModel = hiltViewModel(),
 ) {
@@ -129,12 +130,13 @@ fun TodayScreen(
                             OccurrenceRow(
                                 o, nameFor(o),
                                 OccurrenceActions(onApprove = { vm.review(o, true) }, onReject = { vm.review(o, false) }),
+                                onOpen = { onOpenTask(o.seriesId) },
                             )
                         }
                     }
                     if (d.overdue.isNotEmpty()) {
                         item(key = "h-over") { SectionHeader("Overdue") }
-                        items(d.overdue, key = { "o-" + it.id }) { o -> OccurrenceRow(o, nameFor(o), actionsFor(o)) }
+                        items(d.overdue, key = { "o-" + it.id }) { o -> OccurrenceRow(o, nameFor(o), actionsFor(o), onOpen = { onOpenTask(o.seriesId) }) }
                     }
                     item(key = "h-today") { SectionHeader("Today") }
                     // Whole-day extension: the user's own open tasks for today, plus today's that already slipped.
@@ -157,16 +159,16 @@ fun TodayScreen(
                             EmptyBox("Nothing else due today", if (d.overdue.isEmpty()) "Enjoy it, or ask for more." else null)
                         }
                     } else {
-                        items(d.today, key = { "t-" + it.id }) { o -> OccurrenceRow(o, nameFor(o), actionsFor(o)) }
+                        items(d.today, key = { "t-" + it.id }) { o -> OccurrenceRow(o, nameFor(o), actionsFor(o), onOpen = { onOpenTask(o.seriesId) }) }
                     }
                     val waiting = if (session?.canManage == true) emptyList() else d.awaitingReview
                     if (waiting.isNotEmpty()) {
                         item(key = "h-wait") { SectionHeader("Waiting for approval") }
-                        items(waiting, key = { "w-" + it.id }) { o -> OccurrenceRow(o, nameFor(o), OccurrenceActions()) }
+                        items(waiting, key = { "w-" + it.id }) { o -> OccurrenceRow(o, nameFor(o), OccurrenceActions(), onOpen = { onOpenTask(o.seriesId) }) }
                     }
                     if (d.done.isNotEmpty()) {
                         item(key = "h-done") { SectionHeader("Done today") }
-                        items(d.done, key = { "d-" + it.id }) { o -> OccurrenceRow(o, nameFor(o), OccurrenceActions()) }
+                        items(d.done, key = { "d-" + it.id }) { o -> OccurrenceRow(o, nameFor(o), OccurrenceActions(), onOpen = { onOpenTask(o.seriesId) }) }
                     }
                     item(key = "spacer") { androidx.compose.foundation.layout.Spacer(Modifier.padding(48.dp)) }
                 }

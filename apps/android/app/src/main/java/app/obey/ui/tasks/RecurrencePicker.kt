@@ -84,8 +84,14 @@ fun RecurrencePicker(
                 })
             }
             RepeatKind.Monthly -> {
-                Stepper("Every", draft.interval, if (draft.interval == 1) "month" else "months", 1..24) {
+                Stepper("Every", draft.interval, if (draft.interval == 1) "month" else "months", 1..120) {
                     onChange(draft.copy(interval = it))
+                }
+                // Shortcuts, so a yearly task is one tap rather than eleven.
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(3 to "Quarterly", 6 to "Twice a year", 12 to "Yearly").forEach { (n, label) ->
+                        FilterChip(selected = draft.interval == n, onClick = { onChange(draft.copy(interval = n)) }, label = { Text(label) })
+                    }
                 }
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                     MonthlyMode.entries.forEachIndexed { i, mode ->

@@ -7,6 +7,18 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -106,6 +118,7 @@ fun ProtocolsScreen(onOpen: (String) -> Unit, onNew: () -> Unit, onOpenSettings:
     }
     val canManage = vm.session?.canManage == true
     val showRules = LocalFeatures.current.rules
+    var expanded by remember { mutableStateOf(setOf<String>()) }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Protocols") }, actions = { SettingsAction(onOpenSettings) }) },
@@ -138,14 +151,25 @@ fun ProtocolsScreen(onOpen: (String) -> Unit, onNew: () -> Unit, onOpenSettings:
                             headlineContent = { Text(p.title) },
                             supportingContent = if (p.bodyMd.isNotBlank()) {
                                 {
+                                    val open = p.id in expanded
                                     MarkdownPreview(
-                                        markdown = p.bodyMd.lineSequence().filter { it.isNotBlank() }.take(3).joinToString("\n"),
+                                        markdown = p.bodyMd,
                                         onToggleCheck = null,
-                                        modifier = Modifier.heightIn(max = 96.dp).clipToBounds(),
+                                        modifier = if (open || !p.isLong) Modifier else Modifier.heightIn(max = 120.dp).clipToBounds().fadeOut(),
                                     )
                                 }
                             } else null,
-                            trailingContent = handle,
+                            trailingContent = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (p.isLong) {
+                                        val open = p.id in expanded
+                                        IconButton(onClick = { expanded = if (open) expanded - p.id else expanded + p.id }) {
+                                            Icon(if (open) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, if (open) "Show less" else "Show more")
+                                        }
+                                    }
+                                    handle?.invoke()
+                                }
+                            },
                         )
                     }
                 }
@@ -153,3 +177,17 @@ fun ProtocolsScreen(onOpen: (String) -> Unit, onNew: () -> Unit, onOpenSettings:
         }
     }
 }
+
+/** Long enough that the collapsed preview cuts it off, so it gets a chevron. */
+private val Protocol.isLong: Boolean
+    get() = bodyMd.lineSequence().count { it.isNotBlank() } > 3 || bodyMd.length > 180
+
+/** Fades the bottom of a clipped preview so it reads as "more below". */
+private fun Modifier.fadeOut(): Modifier = graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        drawRect(
+            brush = Brush.verticalGradient(0.6f to Color.Black, 1f to Color.Transparent),
+            blendMode = BlendMode.DstIn,
+        )
+    }

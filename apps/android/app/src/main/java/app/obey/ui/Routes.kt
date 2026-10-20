@@ -19,5 +19,10 @@ import kotlinx.serialization.Serializable
 /** [noteId] null = new note; [journal] picks the Journal over Notes for a new one. */
 @Serializable data class NoteEditorRoute(val noteId: String? = null, val journal: Boolean = false)
 
+/** A task's page: what's due now, stats and details. */
+@Serializable data class TaskDetailRoute(val taskId: String)
+
+@Serializable data class TaskHistoryRoute(val taskId: String)
+
 /** [protocolId] null = new protocol. */
 @Serializable data class ProtocolEditorRoute(val protocolId: String? = null)

@@ -23,6 +23,7 @@ import app.obey.api.ObeyApi
 import app.obey.api.ReschedulePolicy
 import app.obey.api.Role
 import app.obey.api.UpdateMeInput
+import app.obey.api.WeekStartInput
 import app.obey.api.UpdateRelationshipInput
 import app.obey.auth.AuthManager
 import app.obey.auth.AuthState
@@ -82,6 +83,11 @@ class SettingsViewModel @Inject constructor(
         api.updateMe(UpdateMeInput(name.trim()))
         sessions.refresh()
         say("Name updated")
+    }
+
+    fun setWeekStart(monday: Boolean) = action {
+        api.setWeekStart(WeekStartInput(if (monday) "mon" else "sun"))
+        sessions.refresh()
     }
 
     fun selectRelationship(id: String) = action { sessions.select(id) }

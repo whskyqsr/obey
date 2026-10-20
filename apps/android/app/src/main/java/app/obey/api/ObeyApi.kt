@@ -22,6 +22,9 @@ interface ObeyApi {
     @PATCH("me")
     suspend fun updateMe(@Body body: UpdateMeInput): User
 
+    @PATCH("me")
+    suspend fun setWeekStart(@Body body: WeekStartInput): User
+
     /** A square JPEG; the app crops and shrinks it first. */
     @PUT("me/avatar")
     suspend fun setAvatar(@Body image: RequestBody): User
@@ -68,6 +71,9 @@ interface ObeyApi {
 
     @GET("tasks/{id}/history")
     suspend fun taskHistory(@Path("id") taskId: String, @Query("limit") limit: Int = 100): List<HistoryEntry>
+
+    @GET("tasks/{id}/stats")
+    suspend fun taskStats(@Path("id") taskId: String): TaskStats
 
     @PATCH("occurrences/{id}")
     suspend fun editOccurrence(@Path("id") occurrenceId: String, @Body body: EditOccurrenceInput): Occurrence

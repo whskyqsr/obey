@@ -51,6 +51,7 @@ import java.time.format.DateTimeFormatter
 fun UpcomingScreen(
     onNewTask: (LocalDate?) -> Unit,
     onEditTask: (String) -> Unit,
+    onOpenTask: (String) -> Unit,
     onAllTasks: () -> Unit,
     onOpenSettings: () -> Unit,
     vm: UpcomingViewModel = hiltViewModel(),
@@ -142,6 +143,7 @@ fun UpcomingScreen(
                                     onReschedule = { rescheduling = o },
                                     onEditTask = if (session?.canManage == true) ({ onEditTask(o.seriesId) }) else null,
                                 ),
+                                onOpen = { onOpenTask(o.seriesId) },
                             )
                         }
                     }

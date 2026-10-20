@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Notes
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.Today
@@ -78,7 +79,9 @@ import app.obey.ui.protocols.ProtocolsScreen
 import app.obey.ui.rules.RulesScreen
 import app.obey.ui.settings.SettingsScreen
 import app.obey.ui.settings.SettingsViewModel
+import app.obey.ui.tasks.TaskDetailScreen
 import app.obey.ui.tasks.TaskEditorScreen
+import app.obey.ui.tasks.TaskHistoryScreen
 import app.obey.ui.tasks.TaskListScreen
 import app.obey.ui.today.TodayScreen
 import app.obey.ui.upcoming.UpcomingScreen
@@ -145,6 +148,8 @@ private fun topLevels(f: Features) = listOfNotNull(
     if (f.protocols) TopLevel(ProtocolsRoute, "Protocols", Icons.Outlined.FactCheck) { it.hasRoute<ProtocolsRoute>() } else null,
     TopLevel(NotesRoute, "Notes", Icons.AutoMirrored.Outlined.Notes) { it.hasRoute<NotesRoute>() },
     if (f.journal) TopLevel(JournalRoute, "Journal", Icons.Outlined.AutoStories) { it.hasRoute<JournalRoute>() } else null,
+    // Tasks open from Today and Upcoming; the full list is for managing them, so it sits under More.
+    TopLevel(TaskListRoute, "All tasks", Icons.Outlined.Checklist) { it.hasRoute<TaskListRoute>() },
 )
 
 /** A phone's bar fits five; past that it keeps Today, Upcoming, Rewards and the first writing space, and the rest go under More. */
@@ -247,11 +252,13 @@ private fun MainScaffold() {
 @Composable
 private fun ObeyNavHost(nav: NavHostController) {
     val settings = { nav.navigate(SettingsRoute) }
+    val openTask = { id: String -> nav.navigate(TaskDetailRoute(id)) }
     NavHost(navController = nav, startDestination = TodayRoute) {
         composable<TodayRoute> {
             TodayScreen(
                 onNewTask = { nav.navigate(TaskEditorRoute()) },
                 onEditTask = { nav.navigate(TaskEditorRoute(taskId = it)) },
+                onOpenTask = openTask,
                 onOpenSettings = settings,
             )
         }
@@ -259,6 +266,7 @@ private fun ObeyNavHost(nav: NavHostController) {
             UpcomingScreen(
                 onNewTask = { date -> nav.navigate(TaskEditorRoute(date = date?.toString())) },
                 onEditTask = { nav.navigate(TaskEditorRoute(taskId = it)) },
+                onOpenTask = openTask,
                 onAllTasks = { nav.navigate(TaskListRoute) },
                 onOpenSettings = settings,
             )
@@ -291,11 +299,19 @@ private fun ObeyNavHost(nav: NavHostController) {
         }
         composable<TaskListRoute> {
             TaskListScreen(
-                onBack = { nav.popBackStack() },
-                onEdit = { nav.navigate(TaskEditorRoute(taskId = it)) },
+                onOpen = openTask,
                 onNew = { nav.navigate(TaskEditorRoute()) },
+                onOpenSettings = settings,
             )
         }
+        composable<TaskDetailRoute> {
+            TaskDetailScreen(
+                onBack = { nav.popBackStack() },
+                onEdit = { nav.navigate(TaskEditorRoute(taskId = it)) },
+                onHistory = { nav.navigate(TaskHistoryRoute(it)) },
+            )
+        }
+        composable<TaskHistoryRoute> { TaskHistoryScreen(onBack = { nav.popBackStack() }) }
         composable<TaskEditorRoute> { TaskEditorScreen(onDone = { nav.popBackStack() }) }
         composable<NoteEditorRoute> { NoteEditorScreen(onDone = { nav.popBackStack() }) }
         composable<SettingsRoute> { SettingsScreen(onBack = { nav.popBackStack() }) }

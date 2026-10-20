@@ -1,6 +1,7 @@
 package app.obey.ui.today
 
 import app.obey.ui.common.LocalFeatures
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
@@ -50,6 +51,8 @@ fun OccurrenceRow(
     assigneeName: String?,
     actions: OccurrenceActions,
     modifier: Modifier = Modifier,
+    /** Opens the task this occurrence belongs to. */
+    onOpen: (() -> Unit)? = null,
 ) {
     var menu by remember { mutableStateOf(false) }
     val done = occurrence.status == OccurrenceStatus.Completed || occurrence.status == OccurrenceStatus.Excused
@@ -68,7 +71,7 @@ fun OccurrenceRow(
     }.joinToString(" · ")
 
     ListItem(
-        modifier = modifier,
+        modifier = if (onOpen != null) modifier.clickable(onClick = onOpen) else modifier,
         colors = ListItemDefaults.colors(),
         leadingContent = {
             val canComplete = actions.onComplete != null && occurrence.status == OccurrenceStatus.Pending

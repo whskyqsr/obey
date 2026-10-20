@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { type Schedule, occurrencesBetween } from "@obey/recurrence";
 import { defaultPicker, fromSchedule, preview, toSchedule, type PickerState } from "./picker";
 
 const base = (patch: Partial<PickerState>): PickerState => ({ ...defaultPicker("2026-10-16"), ...patch });
@@ -93,5 +94,18 @@ describe("preview", () => {
     const p = preview({ start: "2026-10-16", rule: { freq: "cycle", cycleLength: 0, cycleDays: [] } }, "2026-10-16");
     expect(p.errors.length).toBeGreaterThan(0);
     expect(p.dates).toEqual([]);
+  });
+});
+
+describe("yearly schedules", () => {
+  it("open as every 12 months on the same day, with the same dates", () => {
+    const yearly: Schedule = { start: "2026-03-05", rule: { freq: "yearly", interval: 1 } };
+    const s = fromSchedule(yearly);
+    expect(s).toMatchObject({ kind: "months", interval: 12, monthlyMode: "day", monthDay: 5 });
+    const monthly = toSchedule(s);
+    expect(monthly.rule).toMatchObject({ freq: "monthly", interval: 12, byMonthDay: [5] });
+    const dates = (sch: Schedule) => occurrencesBetween(sch, "2026-01-01", "2030-12-31");
+    expect(dates(monthly)).toEqual(dates(yearly));
+    expect(dates(monthly)).toHaveLength(5);
   });
 });

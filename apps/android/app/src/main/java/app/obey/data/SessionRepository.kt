@@ -21,6 +21,8 @@ data class Session(
     val relationship: Relationship?,
 ) {
     val userId: String get() = me.user.id
+    /** The day calendars start the week on; Sunday unless the person chose Monday. */
+    val weekStart: java.time.DayOfWeek get() = if (me.user.weekStart == "mon") java.time.DayOfWeek.MONDAY else java.time.DayOfWeek.SUNDAY
     val myMember: Member? get() = relationship?.members?.firstOrNull { it.userId == userId }
     val myRole: Role? get() = myMember?.role
     val partners: List<Member> get() = relationship?.members?.filter { it.userId != userId }.orEmpty()

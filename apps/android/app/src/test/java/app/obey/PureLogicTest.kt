@@ -17,6 +17,9 @@ import app.obey.recurrence.MonthlyMode
 import app.obey.recurrence.RecurrenceDraft
 import app.obey.recurrence.RepeatKind
 import app.obey.recurrence.describe
+import app.obey.api.Frequency
+import app.obey.api.RecurrenceRule
+import app.obey.api.Schedule
 import java.time.LocalDate
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -87,5 +90,18 @@ class PureLogicTest {
         val spans = (b[6] as MdBlock.Paragraph).inline
         assertEquals(listOf(MdSpan("snake_case and "), MdSpan("it", italic = true)), spans)
         assertEquals(listOf(MdSpan("done "), MdSpan("now", bold = true)), (b[1] as MdBlock.Check).inline)
+    }
+
+    @Test
+    fun yearlySchedulesOpenAsEvery12Months() {
+        val draft = RecurrenceDraft.fromSchedule(Schedule(start = "2026-03-05", rule = RecurrenceRule(Frequency.Yearly, interval = 1)))
+        assertEquals(RepeatKind.Monthly, draft.kind)
+        assertEquals(12, draft.interval)
+        assertEquals(MonthlyMode.DayOfMonth, draft.monthlyMode)
+        assertEquals(5, draft.monthDay)
+        val rule = draft.toSchedule(LocalDate.parse("2026-03-05")).rule!!
+        assertEquals(Frequency.Monthly, rule.freq)
+        assertEquals(12, rule.interval)
+        assertEquals(listOf(5), rule.byMonthDay)
     }
 }

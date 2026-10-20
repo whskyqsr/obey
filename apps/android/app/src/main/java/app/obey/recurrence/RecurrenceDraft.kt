@@ -7,7 +7,7 @@ import app.obey.api.Schedule
 import app.obey.api.Weekday
 import java.time.LocalDate
 
-/** The repeat options the task editor offers. Yearly rules from the API are kept as-is but not editable here. */
+/** The repeat options the task editor offers. Yearly is "every 12 months", which repeats on the same dates. */
 enum class RepeatKind(val label: String) {
     Once("Once"),
     Daily("Daily"),
@@ -38,7 +38,7 @@ data class RecurrenceDraft(
     val cycleOn: Int = 3,
     val cycleOff: Int = 4,
     val afterCompletion: Boolean = false,
-    /** A rule the editor can't represent (yearly, multi-day monthly...). Preserved unless the user changes kind. */
+    /** A rule the editor can't represent. Preserved unless the user changes kind. */
     val passthrough: RecurrenceRule? = null,
 ) {
     fun toSchedule(start: LocalDate): Schedule {
@@ -104,8 +104,11 @@ data class RecurrenceDraft(
                     val on = rule.cycleDays?.size ?: 1
                     RecurrenceDraft(RepeatKind.Cycle, cycleOn = on, cycleOff = (length - on).coerceAtLeast(0), afterCompletion = after)
                 }
-                // Not editable here; keep the rule untouched and show it via describe().
-                Frequency.Yearly -> RecurrenceDraft(RepeatKind.Once, passthrough = rule, afterCompletion = after)
+                // Shown as every 12 months on the start date's day, which repeats on the same dates.
+                Frequency.Yearly -> RecurrenceDraft(
+                    RepeatKind.Monthly, interval = n * 12, monthlyMode = MonthlyMode.DayOfMonth,
+                    monthDay = LocalDate.parse(schedule.start).dayOfMonth, afterCompletion = after,
+                )
             }
         }
     }

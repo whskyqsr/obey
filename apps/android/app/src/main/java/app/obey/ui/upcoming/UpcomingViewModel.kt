@@ -30,7 +30,9 @@ class UpcomingViewModel @Inject constructor(
     private val api: ObeyApi,
     private val sessions: SessionRepository,
 ) : BaseViewModel() {
-    private val _weekStart = MutableStateFlow(LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)))
+    private fun startOf(day: LocalDate) = day.with(TemporalAdjusters.previousOrSame(sessions.session?.weekStart ?: DayOfWeek.SUNDAY))
+
+    private val _weekStart = MutableStateFlow(startOf(LocalDate.now()))
     val weekStart: StateFlow<LocalDate> = _weekStart.asStateFlow()
 
     private val _state = MutableStateFlow<Load<WeekData>>(Load.Loading)
@@ -44,11 +46,13 @@ class UpcomingViewModel @Inject constructor(
     }
 
     fun thisWeek() {
-        _weekStart.value = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        _weekStart.value = startOf(LocalDate.now())
         refresh()
     }
 
     fun refresh() {
+        // Follow a change to the week-start setting, keeping the same week in view (judged by its middle).
+        _weekStart.value = startOf(_weekStart.value.plusDays(3))
         val start = _weekStart.value
         viewModelScope.launch {
             val current = _state.value

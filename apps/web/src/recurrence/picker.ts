@@ -15,7 +15,8 @@ import {
 } from "@obey/recurrence";
 
 /** What the recurrence picker edits. Converted to and from the stored {@link Schedule}. */
-export type RepeatKind = "once" | "days" | "weeks" | "months" | "years" | "cycle";
+/** No "years": every 12 months from the start date gives the same dates, so the picker offers months only. */
+export type RepeatKind = "once" | "days" | "weeks" | "months" | "cycle";
 export type MonthlyMode = "day" | "nth" | "last";
 export type EndMode = "never" | "count" | "until";
 
@@ -37,7 +38,7 @@ export interface PickerState {
 }
 
 /** Kinds that support "repeat after completion" (the engine only anchors interval rules). */
-export const COMPLETION_KINDS: RepeatKind[] = ["days", "weeks", "months", "years"];
+export const COMPLETION_KINDS: RepeatKind[] = ["days", "weeks", "months"];
 
 export function defaultPicker(start: PlainDate): PickerState {
   const day = toDayNumber(start);
@@ -89,9 +90,6 @@ export function toSchedule(s: PickerState): Schedule {
         }
       }
       break;
-    case "years":
-      rule = { freq: "yearly", interval };
-      break;
     case "cycle": {
       const on = int(s.cycleOn, 1);
       const off = int(s.cycleOff, 0);
@@ -141,7 +139,10 @@ export function fromSchedule(schedule: Schedule): PickerState {
       }
       break;
     case "yearly":
-      s.kind = "years";
+      // Shown as "every 12 months" on the start date's day, which repeats on the same dates.
+      s.kind = "months";
+      s.interval = (rule.interval ?? 1) * 12;
+      s.monthlyMode = "day";
       break;
     case "cycle": {
       s.kind = "cycle";

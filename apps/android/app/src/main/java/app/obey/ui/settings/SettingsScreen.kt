@@ -33,6 +33,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -137,6 +140,20 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
                             enabled = !busy,
                         ) { Text(if (user.avatarVersion == null) "Add photo" else "Change photo") }
                         if (user.avatarVersion != null) TextButton(onClick = vm::removeAvatar, enabled = !busy) { Text("Remove") }
+                    }
+                }
+
+                session?.let { s ->
+                    SectionHeader("Week starts on")
+                    SingleChoiceSegmentedButtonRow(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
+                        listOf(false to "Sunday", true to "Monday").forEachIndexed { i, (monday, label) ->
+                            SegmentedButton(
+                                selected = (s.weekStart == java.time.DayOfWeek.MONDAY) == monday,
+                                onClick = { vm.setWeekStart(monday) },
+                                enabled = !busy,
+                                shape = SegmentedButtonDefaults.itemShape(i, 2),
+                            ) { Text(label) }
+                        }
                     }
                 }
 
