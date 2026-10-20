@@ -46,9 +46,7 @@ export function SettingsPage() {
         <Link to="/dynamic" className="state-layer flex items-center gap-4 rounded-xl bg-primary-container p-4 text-on-primary-container">
           <span className="flex">
             {rel.members.slice(0, 3).map((m, i) => (
-              <span key={m.userId} className={cx("rounded-full ring-4 ring-primary-container", i > 0 && "-ml-3")}>
-                <Avatar userId={m.userId} name={m.displayName} version={m.avatarVersion} size={48} />
-              </span>
+              <Avatar key={m.userId} userId={m.userId} name={m.displayName} version={m.avatarVersion} size={48} className={cx("ring-4 ring-primary-container", i > 0 && "-ml-3")} />
             ))}
           </span>
           <span className="min-w-0 flex-1">

@@ -14,9 +14,8 @@ export function DynamicHero({ people, title, sub, size = 64, className }: { peop
     <div className={cx("flex flex-col items-center gap-3 text-center", className)}>
       <div className="flex">
         {people.slice(0, 4).map((p, i) => (
-          <span key={p.userId} className={cx("rounded-full ring-4 ring-surface", i > 0 && "-ml-3")}>
-            <Avatar userId={p.userId} name={p.displayName} version={p.avatarVersion} size={size} />
-          </span>
+          // The ring sits on the avatar itself; on an inline wrapper it followed the text baseline, not the circle.
+          <Avatar key={p.userId} userId={p.userId} name={p.displayName} version={p.avatarVersion} size={size} className={cx("ring-4 ring-surface", i > 0 && "-ml-3")} />
         ))}
       </div>
       <div>
