@@ -7,7 +7,7 @@ import { fmtDate, fmtDateTime, fmtRelative, fmtTime, localDateOf, today } from "
 import { useRel } from "../lib/relationship";
 import { RescheduleSheet } from "./RescheduleSheet";
 import { StreakStrip } from "./StreakStrip";
-import { Badge, Button, Dialog, IconButton, TextArea, cx, useSnackbar } from "./ui";
+import { Badge, Button, Dialog, TextArea, cx, useSnackbar } from "./ui";
 
 const STATUS: Record<OccurrenceStatus, { label: string; tone: "primary" | "error" | "tertiary" | "neutral" }> = {
   pending: { label: "To do", tone: "neutral" },
@@ -59,13 +59,7 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-body-medium text-on-surface-variant">
             <span>
               {/* All-day tasks are due at 23:59:59 local; show "All day" rather than 11:59 PM. */}
-              {allDay
-                ? showDate || !isToday
-                  ? `${fmtDate(localDateOf(due))}, all day`
-                  : "All day"
-                : showDate || !isToday
-                  ? fmtDateTime(o.dueAt)
-                  : fmtTime(o.dueAt)}
+              {allDay ? (showDate || !isToday ? `${fmtDate(localDateOf(due))}, all day` : "All day") : showDate || !isToday ? fmtDateTime(o.dueAt) : fmtTime(o.dueAt)}
             </span>
             {o.status === "pending" && <span className={overdue ? "text-error" : ""}>· {fmtRelative(o.dueAt)}</span>}
             {!mine && <span>· {memberName(o.assigneeId)}</span>}
@@ -87,17 +81,13 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
               Done
             </Button>
           )}
-          {o.status === "pending" && mine && !isOpen(o) && (
-            <span className="text-body-medium text-on-surface-variant">Opens {fmtDate(o.opensOn!, { weekday: "long" })}</span>
-          )}
+          {o.status === "pending" && mine && !isOpen(o) && <span className="text-body-medium text-on-surface-variant">Opens {fmtDate(o.opensOn!, { weekday: "long" })}</span>}
           {o.status === "submitted" && isDom && (
             <>
               <Button
                 icon="thumb_up"
                 busy={review.isPending}
-                onClick={() =>
-                  review.mutate({ id: o.id, approve: true }, { onSuccess: () => snack("Approved"), onError: (e) => snack(errorMessage(e)) })
-                }
+                onClick={() => review.mutate({ id: o.id, approve: true }, { onSuccess: () => snack("Approved"), onError: (e) => snack(errorMessage(e)) })}
               >
                 Approve
               </Button>
@@ -105,16 +95,17 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
                 variant="outlined"
                 icon="thumb_down"
                 disabled={review.isPending}
-                onClick={() =>
-                  review.mutate({ id: o.id, approve: false }, { onSuccess: () => snack("Sent back"), onError: (e) => snack(errorMessage(e)) })
-                }
+                onClick={() => review.mutate({ id: o.id, approve: false }, { onSuccess: () => snack("Sent back"), onError: (e) => snack(errorMessage(e)) })}
               >
                 Reject
               </Button>
             </>
           )}
-          <div className="flex-1" />
-          {o.status === "pending" && <IconButton icon="schedule" label="Reschedule" onClick={() => setRescheduling(true)} />}
+          {o.status === "pending" && (
+            <Button variant={mine ? "outlined" : "tonal"} icon="more_time" onClick={() => setRescheduling(true)}>
+              {mine ? "More time" : "Reschedule"}
+            </Button>
+          )}
         </div>
       )}
 

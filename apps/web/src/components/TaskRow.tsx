@@ -38,7 +38,7 @@ export function useQuickComplete() {
  * trailing actions. The whole row opens the task.
  */
 export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: boolean; actions?: ReactNode }) {
-  const { me, memberName, features } = useRel();
+  const { me, isDom, memberName, features } = useRel();
   const quickComplete = useQuickComplete();
   const [rescheduling, setRescheduling] = useState(false);
   const mine = o.assigneeId === me.user.id;
@@ -118,7 +118,10 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
       </Link>
       <div className="relative z-10 flex items-center gap-1">
         {actions}
-        {!actions && o.status === "pending" && mine && <IconButton icon="more_time" label="More time" data-action="more" onClick={() => setRescheduling(true)} />}
+        {/* A Dominant moves anyone's deadline as easily as a sub asks for more time on their own. */}
+        {!actions && o.status === "pending" && (mine || isDom) && (
+          <IconButton icon="more_time" label={mine ? "More time" : "Reschedule"} data-action="more" onClick={() => setRescheduling(true)} />
+        )}
         {features.points && o.points !== 0 && (
           <span className="min-w-9 rounded-full bg-primary-container/70 px-2 py-0.5 text-center text-label-medium text-on-primary-container tabular-nums">
             {o.points > 0 ? `+${o.points}` : o.points}

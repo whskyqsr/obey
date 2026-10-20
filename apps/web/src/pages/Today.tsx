@@ -191,7 +191,7 @@ function Glance({ today: list, done }: { today: Occurrence[]; done: number }) {
   );
 }
 
-/** J/K move between rows, X marks the focused one done, R asks for more time, N starts a new task (Dominant). */
+/** J/K move between rows, X marks the focused one done, R asks for more time (a Dominant reschedules), N starts a new task (Dominant). */
 function useRowShortcuts(onNew?: () => void) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -219,7 +219,13 @@ function useRowShortcuts(onNew?: () => void) {
 }
 
 function ShortcutHints({ dom }: { dom: boolean }) {
-  const keys: [string, string][] = [["J K", "move"], ["X", "done"], ["R", "more time"], ...(dom ? ([["N", "new task"]] as [string, string][]) : []), ["Enter", "open"]];
+  const keys: [string, string][] = [
+    ["J K", "move"],
+    ["X", "done"],
+    ["R", dom ? "reschedule" : "more time"],
+    ...(dom ? ([["N", "new task"]] as [string, string][]) : []),
+    ["Enter", "open"],
+  ];
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1 px-6 pb-8 text-body-small text-on-surface-variant">
       {keys.map(([k, what]) => (

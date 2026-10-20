@@ -124,7 +124,9 @@ fun TodayScreen(
                     SwipeableRow(
                         o,
                         onDone = if (o.assigneeId == me && o.status == OccurrenceStatus.Pending && o.isOpen()) ({ vm.complete(o) }) else null,
-                        onMoreTime = if (o.assigneeId == me && o.status == OccurrenceStatus.Pending) ({ rescheduling = o }) else null,
+                        // A Dominant moves anyone's deadline the same way a sub asks for more time on their own.
+                        onMoreTime = if ((o.assigneeId == me || isDom) && o.status == OccurrenceStatus.Pending) ({ rescheduling = o }) else null,
+                        moreTimeLabel = if (o.assigneeId == me) "More time" else "Reschedule",
                     ) {
                         OccurrenceRow(o, nameFor(o), actions, onOpen = { onOpenTask(o.seriesId) }, streak = d.streaks[o.seriesId])
                     }

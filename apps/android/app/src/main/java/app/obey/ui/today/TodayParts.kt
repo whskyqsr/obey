@@ -49,7 +49,7 @@ import java.time.format.DateTimeFormatter
  * Undo snackbar. Tapping still works, and TalkBack gets the same two actions.
  */
 @Composable
-fun SwipeableRow(o: Occurrence, onDone: (() -> Unit)?, onMoreTime: (() -> Unit)?, content: @Composable () -> Unit) {
+fun SwipeableRow(o: Occurrence, onDone: (() -> Unit)?, onMoreTime: (() -> Unit)?, moreTimeLabel: String = "More time", content: @Composable () -> Unit) {
     if (onDone == null && onMoreTime == null) {
         content()
         return
@@ -72,7 +72,7 @@ fun SwipeableRow(o: Occurrence, onDone: (() -> Unit)?, onMoreTime: (() -> Unit)?
         modifier = Modifier.semantics {
             customActions = listOfNotNull(
                 onDone?.let { CustomAccessibilityAction("Mark done") { it(); true } },
-                onMoreTime?.let { CustomAccessibilityAction("More time") { it(); true } },
+                onMoreTime?.let { CustomAccessibilityAction(moreTimeLabel) { it(); true } },
             )
         },
         backgroundContent = {
@@ -89,7 +89,7 @@ fun SwipeableRow(o: Occurrence, onDone: (() -> Unit)?, onMoreTime: (() -> Unit)?
                     Icon(Icons.Outlined.Check, null, tint = colors.onPrimary)
                     Text("  Done", color = colors.onPrimary, style = MaterialTheme.typography.labelLarge)
                 } else {
-                    Text("More time  ", color = colors.onTertiaryContainer, style = MaterialTheme.typography.labelLarge)
+                    Text("$moreTimeLabel  ", color = colors.onTertiaryContainer, style = MaterialTheme.typography.labelLarge)
                     Icon(Icons.Outlined.MoreTime, null, tint = colors.onTertiaryContainer)
                 }
             }
