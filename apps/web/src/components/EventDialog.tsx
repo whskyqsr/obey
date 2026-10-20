@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { CalendarEvent, Occurrence } from "../api/types";
 import { useDeleteEvent, useDismissClashes, useOccurrences, usePlanReschedule, useSaveEvent } from "../api/hooks";
 import { errorMessage } from "../api/client";
@@ -72,6 +72,7 @@ export function EventDialog({ event, day, open, onClose }: { event: CalendarEven
 
   const current = saved;
   const mine = !current || current.authorId === me.user.id;
+  const clashes = useClashes(open && !editing ? current : null);
   const set = (p: Partial<Draft>) => setDraft((d) => ({ ...d, ...p }));
 
   function submit() {
@@ -143,7 +144,10 @@ export function EventDialog({ event, day, open, onClose }: { event: CalendarEven
                 Edit
               </Button>
             )}
-            <Button onClick={onClose}>Done</Button>
+            {clashes.apply}
+            <Button variant={clashes.apply ? "text" : "filled"} onClick={onClose}>
+              Done
+            </Button>
           </>
         }
       >
@@ -157,7 +161,7 @@ export function EventDialog({ event, day, open, onClose }: { event: CalendarEven
             {current.authorId === me.user.id ? "you" : memberName(current.authorId)}
           </div>
           {current.noteMd && <p className="rounded-sm bg-surface-container px-3 py-2 whitespace-pre-wrap">{current.noteMd}</p>}
-          <Clashes event={current} />
+          {clashes.body}
         </div>
       </Dialog>
     );
@@ -232,20 +236,21 @@ type ClashChoice = "keep" | "move" | "cancel";
  * after the plan, or called off. A Dominant's choices apply at once; a sub's moves and call-offs go out as one request
  * (moves may apply straight away, depending on the dynamic's rules).
  */
-function Clashes({ event }: { event: CalendarEvent }) {
+function useClashes(event: CalendarEvent | null): { body: ReactNode; apply: ReactNode } {
   const { rel, me, isDom, memberName } = useRel();
   const snack = useSnackbar();
-  const from = localDateOf(new Date(event.startsAt));
-  const to = localDateOf(new Date(event.endsAt));
+  const from = event ? localDateOf(new Date(event.startsAt)) : today();
+  const to = event ? localDateOf(new Date(event.endsAt)) : today();
   const occ = useOccurrences(rel.id, from, to);
   const plan = usePlanReschedule(rel.id);
   const dismiss = useDismissClashes(rel.id);
   const [choices, setChoices] = useState<Record<string, ClashChoice>>({});
   const [times, setTimes] = useState<Record<string, string>>({});
   const [reason, setReason] = useState("");
-  if (!event.conflictIds.length) return null;
+  const none = { body: null, apply: null };
+  if (!event?.conflictIds.length) return none;
   const items = (occ.data ?? []).filter((o) => event.conflictIds.includes(o.id) && o.status === "pending");
-  if (!items.length && !occ.isLoading) return null;
+  if (!items.length && !occ.isLoading) return none;
   const subBlocked = !isDom && rel.reschedulePolicy === "dominant_only";
   const involved = event.withPartner || event.authorId === me.user.id;
   const canMove = (o: Occurrence) => !subBlocked && (isDom || o.assigneeId === me.user.id);
@@ -263,6 +268,7 @@ function Clashes({ event }: { event: CalendarEvent }) {
   const setAll = (c: ClashChoice) => setChoices(allAre(c) ? {} : Object.fromEntries(actionable.map((o) => [o.id, c])));
 
   async function submit() {
+    if (!event) return;
     try {
       if (kept.length) await dismiss.mutateAsync({ id: event.id, occurrenceIds: kept.map((o) => o.id) });
       if (!changed.length) {
@@ -281,7 +287,7 @@ function Clashes({ event }: { event: CalendarEvent }) {
     }
   }
 
-  return (
+  const body = (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2 text-title-small text-error">
         <Icon name="warning" size={20} />
@@ -338,14 +344,14 @@ function Clashes({ event }: { event: CalendarEvent }) {
       })}
       <p className="px-1 text-body-small">Keep means the task is fine alongside the plan, and it stops counting as a clash.</p>
       {subBlocked && <p className="px-1 text-body-small">Only your Dominant can move or call off tasks in this dynamic.</p>}
-      {picked.length > 0 && (
-        <>
-          {asks && <TextField label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} />}
-          <Button icon={asks ? "send" : "check"} busy={plan.isPending || dismiss.isPending} onClick={() => void submit()} className="self-end">
-            {asks ? "Ask" : "Apply"} ({picked.length})
-          </Button>
-        </>
-      )}
+      {picked.length > 0 && asks && <TextField label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} />}
     </div>
   );
+  // In the dialog's own button row, so a long list doesn't need scrolling to the end.
+  const apply = picked.length > 0 && (
+    <Button icon={asks ? "send" : "check"} busy={plan.isPending || dismiss.isPending} onClick={() => void submit()}>
+      {asks ? "Ask" : "Apply"} ({picked.length})
+    </Button>
+  );
+  return { body, apply };
 }

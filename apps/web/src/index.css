@@ -161,10 +161,15 @@ body {
   min-height: 100dvh;
 }
 
-/* Slim scrollbars in the theme's colours where the system shows them permanently (Windows); overlay ones are unaffected. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--md-outline-variant) transparent;
+/*
+ * Slim scrollbars in the theme's colours where the system shows them permanently (Windows); overlay ones are unaffected.
+ * In the base layer so utilities such as [scrollbar-width:none] on dialogs still win over it.
+ */
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--md-outline-variant) transparent;
+  }
 }
 
 .icon {
