@@ -83,7 +83,8 @@ class AppLock @Inject constructor(private val settings: SettingsStore) {
                     override fun onAuthenticationError(errorCode: Int, errString: CharSequence) = onResult(false)
                 },
             )
-            val info = BiometricPrompt.PromptInfo.Builder().setTitle(title).setSubtitle("Use your fingerprint, face or screen lock")
+            // No extra "Confirm" tap after a face match; on Pixels that tap swaps in the full-size panel.
+            val info = BiometricPrompt.PromptInfo.Builder().setTitle(title).setSubtitle("Use your fingerprint, face or screen lock").setConfirmationRequired(false)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) info.setAllowedAuthenticators(authenticators) else info.setDeviceCredentialAllowed(true)
             prompt.authenticate(info.build())
         }
