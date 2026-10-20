@@ -41,12 +41,13 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
     <div
       className={cx(
         "flex flex-col gap-3 rounded-md p-4",
+        // The title link stretches over the whole card, so the card is the hover and focus target.
+        linkTask && "state-layer has-[a[data-card-link]:focus-visible]:outline-2 has-[a[data-card-link]:focus-visible]:outline-primary",
         overdue ? "bg-error-container/60" : "bg-surface-container-low",
         done && "opacity-70",
       )}
     >
       <div className="flex items-start gap-3">
-        {/* Not a nested interactive: the actions below sit outside this link. */}
         <TitleWrap linkTask={linkTask} taskId={o.seriesId}>
           <div className={cx("text-title-medium text-on-surface", done && "line-through")}>{o.title}</div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-body-medium text-on-surface-variant">
@@ -73,7 +74,7 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
       {o.noteMd && <p className="rounded-sm bg-surface-container px-3 py-2 text-body-medium whitespace-pre-wrap text-on-surface-variant">{o.noteMd}</p>}
 
       {(o.status === "pending" || (isDom && o.status === "submitted")) && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="relative z-10 flex flex-wrap items-center gap-2">
           {o.status === "pending" && mine && (
             <Button variant="filled" icon="check" onClick={() => setCompleting(true)}>
               Done
@@ -117,7 +118,12 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
 function TitleWrap({ linkTask, taskId, children }: { linkTask: boolean; taskId: string; children: React.ReactNode }) {
   if (!linkTask) return <div className="min-w-0 flex-1">{children}</div>;
   return (
-    <Link to="/tasks/$taskId" params={{ taskId }} className="state-layer -m-2 min-w-0 flex-1 rounded-sm p-2">
+    <Link
+      to="/tasks/$taskId"
+      params={{ taskId }}
+      data-card-link
+      className="min-w-0 flex-1 after:absolute after:inset-0 after:rounded-md after:content-[''] focus-visible:outline-none"
+    >
       {children}
     </Link>
   );
