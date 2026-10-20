@@ -213,7 +213,7 @@ fun DynamicScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
                         trailingContent = {
                             if (m.userId != s.userId) Row {
                                 app.obey.ui.proof.ReportPersonButton(m.userId)
-                                IconButton(onClick = { dialog = "block" }) { Icon(Icons.Outlined.Block, "Block ${m.displayName}") }
+                                IconButton(onClick = { dialog = "block:${m.userId}" }) { Icon(Icons.Outlined.Block, "Block ${m.displayName}") }
                             }
                         },
                     )
@@ -354,14 +354,15 @@ fun DynamicScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
             }
         }
 
-        if (dialog == "leave" || dialog == "block") {
+        if (dialog == "leave" || dialog?.startsWith("block:") == true) {
+            val target = dialog?.removePrefix("block:")?.let { id -> s.partners.firstOrNull { it.userId == id } }
             LeaveDialog(
-                names = s.partners.joinToString(" and ") { it.displayName }.ifEmpty { "your partner" },
+                partners = s.partners,
+                target = target,
                 ended = rel.ended,
-                blockFirst = dialog == "block",
                 busy = busy,
                 onDismiss = { dialog = null },
-                onConfirm = { block -> vm.leave(block); dialog = null },
+                onConfirm = { block -> vm.leave(block, blockOnly = target != null); dialog = null },
             )
         }
 
@@ -481,27 +482,45 @@ private fun endedLine(rel: app.obey.api.Relationship, s: app.obey.data.Session):
 }
 
 /**
- * Leaving ends the dynamic for both (Jake's "archive for both"); blocking does the same and stops the partner pairing
- * with you again. Blocking still works on a dynamic that already ended.
+ * Leaving ends the dynamic for both (Jake's "archive for both"). Blocking one person does the same and stops that
+ * person pairing with you again; it still works on a dynamic that already ended.
  */
 @Composable
-private fun LeaveDialog(names: String, ended: Boolean, blockFirst: Boolean, busy: Boolean, onDismiss: () -> Unit, onConfirm: (Boolean) -> Unit) {
-    var block by remember { mutableStateOf(blockFirst) }
+private fun LeaveDialog(
+    partners: List<app.obey.api.Member>,
+    target: app.obey.api.Member?,
+    ended: Boolean,
+    busy: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (List<String>) -> Unit,
+) {
+    var block by remember { mutableStateOf(listOfNotNull(target?.userId)) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(if (block) Icons.Outlined.Block else Icons.AutoMirrored.Outlined.Logout, null) },
-        title = { Text(if (ended) "Block $names?" else if (blockFirst) "Block $names and end this dynamic?" else "Leave this dynamic?") },
+        icon = { Icon(if (target != null) Icons.Outlined.Block else Icons.AutoMirrored.Outlined.Logout, null) },
+        title = {
+            Text(
+                when {
+                    target == null -> "Leave this dynamic?"
+                    ended -> "Block ${target.displayName}?"
+                    else -> "Block ${target.displayName} and end this dynamic?"
+                },
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (!ended) {
-                    Text("This ends the dynamic for both of you. You each keep a read-only copy of its tasks, notes and history. Open tasks are cancelled and proof photos are deleted.")
+                    Text("This ends the dynamic for everyone in it. You each keep a read-only copy of its tasks, notes and history. Open tasks are cancelled and proof photos are deleted.")
                 }
-                if (ended || blockFirst) {
-                    Text("$names won't be able to pair with you again. They aren't told you blocked them.")
+                if (target != null) {
+                    Text("${target.displayName} won't be able to pair with you again. They aren't told you blocked them.")
                 } else {
-                    Row(Modifier.fillMaxWidth().clickable { block = !block }, verticalAlignment = Alignment.CenterVertically) {
-                        androidx.compose.material3.Checkbox(checked = block, onCheckedChange = { block = it })
-                        Text("Also block $names, so they can't pair with you again")
+                    partners.forEach { p ->
+                        val on = p.userId in block
+                        Row(Modifier.fillMaxWidth().clickable { block = if (on) block - p.userId else block + p.userId }, verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material3.Checkbox(checked = on, onCheckedChange = { block = if (it) block + p.userId else block - p.userId })
+                            Text("Also block ${p.displayName}, so they can't pair with you again")
+                        }
                     }
                 }
             }
@@ -511,7 +530,7 @@ private fun LeaveDialog(names: String, ended: Boolean, blockFirst: Boolean, busy
                 onClick = { onConfirm(block) },
                 enabled = !busy,
                 colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError),
-            ) { Text(if (block) "Block" else "Leave") }
+            ) { Text(if (target != null) "Block" else "Leave") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )

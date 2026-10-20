@@ -18,6 +18,7 @@ import type { Tx } from "../db/index.js";
 import { consequences, occurrences, pointsLedger, relationships, reschedules, taskSeries } from "../db/schema.js";
 import { HttpError, forbidden, notFound, parsePatch } from "../errors.js";
 import { occurrenceDto, rescheduleDto, taskDto } from "../serialize.js";
+import { addComment } from "./comments.js";
 import { canManage, managers, membership, requireManager, requireMember } from "../services/access.js";
 import {
   completeOccurrence,
@@ -342,7 +343,14 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const { occ, series, member } = await loadOccurrence(db, req.params.id, req.user.id);
     if (!canManage(member.role) || req.user.id === series.assigneeId) throw forbidden("only a Dominant can review this");
     if (body.noteMd !== undefined) await db.update(occurrences).set({ noteMd: body.noteMd }).where(eq(occurrences.id, occ.id));
-    const updated = await db.transaction((tx) => reviewOccurrence(tx, series, occ, req.user.id, body.approve));
+    const updated = await db.transaction(async (tx) => {
+      const reviewed = await reviewOccurrence(tx, series, occ, req.user.id, body.approve);
+      if (body.comment) {
+        await addComment(tx, occ.id, req.user.id, body.comment);
+        return { ...reviewed, commentCount: reviewed.commentCount + 1 };
+      }
+      return reviewed;
+    });
     await notifier.send([series.assigneeId], {
       title: "Obey",
       body: body.approve ? "Your task was approved" : "Your task needs another try",

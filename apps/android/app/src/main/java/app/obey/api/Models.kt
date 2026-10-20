@@ -142,9 +142,9 @@ data class Relationship(
     val ended: Boolean get() = endedAt != null
 }
 
-/** Leaving ends the dynamic for both; blocking also stops the partner pairing with you again. */
+/** Leaving ends the dynamic for both; the people in [block] can never pair with you again. */
 @Serializable
-data class LeaveInput(val block: Boolean = false)
+data class LeaveInput(val block: List<String> = emptyList())
 
 /** Parts of the app a dynamic can switch off; switched-off parts are hidden for everyone in it. Tasks and notes are always on. */
 @Serializable

@@ -45,6 +45,7 @@ export const occurrenceDto = (o: typeof occurrences.$inferSelect, s: Series) => 
   noteMd: o.noteMd,
   opensOn: opensOn(s.schedule, o.originalDate),
   photoCount: o.photoCount,
+  commentCount: o.commentCount,
   proofRequired: s.proofRequired,
 });
 

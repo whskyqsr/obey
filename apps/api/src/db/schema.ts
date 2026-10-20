@@ -182,6 +182,7 @@ export const occurrences = pgTable(
     noteMd: text("note_md"),
     /** Kept in step with proof_photos, so lists can show a count without a join. */
     photoCount: integer("photo_count").notNull().default(0),
+    commentCount: integer("comment_count").notNull().default(0),
     reviewedBy: uuid("reviewed_by").references(() => users.id),
     reviewedAt: ts("reviewed_at"),
     /** Who last corrected this by hand from the task's history, and when. */
@@ -359,4 +360,21 @@ export const blocks = pgTable(
     createdAt: createdAt(),
   },
   (t) => [primaryKey({ columns: [t.blockerId, t.blockedId] }), index("blocks_blocked_idx").on(t.blockedId)],
+);
+
+/** A remark on one occurrence ("why was this late"), so the conversation stays with the task. */
+export const occurrenceComments = pgTable(
+  "occurrence_comments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    occurrenceId: uuid("occurrence_id")
+      .notNull()
+      .references(() => occurrences.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("occurrence_comments_occurrence_idx").on(t.occurrenceId, t.createdAt)],
 );

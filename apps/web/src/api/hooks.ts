@@ -171,11 +171,11 @@ export function useUpdateRelationship(rel: string) {
   });
 }
 
-/** Ends the dynamic for everyone in it; `block` also stops the others pairing with you again. */
+/** Ends the dynamic for everyone in it; the people in `block` can never pair with you again. */
 export function useLeaveRelationship(rel: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (block: boolean) => api<Relationship>(`/relationships/${rel}/leave`, { method: "POST", body: { block } }),
+    mutationFn: (block: string[]) => api<Relationship>(`/relationships/${rel}/leave`, { method: "POST", body: { block } }),
     onSuccess: () => qc.invalidateQueries(),
   });
 }

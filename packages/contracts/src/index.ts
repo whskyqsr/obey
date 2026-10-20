@@ -83,8 +83,8 @@ export const relationship = z.object({
 });
 export type Relationship = z.infer<typeof relationship>;
 
-/** Leaving ends the dynamic for both; blocking also stops the other person pairing with you again. */
-export const leaveRelationship = z.object({ block: z.boolean().default(false) });
+/** Leaving ends the dynamic for both; `block` names the people who may never pair with you again. */
+export const leaveRelationship = z.object({ block: z.array(id).max(20).default([]) });
 
 export const me = z.object({
   user,
@@ -188,6 +188,7 @@ export const occurrence = z.object({
   /** The first day the assignee may complete it (the day after the previous occurrence); null when any time is fine. */
   opensOn: plainDate.nullable().default(null),
   photoCount: z.number().int().default(0),
+  commentCount: z.number().int().default(0),
   /** The task needs a photo or a note before it can be marked done. */
   proofRequired: z.boolean().default(false),
 });
@@ -241,7 +242,15 @@ export const editOccurrence = z.object({
 });
 
 export const completeOccurrence = z.object({ noteMd: z.string().max(5_000).optional() });
-export const reviewOccurrence = z.object({ approve: z.boolean(), noteMd: z.string().max(5_000).optional() });
+export const reviewOccurrence = z.object({
+  approve: z.boolean(),
+  noteMd: z.string().max(5_000).optional(),
+  /** Posted as a comment on the task, e.g. what to fix when sending it back. */
+  comment: z.string().trim().min(1).max(2_000).optional(),
+});
+export const commentInput = z.object({ body: z.string().trim().min(1).max(2_000) });
+export const occurrenceComment = z.object({ id, occurrenceId: id, authorId: id, body: z.string(), createdAt: z.string() });
+export type OccurrenceComment = z.infer<typeof occurrenceComment>;
 
 export const rescheduleInput = z
   .object({

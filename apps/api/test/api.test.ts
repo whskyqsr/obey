@@ -215,6 +215,27 @@ describe("tasks and occurrences", () => {
     expect((await dom.get(`/relationships/${relId}/balances`)).body[0].balance).toBe(10);
   });
 
+  it("keeps comments on an occurrence, including the reason a task was sent back", async () => {
+    const { dom, sub, relId, subId, domId } = await ctx.pair();
+    await dom.post(`/relationships/${relId}/tasks`, task(subId, { approvalRequired: true }));
+    const [first] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    const c = await sub.post(`/occurrences/${first.id}/comments`, { body: "  Running a little late  " });
+    expect(c.body).toMatchObject({ authorId: subId, body: "Running a little late" });
+    expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [domId], push: { body: "Sub commented on a task" } });
+    expect((await sub.post(`/occurrences/${first.id}/comments`, { body: "   " })).status).toBe(400);
+
+    await sub.post(`/occurrences/${first.id}/complete`);
+    const back = await dom.post(`/occurrences/${first.id}/review`, { approve: false, comment: "Lines were sloppy, again please" });
+    expect(back.body).toMatchObject({ status: "pending", commentCount: 2 });
+    const list = (await dom.get(`/occurrences/${first.id}/comments`)).body;
+    expect(list.map((x: { body: string }) => x.body)).toEqual(["Running a little late", "Lines were sloppy, again please"]);
+
+    expect((await dom.del(`/comments/${c.body.id}`)).status).toBe(403);
+    expect((await sub.del(`/comments/${c.body.id}`)).status).toBe(204);
+    const [after] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    expect(after.commentCount).toBe(1);
+  });
+
   it("puts reports in a queue only admins with a verified email can see and resolve", async () => {
     const { dom, sub, relId, subId } = await ctx.pair();
     await dom.post(`/relationships/${relId}/tasks`, task(subId));
@@ -252,7 +273,7 @@ describe("tasks and occurrences", () => {
     const photo = await ctx.app.inject({ method: "POST", url: `/occurrences/${first.id}/photos`, payload: jpeg, headers: { ...sub.headers, "content-type": "image/jpeg" } });
     expect(photo.statusCode).toBe(201);
 
-    const left = await sub.post(`/relationships/${relId}/leave`, { block: true });
+    const left = await sub.post(`/relationships/${relId}/leave`, { block: [domId, subId] });
     expect(left.body.endedAt).toEqual(expect.any(String));
     expect(left.body.endedBy).toBe(subId);
     expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [domId], push: { body: "Sub ended your dynamic" } });

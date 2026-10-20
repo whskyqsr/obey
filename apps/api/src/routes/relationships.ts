@@ -242,10 +242,12 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
         .set({ endedAt: deps.now(), endedBy: req.user.id })
         .where(and(eq(relationships.id, req.params.id), isNull(relationships.endedAt)))
         .returning();
-      if (body.block && others.length) {
+      // Only people actually in this dynamic can be blocked from it.
+      const blocking = body.block.filter((u) => others.includes(u));
+      if (blocking.length) {
         await tx
           .insert(blocks)
-          .values(others.map((blockedId) => ({ blockerId: req.user.id, blockedId })))
+          .values(blocking.map((blockedId) => ({ blockerId: req.user.id, blockedId })))
           .onConflictDoNothing();
       }
       if (!rel) return false; // Already ended; blocking afterwards is still allowed.

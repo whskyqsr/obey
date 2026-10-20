@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useCreateInvite, useLeaveRelationship, useUpdateRelationship } from "../api/hooks";
 import { errorMessage } from "../api/client";
-import type { DynamicDate, Features, Invite, Relationship, ReschedulePolicy, Role } from "../api/types";
+import type { DynamicDate, Features, Invite, Member, Relationship, ReschedulePolicy, Role } from "../api/types";
 import { Avatar } from "../components/Avatar";
 import { CollarIcon } from "../components/CollarIcon";
 import { DynamicHero } from "../components/DynamicHero";
@@ -140,7 +140,8 @@ export function DynamicPage() {
   const title = useDynamicTitle();
   const [sheet, setSheet] = useState<"invite" | "name" | "deadlines" | null>(null);
   const [reporting, setReporting] = useState<string | null>(null);
-  const [leaving, setLeaving] = useState<"leave" | "block" | null>(null);
+  // Leaving (null target) or blocking one person.
+  const [leaving, setLeaving] = useState<{ target: Member | null } | null>(null);
   const ended = rel.endedAt !== null;
   // The date being edited: an existing one, or a blank new one.
   const [editingDate, setEditingDate] = useState<DynamicDate | null>(null);
@@ -192,7 +193,7 @@ export function DynamicPage() {
                   <OverflowMenu
                     items={[
                       { label: "Report", icon: "flag", onClick: () => setReporting(m.userId) },
-                      { label: "Block", icon: "block", danger: true, onClick: () => setLeaving("block") },
+                      { label: "Block", icon: "block", danger: true, onClick: () => setLeaving({ target: m }) },
                     ]}
                   />
                 ) : undefined
@@ -313,13 +314,13 @@ export function DynamicPage() {
                 leading={<Icon name="logout" className="text-error" />}
                 headline={<span className="text-error">Leave this dynamic</span>}
                 supporting="Ends it for both of you; you each keep a read-only copy"
-                onClick={() => setLeaving("leave")}
+                onClick={() => setLeaving({ target: null })}
               />
             </Group>
           </>
         )}
       </div>
-      {leaving && <LeaveDialog block={leaving === "block"} onClose={() => setLeaving(null)} />}
+      {leaving && <LeaveDialog target={leaving.target} onClose={() => setLeaving(null)} />}
 
       <InviteSheet open={sheet === "invite"} onClose={() => setSheet(null)} />
       <NameDialog open={sheet === "name"} onClose={() => setSheet(null)} onSave={(name) => patch({ name }, "Name saved")} />
@@ -350,22 +351,22 @@ export function endedLine(rel: Relationship, myId: string, memberName: (id: stri
 }
 
 /**
- * Leaving ends the dynamic for both (Jake's "archive for both"); blocking does the same and stops the partner pairing
- * with you again. Blocking still works on a dynamic that already ended.
+ * Leaving ends the dynamic for both (Jake's "archive for both"). Blocking one person does the same and stops that
+ * person pairing with you again; it still works on a dynamic that already ended.
  */
-function LeaveDialog({ block: blockFirst, onClose }: { block: boolean; onClose(): void }) {
+function LeaveDialog({ target, onClose }: { target: Member | null; onClose(): void }) {
   const { rel, partners } = useRel();
   const snack = useSnackbar();
   const leave = useLeaveRelationship(rel.id);
-  const [block, setBlock] = useState(blockFirst);
-  const names = partners.map((p) => p.displayName).join(" and ") || "your partner";
+  const [block, setBlock] = useState<string[]>(target ? [target.userId] : []);
   const ended = rel.endedAt !== null;
+  const toggle = (id: string, on: boolean) => setBlock((b) => (on ? [...b, id] : b.filter((x) => x !== id)));
   return (
     <Dialog
       open
       onClose={onClose}
-      icon={block ? "block" : "logout"}
-      title={ended ? `Block ${names}?` : block ? `Block ${names} and end this dynamic?` : "Leave this dynamic?"}
+      icon={target ? "block" : "logout"}
+      title={target ? (ended ? `Block ${target.displayName}?` : `Block ${target.displayName} and end this dynamic?`) : "Leave this dynamic?"}
       actions={
         <>
           <Button variant="text" onClick={onClose}>
@@ -378,25 +379,32 @@ function LeaveDialog({ block: blockFirst, onClose }: { block: boolean; onClose()
               leave.mutate(block, {
                 onSuccess: () => {
                   onClose();
-                  snack(block ? `Blocked ${names}` : "You left the dynamic");
+                  snack(target ? `Blocked ${target.displayName}` : "You left the dynamic");
                 },
                 onError: (e) => snack(errorMessage(e)),
               })
             }
           >
-            {block ? "Block" : "Leave"}
+            {target ? "Block" : "Leave"}
           </Button>
         </>
       }
     >
       <div className="flex flex-col gap-3">
         {!ended && (
-          <p>This ends the dynamic for both of you. You each keep a read-only copy of its tasks, notes and history. Open tasks are cancelled and proof photos are deleted.</p>
+          <p>This ends the dynamic for everyone in it. You each keep a read-only copy of its tasks, notes and history. Open tasks are cancelled and proof photos are deleted.</p>
         )}
-        {ended || blockFirst ? (
-          <p>{names} won't be able to pair with you again. They aren't told you blocked them.</p>
+        {target ? (
+          <p>{target.displayName} won't be able to pair with you again. They aren't told you blocked them.</p>
         ) : (
-          <Checkbox checked={block} onChange={setBlock} label={`Also block ${names}, so they can't pair with you again`} />
+          partners.map((p) => (
+            <Checkbox
+              key={p.userId}
+              checked={block.includes(p.userId)}
+              onChange={(on) => toggle(p.userId, on)}
+              label={`Also block ${p.displayName}, so they can't pair with you again`}
+            />
+          ))
         )}
       </div>
     </Dialog>
