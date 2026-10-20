@@ -1,5 +1,6 @@
 package app.obey.ui.tasks
 
+import app.obey.ui.common.LocalFeatures
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -98,7 +99,7 @@ fun TaskListScreen(
                                     t.summary,
                                     t.dueTime?.let { "at $it" },
                                     who,
-                                    if (t.points != 0) "${signed(t.points)} pts" else null,
+                                    if (LocalFeatures.current.points && t.points != 0) "${signed(t.points)} pts" else null,
                                     if (!t.active) "paused" else null,
                                 ).joinToString(" · "),
                             )

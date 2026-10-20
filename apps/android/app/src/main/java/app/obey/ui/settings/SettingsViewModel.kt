@@ -1,5 +1,6 @@
 package app.obey.ui.settings
 
+import app.obey.api.Features
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -157,6 +158,12 @@ class SettingsViewModel @Inject constructor(
         sessions.onRelationshipChanged(
             api.updateRelationship(rel, UpdateRelationshipInput(reschedulePolicy = policy, weeklyDelayAllowance = allowance)),
         )
+    }
+
+    fun setFeatures(features: Features, confirmation: String) = action {
+        val rel = sessions.requireRelationshipId()
+        sessions.onRelationshipChanged(api.updateRelationship(rel, UpdateRelationshipInput(features = features)))
+        say(confirmation)
     }
 
     fun signInEmail(email: String, password: String, create: Boolean) = action {

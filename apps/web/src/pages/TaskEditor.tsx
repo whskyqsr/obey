@@ -80,7 +80,7 @@ export function TaskEditorPage({ taskId }: { taskId: string }) {
 }
 
 function Editor({ task, readOnly, defaultAssignee }: { task?: Task; readOnly: boolean; defaultAssignee: string }) {
-  const { rel } = useRel();
+  const { rel, features } = useRel();
   const navigate = useNavigate();
   const snack = useSnackbar();
   const save = useSaveTask(rel.id);
@@ -135,10 +135,12 @@ function Editor({ task, readOnly, defaultAssignee }: { task?: Task; readOnly: bo
               </option>
             ))}
           </Select>
-          <div className="flex gap-4">
-            <TextField label="Points" type="number" value={Number.isFinite(form.points) ? form.points : ""} onChange={(e) => set({ points: num(e.target.value) })} className="flex-1" />
-            <TextField label="Miss penalty" type="number" min={0} value={Number.isFinite(form.missPenalty) ? form.missPenalty : ""} onChange={(e) => set({ missPenalty: num(e.target.value) })} className="flex-1" />
-          </div>
+          {features.points && (
+            <div className="flex gap-4">
+              <TextField label="Points" type="number" value={Number.isFinite(form.points) ? form.points : ""} onChange={(e) => set({ points: num(e.target.value) })} className="flex-1" />
+              <TextField label="Miss penalty" type="number" min={0} value={Number.isFinite(form.missPenalty) ? form.missPenalty : ""} onChange={(e) => set({ missPenalty: num(e.target.value) })} className="flex-1" />
+            </div>
+          )}
         </div>
 
         <section className="rounded-lg bg-surface-container-low p-4" style={{ ["--field-bg" as string]: "var(--md-surface-container-low)" }}>
@@ -154,27 +156,38 @@ function Editor({ task, readOnly, defaultAssignee }: { task?: Task; readOnly: bo
           </div>
         </section>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Select label="Reward on completion" value={form.rewardId} onChange={(e) => set({ rewardId: e.target.value })}>
-            <option value="">None</option>
-            {rewards.data?.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.title}
-              </option>
-            ))}
-          </Select>
-          <Select label="Consequence if missed" value={form.consequenceId} onChange={(e) => set({ consequenceId: e.target.value })}>
-            <option value="">None</option>
-            {consequences.data?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.title}
-              </option>
-            ))}
-          </Select>
-        </div>
+        {(features.points || features.consequences) && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {features.points && (
+              <Select label="Reward on completion" value={form.rewardId} onChange={(e) => set({ rewardId: e.target.value })}>
+                <option value="">None</option>
+                {rewards.data?.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.title}
+                  </option>
+                ))}
+              </Select>
+            )}
+            {features.consequences && (
+              <Select label="Consequence if missed" value={form.consequenceId} onChange={(e) => set({ consequenceId: e.target.value })}>
+                <option value="">None</option>
+                {consequences.data?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </div>
+        )}
 
         <div>
-          <Switch checked={form.approvalRequired} onChange={(approvalRequired) => set({ approvalRequired })} label="Needs approval" help="Points post only after you approve the completion." />
+          <Switch
+            checked={form.approvalRequired}
+            onChange={(approvalRequired) => set({ approvalRequired })}
+            label="Needs approval"
+            help={features.points ? "Points post only after you approve the completion." : "It counts as done only after you approve it."}
+          />
           <Switch checked={form.proofRequired} onChange={(proofRequired) => set({ proofRequired })} label="Proof required" help="A note or photo must accompany the completion." />
         </div>
       </fieldset>
@@ -211,7 +224,7 @@ function Editor({ task, readOnly, defaultAssignee }: { task?: Task; readOnly: bo
           </>
         }
       >
-        Upcoming occurrences are removed. Completed ones and their points stay in the history.
+        Upcoming occurrences are removed. Completed ones stay in the history.
       </Dialog>
     </form>
   );

@@ -1,5 +1,7 @@
 package app.obey.ui.settings
 
+import androidx.compose.material3.Switch
+import app.obey.api.Features
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -67,6 +69,16 @@ import app.obey.ui.onboarding.CreateRelationshipForm
 import app.obey.ui.onboarding.JoinRelationshipForm
 import app.obey.ui.onboarding.label
 import app.obey.ui.tasks.Stepper
+
+private data class FeatureRow(val label: String, val help: String, val get: (Features) -> Boolean, val set: (Features, Boolean) -> Features)
+
+private val featureRows = listOf(
+    FeatureRow("Points and rewards", "Tasks earn points that can be spent on rewards.", { it.points }, { f, on -> f.copy(points = on) }),
+    FeatureRow("Consequences", "A list of consequences, and one per task if it's missed.", { it.consequences }, { f, on -> f.copy(consequences = on) }),
+    FeatureRow("Rules", "A shared list of standing rules.", { it.rules }, { f, on -> f.copy(rules = on) }),
+    FeatureRow("Notes", "Limits, aftercare plans and other notes.", { it.notes }, { f, on -> f.copy(notes = on) }),
+    FeatureRow("Journal", "Dated entries with a mood.", { it.journal }, { f, on -> f.copy(journal = on) }),
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -180,6 +192,28 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
                                 }
                             }
                         }
+
+                        SectionHeader("Features")
+                        featureRows.forEach { (label, help, get, set) ->
+                            ListItem(
+                                headlineContent = { Text(label) },
+                                supportingContent = { Text(help) },
+                                trailingContent = {
+                                    Switch(
+                                        checked = get(rel.features),
+                                        onCheckedChange = { on -> vm.setFeatures(set(rel.features, on), if (on) "$label on" else "$label off") },
+                                        enabled = s.canManage && !busy,
+                                    )
+                                },
+                            )
+                        }
+                        Text(
+                            if (s.canManage) "Switched-off features are hidden for everyone in this relationship. Nothing is deleted."
+                            else "Only a Dominant can change these.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
 
                         if (s.canManage) {
                             SectionHeader("Rescheduling")

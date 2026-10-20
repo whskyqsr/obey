@@ -13,6 +13,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { Features } from "@obey/contracts";
 import type { Schedule } from "@obey/recurrence";
 
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
@@ -39,6 +40,8 @@ export const relationships = pgTable("relationships", {
     .notNull()
     .default("request"),
   weeklyDelayAllowance: integer("weekly_delay_allowance").notNull().default(0),
+  /** Switched-off parts of the app for this dynamic; missing keys mean on. */
+  features: jsonb("features").$type<Partial<Features>>().notNull().default({}),
   createdAt: createdAt(),
 });
 

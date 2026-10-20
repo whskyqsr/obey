@@ -37,6 +37,13 @@ export const reschedulePolicy = z.enum(["dominant_only", "request", "allowance"]
 
 /** Changes whenever the picture does; null when there is none. Fetch it from /users/:id/avatar. */
 const avatarVersion = z.string().nullable();
+/** Parts of the app a dynamic can switch off. Points covers rewards too. */
+export const FEATURES = ["points", "consequences", "rules", "notes", "journal"] as const;
+export const features = z.object(Object.fromEntries(FEATURES.map((f) => [f, z.boolean()])) as Record<(typeof FEATURES)[number], z.ZodBoolean>);
+export type Features = z.infer<typeof features>;
+export const allFeatures = (stored: Partial<Features> = {}): Features =>
+  Object.fromEntries(FEATURES.map((f) => [f, stored[f] ?? true])) as Features;
+
 export const user = z.object({ id, displayName: z.string(), email: z.string().nullable(), avatarVersion });
 export type User = z.infer<typeof user>;
 
@@ -48,6 +55,7 @@ export const relationship = z.object({
   members: z.array(member),
   reschedulePolicy,
   weeklyDelayAllowance: z.number().int().nonnegative(),
+  features,
   createdAt: z.string(),
 });
 export type Relationship = z.infer<typeof relationship>;
@@ -71,6 +79,7 @@ export const updateRelationship = z.object({
   name: relationshipName.optional(),
   reschedulePolicy: reschedulePolicy.optional(),
   weeklyDelayAllowance: z.number().int().min(0).max(50).optional(),
+  features: features.partial().optional(),
 });
 
 export const taskInput = z.object({

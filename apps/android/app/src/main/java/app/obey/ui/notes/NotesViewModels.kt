@@ -86,16 +86,18 @@ class NoteEditorViewModel @Inject constructor(
     private val api: ObeyApi,
     private val sessions: SessionRepository,
 ) : BaseViewModel() {
-    private val noteId: String? = savedState.toRoute<NoteEditorRoute>().noteId
+    private val route = savedState.toRoute<NoteEditorRoute>()
+    private val noteId: String? = route.noteId
+    private val blank = NoteDraft(kind = if (route.journal) NoteKind.Journal else NoteKind.Note)
     val isNew: Boolean get() = original == null
 
     private var original: Note? = null
-    private var savedDraft = NoteDraft()
+    private var savedDraft = blank
 
     private val _load = MutableStateFlow<Load<Unit>>(if (noteId == null) Load.Ready(Unit) else Load.Loading)
     val load: StateFlow<Load<Unit>> = _load.asStateFlow()
 
-    private val _draft = MutableStateFlow(NoteDraft())
+    private val _draft = MutableStateFlow(blank)
     val draft: StateFlow<NoteDraft> = _draft.asStateFlow()
 
     /** Whether the current user wrote this note (only authors edit; the API enforces it too). */

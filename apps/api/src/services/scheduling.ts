@@ -80,13 +80,19 @@ async function advanceCompletionSeries(db: Tx, series: Series, basis: PlainDate)
   await db.insert(occurrences).values({ seriesId: series.id, originalDate: next, dueAt: due, originalDueAt: due }).onConflictDoNothing();
 }
 
+/** Whether the dynamic keeps points. When it doesn't, completions and misses book nothing. */
+export async function pointsEnabled(db: Tx, relationshipId: string): Promise<boolean> {
+  const [rel] = await db.select({ features: relationships.features }).from(relationships).where(eq(relationships.id, relationshipId));
+  return rel?.features.points !== false;
+}
+
 async function finalizeCompletion(db: Tx, series: Series, occ: Occurrence, completedAt: Date, reviewerId: string | null) {
   const [updated] = await db
     .update(occurrences)
     .set({ status: "completed", completedAt, reviewedBy: reviewerId, reviewedAt: reviewerId ? new Date() : null })
     .where(eq(occurrences.id, occ.id))
     .returning();
-  if (series.points !== 0) {
+  if (series.points !== 0 && (await pointsEnabled(db, series.relationshipId))) {
     await db
       .insert(pointsLedger)
       .values({
@@ -170,7 +176,8 @@ export async function editOccurrence(
     await db
       .delete(pointsLedger)
       .where(and(eq(pointsLedger.occurrenceId, occ.id), inArray(pointsLedger.kind, ["completion", "miss"])));
-    const delta = status === "completed" ? series.points : status === "missed" ? -series.missPenalty : 0;
+    const earned = status === "completed" ? series.points : status === "missed" ? -series.missPenalty : 0;
+    const delta = (await pointsEnabled(db, series.relationshipId)) ? earned : 0;
     if (delta !== 0) {
       await db.insert(pointsLedger).values({
         relationshipId: series.relationshipId,
@@ -206,7 +213,7 @@ export async function markMissed(db: Tx, now: Date) {
       .where(and(eq(occurrences.id, occ.id), eq(occurrences.status, "pending")))
       .returning();
     if (!updated) continue;
-    if (series.missPenalty > 0) {
+    if (series.missPenalty > 0 && (await pointsEnabled(db, series.relationshipId))) {
       await db
         .insert(pointsLedger)
         .values({

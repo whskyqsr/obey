@@ -21,7 +21,7 @@ export function isOverdue(o: Occurrence, now = Date.now()) {
 }
 
 export function OccurrenceCard({ o, showDate }: { o: Occurrence; showDate?: boolean }) {
-  const { rel, me, isDom, memberName } = useRel();
+  const { rel, me, isDom, memberName, features } = useRel();
   const snack = useSnackbar();
   const complete = useCompleteOccurrence(rel.id);
   const review = useReviewOccurrence(rel.id);
@@ -65,7 +65,7 @@ export function OccurrenceCard({ o, showDate }: { o: Occurrence; showDate?: bool
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
-          {o.points !== 0 && <Badge tone="primary">{o.points > 0 ? `+${o.points}` : o.points} pts</Badge>}
+          {features.points && o.points !== 0 && <Badge tone="primary">{o.points > 0 ? `+${o.points}` : o.points} pts</Badge>}
           {(o.status !== "pending" || overdue) && <Badge tone={overdue ? "error" : status.tone}>{overdue ? "Overdue" : status.label}</Badge>}
         </div>
       </div>

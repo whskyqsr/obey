@@ -5,7 +5,7 @@ import { Badge, Chip, Empty, ErrorBox, Fab, Icon, Loading, PageHeader, TextField
 import { useRel } from "../lib/relationship";
 
 export function TasksPage() {
-  const { rel, isDom, memberName, me } = useRel();
+  const { rel, isDom, memberName, me, features } = useRel();
   const tasks = useTasks(rel.id);
   const navigate = useNavigate();
   const [q, setQ] = useState("");
@@ -58,7 +58,7 @@ export function TasksPage() {
               </div>
             </div>
             <div className="flex flex-col items-end gap-1">
-              {t.points !== 0 && <Badge>{t.points > 0 ? `+${t.points}` : t.points} pts</Badge>}
+              {features.points && t.points !== 0 && <Badge>{t.points > 0 ? `+${t.points}` : t.points} pts</Badge>}
               {!t.active && <Badge tone="neutral">Paused</Badge>}
               {t.approvalRequired && <Icon name="verified" size={18} className="text-on-surface-variant" />}
             </div>

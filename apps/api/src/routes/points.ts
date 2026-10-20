@@ -6,6 +6,7 @@ import { pointsLedger, rewards } from "../db/schema.js";
 import { HttpError, notFound } from "../errors.js";
 import { ledgerDto } from "../serialize.js";
 import { managers, membership, requireManager, requireMember } from "../services/access.js";
+import { pointsEnabled } from "../services/scheduling.js";
 
 export const pointsRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   const { db } = deps;
@@ -33,6 +34,7 @@ export const pointsRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   app.post<{ Params: { id: string } }>("/relationships/:id/ledger/adjust", async (req, reply) => {
     await requireManager(db, req.params.id, req.user.id);
     const body = adjustPoints.parse(req.body);
+    if (!(await pointsEnabled(db, req.params.id))) throw new HttpError(409, "points are switched off for this relationship");
     if (!(await membership(db, req.params.id, body.userId))) throw new HttpError(400, "user is not in this relationship");
     const [row] = await db
       .insert(pointsLedger)
@@ -47,6 +49,7 @@ export const pointsRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const [reward] = await db.select().from(rewards).where(eq(rewards.id, req.params.id));
     if (!reward) throw notFound();
     await requireMember(db, reward.relationshipId, req.user.id);
+    if (!(await pointsEnabled(db, reward.relationshipId))) throw new HttpError(409, "points are switched off for this relationship");
     const row = await db.transaction(async (tx) => {
       // Serialise redemptions per user so two taps can't overspend.
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${reward.relationshipId + req.user.id}))`);

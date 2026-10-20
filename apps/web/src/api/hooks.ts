@@ -2,6 +2,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey 
 import { api, apiObjectUrl } from "./client";
 import type {
   Balance,
+  Features,
   EditOccurrence,
   HistoryEntry,
   Invite,
@@ -116,7 +117,7 @@ export function useJoinRelationship() {
 export function useUpdateRelationship(rel: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Partial<Pick<Relationship, "name" | "reschedulePolicy" | "weeklyDelayAllowance">>) =>
+    mutationFn: (body: Partial<Pick<Relationship, "name" | "reschedulePolicy" | "weeklyDelayAllowance">> & { features?: Partial<Features> }) =>
       api<Relationship>(`/relationships/${rel}`, { method: "PATCH", body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.me }),
   });

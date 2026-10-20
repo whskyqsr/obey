@@ -1,5 +1,6 @@
 package app.obey.ui.tasks
 
+import app.obey.ui.common.LocalFeatures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -153,15 +154,26 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                     SectionHeader("Repeat", horizontalPadding = 0.dp)
                     RecurrencePicker(form.recurrence, form.start, onChange = { r -> vm.update { it.copy(recurrence = r) } })
 
-                    SectionHeader("Points and consequences", horizontalPadding = 0.dp)
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        NumberField("Points", form.points, Modifier.weight(1f)) { v -> vm.update { it.copy(points = v) } }
-                        NumberField("Penalty if missed", form.missPenalty, Modifier.weight(1f)) { v -> vm.update { it.copy(missPenalty = v) } }
+                    val features = LocalFeatures.current
+                    SectionHeader(
+                        when {
+                            features.points && features.consequences -> "Points and consequences"
+                            features.points -> "Points"
+                            features.consequences -> "If it's missed"
+                            else -> "Timing"
+                        },
+                        horizontalPadding = 0.dp,
+                    )
+                    if (features.points) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            NumberField("Points", form.points, Modifier.weight(1f)) { v -> vm.update { it.copy(points = v) } }
+                            NumberField("Penalty if missed", form.missPenalty, Modifier.weight(1f)) { v -> vm.update { it.copy(missPenalty = v) } }
+                        }
                     }
                     NumberField("Grace period (minutes)", form.graceMinutes, Modifier.fillMaxWidth()) { v -> vm.update { it.copy(graceMinutes = v) } }
 
                     var consequenceMenu by remember { mutableStateOf(false) }
-                    Box {
+                    if (features.consequences) Box {
                         val current = d.value.consequences.firstOrNull { it.id == form.consequenceId }
                         OutlinedButton(onClick = { consequenceMenu = true }, modifier = Modifier.fillMaxWidth()) {
                             Text("If missed: ${current?.title ?: "no consequence"}")
@@ -181,7 +193,7 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                     }
 
                     HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                    LabeledSwitch("Needs approval", "Points post after you approve it", form.approvalRequired) { v ->
+                    LabeledSwitch("Needs approval", if (features.points) "Points post after you approve it" else "You confirm it's done", form.approvalRequired) { v ->
                         vm.update { it.copy(approvalRequired = v) }
                     }
                     LabeledSwitch("Proof required", "A photo or text must be attached", form.proofRequired) { v ->
@@ -233,7 +245,7 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("Delete this task?") },
-            text = { Text("Future occurrences are removed. Points already earned stay in the ledger.") },
+            text = { Text(if (LocalFeatures.current.points) "Future occurrences are removed. Points already earned stay in the ledger." else "Future occurrences are removed. Its history stays.") },
             confirmButton = { Button(onClick = { confirmDelete = false; vm.delete() }) { Text("Delete") } },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
         )

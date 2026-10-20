@@ -1,7 +1,8 @@
 import { Suspense, lazy } from "react";
 import { createRootRoute, createRoute, createRouter, useNavigate } from "@tanstack/react-router";
 import { AppShell } from "./components/AppShell";
-import { ErrorBox, Loading, PageHeader } from "./components/ui";
+import type { Features } from "./api/types";
+import { Empty, ErrorBox, Loading, PageHeader } from "./components/ui";
 import { useRel } from "./lib/relationship";
 import { CalendarPage } from "./pages/Calendar";
 import { ConsequencesPage } from "./pages/Consequences";
@@ -34,15 +35,49 @@ const taskRoute = createRoute({
   },
 });
 
+/** Shows a page only while its feature is on, so an old link doesn't open a switched-off area. */
+function Gate({ feature, children }: { feature: keyof Features; children: React.ReactNode }) {
+  const { features } = useRel();
+  if (features[feature]) return <>{children}</>;
+  return (
+    <div className="p-4 md:p-6">
+      <Empty icon="toggle_off" title="This is switched off" body="A Dominant can turn it back on in Settings, under Features." />
+    </div>
+  );
+}
+
+const gated = (feature: keyof Features, Component: () => React.ReactNode) => () => (
+  <Gate feature={feature}>
+    <Component />
+  </Gate>
+);
+
 const noteRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/notes/$noteId",
   component: function NoteRoute() {
     const { noteId } = noteRoute.useParams();
     return (
-      <Suspense fallback={<Loading />}>
-        <NoteEditorPage noteId={noteId} />
-      </Suspense>
+      <Gate feature="notes">
+        <Suspense fallback={<Loading />}>
+          <NoteEditorPage noteId={noteId} kind="note" />
+        </Suspense>
+      </Gate>
+    );
+  },
+});
+
+const journalEntryRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/journal/$noteId",
+  component: function JournalEntryRoute() {
+    const { noteId } = journalEntryRoute.useParams();
+    return (
+      <Gate feature="journal">
+        <Suspense fallback={<Loading />}>
+          <NoteEditorPage noteId={noteId} kind="journal" />
+        </Suspense>
+      </Gate>
     );
   },
 });
@@ -71,11 +106,13 @@ const routeTree = rootRoute.addChildren([
   page("/calendar", CalendarPage),
   page("/tasks", TasksPage),
   taskRoute,
-  page("/rewards", RewardsPage),
-  page("/consequences", ConsequencesPage),
-  page("/rules", RulesPage),
-  page("/notes", NotesPage),
+  page("/rewards", gated("points", RewardsPage)),
+  page("/consequences", gated("consequences", ConsequencesPage)),
+  page("/rules", gated("rules", RulesPage)),
+  page("/notes", gated("notes", () => <NotesPage kind="note" />)),
   noteRoute,
+  page("/journal", gated("journal", () => <NotesPage kind="journal" />)),
+  journalEntryRoute,
   page("/settings", SettingsPage),
   page("/more", MorePage),
   page("/onboarding", OnboardingRoute),

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useCreateInvite, useSetAvatar, useUpdateMe, useUpdateRelationship } from "../api/hooks";
 import { errorMessage } from "../api/client";
-import type { ReschedulePolicy } from "../api/types";
+import type { Features, ReschedulePolicy } from "../api/types";
 import { getSession, signOut } from "../auth/session";
 import { Avatar, squareJpeg } from "../components/Avatar";
-import { Button, Divider, Icon, PageHeader, Section, SegmentedButtons, Select, TextField, cx, useSnackbar } from "../components/ui";
+import { Button, Divider, Icon, PageHeader, Section, SegmentedButtons, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
 import { fmtDateTime } from "../lib/dates";
 import { ROLE_LABEL, relTitle, useRel } from "../lib/relationship";
 import { type PushState, pushState, registerPush } from "../push";
@@ -19,8 +19,16 @@ const POLICIES: { value: ReschedulePolicy; label: string; help: string }[] = [
   { value: "allowance", label: "Weekly allowance", help: "The sub gets a number of free delays each week; more need approval." },
 ];
 
+const FEATURE_ROWS: { key: keyof Features; label: string; help: string }[] = [
+  { key: "points", label: "Points and rewards", help: "Tasks earn points that can be spent on rewards." },
+  { key: "consequences", label: "Consequences", help: "A list of consequences, and one per task if it's missed." },
+  { key: "rules", label: "Rules", help: "A shared list of standing rules." },
+  { key: "notes", label: "Notes", help: "Limits, aftercare plans and other notes." },
+  { key: "journal", label: "Journal", help: "Dated entries with a mood." },
+];
+
 export function SettingsPage() {
-  const { me, rel, self, isDom, select, title } = useRel();
+  const { me, rel, self, isDom, select, title, features } = useRel();
   const theme = useTheme();
   const snack = useSnackbar();
   const navigate = useNavigate();
@@ -231,6 +239,23 @@ export function SettingsPage() {
           <Button variant="outlined" icon="add_link" onClick={() => navigate({ to: "/onboarding" })} className="self-start">
             Join or start another relationship
           </Button>
+        </div>
+      </Section>
+
+      <Section title="Features">
+        <div className="flex flex-col rounded-lg bg-surface-container-low px-4 py-2">
+          {FEATURE_ROWS.map((f) => (
+            <Switch
+              key={f.key}
+              checked={features[f.key]}
+              onChange={(on) => isDom && patch({ features: { [f.key]: on } }, on ? `${f.label} on` : `${f.label} off`)}
+              label={f.label}
+              help={f.help}
+            />
+          ))}
+          <p className="pb-2 text-body-small text-on-surface-variant">
+            {isDom ? "Switched-off features are hidden for everyone in this relationship. Nothing is deleted." : "Only a Dominant can change these."}
+          </p>
         </div>
       </Section>
 

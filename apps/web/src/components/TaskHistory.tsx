@@ -25,7 +25,7 @@ const toLocalInput = (iso: string) => {
 
 /** Past occurrences of a task. A Dominant can tap one to correct it. */
 export function TaskHistory({ taskId }: { taskId: string }) {
-  const { rel, me, isDom, memberName } = useRel();
+  const { rel, me, isDom, memberName, features } = useRel();
   const history = useTaskHistory(rel.id, taskId);
   const [editing, setEditing] = useState<HistoryEntry | null>(null);
   const entries = history.data?.pages.flat() ?? [];
@@ -55,7 +55,7 @@ export function TaskHistory({ taskId }: { taskId: string }) {
                       {h.editedBy && ` · edited by ${h.editedBy === me.user.id ? "you" : memberName(h.editedBy)}`}
                     </div>
                   </div>
-                  {h.pointsDelta !== 0 && (
+                  {features.points && h.pointsDelta !== 0 && (
                     <span className={h.pointsDelta > 0 ? "text-label-large text-primary" : "text-label-large text-error"}>
                       {h.pointsDelta > 0 ? `+${h.pointsDelta}` : h.pointsDelta}
                     </span>
@@ -78,7 +78,7 @@ export function TaskHistory({ taskId }: { taskId: string }) {
 }
 
 function EditEntry({ entry, onClose }: { entry: HistoryEntry; onClose(): void }) {
-  const { rel } = useRel();
+  const { rel, features } = useRel();
   const snack = useSnackbar();
   const edit = useEditOccurrence(rel.id);
   const [status, setStatus] = useState<Fixable>(entry.status === "submitted" ? "completed" : (entry.status as Fixable));
@@ -135,7 +135,7 @@ function EditEntry({ entry, onClose }: { entry: HistoryEntry; onClose(): void })
         />
         {status === "completed" && <TextField label="Done at" type="datetime-local" value={doneAt} onChange={(e) => setDoneAt(e.target.value)} />}
         <TextArea label="Note" value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
-        <p className="text-body-small text-on-surface-variant">Points follow the status: done earns the task's points, missed costs its penalty, excused is neither.</p>
+        {features.points && <p className="text-body-small text-on-surface-variant">Points follow the status: done earns the task's points, missed costs its penalty, excused is neither.</p>}
       </div>
     </Dialog>
   );

@@ -1,14 +1,13 @@
 import { useNavigate } from "@tanstack/react-router";
-import { DESTINATIONS } from "../components/AppShell";
+import { useDestinations } from "../components/AppShell";
 import { Icon, PageHeader } from "../components/ui";
 import { useRel } from "../lib/relationship";
-
-const ITEMS = DESTINATIONS.filter((d) => ["/rewards", "/rules", "/consequences", "/settings"].includes(d.to));
 
 /** Overflow destinations for the compact navigation bar. */
 export function MorePage() {
   const navigate = useNavigate();
   const { title } = useRel();
+  const ITEMS = useDestinations().more;
   return (
     <>
       <PageHeader title="More" subtitle={title} />

@@ -381,6 +381,29 @@ describe("task history", () => {
   });
 });
 
+describe("feature switches", () => {
+  it("merges switches and stops booking points when points are off", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    expect((await dom.get("/me")).body.relationships.find((r: { id: string }) => r.id === relId).features).toEqual({
+      points: true,
+      consequences: true,
+      rules: true,
+      notes: true,
+      journal: true,
+    });
+    expect((await sub.patch(`/relationships/${relId}`, { features: { points: false } })).status).toBe(403);
+    await dom.patch(`/relationships/${relId}`, { features: { points: false } });
+    const rel = (await dom.patch(`/relationships/${relId}`, { features: { journal: false } })).body;
+    expect(rel.features).toMatchObject({ points: false, journal: false, consequences: true });
+
+    await dom.post(`/relationships/${relId}/tasks`, task(subId, { points: 10, schedule: { start: "2026-10-16" } }));
+    const [occ] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    expect((await sub.post(`/occurrences/${occ.id}/complete`)).body.status).toBe("completed");
+    expect((await sub.get(`/relationships/${relId}/balances`)).body).toEqual([]);
+    expect((await dom.post(`/relationships/${relId}/ledger/adjust`, { userId: subId, delta: 5, note: "x" })).status).toBe(409);
+  });
+});
+
 describe("push payloads", () => {
   it("sends Android data only, so the app titles it with the discreet-mode name", () => {
     const [web, android] = fcmMessages(

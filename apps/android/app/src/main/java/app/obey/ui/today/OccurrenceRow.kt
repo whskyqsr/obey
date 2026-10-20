@@ -1,5 +1,6 @@
 package app.obey.ui.today
 
+import app.obey.ui.common.LocalFeatures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
@@ -52,11 +53,12 @@ fun OccurrenceRow(
 ) {
     var menu by remember { mutableStateOf(false) }
     val done = occurrence.status == OccurrenceStatus.Completed || occurrence.status == OccurrenceStatus.Excused
+    val showPoints = LocalFeatures.current.points
     val supporting = buildList {
         add(formatDue(occurrence.dueAt))
         if (occurrence.rescheduled) add("moved")
         if (assigneeName != null) add(assigneeName)
-        if (occurrence.points != 0) add("${signed(occurrence.points)} pts")
+        if (showPoints && occurrence.points != 0) add("${signed(occurrence.points)} pts")
         when (occurrence.status) {
             OccurrenceStatus.Submitted -> add("awaiting approval")
             OccurrenceStatus.Missed -> add("missed")

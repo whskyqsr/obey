@@ -62,7 +62,7 @@ import app.obey.ui.common.Load
 import app.obey.ui.common.LoadingBox
 import app.obey.ui.common.MessageEffect
 
-private val moods = listOf(1 to "Low", 2 to "Meh", 3 to "OK", 4 to "Good", 5 to "Great")
+internal val moods = listOf(1 to "Low", 2 to "Meh", 3 to "OK", 4 to "Good", 5 to "Great")
 
 /**
  * The notes editor: a real formatting toolbar over Markdown source, list/checklist continuation on Enter,
@@ -103,15 +103,17 @@ fun NoteEditorScreen(onDone: () -> Unit, vm: NoteEditorViewModel = hiltViewModel
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (draft.kind == NoteKind.Journal) "Journal" else "Note") },
+                title = { Text(if (draft.kind == NoteKind.Journal) "Journal entry" else "Note") },
                 navigationIcon = { IconButton(onClick = ::close) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Save and close") } },
                 actions = {
                     if (canEdit) {
                         IconButton(onClick = { preview = !preview }) {
                             if (preview) Icon(Icons.Outlined.EditNote, "Edit") else Icon(Icons.Outlined.Visibility, "Preview")
                         }
-                        IconButton(onClick = { vm.update { it.copy(pinned = !it.pinned) } }) {
-                            if (draft.pinned) Icon(Icons.Filled.PushPin, "Unpin") else Icon(Icons.Outlined.PushPin, "Pin")
+                        if (draft.kind == NoteKind.Note) {
+                            IconButton(onClick = { vm.update { it.copy(pinned = !it.pinned) } }) {
+                                if (draft.pinned) Icon(Icons.Filled.PushPin, "Unpin") else Icon(Icons.Outlined.PushPin, "Pin")
+                            }
                         }
                         TextButton(onClick = { vm.save(close = false) }, enabled = !busy && vm.dirty) { Text("Save") }
                         Box {
@@ -172,13 +174,6 @@ fun NoteEditorScreen(onDone: () -> Unit, vm: NoteEditorViewModel = hiltViewModel
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            FilterChip(
-                                selected = draft.kind == NoteKind.Journal,
-                                onClick = {
-                                    vm.update { it.copy(kind = if (it.kind == NoteKind.Journal) NoteKind.Note else NoteKind.Journal) }
-                                },
-                                label = { Text("Journal entry") },
-                            )
                             FilterChip(
                                 selected = draft.visibility == NoteVisibility.Private,
                                 onClick = {

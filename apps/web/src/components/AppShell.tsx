@@ -1,5 +1,6 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { usePendingReschedules } from "../api/hooks";
+import type { Features } from "../api/types";
 import { useRel } from "../lib/relationship";
 import { Icon, cx } from "./ui";
 
@@ -7,31 +8,38 @@ interface Dest {
   to: string;
   label: string;
   icon: string;
+  /** Hidden when the dynamic switches this feature off. */
+  feature?: keyof Features;
 }
 
-export const DESTINATIONS: Dest[] = [
+const ALL: Dest[] = [
   { to: "/", label: "Today", icon: "today" },
   { to: "/calendar", label: "Calendar", icon: "calendar_month" },
   { to: "/tasks", label: "Tasks", icon: "checklist" },
-  { to: "/rewards", label: "Rewards", icon: "redeem" },
-  { to: "/rules", label: "Rules", icon: "gavel" },
-  { to: "/consequences", label: "Consequences", icon: "bolt" },
-  { to: "/notes", label: "Notes", icon: "sticky_note_2" },
+  { to: "/rewards", label: "Rewards", icon: "redeem", feature: "points" },
+  { to: "/rules", label: "Rules", icon: "gavel", feature: "rules" },
+  { to: "/consequences", label: "Consequences", icon: "bolt", feature: "consequences" },
+  { to: "/notes", label: "Notes", icon: "sticky_note_2", feature: "notes" },
+  { to: "/journal", label: "Journal", icon: "auto_stories", feature: "journal" },
   { to: "/settings", label: "Settings", icon: "settings" },
 ];
 
-const MOBILE: Dest[] = [
-  DESTINATIONS[0]!,
-  DESTINATIONS[1]!,
-  DESTINATIONS[2]!,
-  DESTINATIONS[6]!,
-  { to: "/more", label: "More", icon: "menu" },
-];
-const MORE_PATHS = ["/more", "/rewards", "/rules", "/consequences", "/settings", "/onboarding"];
+const MORE: Dest = { to: "/more", label: "More", icon: "menu" };
 
-function isActive(pathname: string, to: string) {
+/** Destinations for the current dynamic: everything, plus the compact bar and what overflows into More. */
+export function useDestinations() {
+  const { features } = useRel();
+  const all = ALL.filter((d) => !d.feature || features[d.feature]);
+  // The bar holds Today, Calendar, Tasks and the first writing space that's on; the rest go under More.
+  const writing = all.find((d) => d.to === "/notes" || d.to === "/journal");
+  const bar = [...all.slice(0, 3), ...(writing ? [writing] : []), MORE];
+  const more = all.filter((d) => !bar.includes(d));
+  return { all, bar, more };
+}
+
+function isActive(pathname: string, to: string, more: Dest[]) {
   if (to === "/") return pathname === "/";
-  if (to === "/more") return MORE_PATHS.some((p) => pathname.startsWith(p));
+  if (to === "/more") return ["/more", "/onboarding", ...more.map((d) => d.to)].some((p) => pathname.startsWith(p));
   return pathname === to || pathname.startsWith(to + "/");
 }
 
@@ -65,6 +73,7 @@ export function AppShell() {
   const { rel, isDom, title } = useRel();
   const pending = usePendingReschedules(rel.id);
   const todayBadge = isDom ? (pending.data?.length ?? 0) : 0;
+  const { all, bar, more } = useDestinations();
 
   return (
     <div className="min-h-dvh bg-surface">
@@ -73,8 +82,8 @@ export function AppShell() {
         <Link to="/" className="mb-4 flex size-14 items-center justify-center rounded-lg bg-primary-container text-on-primary-container" title={title}>
           <Icon name="link" filled />
         </Link>
-        {DESTINATIONS.map((d) => (
-          <NavItem key={d.to} d={d} active={isActive(pathname, d.to)} badge={d.to === "/" ? todayBadge : 0} />
+        {all.map((d) => (
+          <NavItem key={d.to} d={d} active={isActive(pathname, d.to, more)} badge={d.to === "/" ? todayBadge : 0} />
         ))}
       </nav>
 
@@ -86,8 +95,8 @@ export function AppShell() {
 
       {/* Navigation bar (compact) */}
       <nav className="fixed inset-x-0 bottom-0 z-30 flex bg-surface-container pb-[env(safe-area-inset-bottom)] md:hidden">
-        {MOBILE.map((d) => (
-          <NavItem key={d.to} d={d} compact active={isActive(pathname, d.to)} badge={d.to === "/" ? todayBadge : 0} />
+        {bar.map((d) => (
+          <NavItem key={d.to} d={d} compact active={isActive(pathname, d.to, more)} badge={d.to === "/" ? todayBadge : 0} />
         ))}
       </nav>
     </div>

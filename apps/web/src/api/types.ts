@@ -4,6 +4,7 @@ import type * as c from "@obey/contracts";
 export type Me = c.Me;
 export type User = c.User;
 export type Relationship = c.Relationship;
+export type Features = c.Features;
 export type Member = z.infer<typeof c.member>;
 export type Role = c.Role;
 export type ReschedulePolicy = z.infer<typeof c.reschedulePolicy>;

@@ -1,7 +1,8 @@
 import { randomInt } from "node:crypto";
-import { and, eq, gt, inArray, isNull } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import {
+  allFeatures,
   createRelationship,
   id,
   joinRelationship,
@@ -48,6 +49,7 @@ export async function relationshipDto(db: Tx, ids: string[]) {
     name: r.name,
     reschedulePolicy: r.reschedulePolicy,
     weeklyDelayAllowance: r.weeklyDelayAllowance,
+    features: allFeatures(r.features),
     createdAt: r.createdAt.toISOString(),
     members: members
       .filter((m) => m.relationshipId === r.id)
@@ -121,8 +123,15 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
 
   app.patch<{ Params: { id: string } }>("/relationships/:id", async (req) => {
     await requireManager(db, req.params.id, req.user.id);
-    const body = updateRelationship.parse(req.body);
-    if (Object.keys(body).length) await db.update(relationships).set(body).where(eq(relationships.id, req.params.id));
+    const { features, ...body } = updateRelationship.parse(req.body);
+    // Feature switches merge into what's stored, so one toggle doesn't reset the others.
+    const merged = features ? sql`${relationships.features} || ${JSON.stringify(features)}::jsonb` : undefined;
+    if (Object.keys(body).length || merged) {
+      await db
+        .update(relationships)
+        .set({ ...body, ...(merged ? { features: merged } : {}) })
+        .where(eq(relationships.id, req.params.id));
+    }
     return (await relationshipDto(db, [req.params.id]))[0];
   });
 

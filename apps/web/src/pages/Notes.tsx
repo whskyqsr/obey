@@ -23,7 +23,32 @@ export function excerpt(md: string, max = 160): string {
   return text.length > max ? text.slice(0, max - 1) + "…" : text;
 }
 
-export function NotesPage() {
+const COPY = {
+  note: {
+    title: "Notes",
+    subtitle: "Limits, aftercare plans and anything else worth writing down.",
+    search: "Search notes",
+    empty: "No notes yet",
+    icon: "sticky_note_2",
+    fab: "New note",
+    base: "/notes",
+  },
+  journal: {
+    title: "Journal",
+    subtitle: "Dated entries about how things are going.",
+    search: "Search the journal",
+    empty: "No entries yet",
+    icon: "auto_stories",
+    fab: "New entry",
+    base: "/journal",
+  },
+} as const;
+
+const MOODS = ["sentiment_very_dissatisfied", "sentiment_dissatisfied", "sentiment_neutral", "sentiment_satisfied", "sentiment_very_satisfied"];
+
+/** Notes and the journal share storage but are separate lists, told apart by `kind`. */
+export function NotesPage({ kind }: { kind: "note" | "journal" }) {
+  const copy = COPY[kind];
   const { rel, memberName } = useRel();
   const navigate = useNavigate();
   const snack = useSnackbar();
@@ -32,23 +57,25 @@ export function NotesPage() {
   const [q, setQ] = useState("");
   const [tag, setTag] = useState<string | null>(null);
 
-  const tags = useMemo(() => [...new Set((notes.data ?? []).flatMap((n) => n.tags))].sort(), [notes.data]);
+  const tags = useMemo(() => [...new Set((notes.data ?? []).filter((n) => n.kind === kind).flatMap((n) => n.tags))].sort(), [notes.data, kind]);
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return (notes.data ?? [])
+      .filter((n) => n.kind === kind)
       .filter((n) => !tag || n.tags.includes(tag))
       .filter((n) => !needle || n.title.toLowerCase().includes(needle) || n.bodyMd.toLowerCase().includes(needle) || n.tags.some((t) => t.toLowerCase().includes(needle)))
-      .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt));
-  }, [notes.data, q, tag]);
+      // The journal reads as a timeline; notes keep pinned ones on top.
+      .sort((a, b) => (kind === "journal" ? b.createdAt.localeCompare(a.createdAt) : Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt)));
+  }, [notes.data, q, tag, kind]);
 
   const togglePin = (n: Note) =>
     save.mutate({ id: n.id, input: { pinned: !n.pinned } }, { onError: (e) => snack(errorMessage(e)) });
 
   return (
     <>
-      <PageHeader title="Notes" subtitle="Limits, aftercare plans, journal entries and anything else worth writing down." />
+      <PageHeader title={copy.title} subtitle={copy.subtitle} />
       <div className="flex flex-col gap-3 px-4 pb-4 md:px-6">
-        <TextField placeholder="Search notes" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search notes" type="search" />
+        <TextField placeholder={copy.search} value={q} onChange={(e) => setQ(e.target.value)} aria-label={copy.search} type="search" />
         {tags.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-1">
             {tags.map((t) => (
@@ -63,7 +90,7 @@ export function NotesPage() {
       {notes.error && <ErrorBox error={notes.error} onRetry={() => notes.refetch()} />}
       {notes.data && !list.length && (
         <div className="px-4 md:px-6">
-          <Empty icon="sticky_note_2" title={q || tag ? "No matching notes" : "No notes yet"} body={q || tag ? undefined : "Start one with the button below."} />
+          <Empty icon={copy.icon} title={q || tag ? "Nothing matches" : copy.empty} body={q || tag ? undefined : "Start one with the button below."} />
         </div>
       )}
       <div className="grid gap-3 px-4 sm:grid-cols-2 md:px-6 xl:grid-cols-3">
@@ -79,22 +106,24 @@ export function NotesPage() {
               type="button"
               className="absolute inset-0 rounded-md"
               aria-label={`Open ${n.title || "note"}`}
-              onClick={() => navigate({ to: "/notes/$noteId", params: { noteId: n.id } })}
+              onClick={() => navigate({ to: `${copy.base}/$noteId`, params: { noteId: n.id } })}
             />
             <div className="flex items-start gap-2">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 text-title-medium">
-                  {n.kind === "journal" && <Icon name="auto_stories" size={18} />}
+                  {kind === "journal" && n.mood && <Icon name={MOODS[n.mood - 1]!} size={18} />}
                   {n.visibility === "private" && <Icon name="lock" size={16} />}
                   <span className="truncate">{n.title || "Untitled"}</span>
                 </div>
                 <div className="text-body-small opacity-75">
-                  {memberName(n.authorId)} · {fmtDateTime(n.updatedAt)}
+                  {memberName(n.authorId)} · {fmtDateTime(kind === "journal" ? n.createdAt : n.updatedAt)}
                 </div>
               </div>
-              <div className="relative">
-                <IconButton icon="push_pin" filled={n.pinned} label={n.pinned ? "Unpin" : "Pin"} onClick={() => togglePin(n)} />
-              </div>
+              {kind === "note" && (
+                <div className="relative">
+                  <IconButton icon="push_pin" filled={n.pinned} label={n.pinned ? "Unpin" : "Pin"} onClick={() => togglePin(n)} />
+                </div>
+              )}
             </div>
             {n.bodyMd && <p className="line-clamp-4 text-body-medium opacity-85">{excerpt(n.bodyMd, 280)}</p>}
             {n.tags.length > 0 && (
@@ -109,7 +138,7 @@ export function NotesPage() {
           </div>
         ))}
       </div>
-      <Fab icon="edit" label="New note" onClick={() => navigate({ to: "/notes/$noteId", params: { noteId: "new" } })} />
+      <Fab icon="edit" label={copy.fab} onClick={() => navigate({ to: `${copy.base}/$noteId`, params: { noteId: "new" } })} />
     </>
   );
 }

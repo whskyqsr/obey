@@ -8,7 +8,7 @@ import { Button, Chip, ErrorBox, Icon, IconButton, Loading, SegmentedButtons, us
 import { useRel } from "../lib/relationship";
 import { useConfirm } from "../lib/useConfirm";
 
-export function NoteEditorPage({ noteId }: { noteId: string }) {
+export function NoteEditorPage({ noteId, kind }: { noteId: string; kind: "note" | "journal" }) {
   const { rel } = useRel();
   const notes = useLibrary(rel.id, "notes");
   const isNew = noteId === "new";
@@ -16,10 +16,10 @@ export function NoteEditorPage({ noteId }: { noteId: string }) {
   if (!isNew && notes.isLoading) return <Loading />;
   if (!isNew && notes.error) return <ErrorBox error={notes.error} onRetry={() => notes.refetch()} />;
   if (!isNew && !note) return <ErrorBox error="That note doesn't exist any more." />;
-  return <Editor key={noteId} note={note} />;
+  return <Editor key={noteId} note={note} kind={note?.kind ?? kind} />;
 }
 
-function Editor({ note }: { note?: Note }) {
+function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
   const { rel, me } = useRel();
   const navigate = useNavigate();
   const snack = useSnackbar();
@@ -29,7 +29,7 @@ function Editor({ note }: { note?: Note }) {
   const canEdit = !note || note.authorId === me.user.id || note.visibility === "shared";
 
   const [form, setForm] = useState<NoteInput>(() => ({
-    kind: note?.kind ?? "note",
+    kind,
     title: note?.title ?? "",
     bodyMd: note?.bodyMd ?? "",
     visibility: note?.visibility ?? "shared",
@@ -44,7 +44,7 @@ function Editor({ note }: { note?: Note }) {
     setDirty(true);
   };
 
-  const back = () => navigate({ to: "/notes" });
+  const back = () => navigate({ to: kind === "journal" ? "/journal" : "/notes" });
 
   function addTag() {
     const t = tagDraft.trim().replace(/^#/, "").slice(0, 40);
@@ -59,7 +59,7 @@ function Editor({ note }: { note?: Note }) {
         onSuccess: (saved) => {
           setDirty(false);
           snack("Saved");
-          if (!note && saved?.id) navigate({ to: "/notes/$noteId", params: { noteId: saved.id }, replace: true });
+          if (!note && saved?.id) navigate({ to: kind === "journal" ? "/journal/$noteId" : "/notes/$noteId", params: { noteId: saved.id }, replace: true });
         },
         onError: (e) => snack(errorMessage(e)),
       },
@@ -109,14 +109,6 @@ function Editor({ note }: { note?: Note }) {
         />
 
         <div className="flex flex-wrap items-center gap-2">
-          <SegmentedButtons
-            value={form.kind}
-            onChange={(kind) => set({ kind })}
-            options={[
-              { value: "note", label: "Note" },
-              { value: "journal", label: "Journal" },
-            ]}
-          />
           <SegmentedButtons
             value={form.visibility}
             onChange={(visibility) => set({ visibility })}

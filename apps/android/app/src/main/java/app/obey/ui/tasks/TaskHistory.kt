@@ -1,5 +1,6 @@
 package app.obey.ui.tasks
 
+import app.obey.ui.common.LocalFeatures
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -56,6 +57,7 @@ private val HistoryEntry.label: String
 @Composable
 fun TaskHistorySection(history: List<HistoryEntry>, onEdit: (HistoryEntry, OccurrenceStatus, Instant?, String) -> Unit) {
     var editing by remember { mutableStateOf<HistoryEntry?>(null) }
+    val showPoints = LocalFeatures.current.points
     SectionHeader("History", horizontalPadding = 0.dp)
     if (history.isEmpty()) {
         Text(
@@ -77,7 +79,7 @@ fun TaskHistorySection(history: List<HistoryEntry>, onEdit: (HistoryEntry, Occur
             },
             trailingContent = {
                 Text(
-                    listOfNotNull(h.pointsDelta.takeIf { it != 0 }?.let(::signed), h.label).joinToString("  "),
+                    listOfNotNull(h.pointsDelta.takeIf { it != 0 && showPoints }?.let(::signed), h.label).joinToString("  "),
                     color = if (h.status == OccurrenceStatus.Missed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.labelLarge,
                 )
@@ -116,11 +118,13 @@ private fun EditHistoryDialog(entry: HistoryEntry, onDismiss: () -> Unit, onSave
                     }
                 }
                 OutlinedTextField(value = note, onValueChange = { note = it.take(5000) }, label = { Text("Note") }, modifier = Modifier.fillMaxWidth())
-                Text(
-                    "Points follow the status: done earns the task's points, missed costs its penalty, excused is neither.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (LocalFeatures.current.points) {
+                    Text(
+                        "Points follow the status: done earns the task's points, missed costs its penalty, excused is neither.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         },
         confirmButton = { Button(onClick = { onSave(status, doneAt.atZone(zone).toInstant(), note) }) { Text("Save") } },

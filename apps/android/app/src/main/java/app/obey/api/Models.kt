@@ -88,6 +88,17 @@ data class Relationship(
     val reschedulePolicy: ReschedulePolicy,
     val weeklyDelayAllowance: Int,
     val createdAt: String,
+    val features: Features = Features(),
+)
+
+/** Parts of the app a dynamic can switch off; switched-off parts are hidden for everyone in it. */
+@Serializable
+data class Features(
+    val points: Boolean = true,
+    val consequences: Boolean = true,
+    val rules: Boolean = true,
+    val notes: Boolean = true,
+    val journal: Boolean = true,
 )
 
 /** The relationship's name, or the partners' names when it has none. */
@@ -122,6 +133,7 @@ data class UpdateRelationshipInput(
     @EncodeDefault(EncodeDefault.Mode.NEVER) val name: String? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER) val reschedulePolicy: ReschedulePolicy? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER) val weeklyDelayAllowance: Int? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val features: Features? = null,
 )
 
 @Serializable

@@ -55,11 +55,12 @@ import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.formatDateTime
 
-private enum class NoteFilter(val label: String) { All("All"), Notes("Notes"), Journal("Journal"), Pinned("Pinned") }
+private enum class NoteFilter(val label: String) { All("All"), Pinned("Pinned") }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotesScreen(
+    journal: Boolean,
     onOpen: (String) -> Unit,
     onNew: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -80,7 +81,7 @@ fun NotesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Notes") },
+                title = { Text(if (journal) "Journal" else "Notes") },
                 actions = {
                     IconButton(onClick = { searching = !searching; if (!searching) query = "" }) { Icon(Icons.Outlined.Search, "Search") }
                     SettingsAction(onOpenSettings)
@@ -97,17 +98,19 @@ fun NotesScreen(
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    placeholder = { Text("Search notes and tags") },
+                    placeholder = { Text(if (journal) "Search entries and tags" else "Search notes and tags") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                 )
             }
-            Row(
-                Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                NoteFilter.entries.forEach { f ->
-                    FilterChip(selected = filter == f, onClick = { filter = f }, label = { Text(f.label) })
+            if (!journal) {
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    NoteFilter.entries.forEach { f ->
+                        FilterChip(selected = filter == f, onClick = { filter = f }, label = { Text(f.label) })
+                    }
                 }
             }
             when (val s = state) {
@@ -115,13 +118,12 @@ fun NotesScreen(
                 is Load.Failed -> ErrorBox(s.message, vm::refresh)
                 is Load.Ready -> {
                     val q = query.trim().lowercase()
-                    val shown = s.value.filter { n ->
-                        when (filter) {
-                            NoteFilter.All -> true
-                            NoteFilter.Notes -> n.kind == NoteKind.Note
-                            NoteFilter.Journal -> n.kind == NoteKind.Journal
-                            NoteFilter.Pinned -> n.pinned
-                        } && (q.isEmpty() || n.title.lowercase().contains(q) || n.bodyMd.lowercase().contains(q) ||
+                    val kind = if (journal) NoteKind.Journal else NoteKind.Note
+                    val mine = s.value.filter { it.kind == kind }
+                    // Journal entries read newest-written first; notes keep pinned-then-recently-edited.
+                    val ordered = if (journal) mine.sortedByDescending { it.createdAt } else mine
+                    val shown = ordered.filter { n ->
+                        (journal || filter == NoteFilter.All || n.pinned) && (q.isEmpty() || n.title.lowercase().contains(q) || n.bodyMd.lowercase().contains(q) ||
                             n.tags.any { it.lowercase().contains(q) })
                     }
                     LazyColumn(
@@ -130,7 +132,13 @@ fun NotesScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         if (shown.isEmpty()) {
-                            item { EmptyBox(if (q.isEmpty()) "No notes yet" else "Nothing matches", "Notes support headings, lists and checklists.") }
+                            item {
+                                when {
+                                    q.isNotEmpty() -> EmptyBox("Nothing matches")
+                                    journal -> EmptyBox("No entries yet", "Write about your day, and how you felt.")
+                                    else -> EmptyBox("No notes yet", "Limits, aftercare plans, anything worth keeping. Notes support headings, lists and checklists.")
+                                }
+                            }
                         }
                         items(shown, key = { it.id }) { n ->
                             NoteCard(
@@ -172,7 +180,8 @@ private fun NoteCard(note: Note, author: String?, onOpen: () -> Unit, onToggleCh
             Text(
                 listOfNotNull(
                     author,
-                    formatDateTime(note.updatedAt),
+                    if (note.kind == NoteKind.Journal) formatDateTime(note.createdAt) else formatDateTime(note.updatedAt),
+                    note.mood?.let { m -> moods.firstOrNull { it.first == m }?.second },
                     note.tags.takeIf { it.isNotEmpty() }?.joinToString(" ") { "#$it" },
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,

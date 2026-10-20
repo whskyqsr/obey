@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
-import type { Me, Member, Relationship } from "../api/types";
+import { allFeatures } from "@obey/contracts";
+import type { Features, Me, Member, Relationship } from "../api/types";
 import { storage } from "./storage";
 
 const KEY = "obey.relationship";
@@ -14,6 +15,8 @@ interface RelState {
   partners: Member[];
   /** The relationship's name, or the partners' names when it has none. */
   title: string;
+  /** Which optional parts of the app this dynamic uses. */
+  features: Features;
   memberName(userId: string | null | undefined): string;
   select(id: string): void;
 }
@@ -33,6 +36,7 @@ export function RelationshipProvider({ me, children }: { me: Me; children: React
       isDom: self ? self.role !== "submissive" : false,
       partners: rel.members.filter((m) => m.userId !== me.user.id),
       title: relTitle(rel, me.user.id),
+      features: allFeatures(rel.features),
       memberName(userId) {
         if (!userId) return "Someone";
         if (userId === me.user.id) return "You";

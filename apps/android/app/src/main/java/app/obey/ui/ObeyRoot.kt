@@ -49,6 +49,21 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.material.icons.outlined.AutoStories
+import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.Menu
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import app.obey.api.Features
+import app.obey.ui.common.LocalFeatures
 import app.obey.auth.AuthState
 import app.obey.data.SessionState
 import app.obey.ui.common.LoadingBox
@@ -82,7 +97,9 @@ fun ObeyRoot(vm: RootViewModel = hiltViewModel()) {
                         RelationshipSetupScreen()
                     } else {
                         // A new NavHost (and fresh ViewModels) per relationship.
-                        key(s.session.relationship.id) { MainScaffold() }
+                        key(s.session.relationship.id) {
+                            CompositionLocalProvider(LocalFeatures provides s.session.relationship.features) { MainScaffold() }
+                        }
                     }
             }
         }
@@ -110,21 +127,47 @@ private data class TopLevel(
     val matches: (NavDestination) -> Boolean,
 )
 
-private val topLevels = listOf(
+private val writingRoutes = setOf<Any>(NotesRoute, JournalRoute)
+
+/** The destinations this dynamic uses, in bar order. Rewards stays as a home for consequences when points are off. */
+private fun topLevels(f: Features) = listOfNotNull(
     TopLevel(TodayRoute, "Today", Icons.Outlined.Today) { it.hasRoute<TodayRoute>() },
     TopLevel(UpcomingRoute, "Upcoming", Icons.Outlined.CalendarMonth) { it.hasRoute<UpcomingRoute>() },
-    TopLevel(RewardsRoute, "Rewards", Icons.Outlined.EmojiEvents) { it.hasRoute<RewardsRoute>() },
-    TopLevel(RulesRoute, "Rules", Icons.Outlined.Gavel) { it.hasRoute<RulesRoute>() },
-    TopLevel(NotesRoute, "Notes", Icons.AutoMirrored.Outlined.Notes) { it.hasRoute<NotesRoute>() },
+    when {
+        f.points -> TopLevel(RewardsRoute, "Rewards", Icons.Outlined.EmojiEvents) { it.hasRoute<RewardsRoute>() }
+        f.consequences -> TopLevel(RewardsRoute, "Consequences", Icons.Outlined.Bolt) { it.hasRoute<RewardsRoute>() }
+        else -> null
+    },
+    if (f.rules) TopLevel(RulesRoute, "Rules", Icons.Outlined.Gavel) { it.hasRoute<RulesRoute>() } else null,
+    if (f.notes) TopLevel(NotesRoute, "Notes", Icons.AutoMirrored.Outlined.Notes) { it.hasRoute<NotesRoute>() } else null,
+    if (f.journal) TopLevel(JournalRoute, "Journal", Icons.Outlined.AutoStories) { it.hasRoute<JournalRoute>() } else null,
 )
 
+/** A phone's bar fits five; past that it keeps Today, Upcoming, Rewards and the first writing space, and the rest go under More. */
+private fun splitBar(all: List<TopLevel>): Pair<List<TopLevel>, List<TopLevel>> {
+    if (all.size <= 5) return all to emptyList()
+    val writing = all.firstOrNull { it.route in writingRoutes }
+    val bar = (all.filter { it.route !in writingRoutes }.take(3) + listOfNotNull(writing)).take(4)
+    return bar to all.filter { it !in bar }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MainScaffold() {
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val destination = entry?.destination
-    val isTopLevel = destination != null && topLevels.any { t -> destination.hierarchy.any(t.matches) }
+    val features = LocalFeatures.current
+    val all = remember(features) { topLevels(features) }
+    val (bar, overflow) = remember(all) { splitBar(all) }
+    val isTopLevel = destination != null && all.any { t -> destination.hierarchy.any(t.matches) }
     val wide = LocalConfiguration.current.screenWidthDp >= 600
+    var moreOpen by remember { mutableStateOf(false) }
+    // A tab the dynamic just switched off (say, from Settings) shouldn't stay reachable underneath.
+    val switchedOff = destination != null && !isTopLevel && destination.hierarchy.any {
+        it.hasRoute<RewardsRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<NotesRoute>() || it.hasRoute<JournalRoute>()
+    }
+    LaunchedEffect(switchedOff) { if (switchedOff) nav.navigate(TodayRoute) { popUpTo(nav.graph.findStartDestination().id) } }
 
     // Ask for notification permission once we're in the app (Android 13+).
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -142,7 +185,7 @@ private fun MainScaffold() {
     if (wide) {
         Row(Modifier.fillMaxSize()) {
             NavigationRail {
-                topLevels.forEach { t ->
+                all.forEach { t ->
                     NavigationRailItem(
                         selected = selected(t),
                         onClick = { go(t.route) },
@@ -158,12 +201,20 @@ private fun MainScaffold() {
             bottomBar = {
                 if (isTopLevel) {
                     NavigationBar {
-                        topLevels.forEach { t ->
+                        bar.forEach { t ->
                             NavigationBarItem(
                                 selected = selected(t),
                                 onClick = { go(t.route) },
                                 icon = { Icon(t.icon, null) },
                                 label = { Text(t.label) },
+                            )
+                        }
+                        if (overflow.isNotEmpty()) {
+                            NavigationBarItem(
+                                selected = overflow.any(::selected),
+                                onClick = { moreOpen = true },
+                                icon = { Icon(Icons.Outlined.Menu, null) },
+                                label = { Text("More") },
                             )
                         }
                     }
@@ -173,6 +224,18 @@ private fun MainScaffold() {
             // Only the bottom bar's space is reserved here; each screen's own Scaffold handles the top insets.
             val bottomOnly = androidx.compose.foundation.layout.PaddingValues(bottom = padding.calculateBottomPadding())
             Box(Modifier.padding(bottomOnly).consumeWindowInsets(bottomOnly)) { ObeyNavHost(nav) }
+        }
+        if (moreOpen) {
+            ModalBottomSheet(onDismissRequest = { moreOpen = false }) {
+                overflow.forEach { t ->
+                    ListItem(
+                        headlineContent = { Text(t.label) },
+                        leadingContent = { Icon(t.icon, null) },
+                        modifier = Modifier.clickable { moreOpen = false; go(t.route) },
+                    )
+                }
+                Spacer(Modifier.height(24.dp))
+            }
         }
     }
 }
@@ -200,8 +263,17 @@ private fun ObeyNavHost(nav: NavHostController) {
         composable<RulesRoute> { RulesScreen(onOpenSettings = settings) }
         composable<NotesRoute> {
             NotesScreen(
+                journal = false,
                 onOpen = { nav.navigate(NoteEditorRoute(noteId = it)) },
                 onNew = { nav.navigate(NoteEditorRoute()) },
+                onOpenSettings = settings,
+            )
+        }
+        composable<JournalRoute> {
+            NotesScreen(
+                journal = true,
+                onOpen = { nav.navigate(NoteEditorRoute(noteId = it, journal = true)) },
+                onNew = { nav.navigate(NoteEditorRoute(journal = true)) },
                 onOpenSettings = settings,
             )
         }

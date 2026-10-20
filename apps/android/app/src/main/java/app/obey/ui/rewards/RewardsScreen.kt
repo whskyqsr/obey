@@ -1,5 +1,6 @@
 package app.obey.ui.rewards
 
+import app.obey.ui.common.LocalFeatures
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -71,6 +72,7 @@ fun RewardsScreen(onOpenSettings: () -> Unit, vm: RewardsViewModel = hiltViewMod
     MessageEffect(message, snackbar, vm::messageShown)
     val session = vm.session
     val canManage = session?.canManage == true
+    val features = LocalFeatures.current
 
     // null = dialog closed; Editing(null) = creating; Editing(x) = editing x.
     var editReward by remember { mutableStateOf<Editing<Reward>?>(null) }
@@ -81,15 +83,15 @@ fun RewardsScreen(onOpenSettings: () -> Unit, vm: RewardsViewModel = hiltViewMod
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Rewards & points") },
+                title = { Text(if (features.points) "Rewards & points" else "Consequences") },
                 actions = {
-                    if (canManage) IconButton(onClick = { adjusting = true }) { Icon(Icons.Outlined.Exposure, "Adjust points") }
+                    if (canManage && features.points) IconButton(onClick = { adjusting = true }) { Icon(Icons.Outlined.Exposure, "Adjust points") }
                     SettingsAction(onOpenSettings)
                 },
             )
         },
         floatingActionButton = {
-            if (canManage) {
+            if (canManage && features.points) {
                 ExtendedFloatingActionButton(
                     onClick = { editReward = Editing(null) },
                     icon = { Icon(Icons.Outlined.Add, null) },
@@ -104,7 +106,7 @@ fun RewardsScreen(onOpenSettings: () -> Unit, vm: RewardsViewModel = hiltViewMod
             is Load.Failed -> ErrorBox(s.message, vm::refresh, Modifier.padding(padding))
             is Load.Ready -> LazyColumn(Modifier.padding(padding).fillMaxSize()) {
                 val d = s.value
-                item(key = "balances") {
+                if (features.points) item(key = "balances") {
                     Row(
                         Modifier.horizontalScroll(rememberScrollState()).padding(16.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -126,9 +128,9 @@ fun RewardsScreen(onOpenSettings: () -> Unit, vm: RewardsViewModel = hiltViewMod
                     }
                 }
 
-                item(key = "h-rewards") { SectionHeader("Rewards") }
-                if (d.rewards.isEmpty()) item(key = "e-rewards") { EmptyBox("No rewards yet", if (canManage) "Add things worth earning." else null) }
-                items(d.rewards, key = { "r-" + it.id }) { r ->
+                if (features.points) item(key = "h-rewards") { SectionHeader("Rewards") }
+                if (features.points && d.rewards.isEmpty()) item(key = "e-rewards") { EmptyBox("No rewards yet", if (canManage) "Add things worth earning." else null) }
+                items(if (features.points) d.rewards else emptyList(), key = { "r-" + it.id }) { r ->
                     val myBalance = vm.balanceOf(session?.userId.orEmpty())
                     ListItem(
                         modifier = if (canManage) Modifier.clickable { editReward = Editing(r) } else Modifier,
@@ -144,14 +146,14 @@ fun RewardsScreen(onOpenSettings: () -> Unit, vm: RewardsViewModel = hiltViewMod
                     )
                 }
 
-                item(key = "h-cons") {
+                if (features.consequences) item(key = "h-cons") {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                         SectionHeader("Consequences", Modifier.weight(1f))
                         if (canManage) TextButton(onClick = { editConsequence = Editing(null) }) { Text("Add") }
                     }
                 }
-                if (d.consequences.isEmpty()) item(key = "e-cons") { EmptyBox("No consequences defined") }
-                items(d.consequences, key = { "c-" + it.id }) { c ->
+                if (features.consequences && d.consequences.isEmpty()) item(key = "e-cons") { EmptyBox("No consequences defined") }
+                items(if (features.consequences) d.consequences else emptyList(), key = { "c-" + it.id }) { c ->
                     ListItem(
                         modifier = if (canManage) Modifier.clickable { editConsequence = Editing(c) } else Modifier,
                         headlineContent = { Text(c.title) },
@@ -160,9 +162,9 @@ fun RewardsScreen(onOpenSettings: () -> Unit, vm: RewardsViewModel = hiltViewMod
                     )
                 }
 
-                item(key = "h-ledger") { SectionHeader("Activity") }
-                if (d.ledger.isEmpty()) item(key = "e-ledger") { EmptyBox("No points yet") }
-                items(d.ledger, key = { "l-" + it.id }) { e ->
+                if (features.points) item(key = "h-ledger") { SectionHeader("Activity") }
+                if (features.points && d.ledger.isEmpty()) item(key = "e-ledger") { EmptyBox("No points yet") }
+                items(if (features.points) d.ledger else emptyList(), key = { "l-" + it.id }) { e ->
                     ListItem(
                         headlineContent = { Text(e.note.ifBlank { e.kind.name }) },
                         supportingContent = { Text("${session?.nameOf(e.userId) ?: ""} · ${formatDateTime(e.createdAt)}") },

@@ -29,6 +29,13 @@
       "when": 1792498103440,
       "tag": "0003_occurrence_edits",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792498435363,
+      "tag": "0004_features",
+      "breakpoints": true
     }
   ]
 }
