@@ -94,6 +94,9 @@ export const taskInput = z.object({
   missPenalty: z.number().int().min(0).max(10_000).default(0),
   rewardId: id.nullable().default(null),
   consequenceId: id.nullable().default(null),
+  /** When a consequence handed out for a miss is due: this many days after the miss is recorded (0 = that day), by consequenceDueTime or all day. */
+  consequenceDueDays: z.number().int().min(0).max(30).default(1),
+  consequenceDueTime: timeOfDay.nullable().default(null),
   proofRequired: z.boolean().default(false),
   approvalRequired: z.boolean().default(false),
   schedule,

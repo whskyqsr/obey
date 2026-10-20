@@ -80,6 +80,7 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
 
     var pickDate by remember { mutableStateOf(false) }
     var pickTime by remember { mutableStateOf(false) }
+    var pickConsequenceTime by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -192,10 +193,28 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                     }
                     if (features.consequences && form.consequenceId != null) {
                         Text(
-                            "Handed out automatically on a miss, due by the end of the next day",
+                            "Handed out automatically when it's missed, due:",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            (listOf(0, 1, 2, 3, 7) + form.consequenceDueDays).distinct().sorted().forEach { n ->
+                                FilterChip(
+                                    selected = form.consequenceDueDays == n,
+                                    onClick = { vm.update { it.copy(consequenceDueDays = n) } },
+                                    label = { Text(dueDaysLabel(n)) },
+                                )
+                            }
+                        }
+                        LabeledSwitch("Any time that day", null, form.consequenceDueTime == null) { v ->
+                            vm.update { it.copy(consequenceDueTime = if (v) null else LocalTime.of(21, 0)) }
+                        }
+                        form.consequenceDueTime?.let { t ->
+                            OutlinedButton(onClick = { pickConsequenceTime = true }) {
+                                Icon(Icons.Outlined.Schedule, null)
+                                Text("  By ${t.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))}")
+                            }
+                        }
                     }
 
                     HorizontalDivider(Modifier.padding(vertical = 4.dp))
@@ -246,6 +265,22 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
         )
     }
 
+    if (pickConsequenceTime) {
+        val state = rememberTimePickerState(initialHour = form.consequenceDueTime?.hour ?: 21, initialMinute = form.consequenceDueTime?.minute ?: 0)
+        AlertDialog(
+            onDismissRequest = { pickConsequenceTime = false },
+            title = { Text("Consequence due by") },
+            text = { TimePicker(state = state) },
+            confirmButton = {
+                Button(onClick = {
+                    vm.update { it.copy(consequenceDueTime = LocalTime.of(state.hour, state.minute)) }
+                    pickConsequenceTime = false
+                }) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { pickConsequenceTime = false }) { Text("Cancel") } },
+        )
+    }
+
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
@@ -255,6 +290,12 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
         )
     }
+}
+
+private fun dueDaysLabel(n: Int) = when (n) {
+    0 -> "Same day"
+    1 -> "Next day"
+    else -> "$n days later"
 }
 
 @Composable

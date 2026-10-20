@@ -416,7 +416,7 @@ describe("assigned consequences", () => {
   it("are handed out once when a task carrying one is missed, and taken back if the miss is undone", async () => {
     const { dom, sub, relId, subId } = await ctx.pair();
     const c = (await dom.post(`/relationships/${relId}/consequences`, { title: "Corner time" })).body;
-    const t = (await dom.post(`/relationships/${relId}/tasks`, task(subId, { consequenceId: c.id, schedule: { start: "2026-10-16", rule: { freq: "daily" } } }))).body;
+    const t = (await dom.post(`/relationships/${relId}/tasks`, task(subId, { consequenceId: c.id, consequenceDueDays: 0, consequenceDueTime: "22:00", schedule: { start: "2026-10-16", rule: { freq: "daily" } } }))).body;
     await dom.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-18`);
     const issued = async () => ((await sub.get(`/relationships/${relId}/tasks`)).body as { assignedConsequenceId: string | null }[]).filter((x) => x.assignedConsequenceId === c.id);
     try {
@@ -425,7 +425,7 @@ describe("assigned consequences", () => {
       await runJobs(ctx.db, ctx.notifier, ctx.clock.now, { materializeDays: 14, reminderLeadMinutes: 30 });
       const [given, ...extra] = await issued();
       expect(extra).toHaveLength(0);
-      expect(given).toMatchObject({ title: "Corner time", assigneeId: subId, bodyMd: "**Why:** Missed “Kneel and write lines” on Oct 16", schedule: { start: "2026-10-18" }, dueTime: null });
+      expect(given).toMatchObject({ title: "Corner time", assigneeId: subId, bodyMd: "**Why:** Missed “Kneel and write lines” on Oct 16", schedule: { start: "2026-10-17" }, dueTime: "22:00" });
       expect(ctx.notifier.sent.some((n) => n.push.body === "A task was missed, and a consequence was added")).toBe(true);
 
       const [miss] = (await sub.get(`/tasks/${t.id}/history`)).body;

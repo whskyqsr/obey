@@ -26,6 +26,8 @@ export const taskDto = (s: Series) => ({
   missPenalty: s.missPenalty,
   rewardId: s.rewardId,
   consequenceId: s.consequenceId,
+  consequenceDueDays: s.consequenceDueDays,
+  consequenceDueTime: s.consequenceDueTime,
   proofRequired: s.proofRequired,
   approvalRequired: s.approvalRequired,
   schedule: s.schedule,

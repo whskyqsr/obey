@@ -19,6 +19,9 @@ interface Form {
   missPenalty: number;
   rewardId: string;
   consequenceId: string;
+  consequenceDueDays: number;
+  consequenceAllDay: boolean;
+  consequenceDueTime: string;
   proofRequired: boolean;
   approvalRequired: boolean;
   picker: PickerState;
@@ -37,6 +40,9 @@ function formFrom(task: Task | undefined, defaultAssignee: string, start?: strin
     missPenalty: task?.missPenalty ?? 0,
     rewardId: task?.rewardId ?? "",
     consequenceId: task?.consequenceId ?? "",
+    consequenceDueDays: task?.consequenceDueDays ?? 1,
+    consequenceAllDay: task ? task.consequenceDueTime === null : true,
+    consequenceDueTime: task?.consequenceDueTime ?? "21:00",
     proofRequired: task?.proofRequired ?? false,
     approvalRequired: task?.approvalRequired ?? false,
     // From a calendar day it's a one-off on that day, like a new calendar event; otherwise daily from today.
@@ -57,6 +63,8 @@ function toInput(f: Form): TaskInput {
     missPenalty: Number.isFinite(f.missPenalty) ? Math.max(0, Math.trunc(f.missPenalty)) : 0,
     rewardId: f.rewardId || null,
     consequenceId: f.consequenceId || null,
+    consequenceDueDays: f.consequenceDueDays,
+    consequenceDueTime: f.consequenceAllDay ? null : f.consequenceDueTime || null,
     proofRequired: f.proofRequired,
     approvalRequired: f.approvalRequired,
     schedule: toSchedule(f.picker),
@@ -65,6 +73,8 @@ function toInput(f: Form): TaskInput {
     graceMinutes: Number.isFinite(f.graceMinutes) ? Math.max(0, Math.trunc(f.graceMinutes)) : 0,
   };
 }
+
+const dueDaysLabel = (d: number) => (d === 0 ? "Same day" : d === 1 ? "Next day" : `${d} days later`);
 
 const num = (v: string) => (v === "" ? NaN : Number(v));
 
@@ -174,8 +184,10 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
             {features.consequences && (
               <Select
                 label="Consequence if missed"
-                help={form.consequenceId ? "Handed out automatically on a miss, due by the end of the next day" : undefined}
-                value={form.consequenceId} onChange={(e) => set({ consequenceId: e.target.value })}>
+                help={form.consequenceId ? "Handed out automatically when it's missed" : undefined}
+                value={form.consequenceId}
+                onChange={(e) => set({ consequenceId: e.target.value })}
+              >
                 <option value="">None</option>
                 {consequences.data?.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -183,6 +195,23 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
                   </option>
                 ))}
               </Select>
+            )}
+          </div>
+        )}
+        {features.consequences && form.consequenceId && (
+          <div className="flex flex-wrap items-center gap-4">
+            <Select label="Consequence due" value={form.consequenceDueDays} onChange={(e) => set({ consequenceDueDays: Number(e.target.value) })} className="w-48">
+              {[...new Set([0, 1, 2, 3, 7, form.consequenceDueDays])]
+                .sort((a, b) => a - b)
+                .map((d) => (
+                  <option key={d} value={d}>
+                    {dueDaysLabel(d)}
+                  </option>
+                ))}
+            </Select>
+            <Switch checked={form.consequenceAllDay} onChange={(consequenceAllDay) => set({ consequenceAllDay })} label="Any time that day" />
+            {!form.consequenceAllDay && (
+              <TextField label="By" type="time" value={form.consequenceDueTime} onChange={(e) => set({ consequenceDueTime: e.target.value })} className="w-36" />
             )}
           </div>
         )}

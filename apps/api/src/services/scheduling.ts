@@ -229,21 +229,24 @@ export async function issueConsequence(
   return s;
 }
 
-/** The consequence a task carries, handed out for one of its misses: due by the end of the next day. Null if none applies. */
+/** The consequence a task carries, handed out for one of its misses, due when the task says. Null if none applies. */
 async function issueMissConsequence(db: Tx, series: Series, occ: Occurrence, now: Date): Promise<Series | null> {
   if (!series.consequenceId) return null;
   const [rel] = await db.select({ features: relationships.features }).from(relationships).where(eq(relationships.id, series.relationshipId));
   if (rel?.features.consequences === false) return null;
   const [c] = await db.select().from(consequences).where(eq(consequences.id, series.consequenceId));
   if (!c) return null;
+  const date = addDays(localDate(now, series.timezone), series.consequenceDueDays);
+  // A time that has already passed today would make it overdue on arrival; give it the rest of the day instead.
+  const dueTime = series.consequenceDueTime && dueInstant(date, series.consequenceDueTime, series.timezone) > now ? series.consequenceDueTime : null;
   const day = occ.dueAt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: series.timezone });
   return issueConsequence(
     db,
     c,
     {
       assigneeId: series.assigneeId,
-      date: addDays(localDate(now, series.timezone), 1),
-      dueTime: null,
+      date,
+      dueTime,
       timezone: series.timezone,
       reason: `Missed “${series.title}” on ${day}`,
       approvalRequired: series.approvalRequired,

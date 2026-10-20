@@ -155,6 +155,9 @@ data class TaskInput(
     val missPenalty: Int = 0,
     val rewardId: String? = null,
     val consequenceId: String? = null,
+    /** A consequence handed out for a miss is due this many days later (0 = that day), by consequenceDueTime or all day. */
+    val consequenceDueDays: Int = 1,
+    val consequenceDueTime: String? = null,
     val proofRequired: Boolean = false,
     val approvalRequired: Boolean = false,
     val schedule: Schedule,
@@ -175,6 +178,8 @@ data class Task(
     val missPenalty: Int = 0,
     val rewardId: String? = null,
     val consequenceId: String? = null,
+    val consequenceDueDays: Int = 1,
+    val consequenceDueTime: String? = null,
     val proofRequired: Boolean = false,
     val approvalRequired: Boolean = false,
     val schedule: Schedule,
@@ -190,7 +195,8 @@ data class Task(
 ) {
     fun toInput() = TaskInput(
         title = title, bodyMd = bodyMd, assigneeId = assigneeId, points = points, missPenalty = missPenalty,
-        rewardId = rewardId, consequenceId = consequenceId, proofRequired = proofRequired,
+        rewardId = rewardId, consequenceId = consequenceId, consequenceDueDays = consequenceDueDays,
+        consequenceDueTime = consequenceDueTime, proofRequired = proofRequired,
         approvalRequired = approvalRequired, schedule = schedule, dueTime = dueTime, timezone = timezone,
         graceMinutes = graceMinutes,
     )

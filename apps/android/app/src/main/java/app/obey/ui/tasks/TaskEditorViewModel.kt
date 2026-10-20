@@ -45,6 +45,9 @@ data class TaskForm(
     val start: LocalDate = LocalDate.now(),
     val recurrence: RecurrenceDraft = RecurrenceDraft(),
     val consequenceId: String? = null,
+    val consequenceDueDays: Int = 1,
+    /** Null means any time that day. */
+    val consequenceDueTime: LocalTime? = null,
 ) {
     val titleError: String? get() = if (title.isBlank()) "Give it a title" else null
     val valid: Boolean get() = titleError == null && assigneeId.isNotEmpty() &&
@@ -119,6 +122,8 @@ class TaskEditorViewModel @Inject constructor(
         start = LocalDate.parse(t.schedule.start),
         recurrence = RecurrenceDraft.fromSchedule(t.schedule),
         consequenceId = t.consequenceId,
+        consequenceDueDays = t.consequenceDueDays,
+        consequenceDueTime = t.consequenceDueTime?.let { LocalTime.parse(it) },
     )
 
     fun update(change: (TaskForm) -> TaskForm) = _form.update(change)
@@ -138,6 +143,8 @@ class TaskEditorViewModel @Inject constructor(
             missPenalty = f.missPenalty.toInt(),
             rewardId = original?.rewardId,
             consequenceId = f.consequenceId,
+            consequenceDueDays = f.consequenceDueDays,
+            consequenceDueTime = f.consequenceDueTime?.format(DateTimeFormatter.ofPattern("HH:mm")),
             proofRequired = f.proofRequired,
             approvalRequired = f.approvalRequired,
             schedule = f.recurrence.toSchedule(f.start),
