@@ -1,45 +1,27 @@
 package app.obey.ui.protocols
 
-import androidx.compose.animation.animateContentSize
+import app.obey.ui.notes.MarkdownPreview
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Gavel
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -48,7 +30,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.obey.api.ObeyApi
 import app.obey.api.Protocol
-import app.obey.api.ProtocolInput
 import app.obey.api.ReorderInput
 import app.obey.api.Rule
 import app.obey.data.Session
@@ -102,13 +83,6 @@ class ProtocolsViewModel @Inject constructor(
         }
     }
 
-    fun save(existing: Protocol?, input: ProtocolInput) = action {
-        if (existing == null) api.createProtocol(sessions.requireRelationshipId(), input) else api.updateProtocol(existing.id, input)
-        refresh()
-    }
-
-    fun delete(p: Protocol) = action { api.deleteProtocol(p.id); refresh() }
-
     fun reorder(protocols: List<Protocol>) {
         val current = (_state.value as? Load.Ready)?.value ?: return
         _state.value = Load.Ready(current.copy(protocols = protocols))
@@ -119,26 +93,24 @@ class ProtocolsViewModel @Inject constructor(
     }
 }
 
-private data class Editing(val protocol: Protocol?)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProtocolsScreen(onOpenSettings: () -> Unit, vm: ProtocolsViewModel = hiltViewModel()) {
+fun ProtocolsScreen(onOpen: (String) -> Unit, onNew: () -> Unit, onOpenSettings: () -> Unit, vm: ProtocolsViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     MessageEffect(message, snackbar, vm::messageShown)
+    LifecycleResumeEffect(Unit) {
+        vm.refresh()
+        onPauseOrDispose { }
+    }
     val canManage = vm.session?.canManage == true
     val showRules = LocalFeatures.current.rules
-    var editing by remember { mutableStateOf<Editing?>(null) }
-    var expanded by rememberSaveable { mutableStateOf(setOf<String>()) }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Protocols") }, actions = { SettingsAction(onOpenSettings) }) },
         floatingActionButton = {
-            if (canManage) {
-                ExtendedFloatingActionButton(onClick = { editing = Editing(null) }, icon = { Icon(Icons.Outlined.Add, null) }, text = { Text("Protocol") })
-            }
+            if (canManage) ExtendedFloatingActionButton(onClick = onNew, icon = { Icon(Icons.Outlined.Add, null) }, text = { Text("Protocol") })
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
@@ -157,87 +129,27 @@ fun ProtocolsScreen(onOpenSettings: () -> Unit, vm: ProtocolsViewModel = hiltVie
                         onReorder = vm::reorder,
                         modifier = Modifier.padding(padding).fillMaxSize(),
                     ) { p, _, handle ->
-                        val open = p.id in expanded
                         val ruleIndex = rules.indexOfFirst { it.id == p.ruleId }
                         ListItem(
-                            modifier = Modifier.animateContentSize().clickable { expanded = if (open) expanded - p.id else expanded + p.id },
-                            headlineContent = { Text(p.title) },
+                            modifier = Modifier.clickable { onOpen(p.id) },
                             overlineContent = if (ruleIndex >= 0) {
                                 { Text("Rule ${ruleIndex + 1}: ${rules[ruleIndex].title}", maxLines = 1, overflow = TextOverflow.Ellipsis) }
                             } else null,
+                            headlineContent = { Text(p.title) },
                             supportingContent = if (p.bodyMd.isNotBlank()) {
-                                { Text(p.bodyMd, maxLines = if (open) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis) }
-                            } else null,
-                            trailingContent = if (canManage) {
                                 {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        IconButton(onClick = { editing = Editing(p) }) { Icon(Icons.Outlined.Edit, "Edit ${p.title}") }
-                                        handle?.invoke()
-                                    }
+                                    MarkdownPreview(
+                                        markdown = p.bodyMd.lineSequence().filter { it.isNotBlank() }.take(3).joinToString("\n"),
+                                        onToggleCheck = null,
+                                        modifier = Modifier.heightIn(max = 96.dp).clipToBounds(),
+                                    )
                                 }
                             } else null,
+                            trailingContent = handle,
                         )
                     }
                 }
             }
         }
-    }
-
-    editing?.let { e ->
-        val existing = e.protocol
-        val rules = (state as? Load.Ready)?.value?.rules.orEmpty().takeIf { showRules }.orEmpty()
-        var title by remember(existing) { mutableStateOf(existing?.title.orEmpty()) }
-        var body by remember(existing) { mutableStateOf(existing?.bodyMd.orEmpty()) }
-        var ruleId by remember(existing) { mutableStateOf(existing?.ruleId) }
-        var ruleMenu by remember { mutableStateOf(false) }
-        AlertDialog(
-            onDismissRequest = { editing = null },
-            title = { Text(if (existing == null) "New protocol" else "Edit protocol") },
-            text = {
-                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(title, { title = it.take(200) }, label = { Text("Protocol") }, placeholder = { Text("e.g. Hydration") }, singleLine = true)
-                    OutlinedTextField(body, { body = it.take(20_000) }, label = { Text("What's expected, and when and how") }, minLines = 4)
-                    if (rules.isNotEmpty()) {
-                        Box {
-                            val i = rules.indexOfFirst { it.id == ruleId }
-                            OutlinedButton(onClick = { ruleMenu = true }, modifier = Modifier.fillMaxWidth()) {
-                                Icon(Icons.Outlined.Gavel, null)
-                                Text(
-                                    if (i >= 0) "  Rule ${i + 1}: ${rules[i].title}" else "  Spells out a rule (optional)",
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                            DropdownMenu(expanded = ruleMenu, onDismissRequest = { ruleMenu = false }) {
-                                DropdownMenuItem(text = { Text("No rule") }, onClick = { ruleId = null; ruleMenu = false })
-                                rules.forEachIndexed { n, r ->
-                                    DropdownMenuItem(text = { Text("${n + 1}. ${r.title}") }, onClick = { ruleId = r.id; ruleMenu = false })
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        // With Rules switched off the picker is hidden, so keep whatever link was there.
-                        vm.save(existing, ProtocolInput(title.trim(), body, if (rules.isEmpty()) existing?.ruleId else ruleId))
-                        editing = null
-                    },
-                    enabled = title.isNotBlank(),
-                ) { Text("Save") }
-            },
-            dismissButton = {
-                Row {
-                    if (existing != null) {
-                        TextButton(onClick = { vm.delete(existing); editing = null }) {
-                            Text("Delete", color = MaterialTheme.colorScheme.error)
-                        }
-                    }
-                    TextButton(onClick = { editing = null }) { Text("Cancel") }
-                }
-            },
-        )
     }
 }

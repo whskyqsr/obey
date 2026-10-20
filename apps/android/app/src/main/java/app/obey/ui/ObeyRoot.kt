@@ -73,6 +73,7 @@ import app.obey.ui.notes.NotesScreen
 import app.obey.ui.onboarding.RelationshipSetupScreen
 import app.obey.ui.onboarding.SignInScreen
 import app.obey.ui.rewards.RewardsScreen
+import app.obey.ui.protocols.ProtocolEditorScreen
 import app.obey.ui.protocols.ProtocolsScreen
 import app.obey.ui.rules.RulesScreen
 import app.obey.ui.settings.SettingsScreen
@@ -264,7 +265,14 @@ private fun ObeyNavHost(nav: NavHostController) {
         }
         composable<RewardsRoute> { RewardsScreen(onOpenSettings = settings) }
         composable<RulesRoute> { RulesScreen(onOpenSettings = settings) }
-        composable<ProtocolsRoute> { ProtocolsScreen(onOpenSettings = settings) }
+        composable<ProtocolsRoute> {
+            ProtocolsScreen(
+                onOpen = { nav.navigate(ProtocolEditorRoute(protocolId = it)) },
+                onNew = { nav.navigate(ProtocolEditorRoute()) },
+                onOpenSettings = settings,
+            )
+        }
+        composable<ProtocolEditorRoute> { ProtocolEditorScreen(onDone = { nav.popBackStack() }) }
         composable<NotesRoute> {
             NotesScreen(
                 journal = false,

@@ -51,7 +51,7 @@ export function MarkdownEditor({
   }, [editor, editable]);
 
   return (
-    <div className={cx(!bare && "rounded-lg border border-outline-variant bg-surface-container-lowest focus-within:border-primary", bare && "-mx-4")}>
+    <div className={cx(!bare && "group rounded-lg border border-outline-variant bg-surface-container-lowest focus-within:border-primary", bare && "-mx-4")}>
       {editable && editor && <Toolbar editor={editor} />}
       <EditorContent editor={editor} />
     </div>
@@ -129,7 +129,13 @@ function Toolbar({ editor }: { editor: Editor }) {
   }
 
   return (
-    <div role="toolbar" aria-label="Formatting" className="sticky top-14 z-10 flex flex-wrap items-center gap-0.5 rounded-t-lg border-b border-outline-variant bg-surface-container px-1 py-1">
+    // The opaque page-colored wrapper hides the editor's frame and text as they scroll under the pinned toolbar.
+    <div className="sticky top-14 z-10 -mx-px -mt-px bg-surface">
+      <div
+        role="toolbar"
+        aria-label="Formatting"
+        className="flex flex-wrap items-center gap-0.5 rounded-t-lg border border-outline-variant bg-surface-container px-1 py-1 group-focus-within:border-primary group-focus-within:border-b-outline-variant"
+      >
       {groups.map((g, i) => (
         <div key={i} className={cx("flex items-center gap-0.5", i > 0 && "border-l border-outline-variant pl-0.5")}>
           {g.map((b) => (
@@ -187,6 +193,7 @@ function Toolbar({ editor }: { editor: Editor }) {
           <TextField label="URL" type="url" inputMode="url" value={href} onChange={(e) => setHref(e.target.value)} placeholder="https://" />
         </form>
       </Dialog>
+      </div>
     </div>
   );
 }

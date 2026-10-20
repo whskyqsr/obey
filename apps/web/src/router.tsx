@@ -19,6 +19,7 @@ import { TodayPage } from "./pages/Today";
 
 // The notes editor pulls in TipTap/ProseMirror; load it on demand.
 const NoteEditorPage = lazy(() => import("./pages/NoteEditor").then((m) => ({ default: m.NoteEditorPage })));
+const ProtocolPage = lazy(() => import("./pages/ProtocolPage").then((m) => ({ default: m.ProtocolPage })));
 
 const rootRoute = createRootRoute({
   component: AppShell,
@@ -81,6 +82,21 @@ const journalEntryRoute = createRoute({
   },
 });
 
+const protocolRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/protocols/$protocolId",
+  component: function ProtocolRoute() {
+    const { protocolId } = protocolRoute.useParams();
+    return (
+      <Gate feature="protocols">
+        <Suspense fallback={<Loading />}>
+          <ProtocolPage protocolId={protocolId} />
+        </Suspense>
+      </Gate>
+    );
+  },
+});
+
 function OnboardingRoute() {
   const navigate = useNavigate();
   const { select } = useRel();
@@ -109,6 +125,7 @@ const routeTree = rootRoute.addChildren([
   page("/consequences", gated("consequences", ConsequencesPage)),
   page("/rules", gated("rules", RulesPage)),
   page("/protocols", gated("protocols", ProtocolsPage)),
+  protocolRoute,
   page("/notes", () => <NotesPage kind="note" />),
   noteRoute,
   page("/journal", gated("journal", () => <NotesPage kind="journal" />)),
