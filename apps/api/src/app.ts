@@ -31,6 +31,8 @@ export interface Deps {
   adminEmails?: string[];
   /** Sends our own verification email; null means clients fall back to Firebase's. */
   sendVerification?: ((email: string) => Promise<void>) | null;
+  /** Removes a sign-in from Firebase by its uid; null when the API has no service account. */
+  deleteSignIn?: ((authUid: string) => Promise<void>) | null;
   logger?: boolean;
 }
 

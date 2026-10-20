@@ -1,15 +1,6 @@
 package app.obey.ui.settings
 
-import androidx.compose.foundation.layout.height
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-
-import androidx.compose.material3.Button
-import androidx.compose.material.icons.outlined.Share
-import androidx.compose.ui.platform.LocalContext
 import android.content.Intent
-
-import androidx.compose.material3.Switch
-import app.obey.api.Features
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,16 +12,22 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,15 +38,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -63,16 +61,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.obey.api.Features
 import app.obey.api.ReschedulePolicy
 import app.obey.api.title
 import app.obey.auth.AuthState
-import app.obey.ui.common.Avatar
 import app.obey.data.SessionState
+import app.obey.ui.common.Avatar
 import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.SectionHeader
 import app.obey.ui.common.formatDateTime
@@ -216,8 +216,43 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, vm: SettingsVi
                     leadingContent = { Icon(Icons.AutoMirrored.Outlined.Logout, null, tint = MaterialTheme.colorScheme.error) },
                     headlineContent = { Text("Sign out", color = MaterialTheme.colorScheme.error) },
                 )
+                if (session != null) ListItem(
+                    modifier = Modifier.clickable { dialog = "delete" },
+                    leadingContent = { Icon(Icons.Outlined.DeleteForever, null, tint = MaterialTheme.colorScheme.error) },
+                    headlineContent = { Text("Delete account", color = MaterialTheme.colorScheme.error) },
+                )
             }
         }
+    }
+
+    if (dialog == "delete") session?.let { s ->
+        var typed by rememberSaveable { mutableStateOf("") }
+        // Everyone sharing a dynamic that hasn't ended: it ends for them too.
+        val partners = s.me.relationships.filter { it.endedAt == null }
+            .flatMap { r -> r.members.filter { it.userId != s.userId }.map { it.displayName } }
+            .distinct()
+        AlertDialog(
+            onDismissRequest = { if (!busy) dialog = null },
+            icon = { Icon(Icons.Outlined.DeleteForever, null) },
+            title = { Text("Delete your account?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (partners.isNotEmpty()) Text(
+                        "Your dynamic with ${partners.joinToString(" and ")} ends for both of you. They keep a read-only copy of the tasks and notes you shared, shown as from a deleted account.",
+                    )
+                    Text("Your profile, photo, private notes, journal and proof photos are deleted, and so is your sign-in. This can't be undone.")
+                    OutlinedTextField(typed, { typed = it }, label = { Text("Type \"delete\" to confirm") }, singleLine = true)
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !busy && typed.trim().equals("delete", ignoreCase = true),
+                    onClick = { vm.deleteAccount() },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) { Text("Delete for good") }
+            },
+            dismissButton = { TextButton(enabled = !busy, onClick = { dialog = null }) { Text("Cancel") } },
+        )
     }
 
     if (dialog == "name") session?.let { s ->

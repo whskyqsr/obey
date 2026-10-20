@@ -1,3 +1,4 @@
+import { getAuth } from "firebase-admin/auth";
 import { buildApp } from "./app.js";
 import { createAuthenticator } from "./auth.js";
 import { config } from "./config.js";
@@ -23,6 +24,7 @@ const app = buildApp({
   materializeDays: config.materializeDays,
   corsOrigins: config.corsOrigins,
   adminEmails: config.adminEmails,
+  deleteSignIn: firebase?.canSendPush ? (uid) => getAuth(firebase.app).deleteUser(uid) : null,
   // Generating the link needs the service account, the same credentials push uses.
   sendVerification:
     firebase?.canSendPush && config.resendApiKey ? verificationSender(firebase.app, { resendApiKey: config.resendApiKey, from: config.mailFrom, appUrl: config.appUrl }) : null,

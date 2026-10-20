@@ -294,6 +294,30 @@ describe("tasks and occurrences", () => {
     expect((await dom.post(`/relationships/${relId}/leave`, {})).status).toBe(200);
   });
 
+  it("deletes an account: ends shared dynamics, removes private writing, and frees the sign-in", async () => {
+    const { dom, sub, relId, subId, domId } = await ctx.pair();
+    await dom.post(`/relationships/${relId}/tasks`, task(subId));
+    await sub.post(`/relationships/${relId}/notes`, { bodyMd: "Shared with you" });
+    await sub.post(`/relationships/${relId}/notes`, { bodyMd: "Just mine", visibility: "private" });
+    const solo = (await sub.post("/relationships", { role: "submissive" })).body;
+
+    expect((await sub.del("/me")).status).toBe(204);
+    expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [domId], push: { body: "Sub deleted their account, so your dynamic has ended" } });
+
+    // The Dom keeps a read-only copy of what was shared, credited to a deleted account.
+    const me = (await dom.get("/me")).body;
+    const rel = me.relationships.find((r: { id: string }) => r.id === relId);
+    expect(rel.endedAt).toEqual(expect.any(String));
+    expect(rel.members.find((m: { userId: string }) => m.userId === subId).displayName).toBe("Deleted account");
+    expect((await dom.get(`/relationships/${relId}/notes`)).body.map((n: { bodyMd: string }) => n.bodyMd)).toEqual(["Shared with you"]);
+    expect((await dom.get(`/relationships/${solo.id}/notes`)).status).toBe(404);
+
+    // Signing in again with the same login starts over with an empty account.
+    const again = (await sub.get("/me")).body;
+    expect(again.user.id).not.toBe(subId);
+    expect(again.relationships).toEqual([]);
+  });
+
   it("takes photo proof only after the rules are accepted, and lets only its owner delete it", async () => {
     const { dom, sub, relId, subId, domId } = await ctx.pair();
     await dom.post(`/relationships/${relId}/tasks`, task(subId, { proofRequired: true }));

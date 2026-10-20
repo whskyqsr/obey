@@ -38,6 +38,10 @@ interface ObeyApi {
     @DELETE("me/avatar")
     suspend fun deleteAvatar(): User
 
+    /** Deletes the account and its sign-in for good; see the API's deleteAccount. */
+    @DELETE("me")
+    suspend fun deleteAccount()
+
     @GET("users/{id}/avatar")
     suspend fun avatar(@Path("id") userId: String, @Query("v") version: String): ResponseBody
 

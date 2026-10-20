@@ -11,6 +11,7 @@ import { PushHealth } from "../components/PushHealth";
 import { QuietHoursSetting } from "../components/QuietHours";
 import { NotificationTypes } from "../components/NotificationTypes";
 import { AppLockSetting } from "../components/AppLock";
+import { DeleteAccount } from "../components/DeleteAccount";
 import { type PushState, pushState, registerPush } from "../push";
 import { type ThemeMode, useTheme } from "../theme/ThemeProvider";
 import { SEED_PRESETS } from "../theme/tokens";
@@ -260,6 +261,7 @@ export function SettingsPage() {
             Sign out
           </Button>
         </div>
+        <DeleteAccount />
       </Section>
     </>
   );

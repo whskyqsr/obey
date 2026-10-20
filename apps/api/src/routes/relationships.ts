@@ -5,9 +5,10 @@ import type { FastifyInstance } from "fastify";
 import { allFeatures, createInvite, createRelationship, id, joinRelationship, leaveRelationship, registerDevice, updateMe, updateRelationship } from "@obey/contracts";
 import type { Deps } from "../app.js";
 import type { Tx } from "../db/index.js";
-import { blocks, devices, invites, memberships, occurrences, proofPhotos, relationships, taskSeries, users } from "../db/schema.js";
+import { blocks, devices, invites, memberships, relationships, users } from "../db/schema.js";
 import { HttpError, notFound } from "../errors.js";
 import { managers, membership, requireManager, requireMember } from "../services/access.js";
+import { deleteAccount, endRelationship } from "../services/account.js";
 
 // No 0/O/1/I so codes read cleanly aloud.
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -109,6 +110,29 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
     const now = deps.now();
     await db.update(users).set({ avatar: req.body, avatarType: type, avatarUpdatedAt: now }).where(eq(users.id, req.user.id));
     return userDto({ ...req.user, avatarUpdatedAt: now });
+  });
+
+  /**
+   * Deletes the account (see deleteAccount), then the sign-in itself. Allowed before verifying an email, so a
+   * mistyped address can be thrown away.
+   */
+  app.delete("/me", { config: { allowUnverified: true } }, async (req, reply) => {
+    const name = req.user.displayName;
+    const { ended } = await deleteAccount(db, req.user.id, deps.now());
+    for (const { relationshipId, others } of ended) {
+      await deps.notifier.send(others, {
+        title: "Obey",
+        body: `${name} deleted their account, so your dynamic has ended`,
+        data: { type: "relationship_ended", relationshipId },
+      });
+    }
+    try {
+      await deps.deleteSignIn?.(req.user.authUid);
+    } catch (e) {
+      // The data is gone either way; a sign-in left behind just starts a fresh, empty account.
+      req.log.error({ err: e }, "deleting the sign-in failed");
+    }
+    return reply.status(204).send();
   });
 
   app.delete("/me/avatar", async (req) => {
@@ -238,22 +262,13 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
     reply.status(204);
   });
 
-  /**
-   * Ends the dynamic for both partners (Jake's "archive for both"): it stays readable, its schedule stops, pending
-   * tasks are cancelled, open invites go, and proof photos are deleted. With `block`, the others can't pair with this
-   * person again.
-   */
+  /** Ends the dynamic for both partners (see endRelationship). With `block`, the others can't pair with this person again. */
   app.post<{ Params: { id: string } }>("/relationships/:id/leave", async (req) => {
     const body = leaveRelationship.parse(req.body ?? {});
     const m = await membership(db, req.params.id, req.user.id);
     if (!m) throw notFound();
     const others = (await db.select().from(memberships).where(eq(memberships.relationshipId, req.params.id))).map((r) => r.userId).filter((u) => u !== req.user.id);
     const ended = await db.transaction(async (tx) => {
-      const [rel] = await tx
-        .update(relationships)
-        .set({ endedAt: deps.now(), endedBy: req.user.id })
-        .where(and(eq(relationships.id, req.params.id), isNull(relationships.endedAt)))
-        .returning();
       // Only people actually in this dynamic can be blocked from it.
       const blocking = body.block.filter((u) => others.includes(u));
       if (blocking.length) {
@@ -262,18 +277,8 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
           .values(blocking.map((blockedId) => ({ blockerId: req.user.id, blockedId })))
           .onConflictDoNothing();
       }
-      if (!rel) return false; // Already ended; blocking afterwards is still allowed.
-      const series = tx.select({ id: taskSeries.id }).from(taskSeries).where(eq(taskSeries.relationshipId, rel.id));
-      const occs = tx.select({ id: occurrences.id }).from(occurrences).where(inArray(occurrences.seriesId, series));
-      await tx.delete(proofPhotos).where(inArray(proofPhotos.occurrenceId, occs));
-      await tx.update(occurrences).set({ photoCount: 0 }).where(inArray(occurrences.seriesId, series));
-      await tx
-        .update(occurrences)
-        .set({ status: "cancelled" })
-        .where(and(inArray(occurrences.seriesId, series), eq(occurrences.status, "pending")));
-      await tx.update(taskSeries).set({ active: false }).where(eq(taskSeries.relationshipId, rel.id));
-      await tx.delete(invites).where(eq(invites.relationshipId, rel.id));
-      return true;
+      // Already ended; blocking afterwards is still allowed.
+      return endRelationship(tx, req.params.id, req.user.id, deps.now());
     });
     if (ended) {
       await deps.notifier.send(others, {
