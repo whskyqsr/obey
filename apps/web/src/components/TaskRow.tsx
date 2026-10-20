@@ -1,3 +1,4 @@
+import { MOODS, MOOD_LABELS } from "./Mood";
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import type { Occurrence } from "../api/types";
@@ -91,7 +92,7 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
               label={`Mark “${o.title}” done`}
               data-action="done"
               className={missed ? "text-error" : "text-on-surface-variant"}
-              onClick={() => (o.proofRequired ? setCompleting(true) : quickComplete(o))}
+              onClick={() => (o.proofRequired || o.askMood ? setCompleting(true) : quickComplete(o))}
             />
           )
         ) : (
@@ -124,6 +125,12 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
         <div className={cx("flex flex-wrap items-center gap-x-2 text-body-medium", missed ? "text-error" : "text-on-surface-variant")}>
           <StreakStrip taskId={o.seriesId} compact />
           <span className="truncate">{parts.join(" · ")}</span>
+          {o.mood && (
+            <span className="inline-flex items-center gap-0.5" aria-label={`Felt ${MOOD_LABELS[o.mood - 1]!.toLowerCase()}`}>
+              <Icon name={MOODS[o.mood - 1]!} size={16} />
+              {MOOD_LABELS[o.mood - 1]}
+            </span>
+          )}
           {o.commentCount > 0 && (
             <span className="inline-flex items-center gap-0.5" aria-label={`${o.commentCount} comment${o.commentCount === 1 ? "" : "s"}`}>
               <Icon name="chat_bubble" size={14} />

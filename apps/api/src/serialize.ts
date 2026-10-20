@@ -26,6 +26,7 @@ export const taskDto = (s: Series) => ({
   graceMinutes: s.graceMinutes,
   steps: s.steps,
   windowMinutes: s.windowMinutes,
+  askMood: s.askMood,
   summary: describe(s.schedule),
   assignedConsequenceId: s.assignedConsequenceId,
   active: s.active,
@@ -53,6 +54,8 @@ export const occurrenceDto = (o: typeof occurrences.$inferSelect, s: Series) => 
   // Only ids still in the ritual count; a step removed after it was ticked drops out.
   stepsDone: o.stepsDone.filter((id) => s.steps.some((st) => st.id === id)),
   opensAt: s.windowMinutes ? iso(new Date(o.dueAt.getTime() - s.windowMinutes * 60_000)) : null,
+  askMood: s.askMood,
+  mood: o.mood,
 });
 
 /** `title` is the task's, so a request card can say which task it's about. */

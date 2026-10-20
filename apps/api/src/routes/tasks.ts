@@ -18,7 +18,7 @@ import {
 import { addDays, dueInstant, localDate } from "@obey/recurrence";
 import type { Deps } from "../app.js";
 import type { Tx } from "../db/index.js";
-import { consequences, occurrences, pointsLedger, relationships, reschedules, taskSeries } from "../db/schema.js";
+import { consequences, notes, occurrences, pointsLedger, relationships, reschedules, taskSeries } from "../db/schema.js";
 import { HttpError, forbidden, notFound, parsePatch } from "../errors.js";
 import { occurrenceDto, rescheduleDto, taskDto } from "../serialize.js";
 import { addComment } from "./comments.js";
@@ -245,6 +245,52 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   });
 
   /** Each active task's streak and last few results, for the strips on task cards. Follows "this and following" splits like stats. */
+  /** The mood graph: check-in answers (both see them) and journal moods the viewer may read, oldest first. */
+  app.get<{ Params: { id: string }; Querystring: { days?: string } }>("/relationships/:id/moods", async (req) => {
+    await requireMember(db, req.params.id, req.user.id);
+    const days = z.coerce.number().int().min(1).max(366).default(30).parse(req.query.days);
+    const since = new Date(deps.now().getTime() - days * 86_400_000);
+    const checkins = await db
+      .select({ occ: occurrences, title: taskSeries.title, assigneeId: taskSeries.assigneeId })
+      .from(occurrences)
+      .innerJoin(taskSeries, eq(occurrences.seriesId, taskSeries.id))
+      .where(and(eq(taskSeries.relationshipId, req.params.id), sql`${occurrences.mood} is not null`, gte(occurrences.completedAt, since)));
+    const journal = await db
+      .select()
+      .from(notes)
+      .where(
+        and(
+          eq(notes.relationshipId, req.params.id),
+          eq(notes.kind, "journal"),
+          sql`${notes.mood} is not null`,
+          gte(notes.createdAt, since),
+          or(eq(notes.visibility, "shared"), eq(notes.authorId, req.user.id)),
+        ),
+      );
+    return [
+      ...checkins.map(({ occ, title, assigneeId }) => ({
+        at: occ.completedAt!.toISOString(),
+        userId: assigneeId,
+        mood: occ.mood!,
+        source: "checkin" as const,
+        title,
+        note: occ.noteMd,
+        occurrenceId: occ.id,
+        noteId: null,
+      })),
+      ...journal.map((n) => ({
+        at: n.createdAt.toISOString(),
+        userId: n.authorId,
+        mood: n.mood!,
+        source: "journal" as const,
+        title: n.title,
+        note: null,
+        occurrenceId: null,
+        noteId: n.id,
+      })),
+    ].sort((a, b) => a.at.localeCompare(b.at));
+  });
+
   app.get<{ Params: { id: string } }>("/relationships/:id/streaks", async (req) => {
     await requireMember(db, req.params.id, req.user.id);
     const series = await db
@@ -331,7 +377,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   app.post<{ Params: { id: string } }>("/occurrences/:id/complete", async (req) => {
     const body = completeBody.parse(req.body ?? {});
     const { occ, series, member } = await loadOccurrence(db, req.params.id, req.user.id);
-    const updated = await db.transaction((tx) => completeOccurrence(tx, series, occ, { userId: req.user.id, role: member.role }, body.noteMd, deps.now()));
+    const updated = await db.transaction((tx) => completeOccurrence(tx, series, occ, { userId: req.user.id, role: member.role }, body.noteMd, deps.now(), body.mood));
     if (req.user.id === series.assigneeId) {
       const submitted = updated.status === "submitted";
       await notifier.send(await managers(db, series.relationshipId, req.user.id), {

@@ -204,6 +204,8 @@ export const taskSeries = pgTable(
     steps: jsonb("steps").$type<{ id: string; title: string }[]>().notNull().default([]),
     /** When set, the assignee can only do it in the last this-many minutes before it's due. */
     windowMinutes: integer("window_minutes"),
+    /** A check-in: completing it asks the assignee how they feel (1 to 5). */
+    askMood: boolean("ask_mood").notNull().default(false),
     active: boolean("active").notNull().default(true),
     /** Set on the consequence handed out automatically for this missed occurrence; unique, so it's issued once. */
     causedByOccurrenceId: uuid("caused_by_occurrence_id").references((): AnyPgColumn => occurrences.id, { onDelete: "set null" }),
@@ -240,6 +242,8 @@ export const occurrences = pgTable(
     commentCount: integer("comment_count").notNull().default(0),
     /** Ids of the ritual steps ticked off so far. */
     stepsDone: jsonb("steps_done").$type<string[]>().notNull().default([]),
+    /** The mood given at a check-in, 1 (worst) to 5 (best). */
+    mood: integer("mood"),
     reviewedBy: uuid("reviewed_by").references(() => users.id),
     reviewedAt: ts("reviewed_at"),
     /** Cancelled because someone called it off around a plan (not because its series was edited); history shows these. */

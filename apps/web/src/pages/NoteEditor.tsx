@@ -6,7 +6,7 @@ import type { Note, NoteInput } from "../api/types";
 import { MarkdownEditor } from "../components/MarkdownEditor";
 import { Button, Chip, ErrorBox, Icon, IconButton, Loading, SegmentedButtons, Switch, useSnackbar } from "../components/ui";
 import { fmtDateTime } from "../lib/dates";
-import { MOODS } from "./Notes";
+import { MOODS } from "../components/Mood";
 import { useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
 import { useConfirm } from "../lib/useConfirm";

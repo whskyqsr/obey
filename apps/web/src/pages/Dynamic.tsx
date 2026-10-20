@@ -5,6 +5,7 @@ import { errorMessage } from "../api/client";
 import type { DynamicDate, Features, Invite, Member, Relationship, ReschedulePolicy, Role } from "../api/types";
 import { Avatar } from "../components/Avatar";
 import { CollarIcon } from "../components/CollarIcon";
+import { MoodCard } from "../components/Mood";
 import { DynamicHero } from "../components/DynamicHero";
 import { Button, Checkbox, Chip, Dialog, Icon, IconButton, OverflowMenu, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
 import { ReportDialog } from "../components/Proof";
@@ -212,6 +213,8 @@ export function DynamicPage() {
             />
           )}
         </Group>
+
+        <MoodCard heading={<Label>Mood</Label>} />
 
         {(isDom || dates.length > 0) && (
           <>

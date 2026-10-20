@@ -71,6 +71,7 @@ export const kitRoutes = (deps: Deps) => async (app: FastifyInstance) => {
             bodyMd: item.bodyMd ?? "",
             schedule: { start: startFor(item.dueTime), rule: { interval: 1, ...item.repeat! } },
             dueTime: item.dueTime ?? null,
+            askMood: item.askMood ?? false,
             timezone: body.timezone,
           })
           .returning();

@@ -7,10 +7,11 @@ import { fmtDate, fmtDateTime, fmtRelative, fmtTime, localDateOf, today } from "
 import { useReadOnly, useRel } from "../lib/relationship";
 import { Comments, SendBackDialog } from "./Comments";
 import { ProofPhotos } from "./Proof";
+import { MOODS, MOOD_LABELS, MoodPicker } from "./Mood";
 import { RitualDialog, StepList, isRitual, stepProgress } from "./Ritual";
 import { RescheduleSheet } from "./RescheduleSheet";
 import { StreakStrip } from "./StreakStrip";
-import { Badge, Button, Dialog, TextArea, cx, useSnackbar } from "./ui";
+import { Badge, Button, Dialog, Icon, TextArea, cx, useSnackbar } from "./ui";
 
 const STATUS: Record<OccurrenceStatus, { label: string; tone: "primary" | "error" | "tertiary" | "neutral" }> = {
   pending: { label: "To do", tone: "neutral" },
@@ -96,6 +97,11 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
           <StepList o={o} />
         </div>
       )}
+      {o.mood && (
+        <p className="flex items-center gap-1.5 text-body-medium text-on-surface-variant">
+          <Icon name={MOODS[o.mood - 1]!} size={18} /> Felt {MOOD_LABELS[o.mood - 1]!.toLowerCase()}
+        </p>
+      )}
       {o.noteMd && <p className="rounded-sm bg-surface-container px-3 py-2 text-body-medium whitespace-pre-wrap text-on-surface-variant">{o.noteMd}</p>}
       {o.photoCount > 0 && (
         <div className="relative z-10">
@@ -180,13 +186,17 @@ export function CompleteDialog({ o, open, onClose }: { o: Occurrence; open: bool
   const { rel } = useRel();
   const snack = useSnackbar();
   const complete = useCompleteOccurrence(rel.id);
+  const { me } = useRel();
   const [note, setNote] = useState("");
+  const [mood, setMood] = useState<number | null>(null);
+  // Only the assignee answers a check-in; a Dominant marking it done skips the mood.
+  const asksMood = o.askMood && o.assigneeId === me.user.id;
   const needsProof = o.proofRequired && o.photoCount === 0 && !note.trim();
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      title={`Done: ${o.title}`}
+      title={asksMood ? o.title : `Done: ${o.title}`}
       actions={
         <>
           <Button variant="text" onClick={onClose}>
@@ -194,30 +204,42 @@ export function CompleteDialog({ o, open, onClose }: { o: Occurrence; open: bool
           </Button>
           <Button
             busy={complete.isPending}
-            disabled={needsProof}
+            disabled={needsProof || (asksMood && !mood)}
             onClick={() =>
               complete.mutate(
-                { id: o.id, noteMd: note.trim() || undefined },
+                { id: o.id, noteMd: note.trim() || undefined, mood: asksMood ? mood! : undefined },
                 {
                   onSuccess: (res) => {
                     onClose();
                     setNote("");
-                    snack(res?.status === "submitted" ? "Sent for approval" : "Marked done");
+                    setMood(null);
+                    snack(res?.status === "submitted" ? "Sent for approval" : asksMood ? "Checked in" : "Marked done");
                   },
                   onError: (e) => snack(errorMessage(e)),
                 },
               )
             }
           >
-            Mark done
+            {asksMood ? "Check in" : "Mark done"}
           </Button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
+        {asksMood && (
+          <>
+            <p className="text-title-medium text-on-surface">How do you feel?</p>
+            <MoodPicker value={mood} onChange={setMood} />
+          </>
+        )}
         {o.proofRequired && <p>This one needs proof: add a photo, a note, or both.</p>}
         <ProofPhotos o={o} canAdd />
-        <TextArea label={o.proofRequired ? "Note" : "Note (optional)"} value={note} onChange={(e) => setNote(e.target.value)} maxLength={5000} />
+        <TextArea
+          label={o.proofRequired ? "Note" : asksMood ? "Anything to add? (optional)" : "Note (optional)"}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          maxLength={5000}
+        />
       </div>
     </Dialog>
   );

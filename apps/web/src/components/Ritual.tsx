@@ -52,7 +52,7 @@ export function RitualDialog({ o, open, onClose }: { o: Occurrence; open: boolea
   }
 
   function finish() {
-    if (o.proofRequired) setFinishing(true);
+    if (o.proofRequired || o.askMood) setFinishing(true);
     else {
       quickComplete(o);
       onClose();

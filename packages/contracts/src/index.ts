@@ -187,6 +187,8 @@ export const taskInput = z.object({
     .max(60 * 24)
     .nullable()
     .default(null),
+  /** A check-in: marking it done asks the assignee for a mood. */
+  askMood: z.boolean().default(false),
 });
 export type TaskInput = z.input<typeof taskInput>;
 
@@ -228,6 +230,9 @@ export const occurrence = z.object({
   stepsDone: z.array(z.string()).default([]),
   /** The moment the assignee may start it, when the task has a window; null when any time that day is fine. */
   opensAt: z.string().nullable().default(null),
+  /** A check-in asks for a mood when it's marked done; mood is the answer, 1 (worst) to 5 (best). */
+  askMood: z.boolean().default(false),
+  mood: z.number().int().min(1).max(5).nullable().default(null),
 });
 export type Occurrence = z.infer<typeof occurrence>;
 
@@ -278,7 +283,22 @@ export const editOccurrence = z.object({
   noteMd: z.string().max(5_000).nullable().optional(),
 });
 
-export const completeOccurrence = z.object({ noteMd: z.string().max(5_000).optional() });
+export const mood = z.number().int().min(1).max(5);
+export const completeOccurrence = z.object({ noteMd: z.string().max(5_000).optional(), mood: mood.optional() });
+
+/** One point on the mood graph: a check-in, or a journal entry with a mood. */
+export const moodEntry = z.object({
+  at: z.string(),
+  userId: id,
+  mood,
+  source: z.enum(["checkin", "journal"]),
+  /** The check-in task's title, or the journal entry's. */
+  title: z.string(),
+  note: z.string().nullable(),
+  occurrenceId: id.nullable(),
+  noteId: id.nullable(),
+});
+export type MoodEntry = z.infer<typeof moodEntry>;
 export const tickStep = z.object({ stepId: z.string().min(1).max(40), done: z.boolean() });
 export const reviewOccurrence = z.object({
   approve: z.boolean(),
@@ -551,6 +571,8 @@ export interface KitItem {
   /** Tasks: how often, and by when. */
   repeat?: { freq: "daily" | "weekly"; interval?: number; byWeekday?: ("MO" | "TU" | "WE" | "TH" | "FR" | "SA" | "SU")[] };
   dueTime?: string;
+  /** Tasks: a check-in that asks for a mood. */
+  askMood?: boolean;
   /** Protocols: the key of the kit rule it spells out. */
   ruleKey?: string;
 }
@@ -570,7 +592,15 @@ export const starterKits: StarterKit[] = [
     description: "A simple daily rhythm to start with.",
     icon: "wb_sunny",
     items: [
-      { key: "morning", kind: "task", title: "Morning check-in", bodyMd: "A quick message: how you slept and your plan for the day.", repeat: { freq: "daily" }, dueTime: "09:00" },
+      {
+        key: "morning",
+        kind: "task",
+        title: "Morning check-in",
+        bodyMd: "How you feel, how you slept and your plan for the day.",
+        repeat: { freq: "daily" },
+        dueTime: "09:00",
+        askMood: true,
+      },
       { key: "bed", kind: "task", title: "Make the bed", repeat: { freq: "daily" }, dueTime: "10:00" },
       { key: "journal", kind: "task", title: "One line in your journal", bodyMd: "One good thing, one thing to do better.", repeat: { freq: "daily" }, dueTime: "21:30" },
       { key: "lights", kind: "task", title: "Lights out", repeat: { freq: "daily" }, dueTime: "23:00" },
