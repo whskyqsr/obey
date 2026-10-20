@@ -96,6 +96,8 @@ export function AppShell() {
   const partner = rel.members.find((m) => m.userId !== me.user.id);
   const todayBadge = useNeedsYou().count;
   const { all, bar, more } = useDestinations();
+  // The editor's Save is the only action that matters while editing, so the phone bar steps aside.
+  const editing = /^\/tasks\/(new|[^/]+\/edit)$/.test(pathname);
 
   return (
     <div className="min-h-dvh bg-surface">
@@ -143,7 +145,7 @@ export function AppShell() {
         ))}
       </nav>
 
-      <main className="pb-28 md:pb-10 md:pl-24 lg:pl-64">
+      <main className={cx(editing ? "pb-10" : "pb-28", "md:pb-10 md:pl-24 lg:pl-64")}>
         {/* Today brings its own side panel on wide screens, so it gets the full width. */}
         <div className={cx("mx-auto", pathname === "/" ? "max-w-5xl xl:max-w-none" : "max-w-5xl")}>
           <Outlet />
@@ -151,7 +153,7 @@ export function AppShell() {
       </main>
 
       {/* Navigation bar (compact) */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex bg-surface-container pb-[env(safe-area-inset-bottom)] md:hidden">
+      <nav className={cx("fixed inset-x-0 bottom-0 z-30 flex bg-surface-container pb-[env(safe-area-inset-bottom)] md:hidden", editing && "hidden")}>
         {bar.map((d) => (
           <NavItem key={d.to} d={d} compact active={isActive(pathname, d.to, more)} badge={d.to === "/" ? todayBadge : 0} />
         ))}

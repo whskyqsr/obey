@@ -13,6 +13,8 @@ export function MarkdownEditor({
   placeholder,
   editable = true,
   bare = false,
+  label = "Note body",
+  compact = false,
 }: {
   value: string;
   onChange(markdown: string): void;
@@ -20,6 +22,9 @@ export function MarkdownEditor({
   editable?: boolean;
   /** Render without the editing frame, for reading. */
   bare?: boolean;
+  label?: string;
+  /** A shorter writing area, for a field inside a form. */
+  compact?: boolean;
 }) {
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -31,7 +36,7 @@ export function MarkdownEditor({
     contentType: "markdown",
     editable,
     immediatelyRender: true,
-    editorProps: { attributes: { class: "prose-m3 px-4 py-4 text-on-surface", "aria-label": "Note body" } },
+    editorProps: { attributes: { class: cx("prose-m3 px-4 py-4 text-on-surface", compact && "prose-compact"), "aria-label": label } },
     onUpdate({ editor }) {
       const md = editor.getMarkdown();
       lastEmitted.current = md;
@@ -122,7 +127,10 @@ function Toolbar({ editor }: { editor: Editor }) {
     if (!url) chain().extendMarkRange("link").unsetLink().run();
     else {
       const full = /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`;
-      if (editor.state.selection.empty && !s.link) chain().insertContent({ type: "text", text: url, marks: [{ type: "link", attrs: { href: full } }] }).run();
+      if (editor.state.selection.empty && !s.link)
+        chain()
+          .insertContent({ type: "text", text: url, marks: [{ type: "link", attrs: { href: full } }] })
+          .run();
       else chain().extendMarkRange("link").setLink({ href: full }).run();
     }
     setLinkOpen(false);
@@ -136,63 +144,63 @@ function Toolbar({ editor }: { editor: Editor }) {
         aria-label="Formatting"
         className="flex flex-wrap items-center gap-0.5 rounded-t-lg border border-outline-variant bg-surface-container px-1 py-1 group-focus-within:border-primary group-focus-within:border-b-outline-variant"
       >
-      {groups.map((g, i) => (
-        <div key={i} className={cx("flex items-center gap-0.5", i > 0 && "border-l border-outline-variant pl-0.5")}>
-          {g.map((b) => (
-            <button
-              key={b.icon}
-              type="button"
-              title={b.label}
-              aria-label={b.label}
-              aria-pressed={b.active}
-              disabled={b.disabled}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={b.run}
-              className={cx(
-                "state-layer flex size-9 items-center justify-center rounded-full disabled:opacity-30",
-                b.active ? "bg-secondary-container text-on-secondary-container" : "text-on-surface-variant",
-              )}
-            >
-              <Icon name={b.icon} size={20} />
-            </button>
-          ))}
-        </div>
-      ))}
-      <Dialog
-        open={linkOpen}
-        onClose={() => setLinkOpen(false)}
-        title="Link"
-        actions={
-          <>
-            {s.link && (
-              <Button
-                variant="text"
-                className="mr-auto"
-                onClick={() => {
-                  chain().extendMarkRange("link").unsetLink().run();
-                  setLinkOpen(false);
-                }}
+        {groups.map((g, i) => (
+          <div key={i} className={cx("flex items-center gap-0.5", i > 0 && "border-l border-outline-variant pl-0.5")}>
+            {g.map((b) => (
+              <button
+                key={b.icon}
+                type="button"
+                title={b.label}
+                aria-label={b.label}
+                aria-pressed={b.active}
+                disabled={b.disabled}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={b.run}
+                className={cx(
+                  "state-layer flex size-9 items-center justify-center rounded-full disabled:opacity-30",
+                  b.active ? "bg-secondary-container text-on-secondary-container" : "text-on-surface-variant",
+                )}
               >
-                Remove
+                <Icon name={b.icon} size={20} />
+              </button>
+            ))}
+          </div>
+        ))}
+        <Dialog
+          open={linkOpen}
+          onClose={() => setLinkOpen(false)}
+          title="Link"
+          actions={
+            <>
+              {s.link && (
+                <Button
+                  variant="text"
+                  className="mr-auto"
+                  onClick={() => {
+                    chain().extendMarkRange("link").unsetLink().run();
+                    setLinkOpen(false);
+                  }}
+                >
+                  Remove
+                </Button>
+              )}
+              <Button variant="text" onClick={() => setLinkOpen(false)}>
+                Cancel
               </Button>
-            )}
-            <Button variant="text" onClick={() => setLinkOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={applyLink}>Apply</Button>
-          </>
-        }
-      >
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            applyLink();
-          }}
-          className="pt-2"
+              <Button onClick={applyLink}>Apply</Button>
+            </>
+          }
         >
-          <TextField label="URL" type="url" inputMode="url" value={href} onChange={(e) => setHref(e.target.value)} placeholder="https://" />
-        </form>
-      </Dialog>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              applyLink();
+            }}
+            className="pt-2"
+          >
+            <TextField label="URL" type="url" inputMode="url" value={href} onChange={(e) => setHref(e.target.value)} placeholder="https://" />
+          </form>
+        </Dialog>
       </div>
     </div>
   );
