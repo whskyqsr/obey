@@ -17,15 +17,20 @@ const files = {
   "__/auth/experiments.js": "__/auth/experiments.js",
   "__/auth/iframe": "__/auth/iframe.html",
   "__/auth/iframe.js": "__/auth/iframe.js",
-  "__/firebase/init.json": "__/firebase/init.json",
 };
+// Only exists when the project has Firebase Hosting; the helpers work without it.
+const optional = { "__/firebase/init.json": "__/firebase/init.json" };
 
 try {
   await mkdir("dist/__/auth", { recursive: true });
   await mkdir("dist/__/firebase", { recursive: true });
-  for (const [path, out] of Object.entries(files)) {
+  for (const [path, out] of Object.entries({ ...files, ...optional })) {
     const res = await fetch(`${source}/${path}`);
-    if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
+    console.log(`${source}/${path}: HTTP ${res.status}`);
+    if (!res.ok) {
+      if (path in optional) continue;
+      throw new Error(`${path}: HTTP ${res.status}`);
+    }
     await writeFile(`dist/${out}`, Buffer.from(await res.arrayBuffer()));
   }
   console.log(`Copied Firebase auth helpers from ${source}`);
