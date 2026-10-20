@@ -71,6 +71,9 @@ interface ObeyApi {
     @PATCH("relationships/{id}")
     suspend fun updateRelationship(@Path("id") relationshipId: String, @Body body: UpdateRelationshipInput): Relationship
 
+    @POST("relationships/{id}/leave")
+    suspend fun leaveRelationship(@Path("id") relationshipId: String, @Body body: LeaveInput): Relationship
+
     // Tasks
     @GET("relationships/{id}/tasks")
     suspend fun tasks(@Path("id") relationshipId: String): List<Task>

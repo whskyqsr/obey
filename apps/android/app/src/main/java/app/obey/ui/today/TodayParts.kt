@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -181,6 +183,23 @@ fun LaterDay(day: LocalDate, items: List<Occurrence>, row: @Composable (Occurren
         }
         AnimatedVisibility(open) {
             Column { items.forEach { row(it) } }
+        }
+    }
+}
+
+/** At the top of Today in a dynamic that has ended: it's an archive now. */
+@Composable
+fun EndedBanner(onOpen: () -> Unit) {
+    androidx.compose.material3.Surface(
+        onClick = onOpen,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = MaterialTheme.shapes.large,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(androidx.compose.material.icons.Icons.Outlined.Inventory2, null)
+            androidx.compose.foundation.layout.Spacer(Modifier.width(12.dp))
+            Text("This dynamic has ended. It's kept here read-only.", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         }
     }
 }

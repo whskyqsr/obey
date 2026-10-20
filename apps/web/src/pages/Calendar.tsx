@@ -92,14 +92,18 @@ export function CalendarPage() {
         <IconButton icon="chevron_left" label="Previous" onClick={() => step(-1)} />
         <IconButton icon="chevron_right" label="Next" onClick={() => step(1)} />
         <h2 className="min-w-0 flex-1 truncate px-2 text-title-large text-on-surface">{title}</h2>
-        <span className="md:hidden">
-          <IconButton icon="event" label="New plan" onClick={() => setPlan(null)} />
-        </span>
-        <span className="hidden md:block">
-          <Button variant="tonal" icon="event" onClick={() => setPlan(null)}>
-            Plan
-          </Button>
-        </span>
+        {!rel.endedAt && (
+          <>
+            <span className="md:hidden">
+              <IconButton icon="event" label="New plan" onClick={() => setPlan(null)} />
+            </span>
+            <span className="hidden md:block">
+              <Button variant="tonal" icon="event" onClick={() => setPlan(null)}>
+                Plan
+              </Button>
+            </span>
+          </>
+        )}
         <Button
           variant="text"
           onClick={() => {

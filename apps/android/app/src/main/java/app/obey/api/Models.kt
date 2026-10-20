@@ -135,7 +135,16 @@ data class Relationship(
     /** Whether a submissive may write notes of their own. */
     val subNotes: Boolean = true,
     val dates: List<DynamicDate> = emptyList(),
-)
+    /** When a partner left or blocked; an ended dynamic is kept read-only for both. */
+    val endedAt: String? = null,
+    val endedBy: String? = null,
+) {
+    val ended: Boolean get() = endedAt != null
+}
+
+/** Leaving ends the dynamic for both; blocking also stops the partner pairing with you again. */
+@Serializable
+data class LeaveInput(val block: Boolean = false)
 
 /** Parts of the app a dynamic can switch off; switched-off parts are hidden for everyone in it. Tasks and notes are always on. */
 @Serializable

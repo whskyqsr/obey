@@ -77,8 +77,14 @@ export const relationship = z.object({
   subNotes: z.boolean(),
   dates: z.array(dynamicDate),
   createdAt: z.string(),
+  /** When a partner left or blocked; an ended dynamic is kept read-only for both. */
+  endedAt: z.string().nullable(),
+  endedBy: id.nullable(),
 });
 export type Relationship = z.infer<typeof relationship>;
+
+/** Leaving ends the dynamic for both; blocking also stops the other person pairing with you again. */
+export const leaveRelationship = z.object({ block: z.boolean().default(false) });
 
 export const me = z.object({ user, relationships: z.array(relationship) });
 export type Me = z.infer<typeof me>;

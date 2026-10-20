@@ -215,6 +215,36 @@ describe("tasks and occurrences", () => {
     expect((await dom.get(`/relationships/${relId}/balances`)).body[0].balance).toBe(10);
   });
 
+  it("ends a dynamic for both when one leaves, keeping it read-only, and blocks re-pairing", async () => {
+    const { dom, sub, relId, subId, domId } = await ctx.pair();
+    await dom.post(`/relationships/${relId}/tasks`, task(subId));
+    const [first] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    await sub.post("/me/proof-terms", { adult: true, rules: true });
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 0xff, 0xd9]);
+    const photo = await ctx.app.inject({ method: "POST", url: `/occurrences/${first.id}/photos`, payload: jpeg, headers: { ...sub.headers, "content-type": "image/jpeg" } });
+    expect(photo.statusCode).toBe(201);
+
+    const left = await sub.post(`/relationships/${relId}/leave`, { block: true });
+    expect(left.body.endedAt).toEqual(expect.any(String));
+    expect(left.body.endedBy).toBe(subId);
+    expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [domId], push: { body: "Sub ended your dynamic" } });
+
+    // Both still read it; nothing changes it any more.
+    // The open task was cancelled, so it no longer lists; done and missed ones stay as history.
+    expect((await dom.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body).toEqual([]);
+    expect((await ctx.app.inject({ method: "GET", url: `/photos/${photo.json().id}`, headers: dom.headers })).statusCode).toBe(404);
+    expect((await sub.get(`/relationships/${relId}/tasks`)).status).toBe(200);
+    expect((await dom.post(`/relationships/${relId}/tasks`, task(subId))).status).toBe(409);
+    expect((await dom.post(`/relationships/${relId}/invites`)).status).toBe(409);
+
+    // The blocked Dom can't bring the sub into a new dynamic.
+    const fresh = (await dom.post("/relationships", { role: "dominant" })).body;
+    const invite = (await dom.post(`/relationships/${fresh.id}/invites`)).body;
+    expect((await sub.post("/relationships/join", { code: invite.code, role: "submissive" })).status).toBe(403);
+    // Leaving again is harmless.
+    expect((await dom.post(`/relationships/${relId}/leave`, {})).status).toBe(200);
+  });
+
   it("takes photo proof only after the rules are accepted, and lets only its owner delete it", async () => {
     const { dom, sub, relId, subId, domId } = await ctx.pair();
     await dom.post(`/relationships/${relId}/tasks`, task(subId, { proofRequired: true }));

@@ -117,7 +117,7 @@ fun UpcomingScreen(
             TopAppBar(
                 title = { Text("Calendar") },
                 actions = {
-                    IconButton(onClick = {
+                    if (session?.readOnly != true) IconButton(onClick = {
                         val day = if (view == CalendarView.Month && !selected.isBefore(today)) selected else today
                         plan = null to day
                     }) { Icon(Icons.Outlined.EditCalendar, "New plan") }

@@ -130,6 +130,16 @@ export function AppShell() {
       <main className={cx(editing ? "pb-10" : "pb-28", "md:pb-10 md:pl-24 lg:pl-64")}>
         {/* Today brings its own side panel on wide screens, so it gets the full width. */}
         <div className={cx("mx-auto", pathname === "/" ? "max-w-5xl xl:max-w-none" : "max-w-5xl")}>
+          {rel.endedAt && pathname !== "/dynamic" && (
+            <Link
+              to="/dynamic"
+              className="state-layer mx-4 mt-3 flex items-center gap-3 rounded-lg bg-surface-container-high px-4 py-3 text-body-medium text-on-surface-variant md:mx-6"
+            >
+              <Icon name="inventory_2" className="shrink-0" />
+              <span className="min-w-0 flex-1">This dynamic has ended. It's kept here read-only.</span>
+              <Icon name="chevron_right" />
+            </Link>
+          )}
           <Outlet />
         </div>
       </main>

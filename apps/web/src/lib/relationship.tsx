@@ -27,7 +27,8 @@ const RelContext = createContext<RelState | null>(null);
 export function RelationshipProvider({ me, children }: { me: Me; children: ReactNode }) {
   const [selected, setSelected] = useState(() => storage.get(KEY));
   const value = useMemo<RelState | null>(() => {
-    const rel = me.relationships.find((r) => r.id === selected) ?? me.relationships[0];
+    // An ended dynamic is still there to look back on, but a live one opens first.
+    const rel = me.relationships.find((r) => r.id === selected) ?? me.relationships.find((r) => !r.endedAt) ?? me.relationships[0];
     if (!rel) return null;
     const self = rel.members.find((m) => m.userId === me.user.id);
     return {
@@ -51,6 +52,11 @@ export function RelationshipProvider({ me, children }: { me: Me; children: React
   }, [me, selected]);
   if (!value) return <>{children}</>;
   return <RelContext.Provider value={value}>{children}</RelContext.Provider>;
+}
+
+/** Whether the dynamic in view has ended and is kept read-only; false outside one. */
+export function useReadOnly(): boolean {
+  return useContext(RelContext)?.rel.endedAt != null;
 }
 
 export function useRel(): RelState {

@@ -1,12 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { useCreateInvite, useUpdateRelationship } from "../api/hooks";
+import { useCreateInvite, useLeaveRelationship, useUpdateRelationship } from "../api/hooks";
 import { errorMessage } from "../api/client";
-import type { DynamicDate, Features, Invite, ReschedulePolicy, Role } from "../api/types";
+import type { DynamicDate, Features, Invite, Relationship, ReschedulePolicy, Role } from "../api/types";
 import { Avatar } from "../components/Avatar";
 import { CollarIcon } from "../components/CollarIcon";
 import { DynamicHero } from "../components/DynamicHero";
-import { Button, Chip, Dialog, Icon, IconButton, OverflowMenu, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
+import { Button, Checkbox, Chip, Dialog, Icon, IconButton, OverflowMenu, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
 import { ReportDialog } from "../components/Proof";
 import { fmtDate, fmtDateTime, localDateOf, today } from "../lib/dates";
 import { anniversary, describeDate } from "../lib/dynamicDates";
@@ -130,7 +130,9 @@ function Row({
 
 /** Everything about the relationship itself: who's in it, inviting, how it works, and which features are on. */
 export function DynamicPage() {
-  const { me, rel, self, isDom, select, memberName, features } = useRel();
+  const { me, rel, self, isDom: dom, select, memberName, features } = useRel();
+  // Nothing in an ended dynamic can change, so nobody gets the controls.
+  const isDom = dom && rel.endedAt === null;
   const navigate = useNavigate();
   const snack = useSnackbar();
   const update = useUpdateRelationship(rel.id);
@@ -138,6 +140,8 @@ export function DynamicPage() {
   const title = useDynamicTitle();
   const [sheet, setSheet] = useState<"invite" | "name" | "deadlines" | null>(null);
   const [reporting, setReporting] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState<"leave" | "block" | null>(null);
+  const ended = rel.endedAt !== null;
   // The date being edited: an existing one, or a blank new one.
   const [editingDate, setEditingDate] = useState<DynamicDate | null>(null);
   const now = today();
@@ -168,6 +172,12 @@ export function DynamicPage() {
             .join(" · ")}
         />
 
+        {ended && (
+          <div className="mb-2 flex items-start gap-3 rounded-lg bg-surface-container-high px-4 py-3 text-body-medium text-on-surface-variant">
+            <Icon name="inventory_2" className="shrink-0" />
+            {endedLine(rel, me.user.id, memberName)}
+          </div>
+        )}
         {reporting && <ReportDialog subjectId={reporting} onClose={() => setReporting(null)} />}
         <Label>People</Label>
         <Group>
@@ -177,18 +187,29 @@ export function DynamicPage() {
               leading={<Avatar userId={m.userId} name={m.displayName} version={m.avatarVersion} collared={isCollared(rel, m.userId)} />}
               headline={m.userId === me.user.id ? `${m.displayName} (you)` : m.displayName}
               supporting={ROLE_LABEL[m.role]}
-              trailing={m.userId !== me.user.id ? <OverflowMenu items={[{ label: "Report", icon: "flag", onClick: () => setReporting(m.userId) }]} /> : undefined}
+              trailing={
+                m.userId !== me.user.id ? (
+                  <OverflowMenu
+                    items={[
+                      { label: "Report", icon: "flag", onClick: () => setReporting(m.userId) },
+                      { label: "Block", icon: "block", danger: true, onClick: () => setLeaving("block") },
+                    ]}
+                  />
+                ) : undefined
+              }
             />
           ))}
-          <Row
-            leading={
-              <span className="flex size-10 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
-                <Icon name="person_add" />
-              </span>
-            }
-            headline="Invite someone"
-            onClick={() => setSheet("invite")}
-          />
+          {!ended && (
+            <Row
+              leading={
+                <span className="flex size-10 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
+                  <Icon name="person_add" />
+                </span>
+              }
+              headline="Invite someone"
+              onClick={() => setSheet("invite")}
+            />
+          )}
         </Group>
 
         {(isDom || dates.length > 0) && (
@@ -258,7 +279,11 @@ export function DynamicPage() {
           </div>
         </Group>
         <p className="px-1 pt-2 text-body-small text-on-surface-variant">
-          {isDom ? "Switched-off features are hidden for everyone here. Nothing is deleted." : "Only a Dominant can change how this dynamic works."}
+          {isDom
+            ? "Switched-off features are hidden for everyone here. Nothing is deleted."
+            : ended
+              ? "This dynamic has ended, so nothing here can change."
+              : "Only a Dominant can change how this dynamic works."}
         </p>
 
         <Label>Other dynamics</Label>
@@ -279,7 +304,22 @@ export function DynamicPage() {
               ))}
           <Row leading={<Icon name="add_link" className="text-on-surface-variant" />} headline="Join or start another" onClick={() => navigate({ to: "/onboarding" })} />
         </Group>
+
+        {!ended && (
+          <>
+            <Label>Leave</Label>
+            <Group>
+              <Row
+                leading={<Icon name="logout" className="text-error" />}
+                headline={<span className="text-error">Leave this dynamic</span>}
+                supporting="Ends it for both of you; you each keep a read-only copy"
+                onClick={() => setLeaving("leave")}
+              />
+            </Group>
+          </>
+        )}
       </div>
+      {leaving && <LeaveDialog block={leaving === "block"} onClose={() => setLeaving(null)} />}
 
       <InviteSheet open={sheet === "invite"} onClose={() => setSheet(null)} />
       <NameDialog open={sheet === "name"} onClose={() => setSheet(null)} onSave={(name) => patch({ name }, "Name saved")} />
@@ -299,6 +339,67 @@ export function DynamicPage() {
       />
       <DeadlinesDialog open={sheet === "deadlines"} onClose={() => setSheet(null)} onSave={(body) => patch(body)} />
     </div>
+  );
+}
+
+/** "Sam ended this dynamic on Oct 20. It's kept here, read-only." */
+export function endedLine(rel: Relationship, myId: string, memberName: (id: string | null) => string) {
+  const who = rel.endedBy === myId ? "You" : rel.endedBy ? memberName(rel.endedBy) : "Someone";
+  const on = fmtDate(localDateOf(new Date(rel.endedAt!)), { month: "short", day: "numeric", year: "numeric" });
+  return `${who} ended this dynamic on ${on}. It's kept here so you can look back, but nothing in it can change.`;
+}
+
+/**
+ * Leaving ends the dynamic for both (Jake's "archive for both"); blocking does the same and stops the partner pairing
+ * with you again. Blocking still works on a dynamic that already ended.
+ */
+function LeaveDialog({ block: blockFirst, onClose }: { block: boolean; onClose(): void }) {
+  const { rel, partners } = useRel();
+  const snack = useSnackbar();
+  const leave = useLeaveRelationship(rel.id);
+  const [block, setBlock] = useState(blockFirst);
+  const names = partners.map((p) => p.displayName).join(" and ") || "your partner";
+  const ended = rel.endedAt !== null;
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      icon={block ? "block" : "logout"}
+      title={ended ? `Block ${names}?` : block ? `Block ${names} and end this dynamic?` : "Leave this dynamic?"}
+      actions={
+        <>
+          <Button variant="text" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            busy={leave.isPending}
+            onClick={() =>
+              leave.mutate(block, {
+                onSuccess: () => {
+                  onClose();
+                  snack(block ? `Blocked ${names}` : "You left the dynamic");
+                },
+                onError: (e) => snack(errorMessage(e)),
+              })
+            }
+          >
+            {block ? "Block" : "Leave"}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        {!ended && (
+          <p>This ends the dynamic for both of you. You each keep a read-only copy of its tasks, notes and history. Open tasks are cancelled and proof photos are deleted.</p>
+        )}
+        {ended || blockFirst ? (
+          <p>{names} won't be able to pair with you again. They aren't told you blocked them.</p>
+        ) : (
+          <Checkbox checked={block} onChange={setBlock} label={`Also block ${names}, so they can't pair with you again`} />
+        )}
+      </div>
+    </Dialog>
   );
 }
 

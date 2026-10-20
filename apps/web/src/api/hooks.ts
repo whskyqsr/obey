@@ -154,6 +154,15 @@ export function useUpdateRelationship(rel: string) {
   });
 }
 
+/** Ends the dynamic for everyone in it; `block` also stops the others pairing with you again. */
+export function useLeaveRelationship(rel: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (block: boolean) => api<Relationship>(`/relationships/${rel}/leave`, { method: "POST", body: { block } }),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
 /** `role` is what the person joining becomes; null lets them choose, undefined uses the server's default. */
 export function useCreateInvite(rel: string) {
   return useMutation({ mutationFn: (role?: Role | null) => api<Invite>(`/relationships/${rel}/invites`, { method: "POST", body: role === undefined ? {} : { role } }) });

@@ -13,6 +13,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { useReadOnly } from "../lib/relationship";
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -134,6 +135,8 @@ export function OverflowMenu({ label = "More options", items }: { label?: string
 }
 
 export function Fab({ icon, label, onClick, extended = true, className }: { icon: string; label: string; onClick(): void; extended?: boolean; className?: string }) {
+  // Every FAB starts something new, and nothing new goes into an ended dynamic.
+  if (useReadOnly()) return null;
   return (
     <button
       type="button"
@@ -152,13 +155,7 @@ export function Fab({ icon, label, onClick, extended = true, className }: { icon
 }
 
 export function Spinner({ size = 24 }: { size?: number }) {
-  return (
-    <span
-      role="progressbar"
-      className="inline-block animate-spin rounded-full border-2 border-current border-t-transparent"
-      style={{ width: size, height: size }}
-    />
-  );
+  return <span role="progressbar" className="inline-block animate-spin rounded-full border-2 border-current border-t-transparent" style={{ width: size, height: size }} />;
 }
 
 // ---------- Surfaces
@@ -193,19 +190,7 @@ export function Card({
   );
 }
 
-export function Chip({
-  children,
-  selected,
-  onClick,
-  icon,
-  className,
-}: {
-  children: ReactNode;
-  selected?: boolean;
-  onClick?: () => void;
-  icon?: string;
-  className?: string;
-}) {
+export function Chip({ children, selected, onClick, icon, className }: { children: ReactNode; selected?: boolean; onClick?: () => void; icon?: string; className?: string }) {
   const Comp = onClick ? "button" : "span";
   return (
     <Comp
@@ -299,11 +284,7 @@ export function ListItem({
 }) {
   const Comp = onClick ? "button" : "div";
   return (
-    <Comp
-      type={onClick ? "button" : undefined}
-      onClick={onClick}
-      className={cx("flex w-full items-center gap-4 px-4 py-3 text-left", onClick && "state-layer")}
-    >
+    <Comp type={onClick ? "button" : undefined} onClick={onClick} className={cx("flex w-full items-center gap-4 px-4 py-3 text-left", onClick && "state-layer")}>
       {leading}
       <div className="min-w-0 flex-1">
         {overline && <div className="text-label-medium text-on-surface-variant">{overline}</div>}
@@ -334,20 +315,12 @@ function FieldShell({ label, id, children, help, error }: { label?: string; id: 
           </label>
         )}
       </div>
-      {(error || help) && (
-        <div className={cx("px-4 text-body-small", error ? "text-error" : "text-on-surface-variant")}>{error || help}</div>
-      )}
+      {(error || help) && <div className={cx("px-4 text-body-small", error ? "text-error" : "text-on-surface-variant")}>{error || help}</div>}
     </div>
   );
 }
 
-export function TextField({
-  label,
-  help,
-  error,
-  className,
-  ...rest
-}: InputHTMLAttributes<HTMLInputElement> & { label?: string; help?: string; error?: string }) {
+export function TextField({ label, help, error, className, ...rest }: InputHTMLAttributes<HTMLInputElement> & { label?: string; help?: string; error?: string }) {
   const id = useId();
   return (
     <div className={className}>
@@ -358,12 +331,7 @@ export function TextField({
   );
 }
 
-export function TextArea({
-  label,
-  help,
-  className,
-  ...rest
-}: TextareaHTMLAttributes<HTMLTextAreaElement> & { label?: string; help?: string }) {
+export function TextArea({ label, help, className, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement> & { label?: string; help?: string }) {
   const id = useId();
   return (
     <div className={className}>
@@ -374,13 +342,7 @@ export function TextArea({
   );
 }
 
-export function Select({
-  label,
-  help,
-  className,
-  children,
-  ...rest
-}: SelectHTMLAttributes<HTMLSelectElement> & { label?: string; help?: string }) {
+export function Select({ label, help, className, children, ...rest }: SelectHTMLAttributes<HTMLSelectElement> & { label?: string; help?: string }) {
   const id = useId();
   return (
     <div className={className}>
@@ -408,10 +370,7 @@ export function Switch({ checked, onChange, label, help }: { checked: boolean; o
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={cx(
-          "relative h-8 w-13 shrink-0 rounded-full border-2 transition-colors",
-          checked ? "border-primary bg-primary" : "border-outline bg-surface-container-highest",
-        )}
+        className={cx("relative h-8 w-13 shrink-0 rounded-full border-2 transition-colors", checked ? "border-primary bg-primary" : "border-outline bg-surface-container-highest")}
       >
         <span
           className={cx(

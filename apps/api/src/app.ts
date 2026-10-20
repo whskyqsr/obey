@@ -6,6 +6,7 @@ import type { Db } from "./db/index.js";
 import type { users } from "./db/schema.js";
 import { HttpError } from "./errors.js";
 import type { Notifier } from "./notify.js";
+import { requestScope } from "./services/access.js";
 import { eventRoutes } from "./routes/events.js";
 import { libraryRoutes } from "./routes/library.js";
 import { pointsRoutes } from "./routes/points.js";
@@ -42,6 +43,8 @@ export function buildApp(deps: Deps) {
   app.register(cors, { origin: deps.corsOrigins ?? true, credentials: true, methods: ["GET", "HEAD", "POST", "PATCH", "PUT", "DELETE"] });
 
   app.decorateRequest("user", null as unknown as User);
+  // Callback style so the rest of the request runs inside the scope.
+  app.addHook("onRequest", (req, _reply, done) => requestScope.run({ write: !["GET", "HEAD", "OPTIONS"].includes(req.method) }, done));
   app.addHook("onRequest", async (req: FastifyRequest) => {
     if (req.method === "OPTIONS" || req.url === "/health") return;
     req.user = await upsertUser(deps.db, await deps.authenticate(req));

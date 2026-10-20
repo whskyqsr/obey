@@ -27,8 +27,11 @@ data class Session(
     val myRole: Role? get() = myMember?.role
     val partners: List<Member> get() = relationship?.members?.filter { it.userId != userId }.orEmpty()
 
-    /** Dominants and switches may create and approve things; the server enforces the real rules. */
-    val canManage: Boolean get() = myRole == Role.Dominant || myRole == Role.Switch
+    /** An ended dynamic stays readable, but nothing in it can change. */
+    val readOnly: Boolean get() = relationship?.ended == true
+
+    /** Dominants and switches may create and approve things, unless the dynamic has ended; the server enforces the real rules. */
+    val canManage: Boolean get() = (myRole == Role.Dominant || myRole == Role.Switch) && !readOnly
 
     fun nameOf(userId: String): String =
         relationship?.members?.firstOrNull { it.userId == userId }?.displayName
@@ -60,7 +63,8 @@ class SessionRepository @Inject constructor(
         try {
             val me = api.me()
             val selectedId = settings.selectedRelationshipId.first()
-            val rel = me.relationships.firstOrNull { it.id == selectedId } ?: me.relationships.firstOrNull()
+            // An ended dynamic is still there to look back on, but a live one opens first.
+            val rel = me.relationships.firstOrNull { it.id == selectedId } ?: me.relationships.firstOrNull { !it.ended } ?: me.relationships.firstOrNull()
             _state.value = SessionState.Ready(Session(me, rel))
         } catch (c: CancellationException) {
             throw c

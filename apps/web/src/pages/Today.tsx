@@ -129,7 +129,11 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
                     ))}
                   </RowGroup>
                 ) : (
-                  <Empty icon="spa" title="Nothing due today" body={isDom ? "Add one with the button below." : "Enjoy it while it lasts."} />
+                  <Empty
+                    icon="spa"
+                    title="Nothing due today"
+                    body={rel.endedAt ? "This dynamic has ended." : isDom ? "Add one with the button below." : "Enjoy it while it lasts."}
+                  />
                 )}
               </Section>
               {groups.later.length > 0 && (

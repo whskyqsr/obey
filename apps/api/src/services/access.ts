@@ -1,7 +1,14 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { and, eq } from "drizzle-orm";
 import type { Tx } from "../db/index.js";
-import { memberships } from "../db/schema.js";
-import { forbidden, notFound } from "../errors.js";
+import { memberships, relationships } from "../db/schema.js";
+import { HttpError, forbidden, notFound } from "../errors.js";
+
+/**
+ * Whether the current request changes anything, set per request in app.ts. An ended dynamic stays readable, so every
+ * membership check refuses writes to one without each route having to remember to.
+ */
+export const requestScope = new AsyncLocalStorage<{ write: boolean }>();
 
 export type Role = "dominant" | "submissive" | "switch";
 
@@ -15,9 +22,14 @@ export async function membership(db: Tx, relationshipId: string, userId: string)
 
 /** Throws 404 (not 403, to avoid leaking existence) unless the user belongs to the relationship. */
 export async function requireMember(db: Tx, relationshipId: string, userId: string) {
-  const m = await membership(db, relationshipId, userId);
-  if (!m) throw notFound();
-  return m;
+  const [row] = await db
+    .select({ m: memberships, endedAt: relationships.endedAt })
+    .from(memberships)
+    .innerJoin(relationships, eq(relationships.id, memberships.relationshipId))
+    .where(and(eq(memberships.relationshipId, relationshipId), eq(memberships.userId, userId)));
+  if (!row) throw notFound();
+  if (row.endedAt && requestScope.getStore()?.write) throw new HttpError(409, "this dynamic has ended; it's kept read-only");
+  return row.m;
 }
 
 /** Dominants and switches manage the dynamic: tasks, rewards, consequences, rules, points. */

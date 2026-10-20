@@ -40,6 +40,9 @@ export const relationships = pgTable("relationships", {
   /** Anniversaries and other dates the dynamic marks. */
   dates: jsonb("dates").$type<DynamicDate[]>().notNull().default([]),
   createdAt: createdAt(),
+  /** Set when a partner leaves or blocks: the dynamic stays readable for both, and nothing in it can change. */
+  endedAt: ts("ended_at"),
+  endedBy: uuid("ended_by").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
 });
 
 export const memberships = pgTable(
@@ -341,4 +344,19 @@ export const calendarEvents = pgTable(
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
   (t) => [index("calendar_events_relationship_idx").on(t.relationshipId, t.startsAt)],
+);
+
+/** Someone a person never wants to pair with again. Checked both ways when joining. */
+export const blocks = pgTable(
+  "blocks",
+  {
+    blockerId: uuid("blocker_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    blockedId: uuid("blocked_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.blockerId, t.blockedId] }), index("blocks_blocked_idx").on(t.blockedId)],
 );

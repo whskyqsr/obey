@@ -1,12 +1,12 @@
 import { randomInt } from "node:crypto";
-import { and, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { allFeatures, createInvite, createRelationship, id, joinRelationship, registerDevice, updateMe, updateRelationship } from "@obey/contracts";
+import { allFeatures, createInvite, createRelationship, id, joinRelationship, leaveRelationship, registerDevice, updateMe, updateRelationship } from "@obey/contracts";
 import type { Deps } from "../app.js";
 import type { Tx } from "../db/index.js";
-import { devices, invites, memberships, relationships, users } from "../db/schema.js";
+import { blocks, devices, invites, memberships, occurrences, proofPhotos, relationships, taskSeries, users } from "../db/schema.js";
 import { HttpError, notFound } from "../errors.js";
-import { managers, requireManager, requireMember } from "../services/access.js";
+import { managers, membership, requireManager, requireMember } from "../services/access.js";
 
 // No 0/O/1/I so codes read cleanly aloud.
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -56,6 +56,8 @@ export async function relationshipDto(db: Tx, ids: string[]) {
     subNotes: r.subNotes,
     dates: r.dates,
     createdAt: r.createdAt.toISOString(),
+    endedAt: r.endedAt?.toISOString() ?? null,
+    endedBy: r.endedBy,
     members: members
       .filter((m) => m.relationshipId === r.id)
       .map(({ userId, displayName, role, avatarUpdatedAt }) => ({ userId, displayName, role, avatarVersion: avatarVersion(avatarUpdatedAt) })),
@@ -192,6 +194,17 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
         .from(memberships)
         .where(and(eq(memberships.relationshipId, invite.relationshipId), eq(memberships.userId, req.user.id)));
       if (existing.length) throw new HttpError(409, "already a member");
+      const [rel] = await tx.select({ endedAt: relationships.endedAt }).from(relationships).where(eq(relationships.id, invite.relationshipId));
+      if (rel?.endedAt) throw new HttpError(410, "this dynamic has ended");
+      const others = (await tx.select().from(memberships).where(eq(memberships.relationshipId, invite.relationshipId))).map((m) => m.userId);
+      const blocked = others.length
+        ? await tx
+            .select()
+            .from(blocks)
+            .where(or(and(eq(blocks.blockerId, req.user.id), inArray(blocks.blockedId, others)), and(eq(blocks.blockedId, req.user.id), inArray(blocks.blockerId, others))))
+        : [];
+      // Same answer either way round, so a blocked person can't tell they were blocked.
+      if (blocked.length) throw new HttpError(403, "you can't join this dynamic");
       await tx.insert(memberships).values({ relationshipId: invite.relationshipId, userId: req.user.id, role });
       return invite.relationshipId;
     });
@@ -210,6 +223,51 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
       .values({ token: body.token, userId: req.user.id, platform: body.platform })
       .onConflictDoUpdate({ target: devices.token, set: { userId: req.user.id, platform: body.platform, updatedAt: deps.now() } });
     reply.status(204);
+  });
+
+  /**
+   * Ends the dynamic for both partners (Jake's "archive for both"): it stays readable, its schedule stops, pending
+   * tasks are cancelled, open invites go, and proof photos are deleted. With `block`, the others can't pair with this
+   * person again.
+   */
+  app.post<{ Params: { id: string } }>("/relationships/:id/leave", async (req) => {
+    const body = leaveRelationship.parse(req.body ?? {});
+    const m = await membership(db, req.params.id, req.user.id);
+    if (!m) throw notFound();
+    const others = (await db.select().from(memberships).where(eq(memberships.relationshipId, req.params.id))).map((r) => r.userId).filter((u) => u !== req.user.id);
+    const ended = await db.transaction(async (tx) => {
+      const [rel] = await tx
+        .update(relationships)
+        .set({ endedAt: deps.now(), endedBy: req.user.id })
+        .where(and(eq(relationships.id, req.params.id), isNull(relationships.endedAt)))
+        .returning();
+      if (body.block && others.length) {
+        await tx
+          .insert(blocks)
+          .values(others.map((blockedId) => ({ blockerId: req.user.id, blockedId })))
+          .onConflictDoNothing();
+      }
+      if (!rel) return false; // Already ended; blocking afterwards is still allowed.
+      const series = tx.select({ id: taskSeries.id }).from(taskSeries).where(eq(taskSeries.relationshipId, rel.id));
+      const occs = tx.select({ id: occurrences.id }).from(occurrences).where(inArray(occurrences.seriesId, series));
+      await tx.delete(proofPhotos).where(inArray(proofPhotos.occurrenceId, occs));
+      await tx.update(occurrences).set({ photoCount: 0 }).where(inArray(occurrences.seriesId, series));
+      await tx
+        .update(occurrences)
+        .set({ status: "cancelled" })
+        .where(and(inArray(occurrences.seriesId, series), eq(occurrences.status, "pending")));
+      await tx.update(taskSeries).set({ active: false }).where(eq(taskSeries.relationshipId, rel.id));
+      await tx.delete(invites).where(eq(invites.relationshipId, rel.id));
+      return true;
+    });
+    if (ended) {
+      await deps.notifier.send(others, {
+        title: "Obey",
+        body: `${req.user.displayName} ended your dynamic`,
+        data: { type: "relationship_ended", relationshipId: req.params.id },
+      });
+    }
+    return (await relationshipDto(db, [req.params.id]))[0];
   });
 
   const myDevices = async (userId: string) =>

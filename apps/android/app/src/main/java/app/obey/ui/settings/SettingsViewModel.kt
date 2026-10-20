@@ -95,6 +95,13 @@ class SettingsViewModel @Inject constructor(
 
     fun selectRelationship(id: String) = action { sessions.select(id) }
 
+    /** Ends the dynamic for both (it stays read-only); with [block], the partner can't pair with you again. */
+    fun leave(block: Boolean) = action {
+        api.leaveRelationship(sessions.requireRelationshipId(), app.obey.api.LeaveInput(block))
+        sessions.refresh()
+        say(if (block) "Blocked" else "You left the dynamic")
+    }
+
     fun createInvite(role: Role?) = action {
         val rel = sessions.requireRelationshipId()
         _invite.value = api.createInvite(rel, CreateInviteInput(role))

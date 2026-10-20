@@ -141,6 +141,7 @@ fun TodayScreen(
                 }
 
                 LazyColumn(Modifier.fillMaxSize()) {
+                    if (session?.readOnly == true) item(key = "ended") { EndedBanner(onOpenSettings) }
                     items(d.clashingPlans, key = { "plan-${it.id}" }) { e -> PlanHeadsUp(e) { plan = e } }
                     if (!isDom) {
                         val counted = d.today.filter { it.status != OccurrenceStatus.Excused }

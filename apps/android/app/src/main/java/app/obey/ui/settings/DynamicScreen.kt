@@ -1,5 +1,7 @@
 package app.obey.ui.settings
 
+import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.Block
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -189,20 +191,40 @@ fun DynamicScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
                     )
                 }
 
+                if (rel.ended) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        shape = MaterialTheme.shapes.large,
+                        modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+                    ) {
+                        Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Icon(Icons.Outlined.Inventory2, null)
+                            Text(endedLine(rel, s), style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+
                 SectionHeader("People")
                 rel.members.forEach { m ->
                     ListItem(
                         leadingContent = { Avatar(m.userId, m.displayName, m.avatarVersion, vm::loadAvatar, collared = rel.isCollared(m.userId)) },
                         headlineContent = { Text(m.displayName + if (m.userId == s.userId) " (you)" else "") },
                         supportingContent = { Text(m.role.label) },
-                        trailingContent = { if (m.userId != s.userId) app.obey.ui.proof.ReportPersonButton(m.userId) },
+                        trailingContent = {
+                            if (m.userId != s.userId) Row {
+                                app.obey.ui.proof.ReportPersonButton(m.userId)
+                                IconButton(onClick = { dialog = "block" }) { Icon(Icons.Outlined.Block, "Block ${m.displayName}") }
+                            }
+                        },
                     )
                 }
-                ListItem(
-                    modifier = Modifier.clickable { vm.clearInvite(); dialog = "invite" },
-                    leadingContent = { Icon(Icons.Outlined.PersonAdd, null) },
-                    headlineContent = { Text("Invite someone") },
-                )
+                if (!rel.ended) {
+                    ListItem(
+                        modifier = Modifier.clickable { vm.clearInvite(); dialog = "invite" },
+                        leadingContent = { Icon(Icons.Outlined.PersonAdd, null) },
+                        headlineContent = { Text("Invite someone") },
+                    )
+                }
 
                 val today = java.time.LocalDate.now()
                 val dates = rel.dates.sortedBy { d -> runCatching { daysUntilNext(java.time.LocalDate.parse(d.date), today) }.getOrDefault(Long.MAX_VALUE) }
@@ -318,8 +340,29 @@ fun DynamicScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
                     leadingContent = { Icon(Icons.Outlined.Add, null) },
                     headlineContent = { Text("Start a new one") },
                 )
+                if (!rel.ended) {
+                    // Kept apart from everything that edits, so it's never hit by accident.
+                    SectionHeader("Leave")
+                    ListItem(
+                        modifier = Modifier.clickable { dialog = "leave" },
+                        leadingContent = { Icon(Icons.AutoMirrored.Outlined.Logout, null, tint = MaterialTheme.colorScheme.error) },
+                        headlineContent = { Text("Leave this dynamic", color = MaterialTheme.colorScheme.error) },
+                        supportingContent = { Text("Ends it for both of you; you each keep a read-only copy") },
+                    )
+                }
                 Spacer(Modifier.height(24.dp))
             }
+        }
+
+        if (dialog == "leave" || dialog == "block") {
+            LeaveDialog(
+                names = s.partners.joinToString(" and ") { it.displayName }.ifEmpty { "your partner" },
+                ended = rel.ended,
+                blockFirst = dialog == "block",
+                busy = busy,
+                onDismiss = { dialog = null },
+                onConfirm = { block -> vm.leave(block); dialog = null },
+            )
         }
 
         if (dialog == "invite") {
@@ -424,4 +467,52 @@ fun DynamicScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
         )
     }
+}
+
+/** "Kit ended this dynamic on 20 Oct 2026. It's kept here…" */
+private fun endedLine(rel: app.obey.api.Relationship, s: app.obey.data.Session): String {
+    val who = when (rel.endedBy) {
+        s.userId -> "You"
+        null -> "Someone"
+        else -> s.nameOf(rel.endedBy)
+    }
+    val on = rel.endedAt?.let { runCatching { formatDate(java.time.OffsetDateTime.parse(it).atZoneSameInstant(ZoneId.systemDefault()).toLocalDate()) }.getOrNull() }
+    return "$who ended this dynamic${on?.let { " on $it" } ?: ""}. It's kept here so you can look back, but nothing in it can change."
+}
+
+/**
+ * Leaving ends the dynamic for both (Jake's "archive for both"); blocking does the same and stops the partner pairing
+ * with you again. Blocking still works on a dynamic that already ended.
+ */
+@Composable
+private fun LeaveDialog(names: String, ended: Boolean, blockFirst: Boolean, busy: Boolean, onDismiss: () -> Unit, onConfirm: (Boolean) -> Unit) {
+    var block by remember { mutableStateOf(blockFirst) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(if (block) Icons.Outlined.Block else Icons.AutoMirrored.Outlined.Logout, null) },
+        title = { Text(if (ended) "Block $names?" else if (blockFirst) "Block $names and end this dynamic?" else "Leave this dynamic?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (!ended) {
+                    Text("This ends the dynamic for both of you. You each keep a read-only copy of its tasks, notes and history. Open tasks are cancelled and proof photos are deleted.")
+                }
+                if (ended || blockFirst) {
+                    Text("$names won't be able to pair with you again. They aren't told you blocked them.")
+                } else {
+                    Row(Modifier.fillMaxWidth().clickable { block = !block }, verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.Checkbox(checked = block, onCheckedChange = { block = it })
+                        Text("Also block $names, so they can't pair with you again")
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.Button(
+                onClick = { onConfirm(block) },
+                enabled = !busy,
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError),
+            ) { Text(if (block) "Block" else "Leave") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
