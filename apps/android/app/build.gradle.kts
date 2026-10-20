@@ -14,7 +14,7 @@ if (hasGoogleServices) {
     apply(plugin = "com.google.gms.google-services")
 }
 
-val apiBaseUrl: String = providers.gradleProperty("obey.apiBaseUrl").getOrElse("https://api-production-2a65c.up.railway.app/")
+val apiBaseUrl: String = providers.gradleProperty("obey.apiBaseUrl").getOrElse("https://api.obey.chzsda.com/")
 // Where invite links point: the web app, which handles sign-in and accepting.
 val webUrl: String = providers.gradleProperty("obey.webUrl").getOrElse("https://app.obey.chzsda.com")
 
