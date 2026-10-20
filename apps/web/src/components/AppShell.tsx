@@ -28,12 +28,8 @@ const ALL: Dest[] = [
 
 const MORE: Dest = { to: "/more", label: "More", icon: "menu" };
 
-/** The desktop drawer's groups, by path, split by dividers; anything unlisted (Settings) sits at the bottom. */
-const GROUPS: string[][] = [
-  ["/", "/calendar", "/tasks"],
-  ["/rewards", "/consequences", "/rules", "/protocols"],
-  ["/notes", "/journal"],
-];
+/** Destinations the desktop drawer pins to the bottom instead of the main list. */
+const DRAWER_BOTTOM = ["/settings"];
 
 /** Destinations for the current dynamic: everything, plus the compact bar and what overflows into More. */
 export function useDestinations() {
@@ -109,22 +105,14 @@ export function AppShell() {
           </span>
           <span className="text-title-large text-on-surface">Obey</span>
         </Link>
-        {GROUPS.map((g, i) => {
-          const items = all.filter((d) => g.includes(d.to));
-          if (!items.length) return null;
-          return (
-            <div key={g[0]} className={cx("flex flex-col gap-1 py-2", i > 0 && "border-t border-outline-variant/60")}>
-              {items
-                .sort((a, b) => g.indexOf(a.to) - g.indexOf(b.to))
-                .map((d) => (
-                  <DrawerItem key={d.to} d={d} active={isActive(pathname, d.to, [])} badge={d.to === "/" ? todayBadge : 0} />
-                ))}
-            </div>
-          );
-        })}
+        {all
+          .filter((d) => !DRAWER_BOTTOM.includes(d.to))
+          .map((d) => (
+            <DrawerItem key={d.to} d={d} active={isActive(pathname, d.to, [])} badge={d.to === "/" ? todayBadge : 0} />
+          ))}
         <div className="flex-1" />
         {all
-          .filter((d) => !GROUPS.some((g) => g.includes(d.to)))
+          .filter((d) => DRAWER_BOTTOM.includes(d.to))
           .map((d) => (
             <DrawerItem key={d.to} d={d} active={isActive(pathname, d.to, [])} />
           ))}
