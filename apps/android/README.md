@@ -17,7 +17,7 @@ Or open `apps/android` in Android Studio and press Run.
 
 ### Talking to the API
 
-Every build talks to the production API (`https://api-production-2a65c.up.railway.app/`) unless you pass
+Every build talks to the production API (`https://api.obey.chzsda.com/`) unless you pass
 `-Pobey.apiBaseUrl=...`. For a local API from the emulator:
 
 ```sh
