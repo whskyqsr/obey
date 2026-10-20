@@ -182,6 +182,14 @@ export function useCompleteOccurrence(rel: string) {
   });
 }
 
+export function useUndoComplete(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (id: string) => api<Occurrence>(`/occurrences/${id}/undo`, { method: "POST", body: {} }),
+    onSuccess: () => invalidate(),
+  });
+}
+
 export function useReviewOccurrence(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({

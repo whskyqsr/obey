@@ -500,14 +500,15 @@ export function Dialog({
 
 // ---------- Snackbar
 
-const SnackContext = createContext<(msg: string) => void>(() => {});
+type SnackAction = { label: string; onClick(): void };
+const SnackContext = createContext<(msg: string, action?: SnackAction) => void>(() => {});
 
 export function SnackbarProvider({ children }: { children: ReactNode }) {
-  const [msg, setMsg] = useState<{ text: string; key: number } | null>(null);
-  const show = useCallback((text: string) => setMsg({ text, key: Date.now() }), []);
+  const [msg, setMsg] = useState<{ text: string; key: number; action?: SnackAction } | null>(null);
+  const show = useCallback((text: string, action?: SnackAction) => setMsg({ text, key: Date.now(), action }), []);
   useEffect(() => {
     if (!msg) return;
-    const t = setTimeout(() => setMsg(null), 4000);
+    const t = setTimeout(() => setMsg(null), msg.action ? 6000 : 4000);
     return () => clearTimeout(t);
   }, [msg]);
   return (
@@ -521,9 +522,22 @@ export function SnackbarProvider({ children }: { children: ReactNode }) {
             className="fixed bottom-24 left-1/2 z-[60] flex min-h-12 w-[min(92vw,560px)] -translate-x-1/2 animate-fade-in items-center gap-2 rounded-xs bg-inverse-surface px-4 py-3 text-body-medium text-inverse-on-surface shadow-elev-3 md:bottom-6"
           >
             <span className="flex-1">{msg.text}</span>
-            <button type="button" className="text-label-large text-inverse-primary" onClick={() => setMsg(null)}>
-              Dismiss
-            </button>
+            {msg.action ? (
+              <button
+                type="button"
+                className="text-label-large text-inverse-primary"
+                onClick={() => {
+                  msg.action!.onClick();
+                  setMsg(null);
+                }}
+              >
+                {msg.action.label}
+              </button>
+            ) : (
+              <button type="button" className="text-label-large text-inverse-primary" onClick={() => setMsg(null)}>
+                Dismiss
+              </button>
+            )}
           </div>,
           document.body,
         )}

@@ -7,15 +7,17 @@ const SLOTS = 7;
 const WORD = { completed: "done", missed: "missed", excused: "excused" } as const;
 
 /** The last few results as dots (done filled, excused hollow, missed red) and the current streak. Renders nothing for a task with no history. */
-export function StreakStrip({ taskId, className }: { taskId: string; className?: string }) {
+export function StreakStrip({ taskId, className, compact }: { taskId: string; className?: string; compact?: boolean }) {
   const { rel } = useRel();
   const s = useStreaks(rel.id).data?.find((x) => x.taskId === taskId);
   if (!s || !s.recent.length) return null;
-  return <Strip s={s} className={className} />;
+  return <Strip s={s} className={className} compact={compact} />;
 }
 
-export function Strip({ s, className }: { s: TaskStreak; className?: string }) {
-  const pad = SLOTS - s.recent.length;
+/** `compact` is for rows: the last five, without placeholder dots. */
+export function Strip({ s, className, compact }: { s: TaskStreak; className?: string; compact?: boolean }) {
+  const recent = compact ? s.recent.slice(-5) : s.recent;
+  const pad = compact ? 0 : SLOTS - recent.length;
   return (
     <span
       role="img"
@@ -26,7 +28,7 @@ export function Strip({ s, className }: { s: TaskStreak; className?: string }) {
         {Array.from({ length: pad }, (_, i) => (
           <span key={`p${i}`} className="size-2 rounded-full bg-outline-variant/50" />
         ))}
-        {s.recent.map((r, i) => (
+        {recent.map((r, i) => (
           <span
             key={i}
             className={cx(

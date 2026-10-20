@@ -99,7 +99,7 @@ describe("app smoke test (dev auth, mocked API)", () => {
 
     await screen.findByText("Hi, Jake");
     await screen.findByText(/asks for more time on “Write lines”/);
-    expect(await screen.findByText("Needs your review")).toBeTruthy();
+    expect(await screen.findByText(/^Needs you · /)).toBeTruthy();
     expect(fetchMock.mock.calls.some(([, init]) => (init?.headers as Record<string, string> | undefined)?.["X-Dev-User"] === ME)).toBe(true);
     expect(document.getElementById("obey-theme")?.textContent).toContain("--md-primary");
 

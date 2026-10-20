@@ -147,6 +147,25 @@ describe("tasks and occurrences", () => {
     expect((await dom.post(`/occurrences/${tomorrow.id}/complete`)).body.status).toBe("completed");
   });
 
+  it("lets the assignee undo a completion moments later, taking its points back", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    await dom.post(`/relationships/${relId}/tasks`, task(subId));
+    const [first] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    await sub.post(`/occurrences/${first.id}/complete`);
+    const undone = await sub.post(`/occurrences/${first.id}/undo`);
+    expect(undone.body).toMatchObject({ status: "pending", completedAt: null });
+    expect((await sub.get(`/relationships/${relId}/balances`)).body).toEqual([]);
+    expect((await sub.post(`/occurrences/${first.id}/undo`)).status).toBe(409);
+    await sub.post(`/occurrences/${first.id}/complete`);
+    try {
+      ctx.clock.now = new Date(ctx.clock.now.getTime() + 11 * 60_000);
+      expect((await sub.post(`/occurrences/${first.id}/undo`)).status).toBe(409);
+      expect((await dom.post(`/occurrences/${first.id}/undo`)).body.status).toBe("pending");
+    } finally {
+      ctx.clock.now = new Date("2026-10-16T12:00:00Z");
+    }
+  });
+
   it("awards points on completion exactly once", async () => {
     const { dom, sub, relId, subId } = await ctx.pair();
     await dom.post(`/relationships/${relId}/tasks`, task(subId));

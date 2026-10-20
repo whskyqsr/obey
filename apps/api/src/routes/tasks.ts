@@ -19,6 +19,7 @@ import {
   materializeSeries,
   requestReschedule,
   reviewOccurrence,
+  undoCompletion,
 } from "../services/scheduling.js";
 
 const MAX_RANGE_DAYS = 62;
@@ -296,6 +297,12 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         data: { type: "occurrence_edited", occurrenceId: occ.id },
       });
     }
+    return occurrenceDto(updated, series);
+  });
+
+  app.post<{ Params: { id: string } }>("/occurrences/:id/undo", async (req) => {
+    const { occ, series, member } = await loadOccurrence(db, req.params.id, req.user.id);
+    const updated = await db.transaction((tx) => undoCompletion(tx, series, occ, { userId: req.user.id, role: member.role }, deps.now()));
     return occurrenceDto(updated, series);
   });
 

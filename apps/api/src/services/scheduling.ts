@@ -140,6 +140,31 @@ export async function completeOccurrence(
   return finalizeCompletion(db, series, occ, now, isAssignee ? null : actor.userId);
 }
 
+/** How long the assignee has to take back a completion (the Undo after a tap or swipe). */
+export const UNDO_MINUTES = 10;
+
+/** Takes back a completion made moments ago: the occurrence is pending again and its points and any next occurrence go. */
+export async function undoCompletion(db: Tx, series: Series, occ: Occurrence, actor: { userId: string; role: Role }, now: Date): Promise<Occurrence> {
+  if (occ.status !== "completed" && occ.status !== "submitted") throw new HttpError(409, `occurrence is ${occ.status}`);
+  if (!canManage(actor.role)) {
+    if (actor.userId !== series.assigneeId) throw forbidden("only the assignee can undo this");
+    const recent = occ.completedAt && now.getTime() - occ.completedAt.getTime() <= UNDO_MINUTES * 60_000;
+    if (!recent || occ.reviewedBy) throw new HttpError(409, "too late to undo");
+  }
+  const [reopened] = await db
+    .update(occurrences)
+    .set({ status: "pending", completedAt: null, reviewedBy: null, reviewedAt: null })
+    .where(eq(occurrences.id, occ.id))
+    .returning();
+  await db.delete(pointsLedger).where(and(eq(pointsLedger.occurrenceId, occ.id), eq(pointsLedger.kind, "completion")));
+  // A completion-anchored task made its next occurrence on completion; it goes with the undo.
+  if (series.schedule.anchor === "completion")
+    await db
+      .delete(occurrences)
+      .where(and(eq(occurrences.seriesId, series.id), eq(occurrences.status, "pending"), sql`${occurrences.originalDate} > ${occ.originalDate}`));
+  return reopened!;
+}
+
 export async function reviewOccurrence(db: Tx, series: Series, occ: Occurrence, reviewerId: string, approve: boolean) {
   if (occ.status !== "submitted") throw new HttpError(409, `occurrence is ${occ.status}`);
   if (approve) return finalizeCompletion(db, series, occ, occ.completedAt ?? new Date(), reviewerId);

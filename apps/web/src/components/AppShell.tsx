@@ -1,7 +1,7 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { usePendingReschedules } from "../api/hooks";
 import type { Features } from "../api/types";
 import { useRel } from "../lib/relationship";
+import { useNeedsYou } from "../lib/today";
 import { Icon, cx } from "./ui";
 
 interface Dest {
@@ -73,9 +73,8 @@ function NavItem({ d, active, badge, compact }: { d: Dest; active: boolean; badg
 
 export function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { rel, isDom, title } = useRel();
-  const pending = usePendingReschedules(rel.id);
-  const todayBadge = isDom ? (pending.data?.length ?? 0) : 0;
+  const { title } = useRel();
+  const todayBadge = useNeedsYou().count;
   const { all, bar, more } = useDestinations();
 
   return (
