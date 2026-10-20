@@ -86,7 +86,12 @@ export type Relationship = z.infer<typeof relationship>;
 /** Leaving ends the dynamic for both; blocking also stops the other person pairing with you again. */
 export const leaveRelationship = z.object({ block: z.boolean().default(false) });
 
-export const me = z.object({ user, relationships: z.array(relationship) });
+export const me = z.object({
+  user,
+  relationships: z.array(relationship),
+  /** Reviews reports (a verified email in the API's ADMIN_EMAILS). */
+  admin: z.boolean().default(false),
+});
 export type Me = z.infer<typeof me>;
 
 export const updateMe = z.object({
@@ -406,3 +411,19 @@ export const calendarEvent = z.object({
   conflictIds: z.array(id),
 });
 export type CalendarEvent = z.infer<typeof calendarEvent>;
+
+/** A report as the people reviewing them see it. */
+export const adminReport = z.object({
+  id,
+  reason: z.enum(["minor", "non_consensual", "illegal", "other"]),
+  details: z.string().nullable(),
+  reporter: z.object({ id, displayName: z.string(), email: z.string().nullable() }),
+  subject: z.object({ id, displayName: z.string(), email: z.string().nullable() }),
+  /** The reported photo while it still exists. */
+  photoId: id.nullable(),
+  photoDeleted: z.boolean(),
+  createdAt: z.string(),
+  resolvedAt: z.string().nullable(),
+});
+export type AdminReport = z.infer<typeof adminReport>;
+export const resolveReport = z.object({ removePhoto: z.boolean().default(false) });

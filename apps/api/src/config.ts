@@ -17,4 +17,6 @@ export const config = {
   corsOrigins: env("CORS_ORIGINS", "http://localhost:5173").split(","),
   reminderLeadMinutes: Number(env("REMINDER_LEAD_MINUTES", "30")),
   materializeDays: Number(env("MATERIALIZE_DAYS", "14")),
+  /** Comma-separated emails that may review reports; must be verified with the sign-in provider. */
+  adminEmails: (process.env.ADMIN_EMAILS ?? "").split(",").filter(Boolean),
 };

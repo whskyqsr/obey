@@ -71,6 +71,7 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
     const mine = await db.select().from(memberships).where(eq(memberships.userId, req.user.id));
     return {
       user: userDto(req.user),
+      admin: req.admin,
       relationships: await relationshipDto(
         db,
         mine.map((m) => m.relationshipId),

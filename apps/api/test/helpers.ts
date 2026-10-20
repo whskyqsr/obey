@@ -22,6 +22,7 @@ export async function setup() {
     notifier,
     now: () => clock.now,
     materializeDays: 14,
+    adminEmails: ["mod@example.com"],
   });
   await app.ready();
 

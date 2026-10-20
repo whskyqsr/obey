@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { api, apiObjectUrl } from "./client";
 import type {
+  AdminReport,
   DeviceStatus,
   ProofPhoto,
   ReportReason,
@@ -107,6 +108,22 @@ export function useTestPush() {
   return useMutation({
     mutationFn: () => api<DeviceStatus[]>("/me/test-push", { method: "POST" }),
     onSuccess: (devices) => qc.setQueryData(keys.devices, devices),
+  });
+}
+
+export function useAdminReports(all: boolean) {
+  return useQuery({ queryKey: ["admin", "reports", all], queryFn: () => api<AdminReport[]>("/admin/reports", { query: all ? { all: "1" } : undefined }) });
+}
+
+export function useAdminPhotoUrl(photoId: string, enabled: boolean) {
+  return useQuery({ queryKey: ["admin", "photo", photoId], queryFn: () => apiObjectUrl(`/admin/photos/${photoId}`), staleTime: Infinity, enabled });
+}
+
+export function useResolveReport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, removePhoto }: { id: string; removePhoto: boolean }) => api(`/admin/reports/${id}/resolve`, { method: "POST", body: { removePhoto } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin"] }),
   });
 }
 

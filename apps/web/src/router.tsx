@@ -7,6 +7,7 @@ import { useRel } from "./lib/relationship";
 import { CalendarPage } from "./pages/Calendar";
 import { ConsequencesPage } from "./pages/Consequences";
 import { DynamicPage } from "./pages/Dynamic";
+import { AdminReportsPage } from "./pages/AdminReports";
 import { MorePage } from "./pages/More";
 import { NotesPage } from "./pages/Notes";
 import { Onboarding } from "./pages/Onboarding";
@@ -191,6 +192,7 @@ const routeTree = rootRoute.addChildren([
   journalEntryRoute,
   page("/settings", SettingsPage),
   page("/dynamic", DynamicPage),
+  page("/admin/reports", AdminReportsPage),
   page("/more", MorePage),
   page("/onboarding", OnboardingRoute),
 ]);

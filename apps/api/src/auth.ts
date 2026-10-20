@@ -10,6 +10,8 @@ export interface Identity {
   uid: string;
   displayName: string;
   email: string | null;
+  /** The email only when the provider vouches for it; admin rights hang on this, never on a typed address. */
+  verifiedEmail: string | null;
 }
 
 /** Turns a request into the caller's identity, or throws 401. */
@@ -33,6 +35,7 @@ export function createAuthenticator(opts: { devAuth: boolean; firebase: Firebase
           uid: `firebase:${token.uid}`,
           displayName: initialDisplayName(token.name as string | undefined, token.email),
           email: token.email ?? null,
+          verifiedEmail: token.email && token.email_verified === true ? token.email : null,
         };
       } catch {
         throw new HttpError(401, "invalid token");
@@ -41,7 +44,13 @@ export function createAuthenticator(opts: { devAuth: boolean; firebase: Firebase
     const dev = req.headers["x-dev-user"];
     if (opts.devAuth && typeof dev === "string" && UUID.test(dev)) {
       const name = req.headers["x-dev-name"];
-      return { uid: `dev:${dev.toLowerCase()}`, displayName: typeof name === "string" ? name : `Dev ${dev.slice(0, 4)}`, email: null };
+      const email = req.headers["x-dev-email"];
+      return {
+        uid: `dev:${dev.toLowerCase()}`,
+        displayName: typeof name === "string" ? name : `Dev ${dev.slice(0, 4)}`,
+        email: null,
+        verifiedEmail: typeof email === "string" ? email : null,
+      };
     }
     throw new HttpError(401, "sign in required");
   };

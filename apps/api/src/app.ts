@@ -7,6 +7,7 @@ import type { users } from "./db/schema.js";
 import { HttpError } from "./errors.js";
 import type { Notifier } from "./notify.js";
 import { requestScope } from "./services/access.js";
+import { adminRoutes } from "./routes/admin.js";
 import { eventRoutes } from "./routes/events.js";
 import { libraryRoutes } from "./routes/library.js";
 import { pointsRoutes } from "./routes/points.js";
@@ -21,6 +22,8 @@ export interface Deps {
   now: () => Date;
   materializeDays: number;
   corsOrigins?: string[];
+  /** People who review reports, by verified email (ADMIN_EMAILS). */
+  adminEmails?: string[];
   logger?: boolean;
 }
 
@@ -30,6 +33,8 @@ export type User = Omit<typeof users.$inferSelect, "avatar">;
 declare module "fastify" {
   interface FastifyRequest {
     user: User;
+    /** Signed in with a verified email listed in ADMIN_EMAILS. */
+    admin: boolean;
   }
 }
 
@@ -43,11 +48,15 @@ export function buildApp(deps: Deps) {
   app.register(cors, { origin: deps.corsOrigins ?? true, credentials: true, methods: ["GET", "HEAD", "POST", "PATCH", "PUT", "DELETE"] });
 
   app.decorateRequest("user", null as unknown as User);
+  app.decorateRequest("admin", false);
+  const admins = new Set((deps.adminEmails ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean));
   // Callback style so the rest of the request runs inside the scope.
   app.addHook("onRequest", (req, _reply, done) => requestScope.run({ write: !["GET", "HEAD", "OPTIONS"].includes(req.method) }, done));
   app.addHook("onRequest", async (req: FastifyRequest) => {
     if (req.method === "OPTIONS" || req.url === "/health") return;
-    req.user = await upsertUser(deps.db, await deps.authenticate(req));
+    const identity = await deps.authenticate(req);
+    req.user = await upsertUser(deps.db, identity);
+    req.admin = identity.verifiedEmail !== null && admins.has(identity.verifiedEmail.toLowerCase());
   });
 
   app.setErrorHandler((err: unknown, _req: FastifyRequest, reply: FastifyReply) => {
@@ -66,5 +75,6 @@ export function buildApp(deps: Deps) {
   app.register(libraryRoutes(deps));
   app.register(proofRoutes(deps));
   app.register(eventRoutes(deps));
+  app.register(adminRoutes(deps));
   return app;
 }

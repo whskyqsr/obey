@@ -21,6 +21,7 @@ const app = buildApp({
   now: () => new Date(),
   materializeDays: config.materializeDays,
   corsOrigins: config.corsOrigins,
+  adminEmails: config.adminEmails,
   logger: true,
 });
 await app.listen({ port: config.port, host: "0.0.0.0" });

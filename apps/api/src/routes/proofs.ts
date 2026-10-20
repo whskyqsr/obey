@@ -2,6 +2,7 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { acceptProofTerms, id, reportInput } from "@obey/contracts";
 import type { Deps } from "../app.js";
+import { adminUserIds } from "./admin.js";
 import { memberships, occurrences, proofPhotos, reports, taskSeries, users } from "../db/schema.js";
 import { HttpError, forbidden, notFound } from "../errors.js";
 import { requireMember } from "../services/access.js";
@@ -132,6 +133,7 @@ export const proofRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       .values({ reporterId: req.user.id, subjectId: body.subjectId, photoId: body.photoId ?? null, reason: body.reason, details: body.details ?? null })
       .returning({ id: reports.id });
     app.log.warn({ reportId: report!.id, reason: body.reason }, "content report filed");
+    await deps.notifier.send(await adminUserIds(deps), { title: "Obey", body: "A new report needs review", data: { type: "report", url: "/admin/reports" } });
     return reply.status(201).send({ id: report!.id });
   });
 };

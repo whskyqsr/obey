@@ -223,6 +223,16 @@ export function SettingsPage() {
         {push === "granted" && <PushHealth />}
       </Section>
 
+      {me.admin && (
+        <Section title="Obey team">
+          <Link to="/admin/reports" className="state-layer flex items-center gap-3 rounded-lg bg-surface-container-low p-4">
+            <Icon name="flag" className="text-on-surface-variant" />
+            <span className="flex-1 text-body-large text-on-surface">Reports to review</span>
+            <Icon name="chevron_right" className="text-on-surface-variant" />
+          </Link>
+        </Section>
+      )}
+
       <Section title="Account">
         <div className="flex flex-wrap items-center gap-3 rounded-lg bg-surface-container-low p-4">
           <div className="min-w-0 flex-1">

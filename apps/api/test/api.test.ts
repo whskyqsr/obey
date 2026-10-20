@@ -215,6 +215,34 @@ describe("tasks and occurrences", () => {
     expect((await dom.get(`/relationships/${relId}/balances`)).body[0].balance).toBe(10);
   });
 
+  it("puts reports in a queue only admins with a verified email can see and resolve", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    await dom.post(`/relationships/${relId}/tasks`, task(subId));
+    const [first] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    await sub.post("/me/proof-terms", { adult: true, rules: true });
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 9, 9, 0xff, 0xd9]);
+    const photoId = (
+      await ctx.app.inject({ method: "POST", url: `/occurrences/${first.id}/photos`, payload: jpeg, headers: { ...sub.headers, "content-type": "image/jpeg" } })
+    ).json().id;
+    await dom.post("/reports", { subjectId: subId, photoId, reason: "minor", details: "looks young" });
+
+    const mod = { "x-dev-user": crypto.randomUUID(), "x-dev-email": "MOD@example.com" };
+    const asMod = (method: "GET" | "POST", url: string, payload?: object) => ctx.app.inject({ method, url, payload, headers: mod });
+    expect((await dom.get("/admin/reports")).status).toBe(404);
+    expect((await ctx.app.inject({ method: "GET", url: "/me", headers: mod })).json().admin).toBe(true);
+    const queue = (await asMod("GET", "/admin/reports")).json();
+    const mine = queue.find((r: { photoId: string }) => r.photoId === photoId);
+    expect(mine).toMatchObject({ reason: "minor", details: "looks young", subject: { id: subId }, photoDeleted: false, resolvedAt: null });
+    expect((await asMod("GET", `/admin/photos/${photoId}`)).rawPayload.equals(jpeg)).toBe(true);
+
+    expect((await asMod("POST", `/admin/reports/${mine.id}/resolve`, { removePhoto: true })).statusCode).toBe(200);
+    expect((await asMod("GET", "/admin/reports")).json().some((r: { id: string }) => r.id === mine.id)).toBe(false);
+    const all = (await asMod("GET", "/admin/reports?all=1")).json().find((r: { id: string }) => r.id === mine.id);
+    expect(all).toMatchObject({ photoId: null, photoDeleted: true, resolvedAt: expect.any(String) });
+    const [after] = (await dom.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    expect(after.photoCount).toBe(0);
+  });
+
   it("ends a dynamic for both when one leaves, keeping it read-only, and blocks re-pairing", async () => {
     const { dom, sub, relId, subId, domId } = await ctx.pair();
     await dom.post(`/relationships/${relId}/tasks`, task(subId));
