@@ -251,7 +251,15 @@ fun TaskDetailScreen(
                         }
                     }
 
-                    SectionHeader("Now")
+                    // Named by what's in it: today's, overdue ones, or the next one coming up.
+                    val days = current.map { parseInstant(it.dueAt).local().toLocalDate() }
+                    SectionHeader(
+                        when {
+                            LocalDate.now() in days -> "Today"
+                            days.any { it.isBefore(LocalDate.now()) } -> "Overdue"
+                            else -> "Up next"
+                        },
+                    )
                     if (current.isEmpty()) {
                         Text(
                             "Nothing due in the next week.",
