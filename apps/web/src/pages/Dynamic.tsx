@@ -10,7 +10,7 @@ import { Button, Chip, Dialog, Icon, IconButton, Select, Switch, TextField, cx, 
 import { fmtDate, fmtDateTime, localDateOf, today } from "../lib/dates";
 import { anniversary, describeDate } from "../lib/dynamicDates";
 import { inviteLink } from "../lib/invite";
-import { ROLE_LABEL, relTitle, useRel } from "../lib/relationship";
+import { ROLE_LABEL, isCollared, relTitle, useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
 
 const POLICIES: { value: ReschedulePolicy; label: string; help: string }[] = [
@@ -140,7 +140,7 @@ export function DynamicPage() {
   const [editingDate, setEditingDate] = useState<DynamicDate | null>(null);
   const now = today();
   // Soonest to come round first.
-  const dates = [...rel.dates].sort((a, b) => (a.date > now ? 0 : anniversary(a.date, now).daysUntil) - (b.date > now ? 0 : anniversary(b.date, now).daysUntil));
+  const dates = [...(rel.dates ?? [])].sort((a, b) => (a.date > now ? 0 : anniversary(a.date, now).daysUntil) - (b.date > now ? 0 : anniversary(b.date, now).daysUntil));
   const saveDates = (next: DynamicDate[], msg: string) => patch({ dates: next }, msg);
   const patch = (body: Parameters<typeof update.mutate>[0], msg = "Saved") => update.mutate(body, { onSuccess: () => snack(msg), onError: (e) => snack(errorMessage(e)) });
   const partner = rel.members.find((m) => m.userId !== me.user.id);
@@ -156,7 +156,7 @@ export function DynamicPage() {
       <div className="mx-auto w-full max-w-2xl px-4 md:px-6">
         <DynamicHero
           className="py-4"
-          people={rel.members}
+          people={rel.members.map((m) => ({ ...m, collared: isCollared(rel, m.userId) }))}
           title={title}
           sub={[
             self ? `You're the ${ROLE_LABEL[self.role]}` : null,
@@ -171,7 +171,7 @@ export function DynamicPage() {
           {rel.members.map((m) => (
             <Row
               key={m.userId}
-              leading={<Avatar userId={m.userId} name={m.displayName} version={m.avatarVersion} />}
+              leading={<Avatar userId={m.userId} name={m.displayName} version={m.avatarVersion} collared={isCollared(rel, m.userId)} />}
               headline={m.userId === me.user.id ? `${m.displayName} (you)` : m.displayName}
               supporting={ROLE_LABEL[m.role]}
             />
@@ -283,12 +283,12 @@ export function DynamicPage() {
         value={editingDate}
         onClose={() => setEditingDate(null)}
         onSave={(d) => {
-          const exists = rel.dates.some((x) => x.id === d.id);
-          saveDates(exists ? rel.dates.map((x) => (x.id === d.id ? d : x)) : [...rel.dates, { ...d, id: crypto.randomUUID() }], "Date saved");
+          const exists = (rel.dates ?? []).some((x) => x.id === d.id);
+          saveDates(exists ? (rel.dates ?? []).map((x) => (x.id === d.id ? d : x)) : [...(rel.dates ?? []), { ...d, id: crypto.randomUUID() }], "Date saved");
         }}
         onDelete={(id) =>
           saveDates(
-            rel.dates.filter((x) => x.id !== id),
+            (rel.dates ?? []).filter((x) => x.id !== id),
             "Date removed",
           )
         }

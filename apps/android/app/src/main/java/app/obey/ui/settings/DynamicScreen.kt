@@ -78,6 +78,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -121,15 +122,19 @@ fun dynamicTitle(rel: Relationship, myId: String): String {
 
 /** The people in a dynamic as overlapping avatars. [ring] matches the surface behind them. */
 @Composable
-fun AvatarStack(members: List<Member>, load: suspend (String, String) -> androidx.compose.ui.graphics.ImageBitmap?, size: Dp, ring: Color) {
+fun AvatarStack(members: List<Member>, load: suspend (String, String) -> androidx.compose.ui.graphics.ImageBitmap?, size: Dp, ring: Color, collared: (Member) -> Boolean = { false }) {
     Row {
         members.take(4).forEachIndexed { i, m ->
+            val c = collared(m)
             Avatar(
                 m.userId, m.displayName, m.avatarVersion, load,
+                // A collared sub sits on top so the badge isn't hidden under the next picture.
                 modifier = Modifier
+                    .zIndex(if (c) 1f else 0f)
                     .offset(x = -(size / 5) * i)
                     .border(4.dp, ring, CircleShape),
                 size = size,
+                collared = c,
             )
         }
     }
@@ -172,7 +177,7 @@ fun DynamicScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
         Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(rememberScrollState())) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    AvatarStack(rel.members, vm::loadAvatar, size = 64.dp, ring = MaterialTheme.colorScheme.surface)
+                    AvatarStack(rel.members, vm::loadAvatar, size = 64.dp, ring = MaterialTheme.colorScheme.surface, collared = { rel.isCollared(it.userId) })
                     Spacer(Modifier.height(12.dp))
                     Text(dynamicTitle(rel, s.userId), style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
                     val since = runCatching { formatDate(Instant.parse(rel.createdAt).atZone(ZoneId.systemDefault()).toLocalDate()) }.getOrNull()
@@ -187,7 +192,7 @@ fun DynamicScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
                 SectionHeader("People")
                 rel.members.forEach { m ->
                     ListItem(
-                        leadingContent = { Avatar(m.userId, m.displayName, m.avatarVersion, vm::loadAvatar) },
+                        leadingContent = { Avatar(m.userId, m.displayName, m.avatarVersion, vm::loadAvatar, collared = rel.isCollared(m.userId)) },
                         headlineContent = { Text(m.displayName + if (m.userId == s.userId) " (you)" else "") },
                         supportingContent = { Text(m.role.label) },
                     )

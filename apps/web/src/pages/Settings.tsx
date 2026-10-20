@@ -5,7 +5,7 @@ import type { WeekStart } from "../api/types";
 import { getSession, signOut } from "../auth/session";
 import { Avatar, squareJpeg } from "../components/Avatar";
 import { Button, Icon, PageHeader, Section, SegmentedButtons, TextField, cx, useSnackbar } from "../components/ui";
-import { useRel } from "../lib/relationship";
+import { isCollared, useRel } from "../lib/relationship";
 import { useDynamicTitle } from "./Dynamic";
 import { type PushState, pushState, registerPush } from "../push";
 import { type ThemeMode, useTheme } from "../theme/ThemeProvider";
@@ -46,7 +46,15 @@ export function SettingsPage() {
         <Link to="/dynamic" className="state-layer flex items-center gap-4 rounded-xl bg-primary-container p-4 text-on-primary-container">
           <span className="flex">
             {rel.members.slice(0, 3).map((m, i) => (
-              <Avatar key={m.userId} userId={m.userId} name={m.displayName} version={m.avatarVersion} size={48} className={cx("ring-4 ring-primary-container", i > 0 && "-ml-3")} />
+              <Avatar
+                key={m.userId}
+                userId={m.userId}
+                name={m.displayName}
+                version={m.avatarVersion}
+                size={48}
+                collared={isCollared(rel, m.userId)}
+                className={cx("ring-4 ring-primary-container", i > 0 && "-ml-3", isCollared(rel, m.userId) && "z-10")}
+              />
             ))}
           </span>
           <span className="min-w-0 flex-1">

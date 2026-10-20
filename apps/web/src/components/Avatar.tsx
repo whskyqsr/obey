@@ -1,4 +1,5 @@
 import { useAvatarUrl } from "../api/hooks";
+import { CollarIcon } from "./CollarIcon";
 import { cx } from "./ui";
 
 /** A member's picture, or their initial on a tonal circle when they haven't added one. */
@@ -7,23 +8,37 @@ export function Avatar({
   name,
   version,
   size = 40,
+  collared,
   className,
 }: {
   userId: string;
   name: string;
   version: string | null;
   size?: number;
+  /** Shows a small collar badge at the bottom right. */
+  collared?: boolean;
   className?: string;
 }) {
   const url = useAvatarUrl(userId, version).data;
   const initial = name.trim().charAt(0).toUpperCase() || "?";
+  const badge = Math.max(16, Math.round(size * 0.4));
   return (
-    <span
-      className={cx("inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary-container text-on-secondary-container", className)}
-      style={{ width: size, height: size, fontSize: size * 0.42 }}
-      aria-hidden
-    >
-      {url ? <img src={url} alt="" className="size-full object-cover" /> : initial}
+    <span className={cx("relative inline-flex shrink-0 rounded-full", className)} style={{ width: size, height: size }} aria-hidden>
+      <span
+        className="inline-flex size-full items-center justify-center overflow-hidden rounded-full bg-secondary-container text-on-secondary-container"
+        style={{ fontSize: size * 0.42 }}
+      >
+        {url ? <img src={url} alt="" className="size-full object-cover" /> : initial}
+      </span>
+      {collared && (
+        <span
+          className="absolute -right-0.5 -bottom-0.5 inline-flex items-center justify-center rounded-full bg-primary text-on-primary ring-2 ring-surface"
+          style={{ width: badge, height: badge }}
+          title="Collared"
+        >
+          <CollarIcon size={Math.round(badge * 0.7)} />
+        </span>
+      )}
     </span>
   );
 }

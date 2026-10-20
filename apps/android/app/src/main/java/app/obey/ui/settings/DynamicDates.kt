@@ -27,6 +27,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import app.obey.api.DynamicDate
+import app.obey.api.Relationship
+import app.obey.api.Role
 import app.obey.ui.common.CollarIcon
 import app.obey.ui.common.formatDate
 import java.time.Instant
@@ -42,6 +44,11 @@ fun dateIcon(label: String): ImageVector = when (label) {
     "First met" -> Icons.Outlined.WavingHand
     else -> Icons.Outlined.Event
 }
+
+/** A submissive in a dynamic that has marked a Collaring date that has come. */
+fun Relationship.isCollared(userId: String, today: LocalDate = LocalDate.now()): Boolean =
+    members.firstOrNull { it.userId == userId }?.role == Role.Submissive &&
+        dates.any { it.label == "Collaring" && runCatching { LocalDate.parse(it.date) <= today }.getOrDefault(false) }
 
 /** Days until [date] next comes round from [today] (0 = today); Feb 29 falls on Feb 28 in other years. */
 fun daysUntilNext(date: LocalDate, today: LocalDate): Long {

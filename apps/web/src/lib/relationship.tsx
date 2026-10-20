@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import { allFeatures } from "@obey/contracts";
 import type { Features, Me, Member, Relationship } from "../api/types";
+import { today } from "./dates";
 import { storage } from "./storage";
 
 const KEY = "obey.relationship";
@@ -71,3 +72,9 @@ export function relTitle(rel: Relationship, myId: string): string {
 }
 
 export const ROLE_LABEL = { dominant: "Dominant", submissive: "Submissive", switch: "Switch" } as const;
+
+/** A submissive in a dynamic that has marked a Collaring date that has come. */
+export function isCollared(rel: Relationship, userId: string, on = today()): boolean {
+  const m = rel.members.find((x) => x.userId === userId);
+  return m?.role === "submissive" && (rel.dates ?? []).some((d) => d.label === "Collaring" && d.date <= on);
+}

@@ -121,7 +121,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, vm: SettingsVi
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
                     ) {
                         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            AvatarStack(rel.members, vm::loadAvatar, size = 48.dp, ring = MaterialTheme.colorScheme.primaryContainer)
+                            AvatarStack(rel.members, vm::loadAvatar, size = 48.dp, ring = MaterialTheme.colorScheme.primaryContainer, collared = { rel.isCollared(it.userId) })
                             Column(Modifier.weight(1f)) {
                                 Text(dynamicTitle(rel, session.userId), style = MaterialTheme.typography.titleLarge)
                                 Text("Your dynamic · people, invites, how it works, features", style = MaterialTheme.typography.bodyMedium)
