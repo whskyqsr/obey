@@ -217,13 +217,21 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun signInEmail(email: String, password: String, create: Boolean) = action {
-        if (create) auth.createAccount(email, password) else auth.signInWithEmail(email, password)
+        if (!create) return@action auth.signInWithEmail(email, password)
+        auth.createAccount(email, password)
+        // The account exists either way; a failed email can be resent from the Check your email screen.
+        runCatching { sendVerificationEmail() }
+    }
+
+    /** Our own branded email from the app's domain; Firebase's stock email when the server can't send one. */
+    private suspend fun sendVerificationEmail() {
+        if (!api.sendVerificationEmail().sent) auth.sendFirebaseVerification()
     }
 
     fun signInGoogle(idToken: String) = action { auth.signInWithGoogleIdToken(idToken) }
 
     fun resendVerification() = action {
-        auth.resendVerification()
+        sendVerificationEmail()
         say("Sent another link. Check your spam folder too.")
     }
 

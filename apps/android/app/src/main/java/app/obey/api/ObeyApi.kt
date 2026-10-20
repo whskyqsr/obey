@@ -41,6 +41,9 @@ interface ObeyApi {
     @GET("users/{id}/avatar")
     suspend fun avatar(@Path("id") userId: String, @Query("v") version: String): ResponseBody
 
+    @POST("me/verification-email")
+    suspend fun sendVerificationEmail(@Body body: VerificationEmailInput = VerificationEmailInput()): VerificationEmailResult
+
     // Photo proof
     @POST("me/proof-terms")
     suspend fun acceptProofTerms(@Body body: AcceptProofTermsInput = AcceptProofTermsInput()): User

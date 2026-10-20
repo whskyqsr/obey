@@ -12,6 +12,7 @@ import { AcceptInvite } from "./pages/AcceptInvite";
 import { Onboarding } from "./pages/Onboarding";
 import { SignInPage } from "./pages/SignIn";
 import { VerifyEmailPage } from "./pages/VerifyEmail";
+import { ConfirmEmailPage } from "./pages/ConfirmEmail";
 import { registerPush } from "./push";
 import { router } from "./router";
 import { AppLockGate } from "./components/AppLock";
@@ -24,6 +25,8 @@ export function App() {
   }, [session, qc]);
 
   if (session === undefined) return <Splash />;
+  // The link in our verification email works signed in or not, and in a different browser.
+  if (location.pathname === "/verify-email") return <ConfirmEmailPage />;
   if (session === null) return <SignInPage />;
   if (needsVerification(session)) return <VerifyEmailPage email={session.kind === "firebase" ? session.email : null} />;
   return (

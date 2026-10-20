@@ -12,6 +12,7 @@ import { commentRoutes } from "./routes/comments.js";
 import { limitRoutes } from "./routes/limits.js";
 import { ruleLogRoutes } from "./routes/ruleLog.js";
 import { kitRoutes } from "./routes/kits.js";
+import { verificationRoutes } from "./routes/verification.js";
 import { eventRoutes } from "./routes/events.js";
 import { libraryRoutes } from "./routes/library.js";
 import { pointsRoutes } from "./routes/points.js";
@@ -28,6 +29,8 @@ export interface Deps {
   corsOrigins?: string[];
   /** People who review reports, by verified email (ADMIN_EMAILS). */
   adminEmails?: string[];
+  /** Sends our own verification email; null means clients fall back to Firebase's. */
+  sendVerification?: ((email: string) => Promise<void>) | null;
   logger?: boolean;
 }
 
@@ -39,6 +42,12 @@ declare module "fastify" {
     user: User;
     /** Signed in with a verified email listed in ADMIN_EMAILS. */
     admin: boolean;
+    /** The sign-in email, verified or not. */
+    email: string | null;
+  }
+  interface FastifyContextConfig {
+    /** Lets an email-and-password account that hasn't confirmed its address call this route. */
+    allowUnverified?: boolean;
   }
 }
 
@@ -53,13 +62,16 @@ export function buildApp(deps: Deps) {
 
   app.decorateRequest("user", null as unknown as User);
   app.decorateRequest("admin", false);
+  app.decorateRequest("email", null);
   const admins = new Set((deps.adminEmails ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean));
   // Callback style so the rest of the request runs inside the scope.
   app.addHook("onRequest", (req, _reply, done) => requestScope.run({ write: !["GET", "HEAD", "OPTIONS"].includes(req.method) }, done));
   app.addHook("onRequest", async (req: FastifyRequest) => {
     if (req.method === "OPTIONS" || req.url === "/health") return;
     const identity = await deps.authenticate(req);
+    if (identity.unverified && !req.routeOptions.config.allowUnverified) throw new HttpError(403, "verify your email", { code: "email_unverified" });
     req.user = await upsertUser(deps.db, identity);
+    req.email = identity.email;
     req.admin = identity.verifiedEmail !== null && admins.has(identity.verifiedEmail.toLowerCase());
   });
 
@@ -84,5 +96,6 @@ export function buildApp(deps: Deps) {
   app.register(limitRoutes(deps));
   app.register(ruleLogRoutes(deps));
   app.register(kitRoutes(deps));
+  app.register(verificationRoutes(deps));
   return app;
 }

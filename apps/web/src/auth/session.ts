@@ -1,4 +1,4 @@
-import { FIREBASE_ENABLED, firebaseConfig } from "../env";
+import { API_URL, FIREBASE_ENABLED, firebaseConfig } from "../env";
 import { clearPin } from "../lib/appLock";
 import { storage } from "../lib/storage";
 import type { FirebaseApp } from "firebase/app";
@@ -86,15 +86,33 @@ export async function signInWithEmail(email: string, password: string): Promise<
 
 export async function createAccount(email: string, password: string): Promise<void> {
   const a = await getFirebaseAuth();
-  const { createUserWithEmailAndPassword, sendEmailVerification } = await import("firebase/auth");
+  const { createUserWithEmailAndPassword } = await import("firebase/auth");
   const cred = await createUserWithEmailAndPassword(a, email.trim(), password);
-  await sendEmailVerification(cred.user, { url: location.origin });
+  // The account exists either way; a failed email can be resent from the Check your email screen.
+  await sendVerificationEmail(cred.user).catch(() => {});
 }
 
 export async function resendVerification(): Promise<void> {
   const a = await getFirebaseAuth();
+  if (a.currentUser) await sendVerificationEmail(a.currentUser);
+}
+
+/** Our own branded email from the app's domain; Firebase's stock email when the server can't send one. */
+async function sendVerificationEmail(user: import("firebase/auth").User): Promise<void> {
+  const res = await fetch(`${API_URL}/me/verification-email`, { method: "POST", headers: { Authorization: `Bearer ${await user.getIdToken()}` } });
+  if (res.status === 429) throw new Error("We just sent one. Wait a minute before asking for another.");
+  const body = (await res.json().catch(() => null)) as { sent?: boolean } | null;
+  if (res.ok && body?.sent) return;
   const { sendEmailVerification } = await import("firebase/auth");
-  if (a.currentUser) await sendEmailVerification(a.currentUser, { url: location.origin });
+  await sendEmailVerification(user, { url: location.origin });
+}
+
+/** Applies the one-time code from our verification email's link. */
+export async function confirmEmail(code: string): Promise<void> {
+  const a = await getFirebaseAuth();
+  const { applyActionCode } = await import("firebase/auth");
+  await applyActionCode(a, code);
+  if (a.currentUser) await refreshVerification();
 }
 
 /** Re-reads the account after the person clicks the link; returns whether it is verified now. */
@@ -130,6 +148,9 @@ export function authErrorMessage(e: unknown): string | null {
       return "Sign-in isn't enabled for this website yet.";
     case "auth/operation-not-allowed":
       return "This sign-in method isn't turned on yet.";
+    case "auth/invalid-action-code":
+    case "auth/expired-action-code":
+      return "This link has expired or was already used.";
     case "auth/too-many-requests":
       return "Too many tries. Wait a minute and try again.";
     default:

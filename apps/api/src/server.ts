@@ -3,6 +3,7 @@ import { createAuthenticator } from "./auth.js";
 import { config } from "./config.js";
 import { createDb, runMigrations } from "./db/index.js";
 import { initFirebase } from "./firebase.js";
+import { verificationSender } from "./mail.js";
 import { fcmNotifier, noopNotifier, withPreferences } from "./notify.js";
 
 const { db } = createDb(config.databaseUrl);
@@ -22,6 +23,9 @@ const app = buildApp({
   materializeDays: config.materializeDays,
   corsOrigins: config.corsOrigins,
   adminEmails: config.adminEmails,
+  // Generating the link needs the service account, the same credentials push uses.
+  sendVerification:
+    firebase?.canSendPush && config.resendApiKey ? verificationSender(firebase.app, { resendApiKey: config.resendApiKey, from: config.mailFrom, appUrl: config.appUrl }) : null,
   logger: true,
 });
 await app.listen({ port: config.port, host: "0.0.0.0" });
