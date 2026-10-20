@@ -183,6 +183,13 @@
       "when": 1792531829088,
       "tag": "0025_hide_earlier_call_offs",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792538138447,
+      "tag": "0026_ritual_steps",
+      "breakpoints": true
     }
   ]
 }

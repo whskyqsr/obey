@@ -54,6 +54,10 @@ data class TaskForm(
     val consequenceDueDays: Int = 1,
     /** Null means any time that day. */
     val consequenceDueTime: LocalTime? = null,
+    /** A ritual's steps; empty for an ordinary task. */
+    val steps: List<app.obey.api.TaskStep> = emptyList(),
+    /** Only doable this many minutes before it's due; null for any time. */
+    val windowMinutes: Int? = null,
 ) {
     val titleError: String? get() = if (title.isBlank()) "Give it a title" else null
     val valid: Boolean get() = titleError == null && assigneeId.isNotEmpty() &&
@@ -152,6 +156,8 @@ class TaskEditorViewModel @Inject constructor(
         consequenceId = t.consequenceId,
         consequenceDueDays = t.consequenceDueDays,
         consequenceDueTime = t.consequenceDueTime?.let { LocalTime.parse(it) },
+        steps = t.steps,
+        windowMinutes = t.windowMinutes,
     )
 
     fun update(change: (TaskForm) -> TaskForm) = _form.update(change)
@@ -179,6 +185,9 @@ class TaskEditorViewModel @Inject constructor(
             dueTime = if (f.allDay) null else f.dueTime.format(DateTimeFormatter.ofPattern("HH:mm")),
             timezone = f.timezone,
             graceMinutes = f.effectiveGrace,
+            steps = f.steps.map { it.copy(title = it.title.trim()) }.filter { it.title.isNotEmpty() },
+            // A window counts back from a due time, so an all-day task has none.
+            windowMinutes = if (f.allDay) null else f.windowMinutes,
         )
         action {
             if (original == null) api.createTask(sessions.requireRelationshipId(), input)

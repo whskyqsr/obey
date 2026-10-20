@@ -200,6 +200,10 @@ export const taskSeries = pgTable(
     dueTime: text("due_time"),
     timezone: text("timezone").notNull(),
     graceMinutes: integer("grace_minutes").notNull().default(0),
+    /** A ritual's ordered steps; a task with none is an ordinary one. */
+    steps: jsonb("steps").$type<{ id: string; title: string }[]>().notNull().default([]),
+    /** When set, the assignee can only do it in the last this-many minutes before it's due. */
+    windowMinutes: integer("window_minutes"),
     active: boolean("active").notNull().default(true),
     /** Set on the consequence handed out automatically for this missed occurrence; unique, so it's issued once. */
     causedByOccurrenceId: uuid("caused_by_occurrence_id").references((): AnyPgColumn => occurrences.id, { onDelete: "set null" }),
@@ -234,6 +238,8 @@ export const occurrences = pgTable(
     /** Kept in step with proof_photos, so lists can show a count without a join. */
     photoCount: integer("photo_count").notNull().default(0),
     commentCount: integer("comment_count").notNull().default(0),
+    /** Ids of the ritual steps ticked off so far. */
+    stepsDone: jsonb("steps_done").$type<string[]>().notNull().default([]),
     reviewedBy: uuid("reviewed_by").references(() => users.id),
     reviewedAt: ts("reviewed_at"),
     /** Cancelled because someone called it off around a plan (not because its series was edited); history shows these. */

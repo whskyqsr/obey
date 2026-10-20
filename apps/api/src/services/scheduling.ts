@@ -123,6 +123,8 @@ export async function completeOccurrence(
   // The assignee can't work ahead into the next occurrence's turn (tomorrow's daily check-in today); a Dominant can.
   const opens = opensOn(series.schedule, occ.originalDate);
   if (isAssignee && !canManage(actor.role) && opens && localDate(now, series.timezone) < opens) throw new HttpError(409, `this one opens on ${opens}`);
+  if (isAssignee && !canManage(actor.role)) assertWindowOpen(series, occ, now);
+  if (isAssignee && !canManage(actor.role) && series.steps.some((s) => !occ.stepsDone.includes(s.id))) throw new HttpError(409, "finish every step first");
   // "Proof required" means a photo or a note; a Dominant marking it done needs neither.
   if (series.proofRequired && isAssignee && !canManage(actor.role) && occ.photoCount === 0 && !(noteMd ?? occ.noteMd ?? "").trim())
     throw new HttpError(409, "add a photo or a note as proof");
@@ -132,6 +134,32 @@ export async function completeOccurrence(
     return submitted!;
   }
   return finalizeCompletion(db, series, occ, now, isAssignee ? null : actor.userId);
+}
+
+/** A task with a window can't be started before the last windowMinutes before it's due. */
+export function assertWindowOpen(series: Series, occ: Occurrence, now: Date) {
+  if (!series.windowMinutes) return;
+  const opensAt = occ.dueAt.getTime() - series.windowMinutes * 60_000;
+  if (now.getTime() < opensAt) throw new HttpError(409, `this one opens at ${new Date(opensAt).toISOString()}`);
+}
+
+/** Ticks a ritual step on or off. Only the assignee does this, while the occurrence is still to do. */
+export async function tickStep(db: Tx, series: Series, occ: Occurrence, actorId: string, stepId: string, done: boolean, now: Date): Promise<Occurrence> {
+  if (actorId !== series.assigneeId) throw forbidden("only the assignee can do the steps");
+  if (occ.status !== "pending") throw new HttpError(409, `occurrence is ${occ.status}`);
+  if (!series.steps.some((s) => s.id === stepId)) throw new HttpError(400, "no such step");
+  const opens = opensOn(series.schedule, occ.originalDate);
+  if (opens && localDate(now, series.timezone) < opens) throw new HttpError(409, `this one opens on ${opens}`);
+  assertWindowOpen(series, occ, now);
+  const ids = new Set(occ.stepsDone);
+  if (done) ids.add(stepId);
+  else ids.delete(stepId);
+  const [updated] = await db
+    .update(occurrences)
+    .set({ stepsDone: [...ids] })
+    .where(eq(occurrences.id, occ.id))
+    .returning();
+  return updated!;
 }
 
 /** How long the assignee has to take back a completion (the Undo after a tap or swipe). */

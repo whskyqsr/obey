@@ -87,6 +87,7 @@ fun UpcomingScreen(
         onPauseOrDispose { }
     }
     var rescheduling by remember { mutableStateOf<Occurrence?>(null) }
+    var running by remember { mutableStateOf<Occurrence?>(null) }
     // A plan to show, or a day to add one on.
     var plan by remember { mutableStateOf<Pair<CalendarEvent?, LocalDate>?>(null) }
     val session = vm.session
@@ -99,7 +100,7 @@ fun UpcomingScreen(
             o,
             if (mine) null else session?.nameOf(o.assigneeId),
             OccurrenceActions(
-                onComplete = if (mine) ({ vm.complete(o) }) else null,
+                onComplete = if (mine) ({ if (o.isRitual) running = o else vm.complete(o) }) else null,
                 onReschedule = { rescheduling = o },
                 onEditTask = if (canManage) ({ onEditTask(o.seriesId) }) else null,
             ),
@@ -235,6 +236,7 @@ fun UpcomingScreen(
         PlanDialog(e, day, onDismiss = { plan = null }, onChanged = vm::refresh)
     }
 
+    running?.let { o -> app.obey.ui.today.RitualSheet(o, onDismiss = { running = null; vm.refresh() }) }
     rescheduling?.let { o ->
         RescheduleSheet(o, onDismiss = { rescheduling = null }, onSubmit = { vm.reschedule(o, it) })
     }

@@ -526,3 +526,12 @@ export function useApplyKit(rel: string) {
     onSuccess: () => invalidate(),
   });
 }
+
+/** Ticks a ritual step on or off. */
+export function useTickStep(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ id, stepId, done }: { id: string; stepId: string; done: boolean }) => api<Occurrence>(`/occurrences/${id}/steps`, { method: "POST", body: { stepId, done } }),
+    onSuccess: () => invalidate(),
+  });
+}

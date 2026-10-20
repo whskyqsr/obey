@@ -140,6 +140,9 @@ interface ObeyApi {
     @PATCH("occurrences/{id}")
     suspend fun editOccurrence(@Path("id") occurrenceId: String, @Body body: EditOccurrenceInput): Occurrence
 
+    @POST("occurrences/{id}/steps")
+    suspend fun tickStep(@Path("id") occurrenceId: String, @Body body: TickStepInput): Occurrence
+
     @POST("occurrences/{id}/undo")
     suspend fun undoComplete(@Path("id") occurrenceId: String, @Body body: CompleteOccurrenceInput = CompleteOccurrenceInput()): Occurrence
 

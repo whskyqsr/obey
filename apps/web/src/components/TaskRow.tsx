@@ -5,7 +5,8 @@ import { useCompleteOccurrence, useEditOccurrence, useReviewOccurrence, useUndoC
 import { errorMessage } from "../api/client";
 import { fmtDate, fmtDateTime, fmtRelative, fmtTime, isAllDayDue, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
-import { CompleteDialog, isOpen, isOverdue } from "./OccurrenceCard";
+import { CompleteDialog, isOpen, isOverdue, opensLabel } from "./OccurrenceCard";
+import { RitualDialog, isRitual, stepProgress } from "./Ritual";
 import { SendBackDialog } from "./Comments";
 import { RescheduleSheet } from "./RescheduleSheet";
 import { StreakStrip } from "./StreakStrip";
@@ -44,6 +45,7 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
   const [rescheduling, setRescheduling] = useState(false);
   // A task that needs proof opens the Done sheet instead of completing in one tap.
   const [completing, setCompleting] = useState(false);
+  const [running, setRunning] = useState(false);
   const mine = o.assigneeId === me.user.id;
   const overdue = isOverdue(o);
   const missed = o.status === "missed" || overdue;
@@ -67,7 +69,8 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
     o.status === "excused" ? "excused" : null,
     !mine ? memberName(o.assigneeId) : null,
     o.rescheduled ? "moved" : null,
-    o.status === "pending" && mine && !isOpen(o) ? `opens ${fmtDate(o.opensOn!, { weekday: "short" })}` : null,
+    o.status === "pending" && mine && !isOpen(o) ? opensLabel(o) : null,
+    o.status === "pending" && isRitual(o) && o.stepsDone.length ? stepProgress(o) : null,
   ].filter(Boolean);
 
   return (
@@ -80,13 +83,17 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
     >
       <div className="relative z-10">
         {canComplete ? (
-          <IconButton
-            icon="radio_button_unchecked"
-            label={`Mark “${o.title}” done`}
-            data-action="done"
-            className={missed ? "text-error" : "text-on-surface-variant"}
-            onClick={() => (o.proofRequired ? setCompleting(true) : quickComplete(o))}
-          />
+          isRitual(o) ? (
+            <IconButton icon="play_circle" label={`Start “${o.title}”`} data-action="done" className={missed ? "text-error" : "text-primary"} onClick={() => setRunning(true)} />
+          ) : (
+            <IconButton
+              icon="radio_button_unchecked"
+              label={`Mark “${o.title}” done`}
+              data-action="done"
+              className={missed ? "text-error" : "text-on-surface-variant"}
+              onClick={() => (o.proofRequired ? setCompleting(true) : quickComplete(o))}
+            />
+          )
         ) : (
           <span className="flex size-10 items-center justify-center">
             <Icon
@@ -139,6 +146,7 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
       </div>
       <RescheduleSheet occurrence={o} open={rescheduling} onClose={() => setRescheduling(false)} />
       {completing && <CompleteDialog o={o} open onClose={() => setCompleting(false)} />}
+      {running && <RitualDialog o={o} open onClose={() => setRunning(false)} />}
     </div>
   );
 }

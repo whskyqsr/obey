@@ -355,6 +355,37 @@ describe("tasks and occurrences", () => {
     expect(after.photoCount).toBe(0);
   });
 
+  it("runs a ritual step by step inside its window", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    const steps = [
+      { id: "kneel", title: "Kneel" },
+      { id: "recite", title: "Recite the rules" },
+    ];
+    const made = await dom.post(`/relationships/${relId}/tasks`, task(subId, { steps, windowMinutes: 60 }));
+    expect(made.body).toMatchObject({ steps, windowMinutes: 60 });
+    const [first] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    expect(first).toMatchObject({ steps, stepsDone: [], opensAt: "2026-10-17T00:00:00.000Z" });
+    const tick = (who: typeof dom, stepId: string, done = true) => who.post(`/occurrences/${first.id}/steps`, { stepId, done });
+
+    try {
+      expect((await tick(sub, "kneel")).status).toBe(409); // 8 am; it opens at 8 pm
+      ctx.clock.now = new Date("2026-10-17T00:30:00Z");
+      expect((await tick(sub, "kneel")).body.stepsDone).toEqual(["kneel"]);
+      expect((await tick(dom, "recite")).status).toBe(403);
+      expect((await tick(sub, "nope")).status).toBe(400);
+      expect((await sub.post(`/occurrences/${first.id}/complete`)).status).toBe(409);
+      expect((await tick(sub, "recite")).body.stepsDone).toEqual(["kneel", "recite"]);
+      expect((await tick(sub, "recite", false)).body.stepsDone).toEqual(["kneel"]);
+      // Dropping a step from the ritual drops it from what's left to do.
+      await dom.patch(`/tasks/${made.body.id}`, { steps: [steps[0]] });
+      expect((await sub.post(`/occurrences/${first.id}/complete`)).body.status).toBe("completed");
+      expect((await tick(sub, "kneel", false)).status).toBe(409);
+    } finally {
+      ctx.clock.now = new Date("2026-10-16T12:00:00Z");
+    }
+    expect((await dom.post(`/relationships/${relId}/tasks`, task(subId, { steps: [steps[0], steps[0]] }))).status).toBe(400);
+  });
+
   it("accepts a note as proof", async () => {
     const { dom, sub, relId, subId } = await ctx.pair();
     await dom.post(`/relationships/${relId}/tasks`, task(subId, { proofRequired: true }));

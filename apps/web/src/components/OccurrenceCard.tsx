@@ -7,6 +7,7 @@ import { fmtDate, fmtDateTime, fmtRelative, fmtTime, localDateOf, today } from "
 import { useReadOnly, useRel } from "../lib/relationship";
 import { Comments, SendBackDialog } from "./Comments";
 import { ProofPhotos } from "./Proof";
+import { RitualDialog, StepList, isRitual, stepProgress } from "./Ritual";
 import { RescheduleSheet } from "./RescheduleSheet";
 import { StreakStrip } from "./StreakStrip";
 import { Badge, Button, Dialog, TextArea, cx, useSnackbar } from "./ui";
@@ -20,9 +21,20 @@ const STATUS: Record<OccurrenceStatus, { label: string; tone: "primary" | "error
   cancelled: { label: "Cancelled", tone: "neutral" },
 };
 
-/** Whether the assignee may complete it yet: not before the day after the previous occurrence (tomorrow's daily task waits). */
-export function isOpen(o: Occurrence) {
-  return !o.opensOn || o.opensOn <= today();
+/**
+ * Whether the assignee may complete it yet: not before the day after the previous occurrence (tomorrow's daily task
+ * waits), and not before its window opens when it has one.
+ */
+export function isOpen(o: Occurrence, now = Date.now()) {
+  return (!o.opensOn || o.opensOn <= today()) && (!o.opensAt || new Date(o.opensAt).getTime() <= now);
+}
+
+/** "opens Thu" or "opens 8:30 PM", for a task that isn't open yet. */
+export function opensLabel(o: Occurrence) {
+  if (o.opensOn && o.opensOn > today()) return `opens ${fmtDate(o.opensOn, { weekday: "short" })}`;
+  if (!o.opensAt) return "opens later";
+  const at = new Date(o.opensAt);
+  return localDateOf(at) === today() ? `opens ${fmtTime(o.opensAt)}` : `opens ${fmtDateTime(o.opensAt)}`;
 }
 
 export function isOverdue(o: Occurrence, now = Date.now()) {
@@ -39,6 +51,7 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
   const [rescheduling, setRescheduling] = useState(false);
   const [sendingBack, setSendingBack] = useState(false);
   const [commenting, setCommenting] = useState(false);
+  const [running, setRunning] = useState(false);
 
   const mine = o.assigneeId === me.user.id;
   const overdue = isOverdue(o);
@@ -77,6 +90,12 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
           {(o.status !== "pending" || overdue) && <Badge tone={overdue ? "error" : status.tone}>{overdue ? "Overdue" : status.label}</Badge>}
         </div>
       </div>
+      {isRitual(o) && (
+        <div className="flex flex-col gap-2 rounded-sm bg-surface-container px-3 py-2">
+          <div className="text-label-large text-on-surface-variant">{stepProgress(o)}</div>
+          <StepList o={o} />
+        </div>
+      )}
       {o.noteMd && <p className="rounded-sm bg-surface-container px-3 py-2 text-body-medium whitespace-pre-wrap text-on-surface-variant">{o.noteMd}</p>}
       {o.photoCount > 0 && (
         <div className="relative z-10">
@@ -90,12 +109,17 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
 
       {(o.status === "pending" || (isDom && o.status === "submitted")) && (
         <div className="relative z-10 flex flex-wrap items-center gap-2">
-          {o.status === "pending" && mine && isOpen(o) && (
+          {o.status === "pending" && mine && isOpen(o) && !isRitual(o) && (
             <Button variant="filled" icon="check" onClick={() => setCompleting(true)}>
               Done
             </Button>
           )}
-          {o.status === "pending" && mine && !isOpen(o) && <span className="text-body-medium text-on-surface-variant">Opens {fmtDate(o.opensOn!, { weekday: "long" })}</span>}
+          {o.status === "pending" && mine && isOpen(o) && isRitual(o) && (
+            <Button variant="filled" icon="play_arrow" onClick={() => setRunning(true)}>
+              {o.stepsDone.length ? "Continue" : "Start"}
+            </Button>
+          )}
+          {o.status === "pending" && mine && !isOpen(o) && <span className="text-body-medium text-on-surface-variant">{opensLabel(o).replace(/^o/, "O")}</span>}
           {o.status === "submitted" && isDom && (
             <>
               <Button
@@ -130,6 +154,7 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
       <SendBackDialog o={o} open={sendingBack} onClose={() => setSendingBack(false)} />
 
       <CompleteDialog o={o} open={completing} onClose={() => setCompleting(false)} />
+      {running && <RitualDialog o={o} open onClose={() => setRunning(false)} />}
 
       <RescheduleSheet occurrence={o} open={rescheduling} onClose={() => setRescheduling(false)} />
     </div>
