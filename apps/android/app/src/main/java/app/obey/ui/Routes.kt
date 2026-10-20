@@ -9,7 +9,6 @@ import kotlinx.serialization.Serializable
 @Serializable data object ConsequencesRoute
 @Serializable data object RulesRoute
 @Serializable data object ProtocolsRoute
-@Serializable data object LimitsRoute
 @Serializable data object RuleLogRoute
 @Serializable data object NotesRoute
 @Serializable data object JournalRoute

@@ -18,8 +18,6 @@ import type {
   AssignConsequenceInput,
   WeekStart,
   QuietHours,
-  Limit,
-  LimitKind,
   RuleLogEntry,
   Invite,
   LedgerEntry,
@@ -460,24 +458,6 @@ export function useAssignConsequence(rel: string) {
     mutationFn: ({ id, input }: { id: string; input: AssignConsequenceInput }) => api<Task>(`/consequences/${id}/assign`, { method: "POST", body: input }),
     onSuccess: () => invalidate(),
   });
-}
-
-export function useLimits(rel: string) {
-  return useQuery({ queryKey: ["rel", rel, "limits"], queryFn: () => api<Limit[]>(`/relationships/${rel}/limits`) });
-}
-
-export function useSaveLimit(rel: string) {
-  const invalidate = useInvalidateRel(rel);
-  return useMutation({
-    mutationFn: ({ id, input }: { id?: string; input: { title: string; kind: LimitKind; note: string } }) =>
-      id ? api<Limit>(`/limits/${id}`, { method: "PATCH", body: input }) : api<Limit>(`/relationships/${rel}/limits`, { method: "POST", body: input }),
-    onSuccess: () => invalidate(),
-  });
-}
-
-export function useDeleteLimit(rel: string) {
-  const invalidate = useInvalidateRel(rel);
-  return useMutation({ mutationFn: (id: string) => api(`/limits/${id}`, { method: "DELETE" }), onSuccess: () => invalidate() });
 }
 
 export function useRuleLog(rel: string) {
