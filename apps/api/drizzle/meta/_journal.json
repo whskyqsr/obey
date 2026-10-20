@@ -43,6 +43,13 @@
       "when": 1792505077951,
       "tag": "0005_protocols",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792507949557,
+      "tag": "0006_week_start",
+      "breakpoints": true
     }
   ]
 }

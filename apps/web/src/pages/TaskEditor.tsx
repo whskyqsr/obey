@@ -4,12 +4,12 @@ import { useDeleteTask, useLibrary, useSaveTask, useTasks } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { Task, TaskInput } from "../api/types";
 import { RecurrencePicker } from "../components/RecurrencePicker";
-import { TaskHistory } from "../components/TaskHistory";
 import { Button, Dialog, ErrorBox, IconButton, Loading, Select, Switch, TextArea, TextField, useSnackbar } from "../components/ui";
 import { type PickerState, defaultPicker, fromSchedule, toSchedule } from "../recurrence/picker";
 import { validateSchedule } from "@obey/recurrence";
 import { browserTimeZone, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
+import { useBack } from "../lib/useBack";
 
 interface Form {
   title: string;
@@ -28,7 +28,7 @@ interface Form {
   graceMinutes: number;
 }
 
-function formFrom(task: Task | undefined, defaultAssignee: string): Form {
+function formFrom(task: Task | undefined, defaultAssignee: string, start?: string): Form {
   return {
     title: task?.title ?? "",
     bodyMd: task?.bodyMd ?? "",
@@ -39,7 +39,8 @@ function formFrom(task: Task | undefined, defaultAssignee: string): Form {
     consequenceId: task?.consequenceId ?? "",
     proofRequired: task?.proofRequired ?? false,
     approvalRequired: task?.approvalRequired ?? false,
-    picker: task ? fromSchedule(task.schedule) : { ...defaultPicker(today()), kind: "days" },
+    // From a calendar day it's a one-off on that day, like a new calendar event; otherwise daily from today.
+    picker: task ? fromSchedule(task.schedule) : start ? defaultPicker(start) : { ...defaultPicker(today()), kind: "days" },
     allDay: task ? task.dueTime === null : false,
     dueTime: task?.dueTime ?? "21:00",
     timezone: task?.timezone ?? browserTimeZone(),
@@ -67,7 +68,7 @@ function toInput(f: Form): TaskInput {
 
 const num = (v: string) => (v === "" ? NaN : Number(v));
 
-export function TaskEditorPage({ taskId }: { taskId: string }) {
+export function TaskEditorPage({ taskId, start }: { taskId: string; start?: string }) {
   const { rel, isDom, me } = useRel();
   const tasks = useTasks(rel.id);
   const isNew = taskId === "new";
@@ -76,10 +77,10 @@ export function TaskEditorPage({ taskId }: { taskId: string }) {
   if (!isNew && tasks.error) return <ErrorBox error={tasks.error} onRetry={() => tasks.refetch()} />;
   if (!isNew && !task) return <ErrorBox error="That task doesn't exist any more." />;
   const defaultAssignee = rel.members.find((m) => m.role === "submissive" && m.userId !== me.user.id)?.userId ?? me.user.id;
-  return <Editor key={taskId} task={task} readOnly={!isDom} defaultAssignee={defaultAssignee} />;
+  return <Editor key={taskId} task={task} readOnly={!isDom} defaultAssignee={defaultAssignee} start={start} />;
 }
 
-function Editor({ task, readOnly, defaultAssignee }: { task?: Task; readOnly: boolean; defaultAssignee: string }) {
+function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readOnly: boolean; defaultAssignee: string; start?: string }) {
   const { rel, features } = useRel();
   const navigate = useNavigate();
   const snack = useSnackbar();
@@ -87,13 +88,14 @@ function Editor({ task, readOnly, defaultAssignee }: { task?: Task; readOnly: bo
   const del = useDeleteTask(rel.id);
   const rewards = useLibrary(rel.id, "rewards");
   const consequences = useLibrary(rel.id, "consequences");
-  const [form, setForm] = useState(() => formFrom(task, defaultAssignee));
+  const [form, setForm] = useState(() => formFrom(task, defaultAssignee, start));
   const [confirmDelete, setConfirmDelete] = useState(false);
   const set = (patch: Partial<Form>) => setForm((f) => ({ ...f, ...patch }));
 
   const scheduleErrors = useMemo(() => validateSchedule(toSchedule(form.picker)), [form.picker]);
   const canSave = !readOnly && form.title.trim() && !scheduleErrors.length && form.assigneeId;
-  const back = () => navigate({ to: "/tasks" });
+  // Back to wherever the editor was opened from: the task's page, or Today, Calendar or Tasks for a new one.
+  const back = useBack(() => (task ? navigate({ to: "/tasks/$taskId", params: { taskId: task.id } }) : navigate({ to: "/" })));
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -101,9 +103,10 @@ function Editor({ task, readOnly, defaultAssignee }: { task?: Task; readOnly: bo
     save.mutate(
       { id: task?.id, input: toInput(form) },
       {
-        onSuccess: () => {
+        onSuccess: (saved) => {
           snack(task ? "Task saved" : "Task created");
-          back();
+          if (task) back();
+          else navigate({ to: "/tasks/$taskId", params: { taskId: saved.id }, replace: true });
         },
         onError: (err) => snack(errorMessage(err)),
       },
@@ -192,8 +195,6 @@ function Editor({ task, readOnly, defaultAssignee }: { task?: Task; readOnly: bo
         </div>
       </fieldset>
 
-      {task && <TaskHistory taskId={task.id} />}
-
       <Dialog
         open={confirmDelete}
         onClose={() => setConfirmDelete(false)}
@@ -213,7 +214,7 @@ function Editor({ task, readOnly, defaultAssignee }: { task?: Task; readOnly: bo
                 del.mutate(task.id, {
                   onSuccess: () => {
                     snack("Task deleted");
-                    back();
+                    navigate({ to: "/tasks", replace: true });
                   },
                   onError: (e) => snack(errorMessage(e)),
                 })

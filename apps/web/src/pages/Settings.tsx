@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useCreateInvite, useSetAvatar, useUpdateMe, useUpdateRelationship } from "../api/hooks";
 import { errorMessage } from "../api/client";
-import type { Features, ReschedulePolicy } from "../api/types";
+import type { Features, ReschedulePolicy, WeekStart } from "../api/types";
 import { getSession, signOut } from "../auth/session";
 import { Avatar, squareJpeg } from "../components/Avatar";
 import { Button, Divider, Icon, PageHeader, Section, SegmentedButtons, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
@@ -119,6 +119,17 @@ export function SettingsPage() {
                 { value: "system", label: "System", icon: "brightness_auto" },
                 { value: "light", label: "Light", icon: "light_mode" },
                 { value: "dark", label: "Dark", icon: "dark_mode" },
+              ]}
+            />
+          </div>
+          <div>
+            <div className="mb-2 text-label-large text-on-surface-variant">Week starts on</div>
+            <SegmentedButtons<WeekStart>
+              value={me.user.weekStart ?? "sun"}
+              onChange={(weekStart) => updateMe.mutate({ weekStart }, { onError: (e) => snack(errorMessage(e)) })}
+              options={[
+                { value: "sun", label: "Sunday" },
+                { value: "mon", label: "Monday" },
               ]}
             />
           </div>

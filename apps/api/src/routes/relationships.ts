@@ -21,11 +21,12 @@ const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const inviteCode = () => Array.from({ length: 8 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join("");
 
 const avatarVersion = (at: Date | null) => (at ? String(at.getTime()) : null);
-const userDto = (u: { id: string; displayName: string; email: string | null; avatarUpdatedAt: Date | null }) => ({
+const userDto = (u: { id: string; displayName: string; email: string | null; avatarUpdatedAt: Date | null; weekStart: string }) => ({
   id: u.id,
   displayName: u.displayName,
   email: u.email,
   avatarVersion: avatarVersion(u.avatarUpdatedAt),
+  weekStart: u.weekStart === "mon" ? "mon" : "sun",
 });
 
 const AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -70,8 +71,9 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
 
   app.patch("/me", async (req) => {
     const body = updateMe.parse(req.body);
-    await db.update(users).set({ displayName: body.displayName }).where(eq(users.id, req.user.id));
-    return userDto({ ...req.user, displayName: body.displayName });
+    if (!Object.keys(body).length) return userDto(req.user);
+    const [updated] = await db.update(users).set(body).where(eq(users.id, req.user.id)).returning();
+    return userDto(updated!);
   });
 
   // Clients crop and shrink the picture first (256px square), so 1 MB is generous.

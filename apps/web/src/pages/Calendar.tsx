@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { useOccurrences } from "../api/hooks";
 import type { Occurrence } from "../api/types";
 import { OccurrenceCard, isOverdue } from "../components/OccurrenceCard";
-import { Button, Dialog, ErrorBox, IconButton, Loading, PageHeader, SegmentedButtons, cx } from "../components/ui";
+import { Button, Dialog, ErrorBox, Fab, IconButton, Loading, PageHeader, SegmentedButtons, cx } from "../components/ui";
 import {
   addDays,
   addMonths,
@@ -17,9 +18,11 @@ import {
 } from "../lib/dates";
 import { storage } from "../lib/storage";
 import { useRel } from "../lib/relationship";
+import type { WeekStart } from "../api/types";
 
 type View = "week" | "month";
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const weekdayLabels = (ws: WeekStart) => (ws === "mon" ? WEEKDAY_LABELS : ["Sun", ...WEEKDAY_LABELS.slice(0, 6)]);
 
 function dotClass(o: Occurrence) {
   if (o.status === "completed") return "bg-primary";
@@ -30,7 +33,9 @@ function dotClass(o: Occurrence) {
 }
 
 export function CalendarPage() {
-  const { rel } = useRel();
+  const { rel, isDom, me } = useRel();
+  const weekStart = me.user.weekStart ?? "sun";
+  const navigate = useNavigate();
   const [view, setViewState] = useState<View>(() => (storage.get("obey.calendar.view") === "month" ? "month" : "week"));
   const setView = (v: View) => {
     storage.set("obey.calendar.view", v);
@@ -39,7 +44,7 @@ export function CalendarPage() {
   const [anchor, setAnchor] = useState(today());
   const [selected, setSelected] = useState(today());
 
-  const days = view === "week" ? daysBetween(startOfWeek(anchor), addDays(startOfWeek(anchor), 6)) : monthGrid(anchor);
+  const days = view === "week" ? daysBetween(startOfWeek(anchor, weekStart), addDays(startOfWeek(anchor, weekStart), 6)) : monthGrid(anchor, weekStart);
   const from = days[0]!;
   const to = days[days.length - 1]!;
   const occ = useOccurrences(rel.id, from, to);
@@ -63,6 +68,8 @@ export function CalendarPage() {
   const selectedItems = byDay.get(selected) ?? [];
   const [detailId, setDetailId] = useState<string | null>(null);
   const detail = occ.data?.find((o) => o.id === detailId);
+  // Like a new calendar event: on the picked day in month view, else today if it's on screen, else the week's first day.
+  const newTaskDay = view === "month" ? selected : days.includes(t) ? t : from;
 
   return (
     <>
@@ -98,7 +105,7 @@ export function CalendarPage() {
       {view === "month" ? (
         <div className="px-2 md:px-6">
           <div className="grid grid-cols-7 text-center text-label-medium text-on-surface-variant">
-            {WEEKDAY_LABELS.map((d) => (
+            {weekdayLabels(weekStart).map((d) => (
               <div key={d} className="py-2">
                 {d}
               </div>
@@ -184,6 +191,7 @@ export function CalendarPage() {
       <Dialog open={!!detail} onClose={() => setDetailId(null)} actions={<Button variant="text" onClick={() => setDetailId(null)}>Close</Button>}>
         {detail && <OccurrenceCard o={detail} showDate />}
       </Dialog>
+      {isDom && <Fab icon="add" label="New task" onClick={() => navigate({ to: "/tasks/$taskId", params: { taskId: "new" }, search: { start: newTaskDay } })} />}
     </>
   );
 }

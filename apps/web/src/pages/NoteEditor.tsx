@@ -8,6 +8,7 @@ import { Button, Chip, ErrorBox, Icon, IconButton, Loading, SegmentedButtons, us
 import { fmtDateTime } from "../lib/dates";
 import { MOODS } from "./Notes";
 import { useRel } from "../lib/relationship";
+import { useBack } from "../lib/useBack";
 import { useConfirm } from "../lib/useConfirm";
 
 export function NoteEditorPage({ noteId, kind }: { noteId: string; kind: "note" | "journal" }) {
@@ -48,7 +49,7 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
     setDirty(true);
   };
 
-  const back = () => navigate({ to: kind === "journal" ? "/journal" : "/notes" });
+  const back = useBack(() => navigate({ to: kind === "journal" ? "/journal" : "/notes" }));
 
   function addTag() {
     const t = tagDraft.trim().replace(/^#/, "").slice(0, 40);

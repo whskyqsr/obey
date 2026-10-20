@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { useDecideReschedule, useOccurrences, usePendingReschedules } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { Occurrence, RescheduleRequest } from "../api/types";
 import { DayRescheduleSheet } from "../components/DayRescheduleSheet";
 import { OccurrenceCard, isOverdue } from "../components/OccurrenceCard";
-import { Button, Empty, ErrorBox, Loading, PageHeader, Section, useSnackbar } from "../components/ui";
+import { Button, Empty, ErrorBox, Fab, Loading, PageHeader, Section, useSnackbar } from "../components/ui";
 import { addDays, fmtDate, fmtDateTime, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 
@@ -12,6 +13,7 @@ const byDue = (a: Occurrence, b: Occurrence) => a.dueAt.localeCompare(b.dueAt);
 
 export function TodayPage() {
   const { rel, me, isDom } = useRel();
+  const navigate = useNavigate();
   const t = today();
   const occ = useOccurrences(rel.id, addDays(t, -30), addDays(t, 7));
 
@@ -75,7 +77,7 @@ export function TodayPage() {
             {groups.today.length ? (
               <List items={groups.today} />
             ) : (
-              <Empty icon="spa" title="Nothing due today" body={isDom ? "Add a task from the Tasks tab." : "Enjoy it while it lasts."} />
+              <Empty icon="spa" title="Nothing due today" body={isDom ? "Add one with the button below." : "Enjoy it while it lasts."} />
             )}
           </Section>
           {groups.upcoming.length > 0 && (
@@ -86,6 +88,7 @@ export function TodayPage() {
         </>
       )}
       <DayRescheduleSheet tasks={myOpenToday} open={daySheet} onClose={() => setDaySheet(false)} />
+      {isDom && <Fab icon="add" label="New task" onClick={() => navigate({ to: "/tasks/$taskId", params: { taskId: "new" } })} />}
     </>
   );
 }

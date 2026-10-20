@@ -29,6 +29,8 @@ export const users = pgTable("users", {
   avatar: bytea("avatar"),
   avatarType: text("avatar_type"),
   avatarUpdatedAt: ts("avatar_updated_at"),
+  /** "sun" or "mon": where calendars start the week. */
+  weekStart: text("week_start").notNull().default("sun"),
   createdAt: createdAt(),
 });
 

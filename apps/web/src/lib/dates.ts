@@ -1,3 +1,4 @@
+import type { WeekStart } from "../api/types";
 import { type PlainDate, addDays, addMonths, parseDate, toDayNumber, weekdayIndex } from "@obey/recurrence";
 
 export { addDays, addMonths };
@@ -17,9 +18,10 @@ export function browserTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 }
 
-/** Monday of the week containing `date`. */
-export function startOfWeek(date: PlainDate): PlainDate {
-  return addDays(date, -weekdayIndex(toDayNumber(date)));
+/** First day (Sunday or Monday) of the week containing `date`. */
+export function startOfWeek(date: PlainDate, weekStart: WeekStart = "sun"): PlainDate {
+  const fromMonday = weekdayIndex(toDayNumber(date));
+  return addDays(date, -(weekStart === "mon" ? fromMonday : (fromMonday + 1) % 7));
 }
 
 export function startOfMonth(date: PlainDate): PlainDate {
@@ -36,9 +38,9 @@ export function daysBetween(from: PlainDate, to: PlainDate): PlainDate[] {
   return out;
 }
 
-/** 6x7 grid of dates covering the month, starting on Monday. */
-export function monthGrid(date: PlainDate): PlainDate[] {
-  const first = startOfWeek(startOfMonth(date));
+/** 6x7 grid of dates covering the month, starting on the week's first day. */
+export function monthGrid(date: PlainDate, weekStart: WeekStart = "sun"): PlainDate[] {
+  const first = startOfWeek(startOfMonth(date), weekStart);
   return Array.from({ length: 42 }, (_, i) => addDays(first, i));
 }
 

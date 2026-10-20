@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { completeOccurrence as completeBody, editOccurrence as editBody, plainDate, rescheduleDayInput, rescheduleInput, reviewOccurrence as reviewBody, taskInput } from "@obey/contracts";
+import { type TaskStats, completeOccurrence as completeBody, editOccurrence as editBody, plainDate, rescheduleDayInput, rescheduleInput, reviewOccurrence as reviewBody, taskInput } from "@obey/contracts";
 import { addDays, dueInstant, localDate } from "@obey/recurrence";
 import type { Deps } from "../app.js";
 import type { Tx } from "../db/index.js";
@@ -42,8 +42,40 @@ async function loadOccurrence(db: Tx, id: string, userId: string) {
   return { ...row, member: m, rel: rel! };
 }
 
+/** Rows oldest first. Excused occurrences neither count against the rate nor break a streak. */
+export function taskStats(rows: { status: string; completedAt: Date | null }[]): TaskStats {
+  let done = 0, missed = 0, excused = 0, streak = 0, bestStreak = 0;
+  let lastDoneAt: Date | null = null;
+  for (const r of rows) {
+    if (r.status === "completed") {
+      done++;
+      streak++;
+      bestStreak = Math.max(bestStreak, streak);
+      if (r.completedAt && (!lastDoneAt || r.completedAt > lastDoneAt)) lastDoneAt = r.completedAt;
+    } else if (r.status === "missed") {
+      missed++;
+      streak = 0;
+    } else excused++;
+  }
+  return { done, missed, excused, rate: done + missed ? done / (done + missed) : null, streak, bestStreak, lastDoneAt: lastDoneAt?.toISOString() ?? null };
+}
+
 export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   const { db, notifier } = deps;
+
+  /** A task's series id plus those it replaced in "this and following" edits, after checking membership. */
+  async function lineage(seriesId: string, userId: string) {
+    const [series] = await db.select().from(taskSeries).where(eq(taskSeries.id, seriesId));
+    if (!series) throw notFound();
+    await requireMember(db, series.relationshipId, userId);
+    const ids = [series.id];
+    for (let frontier = [series.id]; frontier.length; ) {
+      const older = await db.select({ id: taskSeries.id }).from(taskSeries).where(inArray(taskSeries.supersededBy, frontier));
+      frontier = older.map((r) => r.id).filter((id) => !ids.includes(id));
+      ids.push(...frontier);
+    }
+    return ids;
+  }
   const horizon = (zone: string) => addDays(localDate(deps.now(), zone), deps.materializeDays);
 
   app.get<{ Params: { id: string } }>("/relationships/:id/tasks", async (req) => {
@@ -154,15 +186,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const q = z
       .object({ before: z.string().datetime({ offset: true }).optional(), limit: z.coerce.number().int().min(1).max(100).default(50) })
       .parse(req.query);
-    const [series] = await db.select().from(taskSeries).where(eq(taskSeries.id, req.params.id));
-    if (!series) throw notFound();
-    await requireMember(db, series.relationshipId, req.user.id);
-    const ids = [series.id];
-    for (let frontier = [series.id]; frontier.length; ) {
-      const older = await db.select({ id: taskSeries.id }).from(taskSeries).where(inArray(taskSeries.supersededBy, frontier));
-      frontier = older.map((r) => r.id).filter((id) => !ids.includes(id));
-      ids.push(...frontier);
-    }
+    const ids = await lineage(req.params.id, req.user.id);
     const rows = await db
       .select({
         occ: occurrences,
@@ -186,6 +210,17 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       editedBy: occ.editedBy,
       editedAt: occ.editedAt?.toISOString() ?? null,
     }));
+  });
+
+  /** Completion counts and streaks over a task's whole history. */
+  app.get<{ Params: { id: string } }>("/tasks/:id/stats", async (req) => {
+    const ids = await lineage(req.params.id, req.user.id);
+    const rows = await db
+      .select({ status: occurrences.status, completedAt: occurrences.completedAt })
+      .from(occurrences)
+      .where(and(inArray(occurrences.seriesId, ids), inArray(occurrences.status, ["completed", "missed", "excused"])))
+      .orderBy(asc(occurrences.dueAt));
+    return taskStats(rows);
   });
 
   app.patch<{ Params: { id: string } }>("/occurrences/:id", async (req) => {

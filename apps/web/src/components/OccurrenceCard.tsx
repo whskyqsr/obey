@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import type { Occurrence, OccurrenceStatus } from "@obey/contracts";
 import { useCompleteOccurrence, useReviewOccurrence } from "../api/hooks";
 import { errorMessage } from "../api/client";
@@ -20,14 +21,13 @@ export function isOverdue(o: Occurrence, now = Date.now()) {
   return o.status === "pending" && new Date(o.dueAt).getTime() < now;
 }
 
-export function OccurrenceCard({ o, showDate }: { o: Occurrence; showDate?: boolean }) {
+/** One due date of a task. Its title opens the task, except on the task's own page. */
+export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence; showDate?: boolean; linkTask?: boolean }) {
   const { rel, me, isDom, memberName, features } = useRel();
   const snack = useSnackbar();
-  const complete = useCompleteOccurrence(rel.id);
   const review = useReviewOccurrence(rel.id);
   const [completing, setCompleting] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
-  const [note, setNote] = useState("");
 
   const mine = o.assigneeId === me.user.id;
   const overdue = isOverdue(o);
@@ -46,7 +46,8 @@ export function OccurrenceCard({ o, showDate }: { o: Occurrence; showDate?: bool
       )}
     >
       <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1">
+        {/* Not a nested interactive: the actions below sit outside this link. */}
+        <TitleWrap linkTask={linkTask} taskId={o.seriesId}>
           <div className={cx("text-title-medium text-on-surface", done && "line-through")}>{o.title}</div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-body-medium text-on-surface-variant">
             <span>
@@ -63,7 +64,7 @@ export function OccurrenceCard({ o, showDate }: { o: Occurrence; showDate?: bool
             {!mine && <span>· {memberName(o.assigneeId)}</span>}
             {o.rescheduled && <span title="Rescheduled">· moved</span>}
           </div>
-        </div>
+        </TitleWrap>
         <div className="flex flex-col items-end gap-1">
           {features.points && o.points !== 0 && <Badge tone="primary">{o.points > 0 ? `+${o.points}` : o.points} pts</Badge>}
           {(o.status !== "pending" || overdue) && <Badge tone={overdue ? "error" : status.tone}>{overdue ? "Overdue" : status.label}</Badge>}
@@ -106,40 +107,60 @@ export function OccurrenceCard({ o, showDate }: { o: Occurrence; showDate?: bool
         </div>
       )}
 
-      <Dialog
-        open={completing}
-        onClose={() => setCompleting(false)}
-        title={`Done: ${o.title}`}
-        actions={
-          <>
-            <Button variant="text" onClick={() => setCompleting(false)}>
-              Cancel
-            </Button>
-            <Button
-              busy={complete.isPending}
-              onClick={() =>
-                complete.mutate(
-                  { id: o.id, noteMd: note.trim() || undefined },
-                  {
-                    onSuccess: (res) => {
-                      setCompleting(false);
-                      setNote("");
-                      snack(res?.status === "submitted" ? "Sent for approval" : "Marked done");
-                    },
-                    onError: (e) => snack(errorMessage(e)),
-                  },
-                )
-              }
-            >
-              Mark done
-            </Button>
-          </>
-        }
-      >
-        <TextArea label="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} maxLength={5000} />
-      </Dialog>
+      <CompleteDialog o={o} open={completing} onClose={() => setCompleting(false)} />
 
       <RescheduleSheet occurrence={o} open={rescheduling} onClose={() => setRescheduling(false)} />
     </div>
+  );
+}
+
+function TitleWrap({ linkTask, taskId, children }: { linkTask: boolean; taskId: string; children: React.ReactNode }) {
+  if (!linkTask) return <div className="min-w-0 flex-1">{children}</div>;
+  return (
+    <Link to="/tasks/$taskId" params={{ taskId }} className="state-layer -m-2 min-w-0 flex-1 rounded-sm p-2">
+      {children}
+    </Link>
+  );
+}
+
+/** Marks an occurrence done, with an optional note. */
+export function CompleteDialog({ o, open, onClose }: { o: Occurrence; open: boolean; onClose: () => void }) {
+  const { rel } = useRel();
+  const snack = useSnackbar();
+  const complete = useCompleteOccurrence(rel.id);
+  const [note, setNote] = useState("");
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={`Done: ${o.title}`}
+      actions={
+        <>
+          <Button variant="text" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            busy={complete.isPending}
+            onClick={() =>
+              complete.mutate(
+                { id: o.id, noteMd: note.trim() || undefined },
+                {
+                  onSuccess: (res) => {
+                    onClose();
+                    setNote("");
+                    snack(res?.status === "submitted" ? "Sent for approval" : "Marked done");
+                  },
+                  onError: (e) => snack(errorMessage(e)),
+                },
+              )
+            }
+          >
+            Mark done
+          </Button>
+        </>
+      }
+    >
+      <TextArea label="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} maxLength={5000} />
+    </Dialog>
   );
 }

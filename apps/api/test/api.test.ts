@@ -62,6 +62,15 @@ describe("relationships", () => {
     expect((await dom.patch("/me", { displayName: "   " })).status).toBe(400);
   });
 
+  it("keeps a week start per person, Sunday by default", async () => {
+    const { dom, sub } = await ctx.pair();
+    expect((await dom.get("/me")).body.user.weekStart).toBe("sun");
+    expect((await dom.patch("/me", { weekStart: "mon" })).body).toMatchObject({ weekStart: "mon", displayName: "Dom" });
+    expect((await dom.get("/me")).body.user.weekStart).toBe("mon");
+    expect((await sub.get("/me")).body.user.weekStart).toBe("sun");
+    expect((await dom.patch("/me", { weekStart: "wed" })).status).toBe(400);
+  });
+
   it("doesn't need a name for a relationship", async () => {
     const dom = ctx.as(crypto.randomUUID());
     const rel = (await dom.post("/relationships", { role: "dominant" })).body;
@@ -360,6 +369,7 @@ describe("task history", () => {
       const history = (await sub.get(`/tasks/${t.id}/history`)).body;
       expect(history.map((h: { originalDate: string; status: string }) => [h.originalDate, h.status])).toEqual([["2026-10-16", "missed"]]);
       expect(history[0].pointsDelta).toBe(-4);
+      expect((await sub.get(`/tasks/${t.id}/stats`)).body).toMatchObject({ done: 0, missed: 1, rate: 0, streak: 0 });
       const before = await balance();
 
       const id = history[0].id;
@@ -371,6 +381,7 @@ describe("task history", () => {
       const [after] = (await sub.get(`/tasks/${t.id}/history`)).body;
       expect(after).toMatchObject({ status: "completed", pointsDelta: 10, completedAt: "2026-10-17T02:30:00.000Z" });
       expect(after.editedBy).toBeTruthy();
+      expect((await sub.get(`/tasks/${t.id}/stats`)).body).toMatchObject({ done: 1, missed: 0, rate: 1, streak: 1, bestStreak: 1 });
 
       await dom.patch(`/occurrences/${id}`, { status: "excused" });
       expect(await balance()).toBe(before + 4);

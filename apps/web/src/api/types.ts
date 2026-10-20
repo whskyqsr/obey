@@ -3,6 +3,7 @@ import type * as c from "@obey/contracts";
 
 export type Me = c.Me;
 export type User = c.User;
+export type WeekStart = c.WeekStart;
 export type Relationship = c.Relationship;
 export type Features = c.Features;
 export type Member = z.infer<typeof c.member>;
@@ -13,6 +14,7 @@ export type Task = c.Task;
 export type TaskInput = z.infer<typeof c.taskInput>;
 export type Occurrence = c.Occurrence;
 export type HistoryEntry = c.HistoryEntry;
+export type TaskStats = c.TaskStats;
 export type EditOccurrence = z.infer<typeof c.editOccurrence>;
 export type RescheduleInput = c.RescheduleInput;
 export type RescheduleDayInput = c.RescheduleDayInput;

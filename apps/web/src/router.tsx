@@ -19,6 +19,9 @@ import { TodayPage } from "./pages/Today";
 
 // The notes editor pulls in TipTap/ProseMirror; load it on demand.
 const NoteEditorPage = lazy(() => import("./pages/NoteEditor").then((m) => ({ default: m.NoteEditorPage })));
+// The task page renders Markdown details with the same editor.
+const TaskPage = lazy(() => import("./pages/TaskPage").then((m) => ({ default: m.TaskPage })));
+const TaskHistoryPage = lazy(() => import("./pages/TaskPage").then((m) => ({ default: m.TaskHistoryPage })));
 const ProtocolPage = lazy(() => import("./pages/ProtocolPage").then((m) => ({ default: m.ProtocolPage })));
 
 const rootRoute = createRootRoute({
@@ -31,9 +34,39 @@ const page = <P extends string>(path: P, component: () => React.ReactNode) => cr
 const taskRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/tasks/$taskId",
+  // `start` (YYYY-MM-DD) seeds a new task's date, e.g. the day picked on the calendar.
+  validateSearch: (s: Record<string, unknown>): { start?: string } => (typeof s.start === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s.start) ? { start: s.start } : {}),
   component: function TaskRoute() {
     const { taskId } = taskRoute.useParams();
+    const { start } = taskRoute.useSearch();
+    if (taskId === "new") return <TaskEditorPage taskId="new" start={start} />;
+    return (
+      <Suspense fallback={<Loading />}>
+        <TaskPage taskId={taskId} />
+      </Suspense>
+    );
+  },
+});
+
+const taskEditRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tasks/$taskId/edit",
+  component: function TaskEditRoute() {
+    const { taskId } = taskEditRoute.useParams();
     return <TaskEditorPage taskId={taskId} />;
+  },
+});
+
+const taskHistoryRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tasks/$taskId/history",
+  component: function TaskHistoryRoute() {
+    const { taskId } = taskHistoryRoute.useParams();
+    return (
+      <Suspense fallback={<Loading />}>
+        <TaskHistoryPage taskId={taskId} />
+      </Suspense>
+    );
   },
 });
 
@@ -121,6 +154,8 @@ const routeTree = rootRoute.addChildren([
   page("/calendar", CalendarPage),
   page("/tasks", TasksPage),
   taskRoute,
+  taskEditRoute,
+  taskHistoryRoute,
   page("/rewards", gated("points", RewardsPage)),
   page("/consequences", gated("consequences", ConsequencesPage)),
   page("/rules", gated("rules", RulesPage)),

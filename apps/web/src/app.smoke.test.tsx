@@ -40,6 +40,8 @@ const routes: Record<string, unknown> = {
       dueTime: "21:00", timezone: "UTC", graceMinutes: 0, summary: "Every 2 weeks on Mon, Thu", active: true, createdBy: ME, createdAt: iso(-100),
     },
   ],
+  ["/tasks/t1/stats"]: { done: 4, missed: 1, excused: 0, rate: 0.8, streak: 2, bestStreak: 3, lastDoneAt: iso(-20) },
+  ["/tasks/t1/history"]: [],
   [`/relationships/${REL}/balances`]: [{ userId: SUB, balance: 42 }],
   [`/relationships/${REL}/ledger`]: [{ id: "l1", userId: SUB, delta: 5, kind: "completion", note: "Write lines", createdBy: null, createdAt: iso(-3) }],
   [`/relationships/${REL}/rewards`]: [{ id: "w1", relationshipId: REL, title: "Movie night", bodyMd: "", cost: 30, needsApproval: true, createdAt: iso(-5) }],
@@ -99,7 +101,9 @@ describe("app smoke test (dev auth, mocked API)", () => {
     };
     await visit("/calendar", "Calendar");
     await visit("/tasks", /Every 2 weeks on Mon, Thu at 21:00/);
-    await visit("/tasks/t1", "Every 2 weeks on Mon, Thu");
+    await visit("/tasks/t1", "Streak");
+    await visit("/tasks/t1/edit", "Edit task");
+    await visit("/tasks/t1/history", "History");
     await visit("/tasks/new", "New task");
     await visit("/rewards", "Movie night");
     await visit("/consequences", "Early bedtime");

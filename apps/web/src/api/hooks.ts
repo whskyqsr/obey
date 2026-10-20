@@ -5,6 +5,8 @@ import type {
   Features,
   EditOccurrence,
   HistoryEntry,
+  TaskStats,
+  WeekStart,
   Invite,
   LedgerEntry,
   LibraryKind,
@@ -55,6 +57,10 @@ export function useTaskHistory(rel: string, taskId: string) {
   });
 }
 
+export function useTaskStats(rel: string, taskId: string) {
+  return useQuery({ queryKey: ["rel", rel, "stats", taskId], queryFn: () => api<TaskStats>(`/tasks/${taskId}/stats`) });
+}
+
 export function useEditOccurrence(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({
@@ -72,7 +78,7 @@ export function useMe(enabled = true) {
 export function useUpdateMe() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { displayName: string }) => api<User>("/me", { method: "PATCH", body }),
+    mutationFn: (body: { displayName?: string; weekStart?: WeekStart }) => api<User>("/me", { method: "PATCH", body }),
     // Names appear in member lists and request cards across every relationship.
     onSuccess: () => qc.invalidateQueries(),
   });

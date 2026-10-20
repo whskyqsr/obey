@@ -15,13 +15,14 @@ interface Dest {
 const ALL: Dest[] = [
   { to: "/", label: "Today", icon: "today" },
   { to: "/calendar", label: "Calendar", icon: "calendar_month" },
-  { to: "/tasks", label: "Tasks", icon: "checklist" },
   { to: "/rewards", label: "Rewards", icon: "redeem", feature: "points" },
   { to: "/rules", label: "Rules", icon: "gavel", feature: "rules" },
   { to: "/protocols", label: "Protocols", icon: "fact_check", feature: "protocols" },
   { to: "/consequences", label: "Consequences", icon: "bolt", feature: "consequences" },
   { to: "/notes", label: "Notes", icon: "sticky_note_2" },
   { to: "/journal", label: "Journal", icon: "auto_stories", feature: "journal" },
+  // Tasks open from Today and Calendar; the full list is for managing them.
+  { to: "/tasks", label: "All tasks", icon: "checklist" },
   { to: "/settings", label: "Settings", icon: "settings" },
 ];
 
@@ -31,9 +32,10 @@ const MORE: Dest = { to: "/more", label: "More", icon: "menu" };
 export function useDestinations() {
   const { features } = useRel();
   const all = ALL.filter((d) => !d.feature || features[d.feature]);
-  // The bar holds Today, Calendar, Tasks and the first writing space that's on; the rest go under More.
-  const writing = all.find((d) => d.to === "/notes" || d.to === "/journal");
-  const bar = [...all.slice(0, 3), ...(writing ? [writing] : []), MORE];
+  // The bar holds Today, Calendar, the next section that's on, and the first writing space; the rest go under More.
+  const isWriting = (d: Dest) => d.to === "/notes" || d.to === "/journal";
+  const writing = all.find(isWriting);
+  const bar = [...all.filter((d) => !isWriting(d)).slice(0, 3), ...(writing ? [writing] : []), MORE];
   const more = all.filter((d) => !bar.includes(d));
   return { all, bar, more };
 }

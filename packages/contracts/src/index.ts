@@ -44,7 +44,11 @@ export type Features = z.infer<typeof features>;
 export const allFeatures = (stored: Partial<Features> = {}): Features =>
   Object.fromEntries(FEATURES.map((f) => [f, stored[f] ?? true])) as Features;
 
-export const user = z.object({ id, displayName: z.string(), email: z.string().nullable(), avatarVersion });
+/** The day calendars start their week on, per person. */
+export const weekStart = z.enum(["sun", "mon"]);
+export type WeekStart = z.infer<typeof weekStart>;
+
+export const user = z.object({ id, displayName: z.string(), email: z.string().nullable(), avatarVersion, weekStart });
 export type User = z.infer<typeof user>;
 
 export const member = z.object({ userId: id, displayName: z.string(), role, avatarVersion });
@@ -63,7 +67,7 @@ export type Relationship = z.infer<typeof relationship>;
 export const me = z.object({ user, relationships: z.array(relationship) });
 export type Me = z.infer<typeof me>;
 
-export const updateMe = z.object({ displayName: z.string().trim().min(1).max(40) });
+export const updateMe = z.object({ displayName: z.string().trim().min(1).max(40).optional(), weekStart: weekStart.optional() });
 
 // A blank name means "no name": apps then show the partners' names.
 const relationshipName = z
@@ -126,6 +130,18 @@ export const occurrence = z.object({
   noteMd: z.string().nullable(),
 });
 export type Occurrence = z.infer<typeof occurrence>;
+
+/** How a task has gone over its whole history. `rate` is done / (done + missed), null before anything is due. */
+export const taskStats = z.object({
+  done: z.number().int(),
+  missed: z.number().int(),
+  excused: z.number().int(),
+  rate: z.number().nullable(),
+  streak: z.number().int(),
+  bestStreak: z.number().int(),
+  lastDoneAt: z.string().nullable(),
+});
+export type TaskStats = z.infer<typeof taskStats>;
 
 /** One past occurrence in a task's history, with the points it earned or cost. */
 export const historyEntry = occurrence.extend({

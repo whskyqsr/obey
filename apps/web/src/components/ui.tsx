@@ -91,6 +91,48 @@ export function IconButton({
   );
 }
 
+/** An overflow menu (⋮). Items close it when chosen. */
+export function OverflowMenu({ label = "More options", items }: { label?: string; items: { label: string; icon: string; onClick(): void; danger?: boolean }[] }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [open]);
+  return (
+    <div ref={ref} className="relative">
+      <IconButton icon="more_vert" label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)} />
+      {open && (
+        <div role="menu" className="absolute top-full right-0 z-30 mt-1 min-w-44 overflow-hidden rounded-xs bg-surface-container py-2 shadow-lg">
+          {items.map((it) => (
+            <button
+              key={it.label}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                it.onClick();
+              }}
+              className={cx("state-layer flex h-12 w-full items-center gap-3 px-3 text-left text-label-large", it.danger ? "text-error" : "text-on-surface")}
+            >
+              <Icon name={it.icon} size={20} className={it.danger ? "" : "text-on-surface-variant"} />
+              {it.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Fab({ icon, label, onClick, extended = true }: { icon: string; label: string; onClick(): void; extended?: boolean }) {
   return (
     <button

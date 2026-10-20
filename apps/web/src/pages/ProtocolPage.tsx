@@ -6,6 +6,7 @@ import type { Protocol } from "../api/types";
 import { MarkdownEditor } from "../components/MarkdownEditor";
 import { Button, ErrorBox, Icon, IconButton, Loading, Select, useSnackbar } from "../components/ui";
 import { useRel } from "../lib/relationship";
+import { useBack } from "../lib/useBack";
 import { useConfirm } from "../lib/useConfirm";
 import { sortRules } from "./Rules";
 
@@ -38,7 +39,8 @@ function ProtocolView({ protocol }: { protocol?: Protocol }) {
     setForm((f) => ({ ...f, ...patch }));
     setDirty(true);
   };
-  const back = () => navigate({ to: "/protocols" });
+  // Back to where it was opened from, e.g. a rule's protocol link returns to Rules.
+  const back = useBack(() => navigate({ to: "/protocols" }));
   const ruleIndex = rules.findIndex((r) => r.id === form.ruleId);
 
   function submit() {
