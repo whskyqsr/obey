@@ -8,6 +8,12 @@ const SUB = "22222222-2222-4222-8222-222222222222";
 const REL = "33333333-3333-4333-8333-333333333333";
 const now = new Date();
 const iso = (h: number) => new Date(now.getTime() + h * 3_600_000).toISOString();
+const endOfDayIn = (days: number) => {
+  const d = new Date(now);
+  d.setDate(d.getDate() + days);
+  d.setHours(23, 59, 59, 999);
+  return d.toISOString();
+};
 
 const routes: Record<string, unknown> = {
   "/me": {
@@ -28,6 +34,8 @@ const routes: Record<string, unknown> = {
   },
   [`/relationships/${REL}/occurrences`]: [
     { id: "o1", seriesId: "s1", title: "Write lines", assigneeId: SUB, points: 5, originalDate: "2026-01-01", dueAt: iso(2), rescheduled: false, status: "pending", completedAt: null, noteMd: null },
+    // All day (due at the end of a local day), and not today: shown with its date.
+    { id: "o3", seriesId: "t1", title: "Write lines", assigneeId: SUB, points: 5, originalDate: "2026-01-01", dueAt: endOfDayIn(2), rescheduled: false, status: "pending", completedAt: null, noteMd: null },
     { id: "o2", seriesId: "s1", title: "Stretch", assigneeId: SUB, points: 3, originalDate: "2026-01-01", dueAt: iso(-30), rescheduled: false, status: "submitted", completedAt: iso(-29), noteMd: "done!" },
   ],
   [`/relationships/${REL}/reschedules`]: [
@@ -102,6 +110,7 @@ describe("app smoke test (dev auth, mocked API)", () => {
     await visit("/calendar", "Calendar");
     await visit("/tasks", /Every 2 weeks on Mon, Thu at 9:00\s?PM/);
     await visit("/tasks/t1", "Streak");
+    await visit("/tasks/t1", /, all day$/);
     await visit("/tasks/t1/edit", "Edit task");
     await visit("/tasks/t1/history", "History");
     await visit("/tasks/new", "New task");

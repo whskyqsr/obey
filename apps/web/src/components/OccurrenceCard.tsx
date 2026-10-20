@@ -56,7 +56,7 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
               {/* All-day tasks are due at 23:59:59 local; show "All day" rather than 11:59 PM. */}
               {allDay
                 ? showDate || !isToday
-                  ? `${fmtDate(o.dueAt)}, all day`
+                  ? `${fmtDate(localDateOf(due))}, all day`
                   : "All day"
                 : showDate || !isToday
                   ? fmtDateTime(o.dueAt)
