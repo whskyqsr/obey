@@ -14,6 +14,7 @@ import androidx.lifecycle.viewModelScope
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import app.obey.BuildConfig
@@ -123,8 +124,11 @@ class SettingsViewModel @Inject constructor(
         _invite.value = null
     }
 
+    /** A new dynamic opens on its setup steps (see WelcomeScreen). */
     fun createRelationship(name: String, role: Role) = action {
-        sessions.onRelationshipChanged(api.createRelationship(CreateRelationshipInput(name.trim().ifEmpty { null }, role)))
+        val rel = api.createRelationship(CreateRelationshipInput(name.trim().ifEmpty { null }, role))
+        settings.setWelcome(rel.id)
+        sessions.onRelationshipChanged(rel)
     }
 
     /** A blank name clears it, so the app shows the partner's name instead. */
@@ -181,8 +185,14 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun join(code: String, role: Role) = action {
-        sessions.onRelationshipChanged(api.joinRelationship(JoinRelationshipInput(parseInviteCode(code), role)))
+        val rel = api.joinRelationship(JoinRelationshipInput(parseInviteCode(code), role))
+        settings.setWelcome(rel.id)
+        sessions.onRelationshipChanged(rel)
         say("Joined")
+    }
+
+    fun finishWelcome() {
+        viewModelScope.launch { settings.setWelcome(null) }
     }
 
     fun updatePolicy(policy: ReschedulePolicy? = null, allowance: Int? = null) = action {

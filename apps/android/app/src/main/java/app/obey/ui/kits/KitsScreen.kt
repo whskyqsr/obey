@@ -139,7 +139,7 @@ fun KitItem.summary(): String {
 
 /** The kits and items this dynamic can use: rules and protocols only when those features are on. */
 @Composable
-private fun usable(kits: List<StarterKit>): List<StarterKit> {
+internal fun usable(kits: List<StarterKit>): List<StarterKit> {
     val features = LocalFeatures.current
     return kits.map { k -> k.copy(items = k.items.filter { it.kind == "task" || (if (it.kind == "rule") features.rules else features.protocols) }) }
         .filter { it.items.isNotEmpty() }
@@ -206,7 +206,7 @@ fun KitsScreen(onBack: () -> Unit, onAdded: (ApplyKitResult) -> Unit, vm: KitsVi
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun KitSheet(kit: StarterKit, session: Session, onDismiss: () -> Unit, onAdd: (List<String>, String?) -> Unit) {
+internal fun KitSheet(kit: StarterKit, session: Session, onDismiss: () -> Unit, onAdd: (List<String>, String?) -> Unit) {
     val me = session.userId
     val people = session.partners.sortedBy { if (it.role == Role.Submissive) 0 else 1 } + session.relationship?.members.orEmpty().filter { it.userId == me }
     var picked by remember { mutableStateOf(kit.items.map { it.key }.toSet()) }

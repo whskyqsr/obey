@@ -105,9 +105,9 @@ import app.obey.ui.tasks.Stepper
 import java.time.Instant
 import java.time.ZoneId
 
-private data class FeatureRow(val label: String, val help: String, val get: (Features) -> Boolean, val set: (Features, Boolean) -> Features)
+internal data class FeatureRow(val label: String, val help: String, val get: (Features) -> Boolean, val set: (Features, Boolean) -> Features)
 
-private val featureRows = listOf(
+internal val featureRows = listOf(
     FeatureRow("Points and rewards", "Tasks earn points that can be spent on rewards.", { it.points }, { f, on -> f.copy(points = on) }),
     FeatureRow("Consequences", "A list of consequences, and one per task if it's missed.", { it.consequences }, { f, on -> f.copy(consequences = on) }),
     FeatureRow("Rules", "A shared list of standing rules.", { it.rules }, { f, on -> f.copy(rules = on) }),
@@ -142,7 +142,7 @@ fun AvatarStack(members: List<Member>, load: suspend (String, String) -> android
     }
 }
 
-private fun inviteDefault(role: Role?): Role? = when (role) {
+internal fun inviteDefault(role: Role?): Role? = when (role) {
     Role.Dominant -> Role.Submissive
     Role.Submissive -> Role.Dominant
     else -> null
@@ -153,13 +153,10 @@ private fun inviteDefault(role: Role?): Role? = when (role) {
 @Composable
 fun DynamicScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
     val sessionState by vm.session.collectAsStateWithLifecycle()
-    val invite by vm.invite.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     MessageEffect(message, snackbar, vm::messageShown)
-    val clipboard = LocalClipboardManager.current
-    val context = LocalContext.current
     var dialog by rememberSaveable { mutableStateOf<String?>(null) } // "relname" | "create" | "join" | "invite"
     val session = (sessionState as? SessionState.Ready)?.session
     var editingDate by remember { mutableStateOf<DynamicDate?>(null) }
@@ -367,7 +364,6 @@ fun DynamicScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
         }
 
         if (dialog == "invite") {
-            var role by rememberSaveable { mutableStateOf(inviteDefault(me?.role)) }
             ModalBottomSheet(onDismissRequest = { dialog = null }) {
                 Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Invite someone", style = MaterialTheme.typography.headlineSmall)
@@ -376,45 +372,7 @@ fun DynamicScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Text("They'll join as", style = MaterialTheme.typography.labelLarge)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        (listOf<Role?>(Role.Submissive, Role.Dominant, Role.Switch) + null).forEach { r ->
-                            FilterChip(
-                                selected = role == r,
-                                onClick = { role = r; vm.clearInvite() },
-                                label = { Text(r?.label ?: "Let them choose") },
-                            )
-                        }
-                    }
-                    val inv = invite
-                    if (inv == null) {
-                        Button(onClick = { vm.createInvite(role) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Create link") }
-                    } else {
-                        Surface(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.medium) {
-                            Text(inv.link.removePrefix("https://"), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(16.dp).fillMaxWidth())
-                        }
-                        Text(
-                            "Works once · code ${inv.code} · expires ${formatDateTime(inv.expiresAt)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { clipboard.setText(AnnotatedString(inv.link)) }, modifier = Modifier.weight(1f)) {
-                                Icon(Icons.Outlined.ContentCopy, null)
-                                Text("  Copy")
-                            }
-                            Button(
-                                onClick = {
-                                    val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, inv.link)
-                                    context.startActivity(Intent.createChooser(send, "Share invite link"))
-                                },
-                                modifier = Modifier.weight(1f),
-                            ) {
-                                Icon(Icons.Outlined.Share, null)
-                                Text("  Share")
-                            }
-                        }
-                    }
+                    InviteControls(vm, initialRole = me?.role)
                 }
             }
         }
@@ -467,6 +425,58 @@ fun DynamicScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
             confirmButton = {},
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
         )
+    }
+}
+
+/** Who the invite is for, then its link with Copy and Share. Used in Your dynamic and the first-run setup. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun InviteControls(vm: SettingsViewModel, initialRole: Role?) {
+    val invite by vm.invite.collectAsStateWithLifecycle()
+    val busy by vm.busy.collectAsStateWithLifecycle()
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+    var role by rememberSaveable { mutableStateOf(inviteDefault(initialRole)) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("They'll join as", style = MaterialTheme.typography.labelLarge)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            (listOf<Role?>(Role.Submissive, Role.Dominant, Role.Switch) + null).forEach { r ->
+                FilterChip(
+                    selected = role == r,
+                    onClick = { role = r; vm.clearInvite() },
+                    label = { Text(r?.label ?: "Let them choose") },
+                )
+            }
+        }
+        val inv = invite
+        if (inv == null) {
+            Button(onClick = { vm.createInvite(role) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Create link") }
+        } else {
+            Surface(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.medium) {
+                Text(inv.link.removePrefix("https://"), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(16.dp).fillMaxWidth())
+            }
+            Text(
+                "Works once · code ${inv.code} · expires ${formatDateTime(inv.expiresAt)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { clipboard.setText(AnnotatedString(inv.link)) }, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Outlined.ContentCopy, null)
+                    Text("  Copy")
+                }
+                Button(
+                    onClick = {
+                        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, inv.link)
+                        context.startActivity(Intent.createChooser(send, "Share invite link"))
+                    },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(Icons.Outlined.Share, null)
+                    Text("  Share")
+                }
+            }
+        }
     }
 }
 
