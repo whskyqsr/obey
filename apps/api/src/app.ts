@@ -6,6 +6,7 @@ import type { Db } from "./db/index.js";
 import type { users } from "./db/schema.js";
 import { HttpError } from "./errors.js";
 import type { Notifier } from "./notify.js";
+import { eventRoutes } from "./routes/events.js";
 import { libraryRoutes } from "./routes/library.js";
 import { pointsRoutes } from "./routes/points.js";
 import { proofRoutes } from "./routes/proofs.js";
@@ -61,5 +62,6 @@ export function buildApp(deps: Deps) {
   app.register(pointsRoutes(deps));
   app.register(libraryRoutes(deps));
   app.register(proofRoutes(deps));
+  app.register(eventRoutes(deps));
   return app;
 }

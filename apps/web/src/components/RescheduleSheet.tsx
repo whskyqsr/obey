@@ -1,14 +1,22 @@
 import { useEffect, useState } from "react";
-import type { Occurrence, RescheduleInput } from "../api/types";
+import type { CalendarEvent, Occurrence, RescheduleInput } from "../api/types";
 import { useReschedule } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { fmtDateTime, fromLocalInput, toLocalInput } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 import { Button, Chip, Dialog, SegmentedButtons, TextArea, TextField, useSnackbar } from "./ui";
 
-type Choice = "1h" | "24h" | "custom";
+type Choice = "1h" | "24h" | "after" | "custom";
 
-export function RescheduleSheet({ occurrence, open, onClose }: { occurrence: Occurrence; open: boolean; onClose(): void }) {
+/** Where "After <event>" moves a task: half an hour after a timed plan, or the same time on the day an all-day plan is over. */
+export function afterEvent(dueAt: string, e: CalendarEvent): string {
+  const due = new Date(dueAt).getTime();
+  const end = new Date(e.endsAt).getTime();
+  if (!e.allDay) return new Date(end + 30 * 60_000).toISOString();
+  return new Date(due + Math.ceil((end - due) / 86_400_000) * 86_400_000).toISOString();
+}
+
+export function RescheduleSheet({ occurrence, open, onClose, after }: { occurrence: Occurrence; open: boolean; onClose(): void; after?: CalendarEvent }) {
   const { rel, isDom } = useRel();
   const snack = useSnackbar();
   const reschedule = useReschedule(rel.id);
@@ -19,26 +27,29 @@ export function RescheduleSheet({ occurrence, open, onClose }: { occurrence: Occ
 
   useEffect(() => {
     if (open) {
-      setChoice("24h");
+      setChoice(after ? "after" : "24h");
       setCustom(toLocalInput(new Date(new Date(occurrence.dueAt).getTime() + 86_400_000).toISOString()));
       setScope("this");
       setReason("");
     }
-  }, [open, occurrence.dueAt]);
+  }, [open, occurrence.dueAt, after]);
 
   const willRequest = !isDom && rel.reschedulePolicy === "request";
   const subBlocked = !isDom && rel.reschedulePolicy === "dominant_only";
 
   const newDue =
-    choice === "custom"
-      ? custom
-        ? new Date(custom).toISOString()
-        : null
-      : new Date(new Date(occurrence.dueAt).getTime() + (choice === "1h" ? 1 : 24) * 3_600_000).toISOString();
+    choice === "after" && after
+      ? afterEvent(occurrence.dueAt, after)
+      : choice === "custom"
+        ? custom
+          ? new Date(custom).toISOString()
+          : null
+        : new Date(new Date(occurrence.dueAt).getTime() + (choice === "1h" ? 1 : 24) * 3_600_000).toISOString();
 
   function submit() {
     const input: RescheduleInput = { scope, ...(reason.trim() ? { reason: reason.trim() } : {}) };
-    if (choice === "custom") {
+    if (choice === "after" && newDue) input.dueAt = newDue;
+    else if (choice === "custom") {
       if (!custom) return;
       input.dueAt = fromLocalInput(custom);
     } else input.delayHours = choice === "1h" ? 1 : 24;
@@ -75,6 +86,11 @@ export function RescheduleSheet({ occurrence, open, onClose }: { occurrence: Occ
           <span className="text-on-surface">{occurrence.title}</span> is due {fmtDateTime(occurrence.dueAt)}.
         </p>
         <div className="flex flex-wrap gap-2">
+          {after && (
+            <Chip selected={choice === "after"} onClick={() => setChoice("after")} icon="event_available">
+              After {after.title}
+            </Chip>
+          )}
           <Chip selected={choice === "1h"} onClick={() => setChoice("1h")}>
             +1 hour
           </Chip>
@@ -85,9 +101,7 @@ export function RescheduleSheet({ occurrence, open, onClose }: { occurrence: Occ
             Pick date & time
           </Chip>
         </div>
-        {choice === "custom" && (
-          <TextField label="New deadline" type="datetime-local" value={custom} onChange={(e) => setCustom(e.target.value)} />
-        )}
+        {choice === "custom" && <TextField label="New deadline" type="datetime-local" value={custom} onChange={(e) => setCustom(e.target.value)} />}
         {newDue && (
           <p className="text-body-medium">
             New deadline: <span className="text-on-surface">{fmtDateTime(newDue)}</span>

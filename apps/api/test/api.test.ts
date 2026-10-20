@@ -644,3 +644,45 @@ describe("push payloads", () => {
     expect(android).toEqual({ tokens: ["a"], data: { type: "reminder", body: "A task is due soon" }, android: { priority: "high" } });
   });
 });
+
+describe("calendar events", () => {
+  it("lets either partner add plans and flags timed tasks they clash with", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    await dom.post(`/relationships/${relId}/tasks`, task(subId)); // 21:00 New York on the 16th
+    await dom.post(`/relationships/${relId}/tasks`, task(subId, { title: "All-day", dueTime: null }));
+    const [timed] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body.filter((o: { title: string }) => o.title !== "All-day");
+
+    const dinner = { title: "Dinner with family", startsAt: "2026-10-16T19:00:00-04:00", endsAt: "2026-10-16T23:00:00-04:00" };
+    // The Dominant's own plan doesn't touch the sub's tasks unless the sub is in on it.
+    const solo = await dom.post(`/relationships/${relId}/events`, { ...dinner, title: "Poker night" });
+    expect(solo.body.conflictIds).toEqual([]);
+    await dom.del(`/events/${solo.body.id}`);
+    const made = await sub.post(`/relationships/${relId}/events`, dinner);
+    expect(made.status).toBe(201);
+    expect(made.body.conflictIds).toEqual([timed.id]);
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Sub added a plan on the calendar");
+
+    expect((await dom.get(`/relationships/${relId}/events?from=2026-10-16&to=2026-10-16`)).body.map((e: { title: string }) => e.title)).toEqual(["Dinner with family"]);
+    expect((await dom.get(`/relationships/${relId}/events?from=2026-10-20&to=2026-10-22`)).body).toEqual([]);
+    expect((await ctx.as(crypto.randomUUID()).get(`/relationships/${relId}/events?from=2026-10-16&to=2026-10-16`)).status).toBe(404);
+
+    // Only the author changes it; moving it off the task clears the clash.
+    expect((await dom.patch(`/events/${made.body.id}`, { title: "Mine now" })).status).toBe(403);
+    const moved = await sub.patch(`/events/${made.body.id}`, { startsAt: "2026-10-16T17:00:00-04:00", endsAt: "2026-10-16T20:00:00-04:00" });
+    expect(moved.body.conflictIds).toEqual([]);
+    expect((await sub.patch(`/events/${made.body.id}`, { endsAt: "2026-10-16T16:00:00-04:00" })).status).toBe(400);
+
+    // A Dominant's plan tells the sub how many of their tasks it runs into.
+    await dom.post(`/relationships/${relId}/events`, {
+      title: "Away",
+      startsAt: "2026-10-16T00:00:00-04:00",
+      endsAt: "2026-10-17T00:00:00-04:00",
+      allDay: true,
+      withPartner: true,
+    });
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Dom added a plan on the calendar; it overlaps one of your tasks");
+
+    expect((await dom.del(`/events/${made.body.id}`)).status).toBe(403);
+    expect((await sub.del(`/events/${made.body.id}`)).status).toBe(204);
+  });
+});

@@ -316,3 +316,26 @@ export const reports = pgTable("reports", {
   createdAt: createdAt(),
   resolvedAt: ts("resolved_at"),
 });
+
+/** A plan on the shared calendar, added by either partner. */
+export const calendarEvents = pgTable(
+  "calendar_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    startsAt: ts("starts_at").notNull(),
+    endsAt: ts("ends_at").notNull(),
+    allDay: boolean("all_day").notNull().default(false),
+    withPartner: boolean("with_partner").notNull().default(false),
+    noteMd: text("note_md"),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [index("calendar_events_relationship_idx").on(t.relationshipId, t.startsAt)],
+);

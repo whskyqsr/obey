@@ -359,3 +359,31 @@ export type Note = z.infer<typeof note>;
 export const registerDevice = z.object({ token: z.string().min(10), platform: z.enum(["android", "web"]) });
 
 export const apiError = z.object({ error: z.string(), details: z.unknown().optional() });
+
+/** Plans either partner puts on the shared calendar. All-day events run from local midnight to the next. */
+export const calendarEventInput = z
+  .object({
+    title: z.string().trim().min(1).max(80),
+    startsAt: z.string().datetime({ offset: true }),
+    endsAt: z.string().datetime({ offset: true }),
+    allDay: z.boolean().default(false),
+    /** Whether the partner is in on it too; only then do the partner's tasks count as clashing. */
+    withPartner: z.boolean().default(false),
+    noteMd: z.string().max(2_000).nullable().optional(),
+  })
+  .refine((e) => Date.parse(e.endsAt) > Date.parse(e.startsAt), { message: "an event has to end after it starts", path: ["endsAt"] })
+  .refine((e) => Date.parse(e.endsAt) - Date.parse(e.startsAt) <= 31 * 86_400_000, { message: "an event can last a month at most", path: ["endsAt"] });
+export const calendarEvent = z.object({
+  id,
+  relationshipId: id,
+  authorId: id,
+  title: z.string(),
+  startsAt: z.string(),
+  endsAt: z.string(),
+  allDay: z.boolean(),
+  withPartner: z.boolean(),
+  noteMd: z.string().nullable(),
+  /** Timed tasks still to do that fall due during the event, for the people it involves. */
+  conflictIds: z.array(id),
+});
+export type CalendarEvent = z.infer<typeof calendarEvent>;

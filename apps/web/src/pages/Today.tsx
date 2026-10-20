@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { useBalances, useDecideReschedule, useLibrary, usePendingReschedules } from "../api/hooks";
+import { useBalances, useDecideReschedule, useEvents, useLibrary, usePendingReschedules } from "../api/hooks";
 import { errorMessage } from "../api/client";
-import type { Occurrence, RescheduleRequest } from "../api/types";
+import type { CalendarEvent, Occurrence, RescheduleRequest } from "../api/types";
+import { EventDialog, eventOn, eventWhen } from "../components/EventDialog";
 import { DayRescheduleSheet } from "../components/DayRescheduleSheet";
 import { isOverdue } from "../components/OccurrenceCard";
 import { ExcuseAction, ReviewActions, RowGroup, RowLink, TaskRow } from "../components/TaskRow";
@@ -74,6 +75,7 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
               .join(" · ")}
           />
           {!isDom && occ.data && todays.length > 0 && <Progress today={todays} done={doneToday} points={features.points} />}
+          <PlanClashes />
           {isDom ? (
             <>
               {needs.count > 0 && (
@@ -380,4 +382,33 @@ function PendingRequests({ bare }: { bare?: boolean }) {
     </div>
   );
   return bare ? body : <Section title={isDom ? "Extension requests" : "Waiting for approval"}>{body}</Section>;
+}
+
+/** A heads-up for plans today or tomorrow that run into tasks, so they get moved before they're missed. */
+function PlanClashes() {
+  const { rel } = useRel();
+  const t = today();
+  const events = useEvents(rel.id, t, addDays(t, 1));
+  const [open, setOpen] = useState<CalendarEvent | null>(null);
+  const clashing = (events.data ?? []).filter((e) => e.conflictIds.length > 0 && new Date(e.endsAt).getTime() > Date.now() && (eventOn(e, t) || eventOn(e, addDays(t, 1))));
+  if (!clashing.length) return null;
+  return (
+    <div className="mx-4 mb-2 flex flex-col gap-2 md:mx-6">
+      {clashing.map((e) => (
+        <div key={e.id} className="flex items-center gap-3 rounded-md bg-tertiary-container px-4 py-3 text-on-tertiary-container">
+          <Icon name="event_busy" />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-title-small">{e.title}</div>
+            <div className="text-body-small opacity-80">
+              {eventWhen(e)} · overlaps {e.conflictIds.length === 1 ? "a task" : `${e.conflictIds.length} tasks`}
+            </div>
+          </div>
+          <Button variant="text" onClick={() => setOpen(e)}>
+            Sort it out
+          </Button>
+        </div>
+      ))}
+      <EventDialog event={open} open={open !== null} onClose={() => setOpen(null)} />
+    </div>
+  );
 }

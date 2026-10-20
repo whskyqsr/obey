@@ -1,6 +1,8 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { api, apiObjectUrl } from "./client";
 import type {
+  CalendarEvent,
+  CalendarEventInput,
   InvitePreview,
   Balance,
   Features,
@@ -31,6 +33,7 @@ export const keys = {
   me: ["me"] as const,
   tasks: (rel: string) => ["rel", rel, "tasks"] as const,
   occurrences: (rel: string, from: string, to: string) => ["rel", rel, "occurrences", from, to] as const,
+  events: (rel: string, from: string, to: string) => ["rel", rel, "events", from, to] as const,
   reschedules: (rel: string) => ["rel", rel, "reschedules"] as const,
   ledger: (rel: string) => ["rel", rel, "ledger"] as const,
   balances: (rel: string) => ["rel", rel, "balances"] as const,
@@ -172,6 +175,33 @@ export function useOccurrences(rel: string, from: string, to: string) {
   return useQuery({
     queryKey: keys.occurrences(rel, from, to),
     queryFn: () => api<Occurrence[]>(`/relationships/${rel}/occurrences`, { query: { from, to } }),
+  });
+}
+
+// ---- calendar events
+
+export function useEvents(rel: string, from: string, to: string) {
+  return useQuery({
+    queryKey: keys.events(rel, from, to),
+    queryFn: () => api<CalendarEvent[]>(`/relationships/${rel}/events`, { query: { from, to } }),
+  });
+}
+
+/** Creates an event, or updates it when an id is given. */
+export function useSaveEvent(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ id, input }: { id?: string; input: CalendarEventInput }) =>
+      id ? api<CalendarEvent>(`/events/${id}`, { method: "PATCH", body: input }) : api<CalendarEvent>(`/relationships/${rel}/events`, { method: "POST", body: input }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useDeleteEvent(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (id: string) => api(`/events/${id}`, { method: "DELETE" }),
+    onSuccess: () => invalidate(),
   });
 }
 
