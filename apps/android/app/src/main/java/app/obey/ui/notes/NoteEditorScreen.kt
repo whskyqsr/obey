@@ -90,7 +90,8 @@ fun NoteEditorScreen(onDone: () -> Unit, vm: NoteEditorViewModel = hiltViewModel
         }
     }
     val canEdit = vm.canEdit
-    var preview by rememberSaveable { mutableStateOf(false) }
+    // Existing notes open for reading; Edit switches to the editor.
+    var preview by rememberSaveable { mutableStateOf(vm.opensForReading) }
     var menu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val showPreview = preview || !canEdit
@@ -107,15 +108,23 @@ fun NoteEditorScreen(onDone: () -> Unit, vm: NoteEditorViewModel = hiltViewModel
                 navigationIcon = { IconButton(onClick = ::close) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Save and close") } },
                 actions = {
                     if (canEdit) {
-                        IconButton(onClick = { preview = !preview }) {
-                            if (preview) Icon(Icons.Outlined.EditNote, "Edit") else Icon(Icons.Outlined.Visibility, "Preview")
-                        }
                         if (draft.kind == NoteKind.Note) {
                             IconButton(onClick = { vm.update { it.copy(pinned = !it.pinned) } }) {
                                 if (draft.pinned) Icon(Icons.Filled.PushPin, "Unpin") else Icon(Icons.Outlined.PushPin, "Pin")
                             }
                         }
-                        TextButton(onClick = { vm.save(close = false) }, enabled = !busy && vm.dirty) { Text("Save") }
+                        if (preview) {
+                            TextButton(onClick = { preview = false }) {
+                                Icon(Icons.Outlined.EditNote, null)
+                                Text(" Edit")
+                            }
+                        } else {
+                            IconButton(onClick = { preview = true }) { Icon(Icons.Outlined.Visibility, "Preview") }
+                            TextButton(
+                                onClick = { vm.save(close = false); if (draft.title.isNotBlank() || draft.body.isNotBlank()) preview = true },
+                                enabled = !busy && vm.dirty,
+                            ) { Text("Save") }
+                        }
                         Box {
                             IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "More") }
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
@@ -168,7 +177,7 @@ fun NoteEditorScreen(onDone: () -> Unit, vm: NoteEditorViewModel = hiltViewModel
                         )
                     }
 
-                    if (canEdit) {
+                    if (canEdit && !showPreview) {
                         Row(
                             Modifier.horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),

@@ -5,6 +5,8 @@ import { errorMessage } from "../api/client";
 import type { Note, NoteInput } from "../api/types";
 import { MarkdownEditor } from "../components/MarkdownEditor";
 import { Button, Chip, ErrorBox, Icon, IconButton, Loading, SegmentedButtons, useSnackbar } from "../components/ui";
+import { fmtDateTime } from "../lib/dates";
+import { MOODS } from "./Notes";
 import { useRel } from "../lib/relationship";
 import { useConfirm } from "../lib/useConfirm";
 
@@ -20,7 +22,7 @@ export function NoteEditorPage({ noteId, kind }: { noteId: string; kind: "note" 
 }
 
 function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
-  const { rel, me } = useRel();
+  const { rel, me, memberName } = useRel();
   const navigate = useNavigate();
   const snack = useSnackbar();
   const save = useSaveLibraryItem(rel.id, "notes");
@@ -39,6 +41,8 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
   }));
   const [tagDraft, setTagDraft] = useState("");
   const [dirty, setDirty] = useState(false);
+  // Existing notes open for reading; Edit switches to the editor.
+  const [editing, setEditing] = useState(!note);
   const set = (patch: Partial<NoteInput>) => {
     setForm((f) => ({ ...f, ...patch }));
     setDirty(true);
@@ -58,6 +62,7 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
       {
         onSuccess: (saved) => {
           setDirty(false);
+          setEditing(false);
           snack("Saved");
           if (!note && saved?.id) navigate({ to: kind === "journal" ? "/journal/$noteId" : "/notes/$noteId", params: { noteId: saved.id }, replace: true });
         },
@@ -66,32 +71,95 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
     );
   }
 
+  function discard() {
+    setForm({ kind, title: note!.title, bodyMd: note!.bodyMd, visibility: note!.visibility, tags: note!.tags, pinned: note!.pinned, mood: note!.mood });
+    setDirty(false);
+    setEditing(false);
+  }
+
+  function togglePin() {
+    const next = !form.pinned;
+    setForm((f) => ({ ...f, pinned: next }));
+    save.mutate({ id: note!.id, input: { ...form, pinned: next } }, { onSuccess: () => snack(next ? "Pinned" : "Unpinned"), onError: (e) => snack(errorMessage(e)) });
+  }
+
+  const deleteButton = note && note.authorId === me.user.id && (
+    <IconButton
+      icon="delete"
+      label="Delete"
+      onClick={() =>
+        confirm(kind === "journal" ? "Delete this entry?" : "Delete this note?", () =>
+          del.mutate(note.id, {
+            onSuccess: () => {
+              snack(kind === "journal" ? "Entry deleted" : "Note deleted");
+              back();
+            },
+            onError: (e) => snack(errorMessage(e)),
+          }),
+        )
+      }
+    />
+  );
+
+  if (note && !editing) {
+    return (
+      <div className="flex flex-col">
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-1 bg-surface px-2 md:px-4">
+          <IconButton icon="arrow_back" label="Back" onClick={back} />
+          <div className="flex-1" />
+          {canEdit && kind === "note" && <IconButton icon="push_pin" filled={form.pinned} label={form.pinned ? "Unpin" : "Pin"} onClick={togglePin} />}
+          {deleteButton}
+          {canEdit && (
+            <Button onClick={() => setEditing(true)} icon="edit">
+              Edit
+            </Button>
+          )}
+        </header>
+        <article className="flex flex-col gap-3 px-4 pb-10 md:px-6">
+          <h1 className="text-headline-medium text-on-surface">{form.title || (kind === "journal" ? "Journal entry" : "Untitled")}</h1>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body-medium text-on-surface-variant">
+            {kind === "journal" && form.mood && <Icon name={MOODS[form.mood - 1]!} size={20} />}
+            <span>
+              {memberName(note.authorId)} · {fmtDateTime(kind === "journal" ? note.createdAt : note.updatedAt)}
+            </span>
+            {form.visibility === "private" && (
+              <span className="flex items-center gap-1">
+                <Icon name="lock" size={16} /> Private
+              </span>
+            )}
+          </div>
+          {form.tags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {form.tags.map((t) => (
+                <Chip key={t}>#{t}</Chip>
+              ))}
+            </div>
+          )}
+          <MarkdownEditor value={form.bodyMd} onChange={() => {}} editable={false} bare />
+        </article>
+        {confirmEl}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col">
       {/* h-14 matches the formatting toolbar's sticky offset (top-14) in MarkdownEditor. */}
       <header className="sticky top-0 z-20 flex h-14 items-center gap-1 bg-surface px-2 md:px-4">
-        <IconButton icon="arrow_back" label="Back" onClick={() => (dirty ? confirm("Discard unsaved changes?", back) : back())} />
+        <IconButton
+          icon={note ? "close" : "arrow_back"}
+          label={note ? "Stop editing" : "Back"}
+          onClick={() => {
+            const leave = note ? discard : back;
+            if (dirty) confirm("Discard unsaved changes?", leave);
+            else leave();
+          }}
+        />
         <div className="flex-1" />
-        {canEdit && (
+        {canEdit && kind === "note" && (
           <IconButton icon="push_pin" filled={form.pinned} label={form.pinned ? "Unpin" : "Pin"} onClick={() => set({ pinned: !form.pinned })} />
         )}
-        {note && note.authorId === me.user.id && (
-          <IconButton
-            icon="delete"
-            label="Delete"
-            onClick={() =>
-              confirm("Delete this note?", () =>
-                del.mutate(note.id, {
-                  onSuccess: () => {
-                    snack("Note deleted");
-                    back();
-                  },
-                  onError: (e) => snack(errorMessage(e)),
-                }),
-              )
-            }
-          />
-        )}
+        {deleteButton}
         {canEdit && (
           <Button onClick={submit} busy={save.isPending} disabled={!dirty && !!note} icon="save">
             Save

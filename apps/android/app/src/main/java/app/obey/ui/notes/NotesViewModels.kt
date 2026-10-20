@@ -88,6 +88,8 @@ class NoteEditorViewModel @Inject constructor(
 ) : BaseViewModel() {
     private val route = savedState.toRoute<NoteEditorRoute>()
     private val noteId: String? = route.noteId
+    /** Existing notes open read-only first. */
+    val opensForReading: Boolean = noteId != null
     private val blank = NoteDraft(kind = if (route.journal) NoteKind.Journal else NoteKind.Note)
     val isNew: Boolean get() = original == null
 

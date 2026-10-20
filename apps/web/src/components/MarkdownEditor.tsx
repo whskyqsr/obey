@@ -12,11 +12,14 @@ export function MarkdownEditor({
   onChange,
   placeholder,
   editable = true,
+  bare = false,
 }: {
   value: string;
   onChange(markdown: string): void;
   placeholder?: string;
   editable?: boolean;
+  /** Render without the editing frame, for reading. */
+  bare?: boolean;
 }) {
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -48,7 +51,7 @@ export function MarkdownEditor({
   }, [editor, editable]);
 
   return (
-    <div className="rounded-lg border border-outline-variant bg-surface-container-lowest focus-within:border-primary">
+    <div className={cx(!bare && "rounded-lg border border-outline-variant bg-surface-container-lowest focus-within:border-primary", bare && "-mx-4")}>
       {editable && editor && <Toolbar editor={editor} />}
       <EditorContent editor={editor} />
     </div>

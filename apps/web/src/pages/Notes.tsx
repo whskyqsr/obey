@@ -44,7 +44,7 @@ const COPY = {
   },
 } as const;
 
-const MOODS = ["sentiment_very_dissatisfied", "sentiment_dissatisfied", "sentiment_neutral", "sentiment_satisfied", "sentiment_very_satisfied"];
+export const MOODS = ["sentiment_very_dissatisfied", "sentiment_dissatisfied", "sentiment_neutral", "sentiment_satisfied", "sentiment_very_satisfied"];
 
 /** Notes and the journal share storage but are separate lists, told apart by `kind`. */
 export function NotesPage({ kind }: { kind: "note" | "journal" }) {
@@ -108,7 +108,8 @@ export function NotesPage({ kind }: { kind: "note" | "journal" }) {
               aria-label={`Open ${n.title || "note"}`}
               onClick={() => navigate({ to: `${copy.base}/$noteId`, params: { noteId: n.id } })}
             />
-            <div className="flex items-start gap-2">
+            {/* Card content lets clicks through to the open button underneath; only the pin takes its own. */}
+            <div className="pointer-events-none flex items-start gap-2">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 text-title-medium">
                   {kind === "journal" && n.mood && <Icon name={MOODS[n.mood - 1]!} size={18} />}
@@ -120,14 +121,14 @@ export function NotesPage({ kind }: { kind: "note" | "journal" }) {
                 </div>
               </div>
               {kind === "note" && (
-                <div className="relative">
+                <div className="pointer-events-auto relative">
                   <IconButton icon="push_pin" filled={n.pinned} label={n.pinned ? "Unpin" : "Pin"} onClick={() => togglePin(n)} />
                 </div>
               )}
             </div>
-            {n.bodyMd && <p className="line-clamp-4 text-body-medium opacity-85">{excerpt(n.bodyMd, 280)}</p>}
+            {n.bodyMd && <p className="pointer-events-none line-clamp-4 text-body-medium opacity-85">{excerpt(n.bodyMd, 280)}</p>}
             {n.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1">
+              <div className="pointer-events-none flex flex-wrap gap-1">
                 {n.tags.map((t) => (
                   <span key={t} className="text-label-medium opacity-80">
                     #{t}
