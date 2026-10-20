@@ -231,6 +231,13 @@ data class UpdateRelationshipInput(
     @EncodeDefault(EncodeDefault.Mode.NEVER) val dates: List<DynamicDate>? = null,
 )
 
+/** One step of a ritual; ids are made by the app and only need to be unique within the task. */
+@Serializable
+data class TaskStep(val id: String, val title: String)
+
+@Serializable
+data class TickStepInput(val stepId: String, val done: Boolean)
+
 @Serializable
 data class TaskInput(
     val title: String,
@@ -250,6 +257,10 @@ data class TaskInput(
     val dueTime: String? = null,
     val timezone: String,
     val graceMinutes: Int = 0,
+    /** A ritual's steps, done in order from the run sheet; empty for an ordinary task. */
+    val steps: List<TaskStep> = emptyList(),
+    /** Only doable in the last this-many minutes before it's due; null for any time. */
+    val windowMinutes: Int? = null,
 )
 
 @Serializable
@@ -271,6 +282,8 @@ data class Task(
     val dueTime: String? = null,
     val timezone: String,
     val graceMinutes: Int = 0,
+    val steps: List<TaskStep> = emptyList(),
+    val windowMinutes: Int? = null,
     val summary: String,
     /** Set when this one-off task is a consequence handed out on its own. */
     val assignedConsequenceId: String? = null,
@@ -283,7 +296,7 @@ data class Task(
         rewardId = rewardId, consequenceId = consequenceId, consequenceDueDays = consequenceDueDays,
         consequenceDueTime = consequenceDueTime, proofRequired = proofRequired,
         approvalRequired = approvalRequired, schedule = schedule, dueTime = dueTime, timezone = timezone,
-        graceMinutes = graceMinutes,
+        graceMinutes = graceMinutes, steps = steps, windowMinutes = windowMinutes,
     )
 }
 
@@ -316,9 +329,24 @@ data class Occurrence(
     /** Needs a photo or a note before it can be marked done. */
     val proofRequired: Boolean = false,
     val commentCount: Int = 0,
+    /** The ritual's steps (empty for an ordinary task) and the ids ticked off so far. */
+    val steps: List<TaskStep> = emptyList(),
+    val stepsDone: List<String> = emptyList(),
+    /** When the task's window opens, if it has one. */
+    val opensAt: String? = null,
 ) {
-    /** Tomorrow's daily task waits for its day; the API refuses it before then. */
-    fun isOpen(today: java.time.LocalDate = java.time.LocalDate.now()) = opensOn == null || !java.time.LocalDate.parse(opensOn).isAfter(today)
+    /**
+     * Tomorrow's daily task waits for its day, and a task with a window waits for it to open; the API refuses
+     * either before then.
+     */
+    fun isOpen(today: java.time.LocalDate = java.time.LocalDate.now(), now: java.time.Instant = java.time.Instant.now()) =
+        (opensOn == null || !java.time.LocalDate.parse(opensOn).isAfter(today)) &&
+            (opensAt == null || !java.time.Instant.parse(opensAt).isAfter(now))
+
+    val isRitual: Boolean get() = steps.isNotEmpty()
+
+    /** "2 of 4 steps" */
+    val stepProgress: String get() = "${stepsDone.size} of ${steps.size} steps"
 }
 
 /** A past occurrence in a task's history, with the points it earned or cost. */

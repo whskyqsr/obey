@@ -28,6 +28,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.FormatListNumbered
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Balance
 import androidx.compose.material.icons.outlined.EventRepeat
 import androidx.compose.material.icons.outlined.ExpandLess
@@ -42,6 +45,7 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -197,7 +201,11 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                     Fold(
                         Icons.Outlined.EventRepeat,
                         (if (schedule.rule == null) "Once, ${formatDate(form.start)}" else describe(schedule)) + at,
-                        listOfNotNull(if (schedule.rule != null) "From ${formatDate(form.start)}" else null, "$zone time").joinToString(" · "),
+                        listOfNotNull(
+                            if (schedule.rule != null) "From ${formatDate(form.start)}" else null,
+                            if (!form.allDay && form.windowMinutes != null) "opens ${windowLabel(form.windowMinutes)}" else null,
+                            "$zone time",
+                        ).joinToString(" · "),
                         initiallyOpen = vm.isNew,
                     ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -213,6 +221,14 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                             }
                         }
                         LabeledSwitch("All day", "Due by the end of the day", form.allDay) { v -> vm.update { it.copy(allDay = v) } }
+                        if (!form.allDay) {
+                            Text("Can be done", style = MaterialTheme.typography.labelLarge)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                (WINDOWS + listOfNotNull(form.windowMinutes)).distinct().forEach { m ->
+                                    FilterChip(selected = form.windowMinutes == m, onClick = { vm.update { it.copy(windowMinutes = m) } }, label = { Text(windowLabel(m)) })
+                                }
+                            }
+                        }
                         RecurrencePicker(form.recurrence, form.start, onChange = { r -> vm.update { it.copy(recurrence = r) } }, weekStart = vm.weekStart)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
@@ -226,6 +242,8 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                             TextButton(onClick = { pickZone = true }) { Text("Change") }
                         }
                     }
+
+                    StepsFold(form.steps) { steps -> vm.update { it.copy(steps = steps) } }
 
                     if (features.points || features.consequences) {
                         val consequence = d.value.consequences.firstOrNull { it.id == form.consequenceId }
@@ -437,6 +455,73 @@ fun NumberField(label: String, value: String, modifier: Modifier = Modifier, onC
 }
 
 /** "America/New_York" → "New York". */
+private val WINDOWS = listOf<Int?>(null, 15, 30, 60, 120, 240)
+
+private fun windowLabel(m: Int?) = when {
+    m == null -> "Any time"
+    m < 60 -> "$m min before"
+    m == 60 -> "1 hour before"
+    else -> "${m / 60} hours before"
+}
+
+/** A ritual's steps: done in order, one at a time, from the run sheet. A task with none is an ordinary task. */
+@Composable
+private fun StepsFold(steps: List<app.obey.api.TaskStep>, onChange: (List<app.obey.api.TaskStep>) -> Unit) {
+    var draft by rememberSaveable { mutableStateOf("") }
+    fun add() {
+        val title = draft.trim()
+        if (title.isEmpty() || steps.size >= 30) return
+        onChange(steps + app.obey.api.TaskStep(java.util.UUID.randomUUID().toString().take(8), title))
+        draft = ""
+    }
+    val named = steps.filter { it.title.isNotBlank() }
+    Fold(
+        Icons.Outlined.FormatListNumbered,
+        if (named.isEmpty()) "No steps" else "Ritual: ${named.size} step${if (named.size == 1) "" else "s"}",
+        if (named.isEmpty()) "Add steps to make it a routine done in order" else named.joinToString(" → ") { it.title.trim() },
+    ) {
+        steps.forEachIndexed { i, s ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("${i + 1}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.widthIn(min = 20.dp))
+                OutlinedTextField(
+                    value = s.title,
+                    onValueChange = { v -> onChange(steps.map { if (it.id == s.id) it.copy(title = v.take(200)) else it }) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = { onChange(steps.toMutableList().apply { add(i - 1, removeAt(i)) }) }, enabled = i > 0) {
+                    Icon(Icons.Outlined.KeyboardArrowUp, "Move step ${i + 1} up")
+                }
+                IconButton(onClick = { onChange(steps.toMutableList().apply { add(i + 1, removeAt(i)) }) }, enabled = i < steps.lastIndex) {
+                    Icon(Icons.Outlined.KeyboardArrowDown, "Move step ${i + 1} down")
+                }
+                IconButton(onClick = { onChange(steps.filter { it.id != s.id }) }) { Icon(Icons.Outlined.Close, "Remove step ${i + 1}") }
+            }
+        }
+        if (steps.size < 30) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = { draft = it.take(200) },
+                    label = { Text("Add a step") },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { add() }),
+                    modifier = Modifier.weight(1f),
+                )
+                FilledTonalButton(onClick = { add() }, enabled = draft.isNotBlank()) { Text("Add") }
+            }
+        }
+        if (steps.isNotEmpty()) {
+            Text(
+                "They're done one at a time from Start, and the task is finished when the last one is.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
 private fun zoneName(id: String) = id.substringAfterLast('/').replace('_', ' ')
 
 /** "9:15 PM", "midnight", or a time "the next day" once it passes midnight. */

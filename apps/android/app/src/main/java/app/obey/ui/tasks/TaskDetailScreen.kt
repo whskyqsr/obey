@@ -183,6 +183,7 @@ fun TaskDetailScreen(
     var confirmDelete by remember { mutableStateOf(false) }
     var rescheduling by remember { mutableStateOf<Occurrence?>(null) }
     var noting by remember { mutableStateOf<Occurrence?>(null) }
+    var running by remember { mutableStateOf<Occurrence?>(null) }
     var commenting by remember { mutableStateOf<Occurrence?>(null) }
     var sendingBack by remember { mutableStateOf<Occurrence?>(null) }
     val title = (state as? Load.Ready)?.value?.task?.title.orEmpty()
@@ -281,13 +282,14 @@ fun TaskDetailScreen(
                                 OccurrenceActions(onApprove = { vm.review(o, true) }, onReject = { sendingBack = o }, onComments = { commenting = o })
                             } else {
                                 OccurrenceActions(
-                                    onComplete = if (mine) ({ vm.complete(o) }) else null,
+                                    onComplete = if (mine) ({ if (o.isRitual) running = o else if (o.proofRequired) noting = o else vm.complete(o) }) else null,
                                     onCompleteWithNote = if (mine) ({ noting = o }) else null,
                                     onReschedule = { rescheduling = o },
                                     onComments = { commenting = o },
                                 )
                             },
                         )
+                        if (o.isRitual && o.status == OccurrenceStatus.Pending) app.obey.ui.today.StepList(o, Modifier.padding(start = 72.dp, end = 16.dp, bottom = 8.dp))
                     }
 
                     if (task.bodyMd.isNotBlank()) {
@@ -314,6 +316,7 @@ fun TaskDetailScreen(
         SendBackDialog(o, onDismiss = { sendingBack = null }, onConfirm = { vm.review(o, false, it); sendingBack = null })
     }
     rescheduling?.let { o -> RescheduleSheet(o, onDismiss = { rescheduling = null }, onSubmit = { vm.reschedule(o, it) }) }
+    running?.let { o -> app.obey.ui.today.RitualSheet(o, onDismiss = { running = null; vm.refresh() }, onNeedsProof = { running = null; noting = it }) }
     noting?.let { o ->
         var note by remember(o.id) { mutableStateOf("") }
         AlertDialog(

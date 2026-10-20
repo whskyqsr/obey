@@ -86,6 +86,7 @@ fun TodayScreen(
 
     var rescheduling by remember { mutableStateOf<Occurrence?>(null) }
     var noting by remember { mutableStateOf<Occurrence?>(null) }
+    var running by remember { mutableStateOf<Occurrence?>(null) }
     var commenting by remember { mutableStateOf<Occurrence?>(null) }
     var sendingBack by remember { mutableStateOf<Occurrence?>(null) }
     var plan by remember { mutableStateOf<CalendarEvent?>(null) }
@@ -126,7 +127,7 @@ fun TodayScreen(
                 fun nameFor(o: Occurrence) = if (o.assigneeId == me) null else session?.nameOf(o.assigneeId)
                 fun actionsFor(o: Occurrence) = OccurrenceActions(
                     // A task that needs proof opens the Done sheet instead of completing in one tap.
-                    onComplete = if (o.assigneeId == me) ({ if (o.proofRequired) noting = o else vm.complete(o) }) else null,
+                    onComplete = if (o.assigneeId == me) ({ if (o.isRitual) running = o else if (o.proofRequired) noting = o else vm.complete(o) }) else null,
                     onCompleteWithNote = if (o.assigneeId == me) ({ noting = o }) else null,
                     onReschedule = { rescheduling = o },
                     onEditTask = if (session?.canManage == true) ({ onEditTask(o.seriesId) }) else null,
@@ -141,7 +142,7 @@ fun TodayScreen(
                 fun row(o: Occurrence, actions: OccurrenceActions = actionsFor(o)): @Composable () -> Unit = {
                     SwipeableRow(
                         o,
-                        onDone = if (o.assigneeId == me && o.status == OccurrenceStatus.Pending && o.isOpen()) ({ if (o.proofRequired) noting = o else vm.complete(o) }) else null,
+                        onDone = if (o.assigneeId == me && o.status == OccurrenceStatus.Pending && o.isOpen()) ({ if (o.isRitual) running = o else if (o.proofRequired) noting = o else vm.complete(o) }) else null,
                         // A Dominant moves anyone's deadline the same way a sub asks for more time on their own.
                         onMoreTime = if ((o.assigneeId == me || isDom) && o.status == OccurrenceStatus.Pending) ({ rescheduling = o }) else null,
                         moreTimeLabel = if (o.assigneeId == me) "More time" else "Reschedule",
@@ -265,6 +266,7 @@ fun TodayScreen(
         )
     }
 
+    running?.let { o -> RitualSheet(o, onDismiss = { running = null; vm.refresh() }, onNeedsProof = { running = null; noting = it }) }
     noting?.let { o ->
         var note by remember(o.id) { mutableStateOf("") }
         val photos by proofViewModel(o.id).photos.collectAsStateWithLifecycle()

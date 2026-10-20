@@ -13,6 +13,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.HourglassTop
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.TaskAlt
@@ -75,6 +76,8 @@ fun OccurrenceRow(
         if (occurrence.rescheduled) add("moved")
         if (assigneeName != null) add(assigneeName)
         if (showPoints && occurrence.points != 0) add("${signed(occurrence.points)} pts")
+        if (occurrence.status == OccurrenceStatus.Pending && occurrence.isRitual && occurrence.stepsDone.isNotEmpty()) add(occurrence.stepProgress)
+        if (occurrence.status == OccurrenceStatus.Pending && actions.onComplete != null && !occurrence.isOpen()) add(occurrence.opensLabel())
         when (occurrence.status) {
             OccurrenceStatus.Submitted -> add("awaiting approval")
             OccurrenceStatus.Missed -> add("missed")
@@ -93,7 +96,11 @@ fun OccurrenceRow(
                     OccurrenceStatus.Completed -> Icon(Icons.Outlined.CheckCircle, "Completed", tint = MaterialTheme.colorScheme.primary)
                     OccurrenceStatus.Submitted -> Icon(Icons.Outlined.HourglassTop, "Awaiting approval")
                     OccurrenceStatus.Missed -> Icon(Icons.Outlined.ErrorOutline, "Missed", tint = MaterialTheme.colorScheme.error)
-                    else -> Icon(Icons.Outlined.RadioButtonUnchecked, "Mark done")
+                    else -> if (occurrence.isRitual) {
+                        Icon(Icons.Outlined.PlayCircle, "Start", tint = if (canComplete) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline)
+                    } else {
+                        Icon(Icons.Outlined.RadioButtonUnchecked, "Mark done")
+                    }
                 }
             }
         },
@@ -134,7 +141,7 @@ fun OccurrenceRow(
                     IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "More") }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         if (occurrence.status == OccurrenceStatus.Pending) {
-                            if (occurrence.isOpen()) actions.onCompleteWithNote?.let {
+                            if (occurrence.isOpen() && !occurrence.isRitual) actions.onCompleteWithNote?.let {
                                 DropdownMenuItem(
                                     text = { Text("Done, with a note") },
                                     leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Notes, null) },

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.HourglassTop
+import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -27,6 +28,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -115,6 +118,7 @@ fun TaskListScreen(
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     MessageEffect(message, snackbar, vm::messageShown)
+    var running by remember { mutableStateOf<Occurrence?>(null) }
     // Reload when coming back from the editor.
     LifecycleResumeEffect(Unit) {
         vm.refresh()
@@ -161,13 +165,14 @@ fun TaskListScreen(
                             }
                         },
                         trailingContent = {
-                            NowStatus(current[t.id].orEmpty(), mine = t.assigneeId == vm.session?.userId, onComplete = vm::complete)
+                            NowStatus(current[t.id].orEmpty(), mine = t.assigneeId == vm.session?.userId, onComplete = { o -> if (o.isRitual) running = o else vm.complete(o) })
                         },
                     )
                 }
             }
         }
     }
+    running?.let { o -> app.obey.ui.today.RitualSheet(o, onDismiss = { running = null; vm.refresh() }) }
 }
 
 /** Today's state for a task, with a one-tap Done when it's the viewer's to do. */
@@ -180,6 +185,7 @@ private fun NowStatus(occurrences: List<Occurrence>, mine: Boolean, onComplete: 
     val open = occurrences.firstOrNull { it.status == OccurrenceStatus.Pending && (overdue(it) || day(it) == today) }
     val tint = if (open != null && overdue(open)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
     when {
+        open != null && mine && open.isRitual -> IconButton(onClick = { onComplete(open) }) { Icon(Icons.Outlined.PlayCircle, "Start “${open.title}”", tint = tint) }
         open != null && mine -> IconButton(onClick = { onComplete(open) }) { Icon(Icons.Outlined.RadioButtonUnchecked, "Mark “${open.title}” done", tint = tint) }
         occurrences.any { day(it) == today && it.status == OccurrenceStatus.Completed } ->
             Icon(Icons.Filled.CheckCircle, "Done today", tint = MaterialTheme.colorScheme.primary)
