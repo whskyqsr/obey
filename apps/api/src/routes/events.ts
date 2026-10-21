@@ -1,4 +1,4 @@
-import { and, eq, gt, gte, lt, ne } from "drizzle-orm";
+import { and, eq, gt, gte, isNull, lt, ne } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { calendarEventInput, plainDate } from "@obey/contracts";
@@ -26,7 +26,16 @@ async function pendingBetween(db: Tx, relationshipId: string, from: Date, to: Da
     .select({ id: occurrences.id, dueAt: occurrences.dueAt, assigneeId: taskSeries.assigneeId })
     .from(occurrences)
     .innerJoin(taskSeries, eq(occurrences.seriesId, taskSeries.id))
-    .where(and(eq(taskSeries.relationshipId, relationshipId), eq(occurrences.status, "pending"), gte(occurrences.dueAt, from), lt(occurrences.dueAt, to)));
+    .where(
+      and(
+        eq(taskSeries.relationshipId, relationshipId),
+        eq(occurrences.status, "pending"),
+        gte(occurrences.dueAt, from),
+        lt(occurrences.dueAt, to),
+        // Curfew nights are sorted out from Today (excuse that night or leave it), not moved like tasks.
+        isNull(taskSeries.curfewUntil),
+      ),
+    );
 }
 
 const eventDto = (e: Event, due: Due[]) => ({

@@ -561,6 +561,93 @@ describe("tasks and occurrences", () => {
     expect((await dom.get("/me")).body.relationships[0].members.find((m: { userId: string }) => m.userId === subId)).toMatchObject({ locationStatus: "ready" });
   });
 
+  it("keeps a curfew: home by the time, in until morning, broken, excused and clashing with plans", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    const opts = { materializeDays: 14, reminderLeadMinutes: 30 };
+    const home = { lat: 40.7128, lng: -74.006 };
+    const place = (await dom.post(`/relationships/${relId}/places`, { name: "Home", ...home })).body;
+    const curfew = { enabled: true, assigneeId: subId, placeId: place.id, time: "22:00", until: "06:00", points: 5, missPenalty: 10, timezone: NY };
+    const night = (date: string) =>
+      sub.get(`/relationships/${relId}/occurrences?from=${date}&to=${date}&curfew=include`).then((r) => r.body.find((o: { curfew: boolean }) => o.curfew));
+    const at = (iso: string) => (ctx.clock.now = new Date(iso));
+    try {
+      expect((await sub.put(`/relationships/${relId}/curfew`, curfew)).status).toBe(403);
+      expect((await dom.put(`/relationships/${relId}/curfew`, { ...curfew, time: "20:00", until: "19:00" })).status).toBe(400);
+      expect((await dom.put(`/relationships/${relId}/curfew`, curfew)).body.settings).toMatchObject({ time: "22:00", weekendTime: null });
+      expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Dom set a curfew: home by 10:00 PM");
+
+      // Nights aren't tasks: lists leave them out unless the phone asks for them.
+      expect((await dom.get(`/relationships/${relId}/tasks`)).body).toEqual([]);
+      expect((await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body).toEqual([]);
+      const fri = await night("2026-10-16");
+      expect(fri).toMatchObject({ dueAt: "2026-10-17T02:00:00.000Z", stayUntil: "2026-10-17T10:00:00.000Z", placeId: place.id });
+      expect((await dom.post(`/occurrences/${fri.id}/reschedule`, { scope: "this", delayHours: 24 })).status).toBe(409);
+      expect((await sub.get(`/relationships/${relId}/curfew`)).body.night).toBeNull();
+
+      // An hour before, Today shows it. With a phone that checks, "I'm home" is the phone's job.
+      at("2026-10-17T01:15:00Z");
+      expect((await sub.get(`/relationships/${relId}/curfew`)).body.night).toMatchObject({ occurrenceId: fri.id, status: "pending", canTap: true });
+      await sub.put("/me/location", { status: "ready" });
+      expect((await sub.post(`/occurrences/${fri.id}/home`)).status).toBe(409);
+      await sub.put("/me/location", { status: "denied" });
+      expect((await dom.post(`/occurrences/${fri.id}/home`)).status).toBe(403);
+      expect((await sub.post(`/occurrences/${fri.id}/home`)).body).toMatchObject({ status: "pending", arrivedAt: "2026-10-17T01:15:00.000Z" });
+      // Popping out before curfew only means coming back in time; leaving after it breaks curfew.
+      expect((await sub.post(`/occurrences/${fri.id}/leave`, { at: "2026-10-17T01:20:00Z" })).body).toMatchObject({ status: "pending", arrivedAt: null });
+      await sub.put("/me/location", { status: "ready" });
+      at("2026-10-17T01:40:00Z");
+      await sub.post(`/occurrences/${fri.id}/arrive`, { kind: "enter", ...home, accuracyM: 30 });
+      at("2026-10-17T03:00:00Z");
+      await runJobs(ctx.db, ctx.notifier, ctx.clock.now, opts);
+      expect((await night("2026-10-16")).status).toBe("pending");
+      at("2026-10-17T03:40:00Z");
+      expect((await sub.post(`/occurrences/${fri.id}/leave`)).body).toMatchObject({ status: "missed", leftAt: "2026-10-17T03:40:00.000Z" });
+      expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Sub broke curfew");
+      const broken = (await dom.get(`/relationships/${relId}/curfew`)).body.night;
+      expect(broken).toMatchObject({ occurrenceId: fri.id, status: "missed", missConfirmed: false, leftAt: "2026-10-17T03:40:00.000Z" });
+      expect((await sub.post(`/relationships/${relId}/curfew/excuse`, { occurrenceId: fri.id })).status).toBe(403);
+      expect((await dom.post(`/relationships/${relId}/curfew/excuse`, { occurrenceId: fri.id })).body).toMatchObject({ status: "excused" });
+      expect((await dom.get(`/relationships/${relId}/curfew`)).body.night).toBeNull();
+
+      // Saturday: home in time and in all night is kept when the night ends.
+      at("2026-10-18T01:30:00Z");
+      await sub.post(`/occurrences/${(await night("2026-10-17")).id}/arrive`, { kind: "enter", ...home, accuracyM: 30 });
+      at("2026-10-18T10:01:00Z");
+      await runJobs(ctx.db, ctx.notifier, ctx.clock.now, opts);
+      expect((await night("2026-10-17")).status).toBe("completed");
+
+      // Sunday: not home yet half an hour out gets a nudge; not home by curfew is missed.
+      at("2026-10-19T01:35:00Z");
+      await runJobs(ctx.db, ctx.notifier, ctx.clock.now, opts);
+      expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [subId], push: { body: "Curfew at 10:00 PM. Time to head home." } });
+      at("2026-10-19T02:01:00Z");
+      await runJobs(ctx.db, ctx.notifier, ctx.clock.now, opts);
+      expect((await night("2026-10-18")).status).toBe("missed");
+      expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Your partner wasn't home by curfew");
+
+      // A plan out past curfew shows to the Dominant, who excuses that night or leaves it.
+      const plan = (await sub.post(`/relationships/${relId}/events`, { title: "Dinner with Jess", startsAt: "2026-10-21T00:00:00Z", endsAt: "2026-10-21T05:00:00Z" })).body;
+      const tue = await night("2026-10-20");
+      expect((await dom.get(`/relationships/${relId}/curfew`)).body.clashes).toMatchObject([{ occurrenceId: tue.id, eventId: plan.id, eventTitle: "Dinner with Jess" }]);
+      expect((await sub.get(`/relationships/${relId}/curfew`)).body.clashes).toEqual([]);
+      expect(plan.conflictIds).toEqual([]);
+      await dom.post(`/relationships/${relId}/curfew/excuse`, { occurrenceId: tue.id });
+      expect((await night("2026-10-20")).status).toBe("excused");
+      expect((await dom.get(`/relationships/${relId}/curfew`)).body.clashes).toEqual([]);
+
+      // Weekend nights at midnight fall on Saturday and Sunday mornings; the old nights still to come are cancelled.
+      await dom.put(`/relationships/${relId}/curfew`, { ...curfew, weekendTime: "00:00" });
+      expect(await night("2026-10-23")).toBeUndefined();
+      expect(await night("2026-10-24")).toMatchObject({ dueAt: "2026-10-24T04:00:00.000Z", stayUntil: "2026-10-24T10:00:00.000Z" });
+      expect(await night("2026-10-22")).toMatchObject({ dueAt: "2026-10-23T02:00:00.000Z" });
+      await dom.put(`/relationships/${relId}/curfew`, { ...curfew, enabled: false });
+      expect(await night("2026-10-22")).toBeUndefined();
+      expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Dom turned your curfew off");
+    } finally {
+      at("2026-10-16T12:00:00Z");
+    }
+  });
+
   it("schedules completion-anchored tasks from the completion date", async () => {
     const { dom, sub, relId, subId } = await ctx.pair();
     await dom.post(`/relationships/${relId}/tasks`, task(subId, { schedule: { start: "2026-10-16", anchor: "completion", rule: { freq: "daily", interval: 3 } } }));

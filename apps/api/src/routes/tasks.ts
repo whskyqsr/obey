@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
@@ -152,7 +152,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const rows = await db
       .select()
       .from(taskSeries)
-      .where(and(eq(taskSeries.relationshipId, req.params.id), eq(taskSeries.active, true)))
+      .where(and(eq(taskSeries.relationshipId, req.params.id), eq(taskSeries.active, true), isNull(taskSeries.curfewUntil)))
       .orderBy(asc(taskSeries.title));
     return rows.map(taskDto);
   });
@@ -197,6 +197,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const [series] = await db.select().from(taskSeries).where(eq(taskSeries.id, req.params.id));
     if (!series) throw notFound();
     await requireManager(db, series.relationshipId, req.user.id);
+    if (series.curfewUntil) throw new HttpError(409, "change the curfew from Your dynamic");
     const body = parsePatch(taskInput.partial(), req.body);
     if (body.timezone) validZone(body.timezone);
     checkCount({ ...series, ...body });
@@ -228,6 +229,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const [series] = await db.select().from(taskSeries).where(eq(taskSeries.id, req.params.id));
     if (!series) throw notFound();
     await requireManager(db, series.relationshipId, req.user.id);
+    if (series.curfewUntil) throw new HttpError(409, "turn the curfew off from Your dynamic");
     await db.transaction(async (tx) => {
       await tx.update(taskSeries).set({ active: false, updatedAt: deps.now() }).where(eq(taskSeries.id, series.id));
       await tx
@@ -238,9 +240,10 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     reply.status(204);
   });
 
-  app.get<{ Params: { id: string }; Querystring: { from?: string; to?: string } }>("/relationships/:id/occurrences", async (req) => {
+  // Curfew nights aren't tasks, so lists leave them out; the phone asks for them to watch Home.
+  app.get<{ Params: { id: string }; Querystring: { from?: string; to?: string; curfew?: string } }>("/relationships/:id/occurrences", async (req) => {
     await requireMember(db, req.params.id, req.user.id);
-    const q = z.object({ from: plainDate, to: plainDate }).parse(req.query);
+    const q = z.object({ from: plainDate, to: plainDate, curfew: z.enum(["include"]).optional() }).parse(req.query);
     const span = (Date.parse(q.to) - Date.parse(q.from)) / 86_400_000;
     if (span < 0 || span > MAX_RANGE_DAYS) throw new HttpError(400, `range must be 0..${MAX_RANGE_DAYS} days`);
     await materializeRelationship(db, req.params.id, q.to, deps.now());
@@ -260,7 +263,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     return rows
       .filter(({ occ, series }) => {
         const d = localDate(occ.dueAt, series.timezone);
-        return d >= q.from && d <= q.to && occ.status !== "cancelled";
+        return d >= q.from && d <= q.to && occ.status !== "cancelled" && (q.curfew === "include" || !series.curfewUntil);
       })
       .map(({ occ, series }) => occurrenceDto(occ, series));
   });
@@ -346,7 +349,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const series = await db
       .select({ id: taskSeries.id, active: taskSeries.active, supersededBy: taskSeries.supersededBy })
       .from(taskSeries)
-      .where(eq(taskSeries.relationshipId, req.params.id));
+      .where(and(eq(taskSeries.relationshipId, req.params.id), isNull(taskSeries.curfewUntil)));
     const rootOf = new Map<string, string>();
     const next = new Map(series.map((s) => [s.id, s.supersededBy]));
     for (const s of series) {

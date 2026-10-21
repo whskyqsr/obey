@@ -112,14 +112,21 @@ export const locationRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const { occ, series } = await loadOccurrence(db, req.params.id, req.user.id);
     const result = await db.transaction((tx) => leaveFrom(tx, series, occ, req.user.id, body, deps.now()));
     if (result.leftEarly) {
+      const curfew = !!series.curfewUntil;
       await notifier.send([series.assigneeId], {
         title: "Fealty",
-        body: result.consequence ? "You left early, and a consequence was added" : "You left before your time was up",
+        body: curfew
+          ? result.consequence
+            ? "You left home during curfew, and a consequence was added"
+            : "You left home during curfew"
+          : result.consequence
+            ? "You left early, and a consequence was added"
+            : "You left before your time was up",
         data: { type: "occurrence_missed", occurrenceId: occ.id },
       });
       await notifier.send(await managers(db, series.relationshipId, req.user.id), {
         title: "Fealty",
-        body: `${req.user.displayName} left “${series.title}” early`,
+        body: curfew ? `${req.user.displayName} broke curfew` : `${req.user.displayName} left “${series.title}” early`,
         data: { type: "occurrence_missed", occurrenceId: occ.id },
       });
     } else if (result.occ.status === "completed" && occ.status === "pending") {

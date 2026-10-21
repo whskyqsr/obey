@@ -1,5 +1,5 @@
-import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
-import { localDate, opensOn } from "@obey/recurrence";
+import { and, eq, isNotNull, isNull, or } from "drizzle-orm";
+import { addDays, dueInstant, localDate, localTime, opensOn } from "@obey/recurrence";
 import type { Tx } from "../db/index.js";
 import { locationEvents, occurrences, places, taskSeries } from "../db/schema.js";
 import { HttpError, forbidden } from "../errors.js";
@@ -13,6 +13,20 @@ export function distanceM(a: { lat: number; lng: number }, b: { lat: number; lng
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
   return 2 * 6_371_000 * Math.asin(Math.sqrt(h));
 }
+
+/** A curfew night ends at the first `until` (local time) after it's due. */
+export function curfewEnd(dueAt: Date, until: string, zone: string): Date {
+  const day = localDate(dueAt, zone);
+  return dueInstant(until > localTime(dueAt, zone) ? day : addDays(day, 1), until, zone);
+}
+
+/** When the assignee may leave: a curfew's end, or the end of the stay once they've arrived; null when there's no stay. */
+export function stayEnd(series: Pick<Series, "curfewUntil" | "stayMinutes" | "timezone">, occ: Pick<Occurrence, "dueAt" | "arrivedAt">): Date | null {
+  if (series.curfewUntil) return curfewEnd(occ.dueAt, series.curfewUntil, series.timezone);
+  if (series.stayMinutes && occ.arrivedAt) return new Date(occ.arrivedAt.getTime() + series.stayMinutes * 60_000);
+  return null;
+}
+const hasStay = (series: Series) => !!series.curfewUntil || !!series.stayMinutes;
 
 /** A browser fix vaguer than this can't place someone at a 100 m spot. */
 export const CHECKIN_MAX_ACCURACY_M = 500;
@@ -40,7 +54,7 @@ export async function arriveAt(
   series: Series,
   occ: Occurrence,
   userId: string,
-  report: { kind: "enter" | "checkin"; lat: number; lng: number; accuracyM: number; at?: string },
+  report: { kind: "enter" | "checkin" | "tap"; lat?: number; lng?: number; accuracyM?: number; at?: string },
   now: Date,
 ): Promise<Occurrence> {
   if (!series.placeId) throw new HttpError(409, "this task isn't tied to a place");
@@ -54,28 +68,37 @@ export async function arriveAt(
   if (at.getTime() > occ.dueAt.getTime() + series.graceMinutes * 60_000) throw new HttpError(409, "the deadline has passed");
   const [place] = await db.select().from(places).where(eq(places.id, series.placeId));
   if (!place) throw new HttpError(409, "this task's place was deleted");
-  if (report.kind === "checkin" && report.accuracyM > CHECKIN_MAX_ACCURACY_M) throw new HttpError(422, "your location isn't precise enough; try from your phone");
-  // A fix is a circle, not a point: count it when that circle reaches the place's.
-  const slack = Math.min(report.accuracyM, report.kind === "checkin" ? 100 : 250);
-  if (distanceM(report, place) > place.radiusM + slack) throw new HttpError(422, `you're not at ${place.name} yet`);
+  // A tap is someone saying they're there when their phone can't check; the caller decides when that's allowed.
+  if (report.kind !== "tap") {
+    const fix = { lat: report.lat ?? 0, lng: report.lng ?? 0, accuracyM: report.accuracyM ?? 0 };
+    if (report.kind === "checkin" && fix.accuracyM > CHECKIN_MAX_ACCURACY_M) throw new HttpError(422, "your location isn't precise enough; try from your phone");
+    // A fix is a circle, not a point: count it when that circle reaches the place's.
+    const slack = Math.min(fix.accuracyM, report.kind === "checkin" ? 100 : 250);
+    if (distanceM(fix, place) > place.radiusM + slack) throw new HttpError(422, `you're not at ${place.name} yet`);
+  }
   await db.insert(locationEvents).values({ occurrenceId: occ.id, userId, kind: report.kind, lat: report.lat, lng: report.lng, accuracyM: report.accuracyM, at });
   const [arrived] = await db.update(occurrences).set({ arrivedAt: at }).where(eq(occurrences.id, occ.id)).returning();
-  if (!series.stayMinutes) return finishAt(db, series, arrived!, at);
-  const stayedUntil = new Date(at.getTime() + series.stayMinutes * 60_000);
-  return stayedUntil <= now ? finishAt(db, series, arrived!, stayedUntil) : arrived!;
+  const until = stayEnd(series, arrived!);
+  if (!until) return finishAt(db, series, arrived!, at);
+  return until <= now ? finishAt(db, series, arrived!, until) : arrived!;
 }
 
 /**
- * The assignee's phone noticed them leaving the place. Before the stay is up that's a miss ("left early");
- * otherwise, and when they hadn't arrived, it changes nothing. Returns the occurrence and any consequence it handed out.
+ * The assignee's phone noticed them leaving the place. Before the stay is up that's a miss ("left early", or a broken
+ * curfew); otherwise, and when they hadn't arrived, it changes nothing. Leaving home before curfew starts just means
+ * they have to be back by then. Returns the occurrence and any consequence it handed out.
  */
 export async function leaveFrom(db: Tx, series: Series, occ: Occurrence, userId: string, report: { at?: string }, now: Date) {
   if (!series.placeId) throw new HttpError(409, "this task isn't tied to a place");
   if (userId !== series.assigneeId) throw forbidden("only the assignee can report this");
   const at = reportedAt(report.at, now);
   await db.insert(locationEvents).values({ occurrenceId: occ.id, userId, kind: "exit", at });
-  if (occ.status !== "pending" || !occ.arrivedAt || occ.leftAt || !series.stayMinutes || at < occ.arrivedAt) return { occ, consequence: null, leftEarly: false };
-  const stayedUntil = new Date(occ.arrivedAt.getTime() + series.stayMinutes * 60_000);
+  if (occ.status !== "pending" || !occ.arrivedAt || occ.leftAt || !hasStay(series) || at < occ.arrivedAt) return { occ, consequence: null, leftEarly: false };
+  if (series.curfewUntil && at < occ.dueAt) {
+    const [out] = await db.update(occurrences).set({ arrivedAt: null }).where(eq(occurrences.id, occ.id)).returning();
+    return { occ: out!, consequence: null, leftEarly: false };
+  }
+  const stayedUntil = stayEnd(series, occ)!;
   if (at >= stayedUntil) return { occ: await finishAt(db, series, occ, stayedUntil), consequence: null, leftEarly: false };
   const [missed] = await db
     .update(occurrences)
@@ -86,9 +109,9 @@ export async function leaveFrom(db: Tx, series: Series, occ: Occurrence, userId:
   return { occ: missed, consequence: await applyMiss(db, series, missed, now), leftEarly: true };
 }
 
-/** Completes location tasks whose assignee has stayed as long as asked. Run by the worker before misses are marked. */
+/** Completes location tasks and curfew nights whose assignee has stayed as long as asked. Run by the worker before misses are marked. */
 export async function finishStays(db: Tx, now: Date) {
-  const due = await db
+  const staying = await db
     .select({ occ: occurrences, series: taskSeries })
     .from(occurrences)
     .innerJoin(taskSeries, eq(occurrences.seriesId, taskSeries.id))
@@ -98,14 +121,13 @@ export async function finishStays(db: Tx, now: Date) {
         isNotNull(occurrences.arrivedAt),
         isNull(occurrences.leftAt),
         isNotNull(taskSeries.placeId),
-        isNotNull(taskSeries.stayMinutes),
-        sql`${occurrences.arrivedAt} + make_interval(mins => ${taskSeries.stayMinutes}) <= ${now.toISOString()}::timestamptz`,
+        or(isNotNull(taskSeries.stayMinutes), isNotNull(taskSeries.curfewUntil)),
       ),
     );
   const done: { occ: Occurrence; series: Series }[] = [];
-  for (const { occ, series } of due) {
-    const stayedUntil = new Date(occ.arrivedAt!.getTime() + series.stayMinutes! * 60_000);
-    done.push({ occ: await finishAt(db, series, occ, stayedUntil), series });
+  for (const { occ, series } of staying) {
+    const stayedUntil = stayEnd(series, occ)!;
+    if (stayedUntil <= now) done.push({ occ: await finishAt(db, series, occ, stayedUntil), series });
   }
   return done;
 }
