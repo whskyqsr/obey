@@ -254,7 +254,8 @@ fun PlanEndSheet(clash: CurfewClash, busy: Boolean, onDismiss: () -> Unit, onCha
             Summary(Icons.Outlined.Event, "${starts.local().format(planDay)}, ${formatTime(clash.eventStartsAt)} – ${formatTime(it.iso())}", "Was until ${formatTime(clash.eventEndsAt)}")
         }
         Text(
-            "They're told the plan now ends at ${endsAt?.let { formatTime(it.iso()) } ?: "the new time"}.",
+            "They're told the plan now ends at ${endsAt?.let { formatTime(it.iso()) } ?: "the new time"}. " +
+                if (endsAt?.isAfter(due) == true) "Curfew moves to ${formatTime(endsAt!!.iso())} that night." else "Curfew stays at ${formatTime(clash.dueAt)}.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
