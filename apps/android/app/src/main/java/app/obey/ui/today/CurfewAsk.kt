@@ -169,10 +169,10 @@ fun MoreTimeSheet(night: CurfewNight, who: String, busy: Boolean, onDismiss: () 
             Button(onClick = { until?.let { onAsk(it.iso(), reason.trim().ifEmpty { null }) } }, enabled = until != null && !busy) { Text("Ask $who") }
         },
     ) {
+        OutlinedTextField(reason, { reason = it.take(280) }, label = { Text("Tell $who why (optional)") }, modifier = Modifier.fillMaxWidth())
         Text("Curfew is $dueLabel. Ask $who to make it:", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         TimeChoices(options, until, due, end) { until = it }
         until?.let { Summary(Icons.Filled.Home, "Home by ${formatTime(it.iso())} tonight", "Still in until ${formatTime(night.endsAt)}") }
-        OutlinedTextField(reason, { reason = it.take(280) }, label = { Text("Reason (optional)") }, modifier = Modifier.fillMaxWidth())
         Text(
             "Only tonight. If $who hasn't answered by $dueLabel, curfew stays at $dueLabel.",
             style = MaterialTheme.typography.bodySmall,
