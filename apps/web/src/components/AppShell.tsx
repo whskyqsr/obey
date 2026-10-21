@@ -2,6 +2,7 @@ import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import type { Features } from "../api/types";
 import { useRel } from "../lib/relationship";
 import { useNeedsYou } from "../lib/today";
+import { BrandMark } from "./BrandMark";
 import { Icon, cx } from "./ui";
 
 interface Dest {
@@ -99,9 +100,7 @@ export function AppShell() {
       {/* Navigation drawer (large): one list, with Settings at the bottom */}
       <nav className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col gap-1 overflow-y-auto border-r border-outline-variant/40 bg-surface px-3 py-4 lg:flex">
         <Link to="/" className="mb-3 flex items-center gap-3 px-3" title={title}>
-          <span className="flex size-10 items-center justify-center rounded-md bg-primary-container text-on-primary-container">
-            <Icon name="link" filled />
-          </span>
+          <BrandMark className="size-10 rounded-md" />
           <span className="text-title-large text-on-surface">Fealty</span>
         </Link>
         {all
@@ -119,8 +118,8 @@ export function AppShell() {
 
       {/* Navigation rail (medium) */}
       <nav className="fixed inset-y-0 left-0 z-30 hidden w-24 flex-col items-center gap-3 overflow-y-auto bg-surface pt-4 pb-4 md:flex lg:hidden">
-        <Link to="/" className="mb-4 flex size-14 items-center justify-center rounded-lg bg-primary-container text-on-primary-container" title={title}>
-          <Icon name="link" filled />
+        <Link to="/" className="mb-4" title={title}>
+          <BrandMark className="size-14 rounded-lg" />
         </Link>
         {all.map((d) => (
           <NavItem key={d.to} d={d} active={isActive(pathname, d.to, more)} badge={d.to === "/" ? todayBadge : 0} />

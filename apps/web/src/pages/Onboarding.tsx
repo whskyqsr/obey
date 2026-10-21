@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useCreateRelationship, useJoinRelationship } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { Role } from "../api/types";
+import { BrandMark } from "../components/BrandMark";
 import { Button, Icon, SegmentedButtons, TextField, cx } from "../components/ui";
 import { parseInvite } from "../lib/invite";
 import { ROLE_LABEL } from "../lib/relationship";
@@ -87,7 +88,7 @@ function FirstRun() {
       <div className="w-full max-w-lg rounded-xl bg-surface p-6 shadow-elev-1 sm:p-8">
         {stage === "choose" && (
           <>
-            <Icon name="favorite" filled size={40} className="mb-4 text-primary" />
+            <BrandMark className="mb-4 size-12 rounded-md" />
             <h1 className="text-headline-medium text-on-surface">Welcome to Fealty</h1>
             <p className="mt-2 mb-6 text-body-large text-on-surface-variant">Tasks, rules and rewards for your dynamic, shared between the two of you.</p>
             <div className="flex flex-col gap-3">
