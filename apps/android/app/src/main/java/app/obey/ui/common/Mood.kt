@@ -229,7 +229,7 @@ private fun MoodChart(entries: List<MoodEntry>, days: Int) {
                     drawPath(path, colors.primary, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
                 }
                 pts.forEachIndexed { i, p ->
-                    val r = (if (i == selected) 6 else 4.5f).dp.toPx()
+                    val r = (if (i == selected) 6f else 4.5f).dp.toPx()
                     if (entries[i].source == "checkin") {
                         drawCircle(colors.surfaceContainerLow, r + 2.dp.toPx(), p)
                         drawCircle(colors.primary, r, p)
