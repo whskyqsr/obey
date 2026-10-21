@@ -422,6 +422,30 @@ interface ObeyApi {
     @POST("curfew-requests/{id}/decline")
     suspend fun declineCurfew(@Path("id") requestId: String, @Body body: Map<String, String> = emptyMap()): CurfewRequest
 
+    // Agreement
+    @GET("relationships/{id}/agreement")
+    suspend fun agreement(@Path("id") relationshipId: String): Agreement
+
+    @GET("agreement-versions/{id}")
+    suspend fun agreementVersion(@Path("id") id: String): AgreementVersion
+
+    @GET("relationships/{id}/agreement/template")
+    suspend fun agreementTemplate(@Path("id") relationshipId: String): AgreementTemplate
+
+    /** Proposes a version, or edits the open proposal; whoever sends it has agreed to it. */
+    @POST("relationships/{id}/agreement")
+    suspend fun proposeAgreement(@Path("id") relationshipId: String, @Body body: AgreementInput): AgreementVersion
+
+    @POST("agreement-versions/{id}/agree")
+    suspend fun agreeToAgreement(@Path("id") id: String, @Body body: Map<String, String> = emptyMap()): AgreementVersion
+
+    @POST("agreement-versions/{id}/request-changes")
+    suspend fun requestAgreementChanges(@Path("id") id: String, @Body body: AgreementFeedbackInput): AgreementVersion
+
+    /** Withdraws an open proposal; only whoever proposed it can. */
+    @DELETE("agreement-versions/{id}")
+    suspend fun withdrawAgreement(@Path("id") id: String)
+
     // Push
     @POST("devices")
     suspend fun registerDevice(@Body body: RegisterDeviceInput)

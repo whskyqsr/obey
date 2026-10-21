@@ -53,9 +53,11 @@ class ObeyMessagingService : FirebaseMessagingService() {
         ) return
 
         val setup = message.data["type"] == "location_setup"
+        val agreement = message.data["type"] in setOf("agreement_proposed", "agreement_agreed", "agreement_changes")
         val intent = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
         if (setup) intent.putExtra(PendingNav.EXTRA, PendingNav.LOCATION)
-        val pending = PendingIntent.getActivity(this, if (setup) 1 else 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        if (agreement) intent.putExtra(PendingNav.EXTRA, PendingNav.AGREEMENT)
+        val pending = PendingIntent.getActivity(this, if (setup) 1 else if (agreement) 2 else 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val quiet = message.data["quiet"] == "1"
         val channel = getString(if (quiet) R.string.notification_channel_quiet else R.string.notification_channel_default)
         val notification = NotificationCompat.Builder(this, channel)

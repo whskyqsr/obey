@@ -140,7 +140,7 @@ private fun Summary(icon: ImageVector, title: String, body: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun Sheet(icon: ImageVector, title: String, onDismiss: () -> Unit, actions: @Composable () -> Unit, content: @Composable () -> Unit) {
+internal fun Sheet(icon: ImageVector, title: String, onDismiss: () -> Unit, actions: @Composable () -> Unit, content: @Composable () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)

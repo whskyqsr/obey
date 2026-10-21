@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 object PendingNav {
     const val EXTRA = "app.obey.open"
     const val LOCATION = "location"
+    const val AGREEMENT = "agreement"
 
     val target = MutableStateFlow<String?>(null)
 }

@@ -204,6 +204,7 @@ data class Features(
     val stats: Boolean = true,
     val review: Boolean = true,
     val location: Boolean = true,
+    val agreement: Boolean = true,
 )
 
 /** The relationship's name, or the partners' names when it has none. */
@@ -1236,3 +1237,78 @@ data class CurfewCheck(val night: CurfewCheckNight? = null)
 
 @Serializable
 data class ExcuseCurfewInput(val occurrenceId: String)
+
+/** A section of the agreement as it's proposed. Text bodies are plain lines ("- " starts a bullet); rules and protocols sections list those pages. */
+@Serializable
+data class AgreementSectionInput(val id: String, val kind: String = "text", val title: String, val body: String = "", val noteId: String? = null)
+
+/** Proposing a version: the whole page, a review date (YYYY-MM-DD), and a line for the partner about what changed. */
+@Serializable
+data class AgreementInput(val sections: List<AgreementSectionInput>, val reviewBy: String? = null, val note: String = "")
+
+@Serializable
+data class AgreementFeedbackInput(val note: String)
+
+/** A line of a section against the version in force before it: "same", "add" or "del". */
+@Serializable
+data class AgreementLine(val op: String, val text: String)
+
+@Serializable
+data class AgreementSection(
+    val id: String,
+    /** "text", "rules" or "protocols". */
+    val kind: String = "text",
+    val title: String,
+    val body: String = "",
+    val noteId: String? = null,
+    val noteTitle: String? = null,
+    val items: List<String> = emptyList(),
+    /** "new", "changed" or "same", against the version before. */
+    val change: String = "same",
+    val lines: List<AgreementLine> = emptyList(),
+)
+
+@Serializable
+data class AgreementSignature(val userId: String, val agreedAt: String)
+
+@Serializable
+data class AgreementFeedback(val userId: String? = null, val note: String = "", val at: String)
+
+@Serializable
+data class AgreementVersion(
+    val id: String,
+    val relationshipId: String,
+    val number: Int,
+    /** "proposed", "changes_requested", "agreed" or "superseded". */
+    val status: String,
+    val sections: List<AgreementSection> = emptyList(),
+    val removed: List<String> = emptyList(),
+    val changes: Int = 0,
+    val reviewBy: String? = null,
+    val note: String = "",
+    val proposedBy: String? = null,
+    val proposedAt: String,
+    val agreements: List<AgreementSignature> = emptyList(),
+    val agreedAt: String? = null,
+    val feedback: AgreementFeedback? = null,
+) {
+    val open: Boolean get() = status == "proposed" || status == "changes_requested"
+}
+
+@Serializable
+data class AgreementVersionSummary(
+    val id: String,
+    val number: Int,
+    val status: String,
+    val proposedBy: String? = null,
+    val proposedAt: String,
+    val agreedAt: String? = null,
+    val changes: Int = 0,
+)
+
+/** The version in force, the open proposal if there is one, and every version newest first. */
+@Serializable
+data class Agreement(val current: AgreementVersion? = null, val proposal: AgreementVersion? = null, val versions: List<AgreementVersionSummary> = emptyList())
+
+@Serializable
+data class AgreementTemplate(val sections: List<AgreementSectionInput>)
