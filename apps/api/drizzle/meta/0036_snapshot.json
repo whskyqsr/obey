@@ -1,5 +1,5 @@
 {
-  "id": "efe1425b-48b6-49a2-990e-44649edc9b79",
+  "id": "0252fc1c-3f8e-4977-be25-44134d1f8fb5",
   "prevId": "cc7d4feb-9e15-4d21-9076-537db0e1660a",
   "version": "7",
   "dialect": "postgresql",
@@ -3390,6 +3390,46 @@
         }
       },
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.usage_daily": {
+      "name": "usage_daily",
+      "schema": "",
+      "columns": {
+        "day": {
+          "name": "day",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "count": {
+          "name": "count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "usage_daily_day_kind_pk": {
+          "name": "usage_daily_day_kind_pk",
+          "columns": [
+            "day",
+            "kind"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},

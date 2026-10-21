@@ -23,6 +23,7 @@ import { relationshipRoutes } from "./routes/relationships.js";
 import { statsRoutes } from "./routes/stats.js";
 import { monthRoutes } from "./routes/months.js";
 import { taskRoutes } from "./routes/tasks.js";
+import type { Geocoder } from "./services/geocode.js";
 
 export interface Deps {
   db: Db;
@@ -37,6 +38,8 @@ export interface Deps {
   sendVerification?: ((email: string) => Promise<void>) | null;
   /** Removes a sign-in from Firebase by its uid; null when the API has no service account. */
   deleteSignIn?: ((authUid: string) => Promise<void>) | null;
+  /** Address search for places; defaults to Photon. Tests pass a stub. */
+  geocode?: Geocoder;
   logger?: boolean;
 }
 

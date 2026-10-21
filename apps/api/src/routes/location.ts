@@ -6,7 +6,9 @@ import { memberships, places, taskSeries, users } from "../db/schema.js";
 import { HttpError, notFound, parsePatch } from "../errors.js";
 import { occurrenceDto } from "../serialize.js";
 import { managers, requireManager, requireMember } from "../services/access.js";
+import { photonGeocoder } from "../services/geocode.js";
 import { arriveAt, leaveFrom } from "../services/location.js";
+import { countUsage } from "../services/usage.js";
 import { loadOccurrence } from "./tasks.js";
 
 /**
@@ -46,6 +48,22 @@ export const locationRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const rows = await db.select().from(places).where(eq(places.relationshipId, req.params.id)).orderBy(asc(places.name));
     const titles = await titlesFor(req.params.id);
     return rows.map((p) => placeDto(p, titles(p.id)));
+  });
+
+  // Search goes through here, not straight from the apps, so it's counted and the service can change without an app update.
+  app.get<{ Querystring: { q?: string; lat?: string; lng?: string } }>("/places/search", async (req) => {
+    const q = (req.query.q ?? "").trim().slice(0, 200);
+    if (q.length < 3) return [];
+    const lat = Number(req.query.lat);
+    const lng = Number(req.query.lng);
+    const near = req.query.lat && req.query.lng && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null;
+    await countUsage(db, "place_search", deps.now());
+    try {
+      return await (deps.geocode ?? photonGeocoder)(q, near);
+    } catch (err) {
+      req.log.warn({ err }, "place search failed");
+      throw new HttpError(502, "search isn't working right now; drag the map to the spot instead");
+    }
   });
 
   app.post<{ Params: { id: string } }>("/relationships/:id/places", async (req, reply) => {

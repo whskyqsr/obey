@@ -70,6 +70,9 @@ data class TaskForm(
     val countTo: String = "5",
     /** "task" or "count": points and penalties once, or for each one. */
     val countPer: String = "task",
+    /** A location task: done by getting to this place by the due time, and staying [stayMinutes] if set. */
+    val placeId: String? = null,
+    val stayMinutes: Int? = null,
 ) {
     /** The bounds this form describes; both null for an ordinary task. */
     val countBounds: Pair<Int?, Int?> get() {
@@ -193,6 +196,8 @@ class TaskEditorViewModel @Inject constructor(
         countN = (t.countMin ?: t.countMax ?: 3).toString(),
         countTo = (t.countMax ?: 5).toString(),
         countPer = t.countPer,
+        placeId = t.placeId,
+        stayMinutes = t.stayMinutes,
     )
 
     fun update(change: (TaskForm) -> TaskForm) = _form.update(change)
@@ -214,20 +219,23 @@ class TaskEditorViewModel @Inject constructor(
             consequenceId = f.consequenceId,
             consequenceDueDays = f.consequenceDueDays,
             consequenceDueTime = f.consequenceDueTime?.format(DateTimeFormatter.ofPattern("HH:mm")),
-            proofRequired = f.proofRequired,
+            // Getting there is the proof; a location task takes no proof, mood or journal entry.
+            proofRequired = f.proofRequired && f.placeId == null,
             approvalRequired = f.approvalRequired,
             schedule = f.recurrence.toSchedule(f.start),
             dueTime = if (f.allDay) null else f.dueTime.format(DateTimeFormatter.ofPattern("HH:mm")),
             timezone = f.timezone,
             graceMinutes = f.effectiveGrace,
-            steps = f.steps.map { it.copy(title = it.title.trim()) }.filter { it.title.isNotEmpty() },
+            steps = if (f.placeId != null) emptyList() else f.steps.map { it.copy(title = it.title.trim()) }.filter { it.title.isNotEmpty() },
             // A window counts back from a due time, so an all-day task has none.
             windowMinutes = if (f.allDay) null else f.windowMinutes,
-            askMood = f.askMood,
-            asksJournal = f.asksJournal,
-            countMin = f.countBounds.first,
-            countMax = f.countBounds.second,
+            askMood = f.askMood && f.placeId == null,
+            asksJournal = f.asksJournal && f.placeId == null,
+            countMin = if (f.placeId != null) null else f.countBounds.first,
+            countMax = if (f.placeId != null) null else f.countBounds.second,
             countPer = f.countPer,
+            placeId = f.placeId,
+            stayMinutes = f.placeId?.let { f.stayMinutes?.coerceIn(5, 720) },
         )
         action {
             if (original == null) api.createTask(sessions.requireRelationshipId(), input)

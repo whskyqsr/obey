@@ -22,7 +22,11 @@ class RootViewModel @Inject constructor(
     private val sessions: SessionRepository,
     private val registrar: DeviceRegistrar,
     settings: app.obey.data.SettingsStore,
+    private val watcher: app.obey.location.LocationWatcher,
+    placeStore: app.obey.location.PlaceStore,
 ) : ViewModel() {
+    /** Each dynamic's places, for showing location tasks' places by name. */
+    val places = placeStore.byRelationship
     /** null until the first auth state arrives, so we don't flash the sign-in screen. */
     val authState: StateFlow<AuthState?> = auth.state.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val session: StateFlow<SessionState> = sessions.state
@@ -39,6 +43,8 @@ class RootViewModel @Inject constructor(
                 } else {
                     sessions.refresh()
                     if (state is AuthState.Firebase) registrar.register()
+                    // Geofences go up (or come down) for the account now signed in.
+                    launch { watcher.sync() }
                 }
             }
         }

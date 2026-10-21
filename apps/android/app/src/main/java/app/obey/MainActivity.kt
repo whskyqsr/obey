@@ -28,12 +28,14 @@ class MainActivity : FragmentActivity() {
     @Inject lateinit var appLock: AppLock
     @Inject lateinit var settings: SettingsStore
     @Inject lateinit var appIcons: AppIcons
+    @Inject lateinit var location: app.obey.location.LocationWatcher
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         // A small blocking read on launch: drawing first and locking a frame later would flash the content.
         appLock.launch(runBlocking { settings.appLock.first() })
+        openFrom(intent)
         setContent {
             ObeyTheme {
                 val locked by appLock.locked.collectAsStateWithLifecycle()
@@ -45,6 +47,15 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        openFrom(intent)
+    }
+
+    private fun openFrom(intent: android.content.Intent?) {
+        intent?.getStringExtra(app.obey.push.PendingNav.EXTRA)?.let { app.obey.push.PendingNav.target.value = it }
     }
 
     private var prompting = false
@@ -62,6 +73,8 @@ class MainActivity : FragmentActivity() {
         super.onStart()
         lifecycleScope.launch {
             appLock.onForeground()
+            // Location may have been switched off or allowed while away.
+            launch { location.sync() }
             // Keep the recent-apps thumbnail blank while the lock is on.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) setRecentsScreenshotEnabled(!settings.appLock.first())
         }

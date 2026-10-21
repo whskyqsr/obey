@@ -32,6 +32,7 @@ class ObeyMessagingService : FirebaseMessagingService() {
     @Inject lateinit var registrar: DeviceRegistrar
     @Inject lateinit var appIcons: AppIcons
     @Inject lateinit var settings: SettingsStore
+    @Inject lateinit var location: app.obey.location.LocationWatcher
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -42,6 +43,8 @@ class ObeyMessagingService : FirebaseMessagingService() {
     @SuppressLint("MissingPermission") // checked just below for API 33+
     override fun onMessageReceived(message: RemoteMessage) {
         scope.launch { settings.markPushReceived() }
+        // A new or changed task may name a place, or a pause may have ended; geofences follow the server.
+        scope.launch { location.sync() }
         // Always the launcher name, so a discreet icon isn't given away by an "Obey" title.
         val title = appIcons.currentLabel()
         val body = message.notification?.body ?: message.data["body"] ?: "You have an update"
@@ -49,8 +52,10 @@ class ObeyMessagingService : FirebaseMessagingService() {
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return
 
+        val setup = message.data["type"] == "location_setup"
         val intent = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        val pending = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+        if (setup) intent.putExtra(PendingNav.EXTRA, PendingNav.LOCATION)
+        val pending = PendingIntent.getActivity(this, if (setup) 1 else 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val quiet = message.data["quiet"] == "1"
         val channel = getString(if (quiet) R.string.notification_channel_quiet else R.string.notification_channel_default)
         val notification = NotificationCompat.Builder(this, channel)

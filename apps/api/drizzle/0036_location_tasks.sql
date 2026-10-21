@@ -22,6 +22,13 @@ CREATE TABLE "places" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "usage_daily" (
+	"day" date NOT NULL,
+	"kind" text NOT NULL,
+	"count" integer DEFAULT 0 NOT NULL,
+	CONSTRAINT "usage_daily_day_kind_pk" PRIMARY KEY("day","kind")
+);
+--> statement-breakpoint
 ALTER TABLE "memberships" ADD COLUMN "location_paused_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "memberships" ADD COLUMN "location_paused_until" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "occurrences" ADD COLUMN "arrived_at" timestamp with time zone;--> statement-breakpoint

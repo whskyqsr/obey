@@ -483,6 +483,19 @@ describe("tasks and occurrences", () => {
     }
   });
 
+  it("searches places through the server and counts each search for the admin", async () => {
+    const { dom } = await ctx.pair();
+    expect((await dom.get("/places/search?q=gy")).body).toEqual([]);
+    const found = await dom.get("/places/search?q=Gym%20on%205th&lat=40.7&lng=-74");
+    expect(found.status).toBe(200);
+    expect(found.body).toEqual([{ name: "Gym on 5th", address: "Near you", lat: 40.7, lng: -74 }]);
+    await dom.get("/places/search?q=Work");
+    expect((await dom.get("/admin/usage")).status).toBe(404);
+    const mod = { "x-dev-user": crypto.randomUUID(), "x-dev-email": "mod@example.com" };
+    const usage = (await ctx.app.inject({ method: "GET", url: "/admin/usage", headers: mod })).json();
+    expect(usage).toEqual([{ day: "2026-10-16", kind: "place_search", count: 2 }]);
+  });
+
   it("runs location tasks: places, arriving in time, staying, leaving early, and pausing", async () => {
     const { dom, sub, relId, subId } = await ctx.pair();
     const opts = { materializeDays: 14, reminderLeadMinutes: 30 };

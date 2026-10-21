@@ -629,3 +629,14 @@ export const monthPrompts = pgTable(
   },
   (t) => [primaryKey({ columns: [t.relationshipId, t.month, t.userId] })],
 );
+
+/** Calls to outside services by day (address search, for now), to notice before a free service is outgrown. */
+export const usageDaily = pgTable(
+  "usage_daily",
+  {
+    day: date("day").notNull(),
+    kind: text("kind").notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.day, t.kind] })],
+);

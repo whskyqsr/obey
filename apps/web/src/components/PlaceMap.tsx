@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import type maplibregl from "maplibre-gl";
-import type { Place, PlaceInput } from "../api/types";
+import type { Place, PlaceInput, PlaceSearchResult } from "../api/types";
 import { useDeletePlace, useSavePlace } from "../api/hooks";
-import { errorMessage } from "../api/client";
+import { api, errorMessage } from "../api/client";
 import { useRel } from "../lib/relationship";
 import { Button, Dialog, Icon, IconButton, TextField, cx, useSnackbar } from "./ui";
 
 /** Free OpenStreetMap tiles; no key or billing account needed. */
 const STYLE = "https://tiles.openfreemap.org/styles/liberty";
-/** Free address search over OpenStreetMap. */
-const SEARCH = "https://photon.komoot.io/api/";
 export const MIN_RADIUS = 100;
 export const MAX_RADIUS = 2000;
 
@@ -126,42 +124,20 @@ export function PlaceMap({
   );
 }
 
-interface Found {
-  name: string;
-  address: string;
-  lat: number;
-  lng: number;
-}
-
-/** Looks up addresses and businesses, nearest to [near] first. */
+/** Looks up addresses and businesses, nearest to [near] first, through our server. */
 function useAddressSearch(q: string, near: { lat: number; lng: number }) {
-  const [found, setFound] = useState<Found[]>([]);
+  const [found, setFound] = useState<PlaceSearchResult[]>([]);
   useEffect(() => {
     if (q.trim().length < 3) return setFound([]);
-    const ctl = new AbortController();
+    let gone = false;
     const t = setTimeout(() => {
-      const url = `${SEARCH}?${new URLSearchParams({ q, limit: "5", lat: String(near.lat), lon: String(near.lng) })}`;
-      fetch(url, { signal: ctl.signal })
-        .then((r) => r.json())
-        .then((j: { features: { geometry: { coordinates: [number, number] }; properties: Record<string, string | undefined> }[] }) =>
-          setFound(
-            j.features.map((f) => {
-              const p = f.properties;
-              const street = [p.housenumber, p.street].filter(Boolean).join(" ");
-              return {
-                name: p.name ?? street ?? "",
-                address: [p.name ? street : null, p.city, p.state].filter(Boolean).join(", "),
-                lat: f.geometry.coordinates[1],
-                lng: f.geometry.coordinates[0],
-              };
-            }),
-          ),
-        )
+      api<PlaceSearchResult[]>(`/places/search?${new URLSearchParams({ q, lat: String(near.lat), lng: String(near.lng) })}`)
+        .then((r) => !gone && setFound(r))
         .catch(() => undefined);
     }, 350);
     return () => {
+      gone = true;
       clearTimeout(t);
-      ctl.abort();
     };
     // Only a new query searches again.
     // eslint-disable-next-line react-hooks/exhaustive-deps

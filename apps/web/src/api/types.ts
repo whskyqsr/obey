@@ -19,6 +19,7 @@ export type DynamicDate = c.DynamicDate;
 export type Features = c.Features;
 export type Place = c.Place;
 export type PlaceInput = z.infer<typeof c.placeInput>;
+export type PlaceSearchResult = c.PlaceSearchResult;
 export type LocationStatus = c.LocationStatus;
 export type DynamicStats = c.DynamicStats;
 export type Tally = c.Tally;

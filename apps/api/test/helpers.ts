@@ -25,6 +25,7 @@ export async function setup() {
     materializeDays: 14,
     adminEmails: ["mod@example.com"],
     sendVerification: async (email) => void verificationEmails.push(email),
+    geocode: async (q, near) => [{ name: q, address: near ? "Near you" : "Anywhere", lat: 40.7, lng: -74 }],
   });
   await app.ready();
 

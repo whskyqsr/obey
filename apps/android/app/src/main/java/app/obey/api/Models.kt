@@ -141,7 +141,26 @@ data class Created(val id: String)
 data class DynamicDate(val id: String, val label: String, val date: String)
 
 @Serializable
-data class Member(val userId: String, val displayName: String, val role: Role, val avatarVersion: String? = null)
+data class Member(
+    val userId: String,
+    val displayName: String,
+    val role: Role,
+    val avatarVersion: String? = null,
+    /** What their Android app last reported about location; null when it never has. */
+    val locationStatus: LocationStatus? = null,
+    /** Location watching paused by them; [locationPausedUntil] null means until they turn it back on. */
+    val locationPaused: Boolean = false,
+    val locationPausedUntil: String? = null,
+)
+
+/** Whether this phone can notice arriving at and leaving places while Fealty is closed. */
+@Serializable
+enum class LocationStatus {
+    @SerialName("ready") Ready,
+    @SerialName("foreground_only") ForegroundOnly,
+    @SerialName("denied") Denied,
+    @SerialName("services_off") ServicesOff,
+}
 
 @Serializable
 data class Relationship(
@@ -177,6 +196,7 @@ data class Features(
     val journal: Boolean = true,
     val stats: Boolean = true,
     val review: Boolean = true,
+    val location: Boolean = true,
 )
 
 /** The relationship's name, or the partners' names when it has none. */
@@ -278,6 +298,10 @@ data class TaskInput(
     val countMax: Int? = null,
     /** "task" books points and penalties once; "count" for each one counted, short or over. */
     val countPer: String = "task",
+    /** A location task: done by getting to this place by the due time. */
+    val placeId: String? = null,
+    /** With a place: how long to stay once there; leaving sooner is a miss. */
+    val stayMinutes: Int? = null,
 )
 
 @Serializable
@@ -307,6 +331,8 @@ data class Task(
     val countMin: Int? = null,
     val countMax: Int? = null,
     val countPer: String = "task",
+    val placeId: String? = null,
+    val stayMinutes: Int? = null,
     /** Set when this one-off task is a consequence handed out on its own. */
     val assignedConsequenceId: String? = null,
     val active: Boolean,
@@ -319,7 +345,7 @@ data class Task(
         consequenceDueTime = consequenceDueTime, proofRequired = proofRequired,
         approvalRequired = approvalRequired, schedule = schedule, dueTime = dueTime, timezone = timezone,
         graceMinutes = graceMinutes, steps = steps, windowMinutes = windowMinutes, askMood = askMood, asksJournal = asksJournal,
-        countMin = countMin, countMax = countMax, countPer = countPer,
+        countMin = countMin, countMax = countMax, countPer = countPer, placeId = placeId, stayMinutes = stayMinutes,
     )
 }
 
@@ -373,9 +399,20 @@ data class Occurrence(
     val countMax: Int? = null,
     val countPer: String = "task",
     val count: Int = 0,
+    /** A location task's place and stay, when they got there, and when they left before the stay was up. */
+    val placeId: String? = null,
+    val stayMinutes: Int? = null,
+    val arrivedAt: String? = null,
+    val leftAt: String? = null,
     /** Done on this phone with no signal and not sent yet; never from the server. */
     @kotlinx.serialization.Transient val waitingToSync: Boolean = false,
 ) {
+    /** Done by getting to a place (and staying, if it says so) rather than by tapping done. */
+    val isPlaced: Boolean get() = placeId != null
+
+    /** At the place now, waiting out the stay. */
+    val isStaying: Boolean get() = status == OccurrenceStatus.Pending && arrivedAt != null && stayMinutes != null
+
     /** Marked once each time it's done (cups of water, edges) instead of once. */
     val isCounted: Boolean get() = countMin != null || countMax != null
 
@@ -982,3 +1019,54 @@ data class SafeCalls(val active: SafeCall? = null, val recent: List<SafeCall> = 
 
 @Serializable
 data class SafeCallInput(val level: SafeLevel, val note: String = "")
+
+/** A spot a Dominant saved for location tasks; arriving anywhere inside the radius counts. */
+@Serializable
+data class PlaceInput(
+    val name: String,
+    val address: String? = null,
+    val lat: Double,
+    val lng: Double,
+    val radiusM: Int = 150,
+)
+
+@Serializable
+data class Place(
+    val id: String,
+    val relationshipId: String,
+    val name: String,
+    val address: String? = null,
+    val lat: Double,
+    val lng: Double,
+    val radiusM: Int,
+    val createdAt: String,
+    /** Active tasks that use it. */
+    val taskTitles: List<String> = emptyList(),
+) {
+    fun toInput() = PlaceInput(name = name, address = address, lat = lat, lng = lng, radiusM = radiusM)
+}
+
+/** An address or business from place search, nearest first. */
+@Serializable
+data class PlaceSearchResult(val name: String, val address: String, val lat: Double, val lng: Double)
+
+/** The phone noticed arriving at a task's place ("enter"), or the person tapped I'm here ("checkin"). */
+@Serializable
+data class ArriveOccurrenceInput(
+    val kind: String,
+    val lat: Double,
+    val lng: Double,
+    val accuracyM: Int,
+    /** When it happened, if it was held back offline. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val at: String? = null,
+)
+
+@Serializable
+data class LeaveOccurrenceInput(@EncodeDefault(EncodeDefault.Mode.NEVER) val at: String? = null)
+
+@Serializable
+data class ReportLocationInput(val status: LocationStatus)
+
+/** [until] null pauses until it's turned back on. */
+@Serializable
+data class PauseLocationInput(val until: String?)

@@ -300,6 +300,10 @@ export const place = placeInput.extend({
 });
 export type Place = z.infer<typeof place>;
 
+/** An address or business from place search, nearest the searcher first. */
+export const placeSearchResult = z.object({ name: z.string(), address: z.string(), lat: z.number(), lng: z.number() });
+export type PlaceSearchResult = z.infer<typeof placeSearchResult>;
+
 /** A phone reporting arrival at a task's place (`enter`), or a browser's one-off "I'm here" (`checkin`). */
 export const arriveOccurrence = z.object({
   kind: z.enum(["enter", "checkin"]),
