@@ -164,9 +164,10 @@ private fun topLevels(f: Features) = listOfNotNull(
 
 /** A phone's bar fits five; past that it keeps Today, Calendar, Rewards and the first writing space, and the rest go under More. */
 private fun splitBar(all: List<TopLevel>): Pair<List<TopLevel>, List<TopLevel>> {
-    if (all.size <= 5) return all to emptyList()
+    // Stats always sits under More, however many sections are switched off.
+    if (all.size <= 5 && all.none { it.route == StatsRoute }) return all to emptyList()
     val writing = all.firstOrNull { it.route in writingRoutes }
-    val bar = (all.filter { it.route !in writingRoutes }.take(3) + listOfNotNull(writing)).take(4)
+    val bar = (all.filter { it.route !in writingRoutes && it.route != StatsRoute }.take(3) + listOfNotNull(writing)).take(4)
     return bar to all.filter { it !in bar }
 }
 

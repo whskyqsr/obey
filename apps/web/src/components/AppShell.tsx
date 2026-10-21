@@ -40,7 +40,8 @@ export function useDestinations() {
   // The bar holds Today, Calendar, the next section that's on, and the first writing space; the rest go under More.
   const isWriting = (d: Dest) => d.to === "/notes" || d.to === "/journal";
   const writing = all.find(isWriting);
-  const bar = [...all.filter((d) => !isWriting(d)).slice(0, 3), ...(writing ? [writing] : []), MORE];
+  // Stats always sits under More, however many sections are switched off.
+  const bar = [...all.filter((d) => !isWriting(d) && d.to !== "/stats").slice(0, 3), ...(writing ? [writing] : []), MORE];
   const more = all.filter((d) => !bar.includes(d));
   return { all, bar, more };
 }
