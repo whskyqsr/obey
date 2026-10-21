@@ -5,6 +5,7 @@ import { ApiError } from "./api/client";
 import { App } from "./App";
 import { initSession } from "./auth/session";
 import { captureInviteLink } from "./lib/invite";
+import { watchForNewBuild } from "./lib/staleBuild";
 import { SnackbarProvider } from "./components/ui";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import "./index.css";
@@ -19,6 +20,7 @@ const queryClient = new QueryClient({
   },
 });
 
+watchForNewBuild();
 captureInviteLink();
 void initSession();
 
