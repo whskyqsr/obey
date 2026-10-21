@@ -111,7 +111,7 @@ import app.obey.ui.rulelog.RuleLogScreen
 import app.obey.ui.stats.StatsScreen
 import app.obey.ui.stats.MonthReviewScreen
 import app.obey.ui.agreement.AgreementScreen
-import androidx.compose.material.icons.outlined.TaskAlt
+import androidx.compose.material.icons.outlined.Handshake
 import app.obey.ui.kits.KitsScreen
 import app.obey.ui.kits.describe
 import app.obey.ui.rules.RulesScreen
@@ -193,7 +193,7 @@ private fun topLevels(f: Features) = listOfNotNull(
     if (f.stats) TopLevel(StatsRoute, "Stats", Icons.Outlined.Insights) { it.hasRoute<StatsRoute>() } else null,
     if (f.review) TopLevel(MonthReviewRoute, "Monthly review", Icons.Outlined.Flag) { it.hasRoute<MonthReviewRoute>() } else null,
     // The menu shows it next to Your dynamic rather than with the other pages.
-    if (f.agreement) TopLevel(AgreementRoute(), "Agreement", Icons.Outlined.TaskAlt) { it.hasRoute<AgreementRoute>() } else null,
+    if (f.agreement) TopLevel(AgreementRoute(), "Agreement", Icons.Outlined.Handshake) { it.hasRoute<AgreementRoute>() } else null,
     // Tasks open from Today and Calendar; the full list is for managing them, so it sits under More.
     TopLevel(TaskListRoute, "All tasks", Icons.Outlined.Checklist) { it.hasRoute<TaskListRoute>() },
 )

@@ -40,7 +40,7 @@ import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.RemoveCircleOutline
-import androidx.compose.material.icons.outlined.TaskAlt
+import androidx.compose.material.icons.outlined.Handshake
 import androidx.compose.material.icons.outlined.UnfoldMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -417,7 +417,10 @@ fun AgreementScreen(onOpenSettings: () -> Unit, onOpenNote: (String) -> Unit, vm
             }
         }
     }
-    agreeing?.let { v -> AgreeSheet(v, a?.current?.number, busy, onDismiss = { agreeing = null }) { vm.agree(v) { agreeing = null; page = "main" } } }
+    agreeing?.let { v ->
+        val last = session.relationship?.members.orEmpty().all { m -> m.userId == session.userId || v.agreements.any { it.userId == m.userId } }
+        AgreeSheet(v, a?.current?.number, last, busy, onDismiss = { agreeing = null }) { vm.agree(v) { agreeing = null; page = "main" } }
+    }
     asking?.let { v -> AskChangesSheet(proposer(v, session), a?.current?.number, busy, onDismiss = { asking = null }) { note -> vm.requestChanges(v, note) { asking = null; page = "main" } } }
     withdrawing?.let { v ->
         AlertDialog(
@@ -477,7 +480,7 @@ private fun EmptyCard(readOnly: Boolean, onTemplate: () -> Unit, onBlank: () -> 
     val c = MaterialTheme.colorScheme
     Surface(color = c.surfaceContainerLow, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Icon(Icons.Outlined.TaskAlt, null, Modifier.size(32.dp), tint = c.primary)
+            Icon(Icons.Outlined.Handshake, null, Modifier.size(32.dp), tint = c.primary)
             Text("Write down what you've agreed", style = MaterialTheme.typography.headlineSmall)
             Text(
                 "One page you both sign: why you're doing this, what each of you will do, limits, safewords, and your rules and protocols. " +
@@ -578,7 +581,7 @@ private fun Review(
         } else if (!agreed) {
             OutlinedButton(onClick = onAsk) { Text("Ask for changes") }
             Button(onClick = onAgree) {
-                Icon(Icons.Outlined.TaskAlt, null, Modifier.size(18.dp))
+                Icon(Icons.Outlined.Handshake, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Agree")
             }
@@ -1004,10 +1007,10 @@ private fun SectionEditor(
 }
 
 @Composable
-private fun AgreeSheet(v: AgreementVersion, inForce: Int?, busy: Boolean, onDismiss: () -> Unit, onAgree: () -> Unit) {
+private fun AgreeSheet(v: AgreementVersion, inForce: Int?, last: Boolean, busy: Boolean, onDismiss: () -> Unit, onAgree: () -> Unit) {
     var read by remember { mutableStateOf(false) }
     Sheet(
-        Icons.Outlined.TaskAlt,
+        Icons.Outlined.Handshake,
         "Agree to version ${v.number}?",
         onDismiss,
         actions = {
@@ -1016,7 +1019,7 @@ private fun AgreeSheet(v: AgreementVersion, inForce: Int?, busy: Boolean, onDism
         },
     ) {
         Text(
-            "It takes effect now for both of you" + (inForce?.let { ", and replaces version $it" } ?: "") + ". Either of you can propose changes at any time.",
+            (if (last) "It takes effect now for both of you" else "It takes effect once everyone has agreed") + (inForce?.let { ", and replaces version $it" } ?: "") + ". Either of you can propose changes at any time.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
