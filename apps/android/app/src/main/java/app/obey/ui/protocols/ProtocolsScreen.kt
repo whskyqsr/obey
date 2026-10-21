@@ -55,6 +55,7 @@ import app.obey.ui.common.LoadingBox
 import app.obey.ui.common.LocalFeatures
 import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.ReorderableList
+import app.obey.ui.common.MenuButton
 import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.loadCatching
 import app.obey.ui.rules.inOrder
@@ -124,6 +125,7 @@ fun ProtocolsScreen(onOpen: (String) -> Unit, onNew: () -> Unit, onOpenSettings:
     Scaffold(
         topBar = {
             TopAppBar(
+                navigationIcon = { MenuButton() },
                 title = { Text("Protocols") },
                 actions = {
                     IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.History, "Broken-rule log") }

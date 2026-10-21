@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -67,6 +68,13 @@ fun SectionHeader(text: String, modifier: Modifier = Modifier, horizontalPadding
         color = MaterialTheme.colorScheme.primary,
         modifier = modifier.padding(start = horizontalPadding, end = horizontalPadding, top = 20.dp, bottom = 8.dp),
     )
+}
+
+/** The phone menu's button, at the start of a top-level screen's top bar. */
+@Composable
+fun MenuButton() {
+    val open = LocalOpenMenu.current ?: return
+    IconButton(onClick = open) { Icon(Icons.Outlined.Menu, contentDescription = "Menu") }
 }
 
 @Composable

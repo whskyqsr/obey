@@ -49,6 +49,7 @@ import app.obey.ui.common.Load
 import app.obey.ui.common.LoadingBox
 import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.formatClock
+import app.obey.ui.common.MenuButton
 import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.local
 import app.obey.ui.common.parseInstant
@@ -129,6 +130,7 @@ fun TaskListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
+                navigationIcon = { MenuButton() },
                 title = { Text("All tasks") },
                 actions = {
                     if (vm.session?.canManage == true && vm.session?.readOnly != true) IconButton(onClick = onKits) { Icon(Icons.Outlined.Widgets, "Starter kits") }
