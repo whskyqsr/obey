@@ -92,7 +92,7 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
               label={`Mark “${o.title}” done`}
               data-action="done"
               className={missed ? "text-error" : "text-on-surface-variant"}
-              onClick={() => (o.proofRequired || o.askMood ? setCompleting(true) : quickComplete(o))}
+              onClick={() => (o.proofRequired || o.askMood || o.asksJournal ? setCompleting(true) : quickComplete(o))}
             />
           )
         ) : (

@@ -315,8 +315,8 @@ export function useDeleteEvent(rel: string) {
 export function useCompleteOccurrence(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({
-    mutationFn: ({ id, noteMd, mood }: { id: string; noteMd?: string; mood?: number }) =>
-      api<Occurrence>(`/occurrences/${id}/complete`, { method: "POST", body: { ...(noteMd ? { noteMd } : {}), ...(mood ? { mood } : {}) } }),
+    mutationFn: ({ id, noteMd, mood, journal }: { id: string; noteMd?: string; mood?: number; journal?: { title: string; bodyMd: string } }) =>
+      api<Occurrence>(`/occurrences/${id}/complete`, { method: "POST", body: { ...(noteMd ? { noteMd } : {}), ...(mood ? { mood } : {}), ...(journal ? { journal } : {}) } }),
     onSuccess: () => invalidate(),
   });
 }

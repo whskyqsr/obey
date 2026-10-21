@@ -34,6 +34,7 @@ interface Form {
   steps: TaskStep[];
   windowMinutes: number | null;
   askMood: boolean;
+  asksJournal: boolean;
 }
 
 /** Grace chips. "midnight" follows the due time, so moving the time keeps it meaning "until midnight". */
@@ -93,6 +94,7 @@ function formFrom(task: Task | undefined, defaultAssignee: string, start?: strin
     steps: task?.steps ?? [],
     windowMinutes: task?.windowMinutes ?? null,
     askMood: task?.askMood ?? false,
+    asksJournal: task?.asksJournal ?? false,
   };
 }
 
@@ -117,6 +119,7 @@ function toInput(f: Form): TaskInput {
     // A window counts back from a due time, so an all-day task has none.
     windowMinutes: f.allDay ? null : f.windowMinutes,
     askMood: f.askMood,
+    asksJournal: f.asksJournal,
   };
 }
 
@@ -254,7 +257,12 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
           <Fold
             icon="person"
             title={`For ${memberName(form.assigneeId).replace(/^You$/, "you")}`}
-            sub={[form.approvalRequired ? "Needs your approval" : "No approval needed", form.proofRequired ? "proof required" : "no proof", form.askMood ? "mood check-in" : null]
+            sub={[
+              form.approvalRequired ? "Needs your approval" : "No approval needed",
+              form.proofRequired ? "proof required" : "no proof",
+              form.askMood ? "mood check-in" : null,
+              form.asksJournal ? "journal task" : null,
+            ]
               .filter(Boolean)
               .join(" · ")}
             open={readOnly}
@@ -285,6 +293,14 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
                 label="Mood check-in"
                 help="Marking it done asks how they feel. Their answers build the mood graph in Your dynamic."
               />
+              {(features.journal || form.asksJournal) && (
+                <Switch
+                  checked={form.asksJournal}
+                  onChange={(asksJournal) => set({ asksJournal })}
+                  label="Journal task"
+                  help="Marking it done means writing a journal entry, shared with you. Use the details as the prompt."
+                />
+              )}
             </div>
           </Fold>
 
