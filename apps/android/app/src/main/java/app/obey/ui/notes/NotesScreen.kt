@@ -183,6 +183,7 @@ private fun NoteCard(note: Note, author: String?, onOpen: () -> Unit, onToggleCh
                     author,
                     if (note.kind == NoteKind.Journal) formatDateTime(note.createdAt) else formatDateTime(note.updatedAt),
                     note.mood?.let { m -> moods.firstOrNull { it.first == m }?.second },
+                    note.commentCount.takeIf { note.kind == NoteKind.Journal && it > 0 }?.let { "$it comment${if (it == 1) "" else "s"}" },
                     note.tags.takeIf { it.isNotEmpty() }?.joinToString(" ") { "#$it" },
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,

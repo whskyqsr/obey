@@ -179,6 +179,15 @@ interface ObeyApi {
     @DELETE("comments/{id}")
     suspend fun deleteComment(@Path("id") commentId: String)
 
+    @GET("notes/{id}/comments")
+    suspend fun noteComments(@Path("id") noteId: String): List<NoteComment>
+
+    @POST("notes/{id}/comments")
+    suspend fun addNoteComment(@Path("id") noteId: String, @Body body: CommentInput): NoteComment
+
+    @DELETE("note-comments/{id}")
+    suspend fun deleteNoteComment(@Path("id") commentId: String)
+
     @POST("occurrences/{id}/reschedule")
     suspend fun reschedule(@Path("id") occurrenceId: String, @Body body: RescheduleInput): RescheduleResult
 

@@ -449,15 +449,33 @@ data class ReviewOccurrenceInput(
 @Serializable
 data class CommentInput(val body: String)
 
+/** What the comment list shows, from a due date's comments or a journal entry's. */
+interface Comment {
+    val id: String
+    val authorId: String
+    val body: String
+    val createdAt: String
+}
+
 /** One message in the conversation on a due date. */
 @Serializable
 data class OccurrenceComment(
-    val id: String,
+    override val id: String,
     val occurrenceId: String,
-    val authorId: String,
-    val body: String,
-    val createdAt: String,
-)
+    override val authorId: String,
+    override val body: String,
+    override val createdAt: String,
+) : Comment
+
+/** A reply under a journal entry. */
+@Serializable
+data class NoteComment(
+    override val id: String,
+    val noteId: String,
+    override val authorId: String,
+    override val body: String,
+    override val createdAt: String,
+) : Comment
 
 @Serializable
 enum class RescheduleScope {
@@ -683,6 +701,7 @@ data class Note(
     val subCanEdit: Boolean = false,
     /** Whether the current user may change it; the server decides. */
     val canEdit: Boolean = false,
+    val commentCount: Int = 0,
     val createdAt: String,
     val updatedAt: String,
 ) {

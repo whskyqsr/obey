@@ -4,6 +4,7 @@ import type { MoodEntry } from "@obey/contracts";
 import type {
   AdminReport,
   OccurrenceComment,
+  NoteComment,
   DeviceStatus,
   ProofPhoto,
   ReportReason,
@@ -355,6 +356,26 @@ export function useDeleteComment(rel: string) {
       void qc.invalidateQueries({ queryKey: ["comments", c.occurrenceId] });
       invalidate();
     },
+  });
+}
+
+export function useNoteComments(noteId: string, enabled = true) {
+  return useQuery({ queryKey: ["noteComments", noteId], queryFn: () => api<NoteComment[]>(`/notes/${noteId}/comments`), enabled });
+}
+
+export function useAddNoteComment(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ noteId, body }: { noteId: string; body: string }) => api<NoteComment>(`/notes/${noteId}/comments`, { method: "POST", body: { body } }),
+    onSuccess: (c) => invalidate(["noteComments", c.noteId]),
+  });
+}
+
+export function useDeleteNoteComment(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (c: NoteComment) => api(`/note-comments/${c.id}`, { method: "DELETE" }),
+    onSuccess: (_, c) => invalidate(["noteComments", c.noteId]),
   });
 }
 

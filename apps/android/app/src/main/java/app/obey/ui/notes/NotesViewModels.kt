@@ -109,6 +109,8 @@ class NoteEditorViewModel @Inject constructor(
     /** The server decides: the author (unless a sub's notes are switched off), or the sub on a note opened up to them. */
     val canEdit: Boolean get() = original?.canEdit ?: true
     val isAuthor: Boolean get() = original == null || original?.authorId == sessions.session?.userId
+    /** The saved journal entry that takes comments: shared ones only, since a private one has no one to reply. */
+    val commentsNoteId: String? get() = original?.takeIf { it.kind == NoteKind.Journal && it.visibility == NoteVisibility.Shared }?.id
     /** The sub a Dominant can let edit a shared note, when the dynamic has one. */
     val subName: String? get() = sessions.session?.takeIf { it.canManage }?.relationship?.members?.firstOrNull { it.role == app.obey.api.Role.Submissive }?.displayName
 

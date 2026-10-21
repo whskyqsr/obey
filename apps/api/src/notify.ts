@@ -30,6 +30,7 @@ const CATEGORY: Record<string, NotifyCategory> = {
   reschedule_decided: "requests",
   rescheduled: "requests",
   occurrence_comment: "comments",
+  note_comment: "comments",
   task_assigned: "assigned",
   occurrence_edited: "assigned",
   rule_log: "assigned",

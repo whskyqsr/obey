@@ -57,6 +57,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.obey.api.NoteKind
 import app.obey.api.NoteVisibility
 import app.obey.markdown.MarkdownEdits
+import app.obey.ui.comments.NoteCommentsSection
 import app.obey.ui.common.ErrorBox
 import app.obey.ui.common.Load
 import app.obey.ui.common.LoadingBox
@@ -243,6 +244,10 @@ fun NoteEditorScreen(onDone: () -> Unit, vm: NoteEditorViewModel = hiltViewModel
                             } else null,
                             modifier = Modifier.fillMaxWidth(),
                         )
+                        vm.commentsNoteId?.let { id ->
+                            HorizontalDivider(Modifier.padding(top = 8.dp))
+                            NoteCommentsSection(id, Modifier.fillMaxWidth().padding(bottom = 16.dp))
+                        }
                     } else {
                         MarkdownField(
                             value = body,

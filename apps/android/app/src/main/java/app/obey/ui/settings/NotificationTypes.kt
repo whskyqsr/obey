@@ -22,7 +22,7 @@ private val TYPES = listOf(
     NotifyType("completions", "Done and reviewed", "When a task is completed, sent for review, approved or sent back"),
     NotifyType("missed", "Missed tasks", "When a deadline passes"),
     NotifyType("requests", "More time", "Requests for more time, the answers, and moved deadlines"),
-    NotifyType("comments", "Comments", "On a task's due date"),
+    NotifyType("comments", "Comments", "On a task or journal entry"),
     NotifyType("assigned", "New tasks and consequences", "Tasks given to you, history corrections and logged broken rules"),
     NotifyType("plans", "Plans", "When a partner adds or changes a calendar plan"),
     NotifyType("rewards", "Rewards", "When a reward is redeemed", needsPoints = true),
