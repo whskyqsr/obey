@@ -73,6 +73,12 @@ export async function sendWithWords(db: Db | Tx, notifier: Notifier, userIds: st
   if (plain.length) await notifier.send(plain, push);
 }
 
+/** Whether [userId] lets notifications carry a partner's words (Settings, "Show your partner's words"). */
+export async function wantsDetails(db: Db | Tx, userId: string): Promise<boolean> {
+  const [row] = await db.select({ on: users.notifyDetails }).from(users).where(eq(users.id, userId));
+  return row?.on ?? false;
+}
+
 /** Records pushes instead of sending them; for tests. */
 export function memoryNotifier(): Notifier & { sent: { userIds: string[]; push: Push }[] } {
   const sent: { userIds: string[]; push: Push }[] = [];
