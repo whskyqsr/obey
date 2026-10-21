@@ -3,9 +3,9 @@ import { getAuth } from "firebase-admin/auth";
 
 export interface MailConfig {
   resendApiKey: string;
-  /** e.g. "Fealty <hello@obey.chzsda.com>" */
+  /** e.g. "Fealty <hello@fealty.me>" */
   from: string;
-  /** Where the confirm page lives, e.g. https://app.obey.chzsda.com */
+  /** Where the confirm page lives, e.g. https://app.fealty.me */
   appUrl: string;
 }
 

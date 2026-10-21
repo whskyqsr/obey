@@ -14,9 +14,9 @@ if (hasGoogleServices) {
     apply(plugin = "com.google.gms.google-services")
 }
 
-val apiBaseUrl: String = providers.gradleProperty("obey.apiBaseUrl").getOrElse("https://api.obey.chzsda.com/")
+val apiBaseUrl: String = providers.gradleProperty("obey.apiBaseUrl").getOrElse("https://api.fealty.me/")
 // Where invite links point: the web app, which handles sign-in and accepting.
-val webUrl: String = providers.gradleProperty("obey.webUrl").getOrElse("https://app.obey.chzsda.com")
+val webUrl: String = providers.gradleProperty("obey.webUrl").getOrElse("https://app.fealty.me")
 
 android {
     namespace = "app.obey"
