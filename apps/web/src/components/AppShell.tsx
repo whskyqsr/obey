@@ -172,7 +172,7 @@ export function AppShell() {
   const [headerButton, setHeaderButton] = useState<HTMLElement | null>(null);
   const [buttonHidden, setButtonHidden] = useState(false);
   useEffect(() => {
-    if (!headerButton) return setButtonHidden(false);
+    if (!headerButton || typeof IntersectionObserver === "undefined") return setButtonHidden(false);
     const io = new IntersectionObserver(([e]) => setButtonHidden(!e!.isIntersecting));
     io.observe(headerButton);
     return () => io.disconnect();
