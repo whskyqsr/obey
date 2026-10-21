@@ -1,28 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Fealty "Links" mark: two linked diamonds. 108dp canvas, art kept inside the 66dp safe zone.
-     The gaps are real breaks in the paths (not background-coloured overlays) so the themed
-     monochrome icon keeps the interlace. -->
+<!-- Fealty "Links" mark: two linked diamonds, as filled outlines (no background-coloured
+     overlays), so the themed monochrome icon keeps the interlace. 108dp canvas, art inside
+     the 66dp safe zone. Source: brand/fealty-mark-*.svg. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group
-        android:translateX="21"
-        android:translateY="21"
-        android:scaleX="0.66"
-        android:scaleY="0.66">
-        <path
-            android:pathData="M38.31,45.52 L32,35 L50,5 L68,35 L50,65 L43.69,54.48"
-            android:strokeColor="@color/launcher_foreground"
-            android:strokeWidth="5.5"
-            android:strokeLineJoin="miter"
-            android:strokeMiterLimit="10" />
-        <path
-            android:pathData="M61.69,54.48 L68,65 L50,95 L32,65 L50,35 L56.31,45.52"
-            android:strokeColor="@color/launcher_foreground"
-            android:strokeWidth="5.5"
-            android:strokeLineJoin="miter"
-            android:strokeMiterLimit="10" />
-    </group>
+    <path
+        android:fillColor="@color/launcher_foreground"
+        android:fillType="evenOdd"
+        android:pathData="M68.79 61.92 L64.78 55.9 L63.2 58.3 L65.61 61.92 L54 79.34 L42.39 61.92 L44.25 59.13 L44.28 59.15 L49.35 51.42 L49.37 51.44 L54 44.5 L59.06 52.1 L60.64 49.7 L54 39.74 L47.91 48.87 L47.88 48.85 L42.81 56.58 L42.79 56.56 L39.21 61.92 L54 84.1 Z M60.09 59.13 L60.12 59.15 L65.19 51.42 L65.21 51.44 L68.79 46.08 L54 23.9 L39.21 46.08 L43.22 52.1 L44.8 49.7 L42.39 46.08 L54 28.66 L65.61 46.08 L63.75 48.87 L63.72 48.85 L58.65 56.58 L58.63 56.56 L54 63.5 L48.94 55.9 L47.36 58.3 L54 68.26 Z" />
 </vector>
