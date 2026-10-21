@@ -661,6 +661,26 @@ describe("points, rewards and notes", () => {
     expect(updated).toMatchObject({ title: "Title", visibility: "private", tags: ["a"], bodyMd: "# Mine" });
   });
 
+  it("keeps comments on a journal entry for anyone who can read it", async () => {
+    const { dom, sub, relId, subId, domId } = await ctx.pair();
+    const entry = (await sub.post(`/relationships/${relId}/notes`, { kind: "journal", bodyMd: "Long day" })).body;
+    expect(entry.commentCount).toBe(0);
+    const c = await dom.post(`/notes/${entry.id}/comments`, { body: " Proud of you " });
+    expect(c.body).toMatchObject({ noteId: entry.id, authorId: domId, body: "Proud of you" });
+    expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [subId], push: { body: "Dom commented on a journal entry" } });
+    await sub.post(`/notes/${entry.id}/comments`, { body: "Thank you" });
+    expect((await sub.get(`/notes/${entry.id}/comments`)).body.map((x: { body: string }) => x.body)).toEqual(["Proud of you", "Thank you"]);
+    expect((await dom.get(`/relationships/${relId}/notes`)).body[0]).toMatchObject({ commentCount: 2, updatedAt: entry.updatedAt });
+
+    expect((await sub.del(`/note-comments/${c.body.id}`)).status).toBe(403);
+    expect((await dom.del(`/note-comments/${c.body.id}`)).status).toBe(204);
+    expect((await sub.get(`/relationships/${relId}/notes`)).body[0].commentCount).toBe(1);
+
+    const priv = (await sub.post(`/relationships/${relId}/notes`, { kind: "journal", bodyMd: "Just mine", visibility: "private" })).body;
+    expect((await dom.get(`/notes/${priv.id}/comments`)).status).toBe(404);
+    expect((await dom.post(`/notes/${priv.id}/comments`, { body: "Hi" })).status).toBe(404);
+  });
+
   it("keeps a dynamic's dates, editable only by a Dominant", async () => {
     const { dom, sub, relId } = await ctx.pair();
     const dates = [{ id: "a", label: "Anniversary", date: "2023-03-04" }];

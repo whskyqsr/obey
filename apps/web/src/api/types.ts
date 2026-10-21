@@ -6,6 +6,7 @@ export type User = c.User;
 export type DeviceStatus = c.DeviceStatus;
 export type AdminReport = c.AdminReport;
 export type OccurrenceComment = c.OccurrenceComment;
+export type NoteComment = c.NoteComment;
 export type WeekStart = c.WeekStart;
 export type QuietHours = c.QuietHours;
 export type NotifyCategory = c.NotifyCategory;

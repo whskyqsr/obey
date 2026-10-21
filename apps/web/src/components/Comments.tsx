@@ -1,35 +1,34 @@
 import { useState } from "react";
-import type { Occurrence } from "../api/types";
-import { useAddComment, useComments, useDeleteComment, useReviewOccurrence } from "../api/hooks";
+import type { Note, Occurrence } from "../api/types";
+import { useAddComment, useAddNoteComment, useComments, useDeleteComment, useDeleteNoteComment, useNoteComments, useReviewOccurrence } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { fmtRelative } from "../lib/dates";
 import { useReadOnly, useRel } from "../lib/relationship";
 import { Avatar } from "./Avatar";
 import { Button, Dialog, IconButton, TextArea, useSnackbar } from "./ui";
 
-/**
- * The conversation on one due date ("why was this late"), so it stays with the task instead of another app.
- * Shown when there are comments or the person opens it with "Comment".
- */
-export function Comments({ o, open, onOpen }: { o: Occurrence; open: boolean; onOpen(): void }) {
+type AnyComment = { id: string; authorId: string; body: string; createdAt: string };
+
+/** A list of comments with a box to add one; each person can delete their own. */
+function CommentThread<C extends AnyComment>({
+  list,
+  open,
+  onOpen,
+  onAdd,
+  onDelete,
+  adding,
+}: {
+  list: C[];
+  open: boolean;
+  onOpen?(): void;
+  onAdd(body: string, done: () => void): void;
+  onDelete(c: C): void;
+  adding: boolean;
+}) {
   const { rel, me, memberName } = useRel();
   const readOnly = useReadOnly();
-  const snack = useSnackbar();
-  const comments = useComments(o.id, o.commentCount > 0 || open);
-  const add = useAddComment(rel.id);
-  const del = useDeleteComment(rel.id);
   const [text, setText] = useState("");
-  const list = comments.data ?? [];
-  if (!list.length && !open) return null;
-
-  const send = () =>
-    add.mutate(
-      { occurrenceId: o.id, body: text.trim() },
-      {
-        onSuccess: () => setText(""),
-        onError: (e) => snack(errorMessage(e)),
-      },
-    );
+  const send = () => onAdd(text.trim(), () => setText(""));
 
   return (
     <div className="flex flex-col gap-2">
@@ -45,12 +44,7 @@ export function Comments({ o, open, onOpen }: { o: Occurrence; open: boolean; on
               <div className="text-body-medium whitespace-pre-wrap text-on-surface">{c.body}</div>
             </div>
             {c.authorId === me.user.id && !readOnly && (
-              <IconButton
-                icon="delete"
-                label="Delete comment"
-                className="opacity-0 group-focus-within:opacity-100 group-hover:opacity-100"
-                onClick={() => del.mutate(c, { onError: (e) => snack(errorMessage(e)) })}
-              />
+              <IconButton icon="delete" label="Delete comment" className="opacity-0 group-focus-within:opacity-100 group-hover:opacity-100" onClick={() => onDelete(c)} />
             )}
           </div>
         );
@@ -69,7 +63,7 @@ export function Comments({ o, open, onOpen }: { o: Occurrence; open: boolean; on
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && text.trim()) send();
               }}
             />
-            <IconButton icon="send" label="Send comment" variant="filled" disabled={!text.trim() || add.isPending} onClick={send} />
+            <IconButton icon="send" label="Send comment" variant="filled" disabled={!text.trim() || adding} onClick={send} />
           </div>
         ) : (
           <Button variant="text" icon="add_comment" className="self-start" onClick={onOpen}>
@@ -77,6 +71,52 @@ export function Comments({ o, open, onOpen }: { o: Occurrence; open: boolean; on
           </Button>
         ))}
     </div>
+  );
+}
+
+/**
+ * The conversation on one due date ("why was this late"), so it stays with the task instead of another app.
+ * Shown when there are comments or the person opens it with "Comment".
+ */
+export function Comments({ o, open, onOpen }: { o: Occurrence; open: boolean; onOpen(): void }) {
+  const { rel } = useRel();
+  const snack = useSnackbar();
+  const comments = useComments(o.id, o.commentCount > 0 || open);
+  const add = useAddComment(rel.id);
+  const del = useDeleteComment(rel.id);
+  const list = comments.data ?? [];
+  if (!list.length && !open) return null;
+  return (
+    <CommentThread
+      list={list}
+      open={open}
+      onOpen={onOpen}
+      adding={add.isPending}
+      onAdd={(body, done) => add.mutate({ occurrenceId: o.id, body }, { onSuccess: done, onError: (e) => snack(errorMessage(e)) })}
+      onDelete={(c) => del.mutate(c, { onError: (e) => snack(errorMessage(e)) })}
+    />
+  );
+}
+
+/** Replies under a journal entry or shared note, with the box to add one always open. */
+export function NoteComments({ note }: { note: Note }) {
+  const { rel } = useRel();
+  const snack = useSnackbar();
+  const comments = useNoteComments(note.id);
+  const add = useAddNoteComment(rel.id);
+  const del = useDeleteNoteComment(rel.id);
+  const list = comments.data ?? [];
+  return (
+    <section className="flex flex-col gap-3" aria-label="Comments">
+      <h2 className="text-title-medium text-on-surface">Comments{list.length > 0 && ` · ${list.length}`}</h2>
+      <CommentThread
+        list={list}
+        open
+        adding={add.isPending}
+        onAdd={(body, done) => add.mutate({ noteId: note.id, body }, { onSuccess: done, onError: (e) => snack(errorMessage(e)) })}
+        onDelete={(c) => del.mutate(c, { onError: (e) => snack(errorMessage(e)) })}
+      />
+    </section>
   );
 }
 

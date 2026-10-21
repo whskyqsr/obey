@@ -340,6 +340,7 @@ export const notes = pgTable(
     mood: integer("mood"),
     /** A Dominant's shared note the submissive may edit too. */
     subCanEdit: boolean("sub_can_edit").notNull().default(false),
+    commentCount: integer("comment_count").notNull().default(0),
     createdAt: createdAt(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
@@ -448,4 +449,21 @@ export const occurrenceComments = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("occurrence_comments_occurrence_idx").on(t.occurrenceId, t.createdAt)],
+);
+
+/** A reply under a journal entry or shared note, from anyone who can read it. */
+export const noteComments = pgTable(
+  "note_comments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    noteId: uuid("note_id")
+      .notNull()
+      .references(() => notes.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("note_comments_note_idx").on(t.noteId, t.createdAt)],
 );

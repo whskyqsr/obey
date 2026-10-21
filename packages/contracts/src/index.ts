@@ -320,6 +320,8 @@ export const reviewOccurrence = z.object({
 export const commentInput = z.object({ body: z.string().trim().min(1).max(2_000) });
 export const occurrenceComment = z.object({ id, occurrenceId: id, authorId: id, body: z.string(), createdAt: z.string() });
 export type OccurrenceComment = z.infer<typeof occurrenceComment>;
+export const noteComment = z.object({ id, noteId: id, authorId: id, body: z.string(), createdAt: z.string() });
+export type NoteComment = z.infer<typeof noteComment>;
 
 export const rescheduleInput = z
   .object({
@@ -509,6 +511,7 @@ export const note = noteInput.extend({
   authorId: id,
   /** Whether the person asking may change this note. */
   canEdit: z.boolean(),
+  commentCount: z.number().int().default(0),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

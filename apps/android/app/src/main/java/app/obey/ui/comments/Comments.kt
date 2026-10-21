@@ -37,10 +37,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.obey.api.Comment
 import app.obey.api.CommentInput
 import app.obey.api.ObeyApi
 import app.obey.api.Occurrence
-import app.obey.api.OccurrenceComment
 import app.obey.data.SessionRepository
 import app.obey.ui.common.BaseViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -54,30 +54,34 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** The conversation on one due date ("why was this late"), so it stays with the task instead of another app. */
+/** The conversation on one due date ("why was this late") or under a journal entry, so it stays with what it's about. */
 @HiltViewModel
 class CommentsViewModel @Inject constructor(private val api: ObeyApi, private val sessions: SessionRepository) : BaseViewModel() {
-    private val _comments = MutableStateFlow<List<OccurrenceComment>?>(null)
-    val comments: StateFlow<List<OccurrenceComment>?> = _comments.asStateFlow()
+    private val _comments = MutableStateFlow<List<Comment>?>(null)
+    val comments: StateFlow<List<Comment>?> = _comments.asStateFlow()
     val session get() = sessions.session
-    private var occurrenceId: String? = null
+    private var targetId: String? = null
+    private var onNote = false
 
-    fun load(id: String) {
-        if (occurrenceId == id && _comments.value != null) return
-        occurrenceId = id
+    /** Loads the comments on an occurrence, or on a note when [note] is true. */
+    fun load(id: String, note: Boolean = false) {
+        if (targetId == id && onNote == note && _comments.value != null) return
+        targetId = id
+        onNote = note
         _comments.value = null
-        action { _comments.value = api.comments(id) }
+        action { _comments.value = if (note) api.noteComments(id) else api.comments(id) }
     }
 
     fun add(body: String, done: () -> Unit) = action {
-        val id = occurrenceId ?: return@action
-        val c = api.addComment(id, CommentInput(body.trim()))
+        val id = targetId ?: return@action
+        val input = CommentInput(body.trim())
+        val c: Comment = if (onNote) api.addNoteComment(id, input) else api.addComment(id, input)
         _comments.value = _comments.value.orEmpty() + c
         done()
     }
 
-    fun delete(c: OccurrenceComment, done: () -> Unit) = action {
-        api.deleteComment(c.id)
+    fun delete(c: Comment, done: () -> Unit) = action {
+        if (onNote) api.deleteNoteComment(c.id) else api.deleteComment(c.id)
         _comments.value = _comments.value.orEmpty().filter { it.id != c.id }
         done()
     }
@@ -120,39 +124,65 @@ fun CommentsSheet(occurrence: Occurrence, onDismiss: () -> Unit, onChanged: () -
                 list.isEmpty() -> Text("No comments yet. Ask a question or say why it was late.", color = colors.onSurfaceVariant)
                 else -> LazyColumn(Modifier.heightIn(max = 420.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(list, key = { it.id }) { c ->
-                        val mine = c.authorId == me
-                        Row(verticalAlignment = Alignment.Top) {
-                            Column(Modifier.weight(1f).background(colors.surfaceContainer, MaterialTheme.shapes.medium).padding(horizontal = 12.dp, vertical = 8.dp)) {
-                                Text(
-                                    "${if (mine) "You" else session?.nameOf(c.authorId) ?: "Someone"} · ${whenLabel(c.createdAt)}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = colors.onSurfaceVariant,
-                                )
-                                Text(c.body, style = MaterialTheme.typography.bodyMedium)
-                            }
-                            if (mine && !readOnly) {
-                                IconButton(onClick = { vm.delete(c, onChanged) }, enabled = !busy) { Icon(Icons.Outlined.DeleteOutline, "Delete comment") }
-                            }
-                        }
+                        CommentRow(c, author = if (c.authorId == me) "You" else session?.nameOf(c.authorId) ?: "Someone", onDelete = { vm.delete(c, onChanged) }.takeIf { c.authorId == me && !readOnly }, busy = busy)
                     }
                 }
             }
             message?.let { Text(it, color = colors.error, style = MaterialTheme.typography.bodyMedium) }
-            if (!readOnly) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = text,
-                        onValueChange = { if (it.length <= 2000) text = it },
-                        label = { Text("Add a comment") },
-                        modifier = Modifier.weight(1f),
-                        maxLines = 5,
-                    )
-                    FilledIconButton(onClick = { vm.add(text) { text = ""; onChanged() } }, enabled = text.isNotBlank() && !busy) {
-                        Icon(Icons.AutoMirrored.Outlined.Send, "Send comment")
-                    }
-                }
-            }
+            if (!readOnly) CommentComposer(text, { text = it }, enabled = !busy, onSend = { vm.add(text) { text = ""; onChanged() } })
         }
+    }
+}
+
+@Composable
+private fun CommentRow(c: Comment, author: String, onDelete: (() -> Unit)?, busy: Boolean) {
+    val colors = MaterialTheme.colorScheme
+    Row(verticalAlignment = Alignment.Top) {
+        Column(Modifier.weight(1f).background(colors.surfaceContainer, MaterialTheme.shapes.medium).padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Text("$author · ${whenLabel(c.createdAt)}", style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
+            Text(c.body, style = MaterialTheme.typography.bodyMedium)
+        }
+        if (onDelete != null) {
+            IconButton(onClick = onDelete, enabled = !busy) { Icon(Icons.Outlined.DeleteOutline, "Delete comment") }
+        }
+    }
+}
+
+@Composable
+private fun CommentComposer(text: String, onText: (String) -> Unit, enabled: Boolean, onSend: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = text,
+            onValueChange = { if (it.length <= 2000) onText(it) },
+            label = { Text("Add a comment") },
+            modifier = Modifier.weight(1f),
+            maxLines = 5,
+        )
+        FilledIconButton(onClick = onSend, enabled = text.isNotBlank() && enabled) {
+            Icon(Icons.AutoMirrored.Outlined.Send, "Send comment")
+        }
+    }
+}
+
+/** Replies under a journal entry, shown inline below it with the box to add one. */
+@Composable
+fun NoteCommentsSection(noteId: String, modifier: Modifier = Modifier, vm: CommentsViewModel = hiltViewModel(key = "note-comments-$noteId")) {
+    LaunchedEffect(noteId) { vm.load(noteId, note = true) }
+    val comments by vm.comments.collectAsStateWithLifecycle()
+    val busy by vm.busy.collectAsStateWithLifecycle()
+    val message by vm.message.collectAsStateWithLifecycle()
+    val session = vm.session
+    val me = session?.userId
+    val readOnly = session?.readOnly == true
+    var text by rememberSaveable(noteId) { mutableStateOf("") }
+    val list = comments.orEmpty()
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(if (list.isEmpty()) "Comments" else "Comments · ${list.size}", style = MaterialTheme.typography.titleMedium)
+        list.forEach { c ->
+            CommentRow(c, author = if (c.authorId == me) "You" else session?.nameOf(c.authorId) ?: "Someone", onDelete = { vm.delete(c) {} }.takeIf { c.authorId == me && !readOnly }, busy = busy)
+        }
+        message?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
+        if (!readOnly) CommentComposer(text, { text = it }, enabled = !busy, onSend = { vm.add(text) { text = "" } })
     }
 }
 

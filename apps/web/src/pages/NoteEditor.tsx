@@ -4,6 +4,7 @@ import { useDeleteLibraryItem, useLibrary, useSaveLibraryItem } from "../api/hoo
 import { errorMessage } from "../api/client";
 import type { Note, NoteInput } from "../api/types";
 import { MarkdownEditor } from "../components/MarkdownEditor";
+import { NoteComments } from "../components/Comments";
 import { Button, Chip, ErrorBox, Icon, IconButton, Loading, SegmentedButtons, Switch, useSnackbar } from "../components/ui";
 import { fmtDateTime } from "../lib/dates";
 import { MOODS } from "../components/Mood";
@@ -151,6 +152,11 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
             </div>
           )}
           <MarkdownEditor value={form.bodyMd} onChange={() => {}} editable={false} bare />
+          {kind === "journal" && note.visibility === "shared" && (
+            <div className="mt-4 border-t border-outline-variant pt-4">
+              <NoteComments note={note} />
+            </div>
+          )}
         </article>
         {confirmEl}
       </div>

@@ -119,8 +119,13 @@ export function NotesPage({ kind }: { kind: "note" | "journal" }) {
                   {n.visibility === "private" && <Icon name="lock" size={16} />}
                   <span className="truncate">{n.title || "Untitled"}</span>
                 </div>
-                <div className="text-body-small opacity-75">
+                <div className="flex items-center gap-1 text-body-small opacity-75">
                   {memberName(n.authorId)} · {fmtDateTime(kind === "journal" ? n.createdAt : n.updatedAt)}
+                  {kind === "journal" && n.commentCount > 0 && (
+                    <span className="flex items-center gap-0.5" aria-label={`${n.commentCount} comment${n.commentCount === 1 ? "" : "s"}`}>
+                      · <Icon name="chat_bubble" size={14} /> {n.commentCount}
+                    </span>
+                  )}
                 </div>
               </div>
               {/* Pinning changes the note, so only its author can; others just see that it's pinned. */}
