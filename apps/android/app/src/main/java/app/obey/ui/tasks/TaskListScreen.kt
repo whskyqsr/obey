@@ -66,6 +66,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import app.obey.ui.common.loadCatching
+import app.obey.ui.today.needsDoneDialog
 
 @HiltViewModel
 class TaskListViewModel @Inject constructor(
@@ -96,8 +97,8 @@ class TaskListViewModel @Inject constructor(
         }
     }
 
-    fun complete(o: Occurrence) = action {
-        val r = api.complete(o.id, CompleteOccurrenceInput())
+    fun complete(o: Occurrence, note: String? = null, mood: Int? = null) = action {
+        val r = api.complete(o.id, CompleteOccurrenceInput(noteMd = note?.takeIf { it.isNotBlank() }, mood = mood))
         say(if (r.status == OccurrenceStatus.Submitted) "Sent for approval" else "Marked “${o.title}” done")
         refresh()
     }
@@ -119,6 +120,7 @@ fun TaskListScreen(
     val snackbar = remember { SnackbarHostState() }
     MessageEffect(message, snackbar, vm::messageShown)
     var running by remember { mutableStateOf<Occurrence?>(null) }
+    var noting by remember { mutableStateOf<Occurrence?>(null) }
     // Reload when coming back from the editor.
     LifecycleResumeEffect(Unit) {
         vm.refresh()
@@ -165,14 +167,15 @@ fun TaskListScreen(
                             }
                         },
                         trailingContent = {
-                            NowStatus(current[t.id].orEmpty(), mine = t.assigneeId == vm.session?.userId, onComplete = { o -> if (o.isRitual) running = o else vm.complete(o) })
+                            NowStatus(current[t.id].orEmpty(), mine = t.assigneeId == vm.session?.userId, onComplete = { o -> if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) })
                         },
                     )
                 }
             }
         }
     }
-    running?.let { o -> app.obey.ui.today.RitualSheet(o, onDismiss = { running = null; vm.refresh() }) }
+    running?.let { o -> app.obey.ui.today.RitualSheet(o, onDismiss = { running = null; vm.refresh() }, onNeedsProof = { running = null; noting = it }) }
+    noting?.let { o -> app.obey.ui.today.DoneDialog(o, onDismiss = { noting = null }, onDone = { note, mood -> vm.complete(o, note, mood); noting = null }) }
 }
 
 /** Today's state for a task, with a one-tap Done when it's the viewer's to do. */

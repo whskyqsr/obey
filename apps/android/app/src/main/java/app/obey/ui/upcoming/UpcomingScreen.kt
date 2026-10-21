@@ -1,5 +1,6 @@
 package app.obey.ui.upcoming
 
+import app.obey.ui.today.needsDoneDialog
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -88,6 +89,7 @@ fun UpcomingScreen(
     }
     var rescheduling by remember { mutableStateOf<Occurrence?>(null) }
     var running by remember { mutableStateOf<Occurrence?>(null) }
+    var noting by remember { mutableStateOf<Occurrence?>(null) }
     // A plan to show, or a day to add one on.
     var plan by remember { mutableStateOf<Pair<CalendarEvent?, LocalDate>?>(null) }
     val session = vm.session
@@ -100,7 +102,7 @@ fun UpcomingScreen(
             o,
             if (mine) null else session?.nameOf(o.assigneeId),
             OccurrenceActions(
-                onComplete = if (mine) ({ if (o.isRitual) running = o else vm.complete(o) }) else null,
+                onComplete = if (mine) ({ if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) }) else null,
                 onReschedule = { rescheduling = o },
                 onEditTask = if (canManage) ({ onEditTask(o.seriesId) }) else null,
             ),
@@ -236,7 +238,8 @@ fun UpcomingScreen(
         PlanDialog(e, day, onDismiss = { plan = null }, onChanged = vm::refresh)
     }
 
-    running?.let { o -> app.obey.ui.today.RitualSheet(o, onDismiss = { running = null; vm.refresh() }) }
+    running?.let { o -> app.obey.ui.today.RitualSheet(o, onDismiss = { running = null; vm.refresh() }, onNeedsProof = { running = null; noting = it }) }
+    noting?.let { o -> app.obey.ui.today.DoneDialog(o, onDismiss = { noting = null }, onDone = { note, mood -> vm.complete(o, note, mood); noting = null }) }
     rescheduling?.let { o ->
         RescheduleSheet(o, onDismiss = { rescheduling = null }, onSubmit = { vm.reschedule(o, it) })
     }

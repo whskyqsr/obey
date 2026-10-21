@@ -261,6 +261,8 @@ data class TaskInput(
     val steps: List<TaskStep> = emptyList(),
     /** Only doable in the last this-many minutes before it's due; null for any time. */
     val windowMinutes: Int? = null,
+    /** A check-in: marking it done asks the assignee how they feel. */
+    val askMood: Boolean = false,
 )
 
 @Serializable
@@ -284,6 +286,7 @@ data class Task(
     val graceMinutes: Int = 0,
     val steps: List<TaskStep> = emptyList(),
     val windowMinutes: Int? = null,
+    val askMood: Boolean = false,
     val summary: String,
     /** Set when this one-off task is a consequence handed out on its own. */
     val assignedConsequenceId: String? = null,
@@ -296,7 +299,7 @@ data class Task(
         rewardId = rewardId, consequenceId = consequenceId, consequenceDueDays = consequenceDueDays,
         consequenceDueTime = consequenceDueTime, proofRequired = proofRequired,
         approvalRequired = approvalRequired, schedule = schedule, dueTime = dueTime, timezone = timezone,
-        graceMinutes = graceMinutes, steps = steps, windowMinutes = windowMinutes,
+        graceMinutes = graceMinutes, steps = steps, windowMinutes = windowMinutes, askMood = askMood,
     )
 }
 
@@ -334,6 +337,9 @@ data class Occurrence(
     val stepsDone: List<String> = emptyList(),
     /** When the task's window opens, if it has one. */
     val opensAt: String? = null,
+    /** A check-in asks for a mood when it's marked done; mood is the answer, 1 (awful) to 5 (great). */
+    val askMood: Boolean = false,
+    val mood: Int? = null,
 ) {
     /**
      * Tomorrow's daily task waits for its day, and a task with a window waits for it to open; the API refuses
@@ -401,7 +407,24 @@ data class EditOccurrenceInput(
 )
 
 @Serializable
-data class CompleteOccurrenceInput(@EncodeDefault(EncodeDefault.Mode.NEVER) val noteMd: String? = null)
+data class CompleteOccurrenceInput(
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val noteMd: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val mood: Int? = null,
+)
+
+/** One point on the mood graph: a check-in answer, or a journal entry with a mood. */
+@Serializable
+data class MoodEntry(
+    val at: String,
+    val userId: String,
+    val mood: Int,
+    /** "checkin" or "journal". */
+    val source: String,
+    val title: String = "",
+    val note: String? = null,
+    val occurrenceId: String? = null,
+    val noteId: String? = null,
+)
 
 @Serializable
 data class ReviewOccurrenceInput(

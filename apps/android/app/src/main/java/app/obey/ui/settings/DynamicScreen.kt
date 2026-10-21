@@ -223,6 +223,8 @@ fun DynamicScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
                     )
                 }
 
+                app.obey.ui.common.MoodCard(Modifier.padding(horizontal = 16.dp), header = { SectionHeader("Mood") })
+
                 val today = java.time.LocalDate.now()
                 val dates = rel.dates.sortedBy { d -> runCatching { daysUntilNext(java.time.LocalDate.parse(d.date), today) }.getOrDefault(Long.MAX_VALUE) }
                 if (s.canManage || dates.isNotEmpty()) {
