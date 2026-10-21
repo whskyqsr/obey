@@ -232,7 +232,7 @@ export function AppShell() {
         {/* Navigation bar (compact): a floating row of tiles */}
         <nav
           className={cx(
-            "fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-30 flex h-19 gap-1 rounded-3xl border border-outline-variant/70 bg-surface-container-lowest p-1.5 shadow-elev-2 md:hidden",
+            "fixed inset-x-3 bottom-[calc(16px+env(safe-area-inset-bottom))] z-30 flex h-19 gap-1 rounded-3xl border border-outline-variant/70 bg-surface-container-lowest p-1.5 shadow-elev-2 md:hidden",
             editing && "hidden",
           )}
         >

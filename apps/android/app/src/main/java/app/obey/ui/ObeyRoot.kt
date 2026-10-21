@@ -305,7 +305,7 @@ private fun MenuItem(label: String, icon: ImageVector, selected: Boolean, onClic
 @Composable
 private fun FloatingBar(items: List<TopLevel>, selected: (TopLevel) -> Boolean, onClick: (TopLevel) -> Unit) {
     Surface(
-        Modifier.windowInsetsPadding(WindowInsets.navigationBars).padding(start = 12.dp, end = 12.dp, bottom = 12.dp).fillMaxWidth().height(76.dp),
+        Modifier.windowInsetsPadding(WindowInsets.navigationBars).padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 16.dp).fillMaxWidth().height(76.dp),
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
