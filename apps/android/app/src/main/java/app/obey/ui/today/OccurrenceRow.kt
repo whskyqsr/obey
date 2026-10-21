@@ -139,7 +139,7 @@ fun OccurrenceRow(
             if (actions.onExcuse != null || actions.onConfirmMiss != null) {
                 Row {
                     actions.onExcuse?.let { androidx.compose.material3.TextButton(onClick = it) { Text("Excuse") } }
-                    actions.onConfirmMiss?.let { androidx.compose.material3.TextButton(onClick = it) { Text("Mark missed") } }
+                    actions.onConfirmMiss?.let { androidx.compose.material3.TextButton(onClick = it) { Text("Dismiss") } }
                 }
             } else if (actions.onApprove != null || actions.onReject != null) {
                 Row {

@@ -133,7 +133,7 @@ class TodayViewModel @Inject constructor(
 
     fun confirmMiss(o: Occurrence) = action {
         api.confirmMiss(o.id)
-        say("Left as missed")
+        say("Kept as missed")
         refresh()
     }
 
