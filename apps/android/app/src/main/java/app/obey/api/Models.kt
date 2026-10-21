@@ -702,11 +702,24 @@ data class Note(
     /** Whether the current user may change it; the server decides. */
     val canEdit: Boolean = false,
     val commentCount: Int = 0,
+    /** Earlier versions kept of the title and text; more than 0 means it was edited. */
+    val revisionCount: Int = 0,
     val createdAt: String,
     val updatedAt: String,
 ) {
     fun toInput() = NoteInput(kind, title, bodyMd, visibility, tags, pinned, mood, subCanEdit)
 }
+
+/** A note's title and text before an edit; [createdAt] is when [editorId]'s edit replaced it. */
+@Serializable
+data class NoteRevision(
+    val id: String,
+    val noteId: String,
+    val editorId: String,
+    val title: String,
+    val bodyMd: String,
+    val createdAt: String,
+)
 
 /** A device this account gets push on; only the token's end is sent, enough to spot this one. */
 @Serializable

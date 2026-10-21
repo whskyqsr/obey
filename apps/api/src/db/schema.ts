@@ -341,6 +341,8 @@ export const notes = pgTable(
     /** A Dominant's shared note the submissive may edit too. */
     subCanEdit: boolean("sub_can_edit").notNull().default(false),
     commentCount: integer("comment_count").notNull().default(0),
+    /** How many earlier versions of the title and text are kept in note_revisions. */
+    revisionCount: integer("revision_count").notNull().default(0),
     createdAt: createdAt(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
@@ -466,4 +468,23 @@ export const noteComments = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("note_comments_note_idx").on(t.noteId, t.createdAt)],
+);
+
+/** A note's title and text as they were before an edit, so changes to a journal entry stay visible. */
+export const noteRevisions = pgTable(
+  "note_revisions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    noteId: uuid("note_id")
+      .notNull()
+      .references(() => notes.id, { onDelete: "cascade" }),
+    /** Who made the edit that replaced this version. */
+    editorId: uuid("editor_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    bodyMd: text("body_md").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("note_revisions_note_idx").on(t.noteId, t.createdAt)],
 );

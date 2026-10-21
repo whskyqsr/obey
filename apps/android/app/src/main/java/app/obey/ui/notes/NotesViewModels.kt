@@ -6,6 +6,7 @@ import androidx.navigation.toRoute
 import app.obey.api.Note
 import app.obey.api.NoteInput
 import app.obey.api.NoteKind
+import app.obey.api.NoteRevision
 import app.obey.api.NoteVisibility
 import app.obey.api.ObeyApi
 import app.obey.data.Session
@@ -98,6 +99,15 @@ class NoteEditorViewModel @Inject constructor(
     val isNew: Boolean get() = original == null
 
     private var original: Note? = null
+        set(value) {
+            field = value
+            _revisionCount.value = value?.revisionCount ?: 0
+        }
+    private val _revisionCount = MutableStateFlow(0)
+    /** Earlier versions kept; above 0 the entry shows "Edited" and its history. */
+    val revisionCount: StateFlow<Int> = _revisionCount.asStateFlow()
+    private val _revisions = MutableStateFlow<List<NoteRevision>?>(null)
+    val revisions: StateFlow<List<NoteRevision>?> = _revisions.asStateFlow()
     private var savedDraft = blank
 
     private val _load = MutableStateFlow<Load<Unit>>(if (noteId == null) Load.Ready(Unit) else Load.Loading)
@@ -153,6 +163,15 @@ class NoteEditorViewModel @Inject constructor(
             if (close) _closed.trySend(Unit) else say("Saved")
         }
     }
+
+    fun loadRevisions() {
+        val id = original?.id ?: return
+        _revisions.value = null
+        action { _revisions.value = api.noteRevisions(id) }
+    }
+
+    /** Who made an edit, as the history shows it. */
+    fun editorName(userId: String): String = sessions.session?.let { if (it.userId == userId) "you" else it.nameOf(userId) } ?: "someone"
 
     fun delete() {
         val n = original ?: run { _closed.trySend(Unit); return }

@@ -3,7 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { consequenceInput, noteInput, protocolInput, reorderInput, rewardInput, ruleInput } from "@obey/contracts";
 import type { ZodObject, ZodRawShape } from "zod";
 import type { Deps } from "../app.js";
-import { consequences, notes, protocols, relationships, rewards, rules } from "../db/schema.js";
+import { consequences, noteRevisions, notes, protocols, relationships, rewards, rules } from "../db/schema.js";
 import { HttpError, forbidden, notFound, parsePatch } from "../errors.js";
 import { libraryDto, noteDto } from "../serialize.js";
 import { type Role, canManage, requireManager, requireMember } from "../services/access.js";
@@ -15,6 +15,9 @@ const LIBRARIES = [
   { path: "rules", table: rules, input: ruleInput, order: asc(rules.position) },
   { path: "protocols", table: protocols, input: protocolInput, order: asc(protocols.position) },
 ] as const;
+
+/** Saves by one person this close together count as one edit in a note's history. */
+const SITTING_MS = 10 * 60_000;
 
 export const libraryRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   const { db } = deps;
@@ -156,12 +159,33 @@ export const libraryRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     } else {
       set = { title: body.title, bodyMd: body.bodyMd, tags: body.tags };
     }
-    const [row] = await db
-      .update(notes)
-      .set({ ...set, updatedAt: deps.now() })
-      .where(eq(notes.id, note.id))
-      .returning();
-    return noteDto(row!, canEditNote(v, row!));
+    const now = deps.now();
+    const textChanged = (set.title !== undefined && set.title !== note.title) || (set.bodyMd !== undefined && set.bodyMd !== note.bodyMd);
+    const row = await db.transaction(async (tx) => {
+      // Keep the version this edit replaces. Saves by the same person within a few minutes are one sitting, whose
+      // starting version is already kept, so ticking a checklist or saving twice doesn't fill the history.
+      if (textChanged) {
+        const [last] = await tx.select().from(noteRevisions).where(eq(noteRevisions.noteId, note.id)).orderBy(desc(noteRevisions.createdAt)).limit(1);
+        const sameSitting = last && last.editorId === v.userId && now.getTime() - last.createdAt.getTime() < SITTING_MS;
+        if (!sameSitting) {
+          await tx.insert(noteRevisions).values({ noteId: note.id, editorId: v.userId, title: note.title, bodyMd: note.bodyMd, createdAt: now });
+          set = { ...set, revisionCount: note.revisionCount + 1 };
+        }
+      }
+      const [r] = await tx
+        .update(notes)
+        .set({ ...set, updatedAt: now })
+        .where(eq(notes.id, note.id))
+        .returning();
+      return r!;
+    });
+    return noteDto(row, canEditNote(v, row));
+  });
+
+  app.get<{ Params: { id: string } }>("/notes/:id/revisions", async (req) => {
+    const { note } = await findNote(req.params.id, req.user.id);
+    const rows = await db.select().from(noteRevisions).where(eq(noteRevisions.noteId, note.id)).orderBy(desc(noteRevisions.createdAt));
+    return rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }));
   });
 
   app.delete<{ Params: { id: string } }>("/notes/:id", async (req, reply) => {

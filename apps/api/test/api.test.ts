@@ -681,6 +681,31 @@ describe("points, rewards and notes", () => {
     expect((await dom.post(`/notes/${priv.id}/comments`, { body: "Hi" })).status).toBe(404);
   });
 
+  it("keeps earlier versions of an edited journal entry, one per sitting", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    const entry = (await sub.post(`/relationships/${relId}/notes`, { kind: "journal", title: "Monday", bodyMd: "First draft" })).body;
+    expect(entry.revisionCount).toBe(0);
+    try {
+      expect((await sub.patch(`/notes/${entry.id}`, { bodyMd: "Second draft" })).body.revisionCount).toBe(1);
+      // Another save in the same sitting, and a change that leaves the text alone, add nothing.
+      expect((await sub.patch(`/notes/${entry.id}`, { bodyMd: "Second draft, tidied" })).body.revisionCount).toBe(1);
+      expect((await sub.patch(`/notes/${entry.id}`, { mood: 3 })).body.revisionCount).toBe(1);
+      ctx.clock.now = new Date(ctx.clock.now.getTime() + 11 * 60_000);
+      expect((await sub.patch(`/notes/${entry.id}`, { title: "Monday, again" })).body.revisionCount).toBe(2);
+    } finally {
+      ctx.clock.now = new Date("2026-10-16T12:00:00Z");
+    }
+    const history = (await dom.get(`/notes/${entry.id}/revisions`)).body;
+    expect(history.map((r: { title: string; bodyMd: string }) => [r.title, r.bodyMd])).toEqual([
+      ["Monday", "Second draft, tidied"],
+      ["Monday", "First draft"],
+    ]);
+    expect(history[0]).toMatchObject({ noteId: entry.id, editorId: subId });
+
+    const priv = (await sub.post(`/relationships/${relId}/notes`, { kind: "journal", bodyMd: "Mine", visibility: "private" })).body;
+    expect((await dom.get(`/notes/${priv.id}/revisions`)).status).toBe(404);
+  });
+
   it("keeps a dynamic's dates, editable only by a Dominant", async () => {
     const { dom, sub, relId } = await ctx.pair();
     const dates = [{ id: "a", label: "Anniversary", date: "2023-03-04" }];
