@@ -1375,6 +1375,7 @@ describe("feature switches", () => {
       stats: true,
       review: true,
       location: true,
+      agreement: true,
     });
     // Notes can't be switched off; the key is ignored.
     expect((await dom.patch(`/relationships/${relId}`, { features: { notes: false } })).body.features).not.toHaveProperty("notes");
