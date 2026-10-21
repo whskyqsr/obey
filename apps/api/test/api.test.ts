@@ -429,6 +429,60 @@ describe("tasks and occurrences", () => {
     expect((await sub.post(`/occurrences/${first.id}/complete`, { noteMd: "Done, 64 oz" })).body.status).toBe("completed");
   });
 
+  it("counts a count task: done within its bounds, failed over the top, and corrections take either back", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    const day = (id: string) =>
+      sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`).then((r) => r.body.find((o: { seriesId: string }) => o.seriesId === id));
+    const balance = async () => (await dom.get(`/relationships/${relId}/balances`)).body[0]?.balance ?? 0;
+    expect((await dom.post(`/relationships/${relId}/tasks`, task(subId, { countMin: 5, countMax: 3 }))).status).toBe(400);
+    expect((await dom.post(`/relationships/${relId}/tasks`, task(subId, { countMin: 3, askMood: true }))).status).toBe(400);
+
+    // Exactly 3, with a consequence: done at 3, failed at 4, and back to done when a mis-tap is fixed.
+    const c = (await dom.post(`/relationships/${relId}/consequences`, { title: "Corner time" })).body;
+    const exact = (await dom.post(`/relationships/${relId}/tasks`, task(subId, { title: "Edges", countMin: 3, countMax: 3, missPenalty: 4, consequenceId: c.id }))).body;
+    const o = await day(exact.id);
+    expect(o).toMatchObject({ count: 0, countMin: 3, countMax: 3, status: "pending" });
+    expect((await sub.post(`/occurrences/${o.id}/complete`)).status).toBe(409);
+    await sub.post(`/occurrences/${o.id}/count`, { by: 1 });
+    expect((await sub.post(`/occurrences/${o.id}/count`, { by: 1 })).body).toMatchObject({ count: 2, status: "pending" });
+    expect((await sub.post(`/occurrences/${o.id}/count`, { by: 1 })).body).toMatchObject({ count: 3, status: "completed" });
+    expect(await balance()).toBe(10);
+    expect((await sub.post(`/occurrences/${o.id}/count`, { by: 1 })).body).toMatchObject({ count: 4, status: "missed" });
+    expect(await balance()).toBe(-4);
+    const consequences = async () => (await sub.get(`/relationships/${relId}/tasks`)).body.filter((t: { assignedConsequenceId: string | null }) => t.assignedConsequenceId).length;
+    expect(await consequences()).toBe(1);
+    expect((await sub.post(`/occurrences/${o.id}/count`, { to: 3 })).body).toMatchObject({ count: 3, status: "completed" });
+    expect(await balance()).toBe(10);
+    expect(await consequences()).toBe(0);
+    expect((await sub.post(`/occurrences/${o.id}/count`, { to: 1 })).body).toMatchObject({ status: "pending" });
+    expect(await balance()).toBe(0);
+
+    // At least 2, points per count: done at 2 and keeps earning past it.
+    const atLeast = (await dom.post(`/relationships/${relId}/tasks`, task(subId, { title: "Water", points: 1, countMin: 2, countPer: "count" }))).body;
+    const w = await day(atLeast.id);
+    await sub.post(`/occurrences/${w.id}/count`, { by: 1 });
+    expect(await balance()).toBe(0);
+    expect((await sub.post(`/occurrences/${w.id}/count`, { by: 1 })).body.status).toBe("completed");
+    expect(await balance()).toBe(2);
+    await sub.post(`/occurrences/${w.id}/count`, { by: 1 });
+    expect(await balance()).toBe(3);
+
+    // No more than 2 stays open until the deadline, then counts as done; short of a minimum by then is missed.
+    const atMost = (await dom.post(`/relationships/${relId}/tasks`, task(subId, { title: "Sweets", points: 5, countMax: 2 }))).body;
+    const m = await day(atMost.id);
+    expect((await sub.post(`/occurrences/${m.id}/count`, { by: 1 })).body.status).toBe("pending");
+    try {
+      ctx.clock.now = new Date("2026-10-17T02:01:00Z");
+      expect((await sub.post(`/occurrences/${m.id}/count`, { by: 1 })).status).toBe(409);
+      await runJobs(ctx.db, ctx.notifier, ctx.clock.now, { materializeDays: 14, reminderLeadMinutes: 30 });
+      expect((await day(atMost.id)).status).toBe("completed");
+      expect((await day(exact.id)).status).toBe("missed");
+      expect(await balance()).toBe(3 + 5 - 4);
+    } finally {
+      ctx.clock.now = new Date("2026-10-16T12:00:00Z");
+    }
+  });
+
   it("schedules completion-anchored tasks from the completion date", async () => {
     const { dom, sub, relId, subId } = await ctx.pair();
     await dom.post(`/relationships/${relId}/tasks`, task(subId, { schedule: { start: "2026-10-16", anchor: "completion", rule: { freq: "daily", interval: 3 } } }));

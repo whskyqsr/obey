@@ -136,6 +136,13 @@ class UpcomingViewModel @Inject constructor(
         }
     }
 
+    /** A count task: [by] 1 for a tap, or [to] to set the count outright. */
+    fun count(o: Occurrence, by: Int? = null, to: Int? = null) = action {
+        val r = api.count(o.id, app.obey.api.CountChange(by = by, to = to))
+        say("${o.title}: ${r.copy(title = o.title).countLine}")
+        refresh()
+    }
+
     fun complete(o: Occurrence, note: String? = null, mood: Int? = null, entry: String? = null) = action {
         api.complete(o.id, CompleteOccurrenceInput(noteMd = note?.takeIf { it.isNotBlank() }, mood = mood, journal = entry?.let { app.obey.api.JournalEntryInput(o.title, it) }))
         say("Marked “${o.title}” done")

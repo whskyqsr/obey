@@ -191,6 +191,11 @@ export const taskInput = z.object({
   askMood: z.boolean().default(false),
   /** A journal task: marking it done means writing a journal entry; the details are the prompt. */
   asksJournal: z.boolean().default(false),
+  /** A count task (cups of water, edges): marked once each time, done when the count is between these. Either may be open; both null is an ordinary task. */
+  countMin: z.number().int().min(1).max(1_000).nullable().default(null),
+  countMax: z.number().int().min(1).max(1_000).nullable().default(null),
+  /** Points and point penalties once per task, or for each one counted (and each one short or over). */
+  countPer: z.enum(["task", "count"]).default("task"),
 });
 export type TaskInput = z.input<typeof taskInput>;
 
@@ -243,8 +248,16 @@ export const occurrence = z.object({
   journalNoteId: id.nullable().default(null),
   /** A Dominant saw this miss and left it missed, so it no longer needs them. */
   missConfirmed: z.boolean().default(false),
+  /** A count task's bounds (both null for an ordinary task) and how many have been marked. */
+  countMin: z.number().int().nullable().default(null),
+  countMax: z.number().int().nullable().default(null),
+  countPer: z.enum(["task", "count"]).default("task"),
+  count: z.number().int().default(0),
 });
 export type Occurrence = z.infer<typeof occurrence>;
+
+/** Adds to a count task's count (a tap is by: 1), or sets it outright to fix a mistake. */
+export const countOccurrence = z.union([z.object({ by: z.number().int().min(-1_000).max(1_000) }), z.object({ to: z.number().int().min(0).max(10_000) })]);
 
 export const proofPhoto = z.object({ id, occurrenceId: id, uploaderId: id, createdAt: z.string() });
 export type ProofPhoto = z.infer<typeof proofPhoto>;

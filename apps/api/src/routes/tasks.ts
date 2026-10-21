@@ -5,6 +5,7 @@ import {
   type TaskStats,
   assignConsequence,
   completeOccurrence as completeBody,
+  countOccurrence as countBody,
   decideRescheduleInput,
   editOccurrence as editBody,
   plainDate,
@@ -25,7 +26,9 @@ import { addComment } from "./comments.js";
 import { canManage, managers, membership, requireManager, requireMember } from "../services/access.js";
 import {
   completeOccurrence,
+  countOccurrence,
   decideReschedule,
+  isCountTask,
   editOccurrence,
   issueConsequence,
   requestGroupReschedule,
@@ -59,6 +62,21 @@ export async function loadOccurrence(db: Tx, id: string, userId: string) {
   const m = await requireMember(db, row.series.relationshipId, userId);
   const [rel] = await db.select().from(relationships).where(eq(relationships.id, row.series.relationshipId));
   return { ...row, member: m, rel: rel! };
+}
+
+/** A count task's bounds must make sense, and it's marked by counting, so it can't also take steps, a review, proof, a mood or an entry. */
+function checkCount(t: {
+  countMin: number | null;
+  countMax: number | null;
+  steps: unknown[];
+  approvalRequired: boolean;
+  proofRequired: boolean;
+  askMood: boolean;
+  asksJournal: boolean;
+}) {
+  if (t.countMin !== null && t.countMax !== null && t.countMin > t.countMax) throw new HttpError(400, "the minimum can't be more than the maximum");
+  if (isCountTask(t) && (t.steps.length || t.approvalRequired || t.proofRequired || t.askMood || t.asksJournal))
+    throw new HttpError(400, "a counted task can't also be a ritual, need approval or proof, or ask for a mood or a journal entry");
 }
 
 /** Rows oldest first. Excused occurrences neither count against the rate nor break a streak. */
@@ -115,6 +133,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     await requireManager(db, req.params.id, req.user.id);
     const body = taskInput.parse(req.body);
     validZone(body.timezone);
+    checkCount(body);
     if (!(await membership(db, req.params.id, body.assigneeId))) throw new HttpError(400, "assignee is not in this relationship");
     const series = await db.transaction(async (tx) => {
       const [s] = await tx
@@ -151,6 +170,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     await requireManager(db, series.relationshipId, req.user.id);
     const body = parsePatch(taskInput.partial(), req.body);
     if (body.timezone) validZone(body.timezone);
+    checkCount({ ...series, ...body });
     if (body.assigneeId && !(await membership(db, series.relationshipId, body.assigneeId))) throw new HttpError(400, "assignee is not in this relationship");
     const timingChanged = body.schedule !== undefined || body.dueTime !== undefined || body.timezone !== undefined;
     const updated = await db.transaction(async (tx) => {
@@ -398,6 +418,19 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         data: { type: submitted ? "occurrence_submitted" : "occurrence_completed", occurrenceId: occ.id },
       });
     }
+    return occurrenceDto(updated, series);
+  });
+
+  app.post<{ Params: { id: string } }>("/occurrences/:id/count", async (req) => {
+    const body = countBody.parse(req.body);
+    const { occ, series, member } = await loadOccurrence(db, req.params.id, req.user.id);
+    const updated = await db.transaction((tx) => countOccurrence(tx, series, occ, { userId: req.user.id, role: member.role }, body, deps.now()));
+    if (req.user.id === series.assigneeId && occ.status !== updated.status && (updated.status === "completed" || updated.status === "missed"))
+      await notifier.send(await managers(db, series.relationshipId, req.user.id), {
+        title: "Fealty",
+        body: updated.status === "completed" ? `${req.user.displayName} completed a task` : `${req.user.displayName} went over on “${series.title}”`,
+        data: { type: updated.status === "completed" ? "occurrence_completed" : "occurrence_missed", occurrenceId: occ.id },
+      });
     return occurrenceDto(updated, series);
   });
 

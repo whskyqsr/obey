@@ -11,6 +11,7 @@ import { RitualDialog, isRitual, stepProgress } from "./Ritual";
 import { SendBackDialog } from "./Comments";
 import { RescheduleSheet } from "./RescheduleSheet";
 import { StreakStrip } from "./StreakStrip";
+import { CountRing, CountSheet, canCount, countLine, isCounted, useCountTap } from "./Count";
 import { Button, Icon, IconButton, cx, useSnackbar } from "./ui";
 
 /** Where a row opens its task. Today's wide layout points it at the side panel instead of the task page. */
@@ -43,7 +44,9 @@ export function useQuickComplete() {
 export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: boolean; actions?: ReactNode }) {
   const { me, isDom, memberName, features } = useRel();
   const quickComplete = useQuickComplete();
+  const countTap = useCountTap();
   const [rescheduling, setRescheduling] = useState(false);
+  const [counting, setCounting] = useState(false);
   // A task that needs proof opens the Done sheet instead of completing in one tap.
   const [completing, setCompleting] = useState(false);
   const [running, setRunning] = useState(false);
@@ -62,8 +65,11 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
     : showDate || !isToday
       ? fmtDateTime(o.dueAt)
       : fmtTime(o.dueAt);
+  const counted = isCounted(o);
+  const countable = counted && canCount(o, mine, isDom);
   const parts = [
-    o.status === "missed" ? "Missed" : overdue ? "Overdue" : null,
+    counted ? countLine(o) : null,
+    o.status === "missed" && !counted ? "Missed" : overdue ? "Overdue" : null,
     when,
     o.status === "pending" && !overdue ? fmtRelative(o.dueAt) : null,
     o.status === "submitted" ? "waiting for approval" : null,
@@ -83,7 +89,9 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
       )}
     >
       <div className="relative z-10">
-        {canComplete ? (
+        {counted ? (
+          <CountRing o={o} onTap={countable && mine ? () => countTap(o) : undefined} onHold={countable ? () => setCounting(true) : undefined} disabled={!countable} />
+        ) : canComplete ? (
           isRitual(o) ? (
             <IconButton icon="play_circle" label={`Start “${o.title}”`} data-action="done" className={missed ? "text-error" : "text-primary"} onClick={() => setRunning(true)} />
           ) : (
@@ -121,7 +129,7 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
         data-task-row
         className="min-w-0 flex-1 py-1 after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
       >
-        <div className={cx("truncate text-body-large text-on-surface", done && "line-through opacity-70")}>{o.title}</div>
+        <div className={cx("truncate text-body-large text-on-surface", done && !counted && "line-through opacity-70")}>{o.title}</div>
         <div className={cx("flex flex-wrap items-center gap-x-2 text-body-medium", missed ? "text-error" : "text-on-surface-variant")}>
           <StreakStrip taskId={o.seriesId} compact />
           <span className="truncate">{parts.join(" · ")}</span>
@@ -148,12 +156,14 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
         {features.points && o.points !== 0 && (
           <span className="min-w-9 rounded-full bg-primary-container/70 px-2 py-0.5 text-center text-label-medium text-on-primary-container tabular-nums">
             {o.points > 0 ? `+${o.points}` : o.points}
+            {counted && o.countPer === "count" ? " each" : ""}
           </span>
         )}
       </div>
       <RescheduleSheet occurrence={o} open={rescheduling} onClose={() => setRescheduling(false)} />
       {completing && <CompleteDialog o={o} open onClose={() => setCompleting(false)} />}
       {running && <RitualDialog o={o} open onClose={() => setRunning(false)} />}
+      {counting && <CountSheet o={o} open onClose={() => setCounting(false)} />}
     </div>
   );
 }

@@ -164,6 +164,9 @@ interface ObeyApi {
     @POST("occurrences/{id}/undo")
     suspend fun undoComplete(@Path("id") occurrenceId: String, @Body body: CompleteOccurrenceInput = CompleteOccurrenceInput()): Occurrence
 
+    @POST("occurrences/{id}/count")
+    suspend fun count(@Path("id") occurrenceId: String, @Body body: CountChange): Occurrence
+
     @POST("occurrences/{id}/complete")
     suspend fun complete(@Path("id") occurrenceId: String, @Body body: CompleteOccurrenceInput): Occurrence
 

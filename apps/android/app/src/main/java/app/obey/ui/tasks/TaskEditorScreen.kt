@@ -34,6 +34,10 @@ import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Balance
 import androidx.compose.material.icons.outlined.EventRepeat
 import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExposurePlus1
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Timer
@@ -187,6 +191,13 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                                 )
                             }
                         }
+                        if (form.counted) {
+                            Text(
+                                "A counted task is marked by counting, so it doesn't take approval, proof, a mood or a journal entry.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
                         LabeledSwitch("Needs approval", if (features.points) "Points post after you approve it" else "You confirm it's done", form.approvalRequired) { v ->
                             vm.update { it.copy(approvalRequired = v) }
                         }
@@ -200,6 +211,7 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                             LabeledSwitch("Journal task", "Marking it done means writing a journal entry, shared with you. The details are the prompt.", form.asksJournal) { v ->
                                 vm.update { it.copy(asksJournal = v) }
                             }
+                        }
                         }
                     }
 
@@ -251,7 +263,8 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                         }
                     }
 
-                    StepsFold(form.steps) { steps -> vm.update { it.copy(steps = steps) } }
+                    if (!form.counted) StepsFold(form.steps) { steps -> vm.update { it.copy(steps = steps) } }
+                    CountFold(form, features.points) { change -> vm.update(change) }
 
                     if (features.points || features.consequences) {
                         val consequence = d.value.consequences.firstOrNull { it.id == form.consequenceId }
@@ -470,6 +483,84 @@ private fun windowLabel(m: Int?) = when {
     m < 60 -> "$m min before"
     m == 60 -> "1 hour before"
     else -> "${m / 60} hours before"
+}
+
+/** A count task is marked once each time (cups of water, edges) and is done when the count is in bounds. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CountFold(form: TaskForm, points: Boolean, update: ((TaskForm) -> TaskForm) -> Unit) {
+    val (min, max) = form.countBounds
+    val bounds = when {
+        min != null && max != null -> if (min == max) "exactly $min" else "$min to $max"
+        min != null -> "at least $min"
+        else -> "no more than $max"
+    }
+    val n = (form.countN.toIntOrNull() ?: 1).coerceIn(1, 1000)
+    val to = max ?: n
+    Fold(
+        Icons.Outlined.ExposurePlus1,
+        if (form.counted) "Count: $bounds" else "Count it",
+        if (form.counted) "Marked once each time, until it's due" else "Mark it more than once, like cups of water",
+    ) {
+        LabeledSwitch("Count it", "A tap marks one more; hold to change the count.", form.counted) { v ->
+            update { if (v) it.copy(counted = true, steps = emptyList(), approvalRequired = false, proofRequired = false, askMood = false, asksJournal = false) else it.copy(counted = false) }
+        }
+        if (form.counted) {
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                CountKind.entries.forEachIndexed { i, k ->
+                    SegmentedButton(selected = form.countKind == k, onClick = { update { it.copy(countKind = k) } }, shape = SegmentedButtonDefaults.itemShape(i, CountKind.entries.size)) {
+                        Text(k.label, maxLines = 1, softWrap = false)
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                OutlinedTextField(
+                    value = form.countN,
+                    onValueChange = { v -> update { it.copy(countN = v.filter(Char::isDigit).take(4)) } },
+                    label = { Text(if (form.countKind == CountKind.Range) "At least" else "How many") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f),
+                )
+                if (form.countKind == CountKind.Range) {
+                    OutlinedTextField(
+                        value = form.countTo,
+                        onValueChange = { v -> update { it.copy(countTo = v.filter(Char::isDigit).take(4)) } },
+                        label = { Text("At most") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                    )
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
+            }
+            Text(
+                when (form.countKind) {
+                    CountKind.Exactly -> "Done at exactly $n. Fewer by the deadline is missed; more counts as failed."
+                    CountKind.AtLeast -> "Done once it reaches $n, and it can keep going. Fewer by the deadline is missed."
+                    CountKind.AtMost -> "Done at the deadline if it's $n or fewer. More counts as failed."
+                    CountKind.Range -> "Done once it reaches $n. Fewer by the deadline is missed; more than $to counts as failed."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (points) {
+                Text("Points and penalties", style = MaterialTheme.typography.bodyLarge)
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    listOf("task" to "Per task", "count" to "Per count").forEachIndexed { i, (v, label) ->
+                        SegmentedButton(selected = form.countPer == v, onClick = { update { it.copy(countPer = v) } }, shape = SegmentedButtonDefaults.itemShape(i, 2)) { Text(label) }
+                    }
+                }
+                Text(
+                    if (form.countPer == "task") "Booked once: points when it's done, the penalty if it isn't."
+                    else "Points for each one counted, and the penalty for each one short or over. A consequence is still handed out once.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
 }
 
 /** A ritual's steps: done in order, one at a time, from the run sheet. A task with none is an ordinary task. */

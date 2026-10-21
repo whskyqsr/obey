@@ -642,3 +642,14 @@ export function useSaveMonthReview(rel: string, month: string) {
     },
   });
 }
+
+// ---- count tasks
+
+/** A tap adds one ({ by: 1 }); a correction sets the count outright ({ to: n }). */
+export function useCountOccurrence(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ id, ...change }: { id: string } & ({ by: number } | { to: number })) => api<Occurrence>(`/occurrences/${id}/count`, { method: "POST", body: change }),
+    onSuccess: () => invalidate(),
+  });
+}

@@ -99,6 +99,13 @@ class TaskListViewModel @Inject constructor(
         }
     }
 
+    /** A count task: [by] 1 for a tap, or [to] to set the count outright. */
+    fun count(o: Occurrence, by: Int? = null, to: Int? = null) = action {
+        val r = api.count(o.id, app.obey.api.CountChange(by = by, to = to))
+        say("${o.title}: ${r.copy(title = o.title).countLine}")
+        refresh()
+    }
+
     fun complete(o: Occurrence, note: String? = null, mood: Int? = null, entry: String? = null) = action {
         val r = api.complete(o.id, CompleteOccurrenceInput(noteMd = note?.takeIf { it.isNotBlank() }, mood = mood, journal = entry?.let { app.obey.api.JournalEntryInput(o.title, it) }))
         say(if (r.status == OccurrenceStatus.Submitted) "Sent for approval" else "Marked “${o.title}” done")
@@ -171,7 +178,7 @@ fun TaskListScreen(
                             }
                         },
                         trailingContent = {
-                            NowStatus(current[t.id].orEmpty(), mine = t.assigneeId == vm.session?.userId, onComplete = { o -> if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) })
+                            NowStatus(current[t.id].orEmpty(), mine = t.assigneeId == vm.session?.userId, onComplete = { o -> if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) }, onCount = { o -> vm.count(o, by = 1) })
                         },
                     )
                 }
@@ -184,7 +191,7 @@ fun TaskListScreen(
 
 /** Today's state for a task, with a one-tap Done when it's the viewer's to do. */
 @Composable
-private fun NowStatus(occurrences: List<Occurrence>, mine: Boolean, onComplete: (Occurrence) -> Unit) {
+private fun NowStatus(occurrences: List<Occurrence>, mine: Boolean, onComplete: (Occurrence) -> Unit, onCount: (Occurrence) -> Unit = {}) {
     val today = LocalDate.now()
     val now = Instant.now()
     fun day(o: Occurrence) = parseInstant(o.dueAt).local().toLocalDate()
@@ -192,6 +199,7 @@ private fun NowStatus(occurrences: List<Occurrence>, mine: Boolean, onComplete: 
     val open = occurrences.firstOrNull { it.status == OccurrenceStatus.Pending && (overdue(it) || day(it) == today) }
     val tint = if (open != null && overdue(open)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
     when {
+        open != null && open.isCounted -> app.obey.ui.today.CountRing(open, if (mine && open.canCount(true, false)) ({ onCount(open) }) else null, null)
         open != null && mine && open.isRitual -> IconButton(onClick = { onComplete(open) }) { Icon(Icons.Outlined.PlayCircle, "Start “${open.title}”", tint = tint) }
         open != null && mine -> IconButton(onClick = { onComplete(open) }) { Icon(Icons.Outlined.RadioButtonUnchecked, "Mark “${open.title}” done", tint = tint) }
         occurrences.any { day(it) == today && it.status == OccurrenceStatus.Completed } ->

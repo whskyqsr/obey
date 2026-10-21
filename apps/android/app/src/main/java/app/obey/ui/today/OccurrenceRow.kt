@@ -61,6 +61,9 @@ data class OccurrenceActions(
     val onConfirmMiss: (() -> Unit)? = null,
     /** Opens the comments on this due date. */
     val onComments: (() -> Unit)? = null,
+    /** A count task: a tap adds one; holding opens the dialog to change the count. */
+    val onCount: (() -> Unit)? = null,
+    val onCountHold: (() -> Unit)? = null,
 )
 
 @Composable
@@ -77,16 +80,17 @@ fun OccurrenceRow(
     val done = occurrence.status == OccurrenceStatus.Completed || occurrence.status == OccurrenceStatus.Excused
     val showPoints = LocalFeatures.current.points
     val supporting = buildList {
+        if (occurrence.isCounted) add(occurrence.countLine)
         add(formatDue(occurrence.dueAt))
         if (occurrence.rescheduled) add("moved")
         if (assigneeName != null) add(assigneeName)
-        if (showPoints && occurrence.points != 0) add("${signed(occurrence.points)} pts")
+        if (showPoints && occurrence.points != 0) add("${signed(occurrence.points)} pts" + if (occurrence.isCounted && occurrence.countPer == "count") " each" else "")
         if (occurrence.status == OccurrenceStatus.Pending && occurrence.isRitual && occurrence.stepsDone.isNotEmpty()) add(occurrence.stepProgress)
         if (occurrence.status == OccurrenceStatus.Pending && actions.onComplete != null && !occurrence.isOpen()) add(occurrence.opensLabel())
         if (occurrence.waitingToSync) add("waiting to sync")
         when (occurrence.status) {
             OccurrenceStatus.Submitted -> add("awaiting approval")
-            OccurrenceStatus.Missed -> add("missed")
+            OccurrenceStatus.Missed -> if (!occurrence.isCounted) add("missed")
             OccurrenceStatus.Excused -> add("excused")
             else -> Unit
         }
@@ -96,6 +100,9 @@ fun OccurrenceRow(
         modifier = if (onOpen != null) modifier.clickable(onClick = onOpen) else modifier,
         colors = ListItemDefaults.colors(),
         leadingContent = {
+            if (occurrence.isCounted) {
+                CountRing(occurrence, actions.onCount, actions.onCountHold)
+            } else {
             val canComplete = actions.onComplete != null && occurrence.status == OccurrenceStatus.Pending && occurrence.isOpen()
             IconButton(onClick = { actions.onComplete?.invoke() }, enabled = canComplete) {
                 when (occurrence.status) {
@@ -109,13 +116,14 @@ fun OccurrenceRow(
                     }
                 }
             }
+            }
         },
         headlineContent = {
-            Text(occurrence.title, textDecoration = if (done) TextDecoration.LineThrough else null)
+            Text(occurrence.title, textDecoration = if (done && !occurrence.isCounted) TextDecoration.LineThrough else null)
         },
         supportingContent = {
             Column {
-                Text(supporting, color = if (occurrence.status == OccurrenceStatus.Missed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(supporting, color = if (occurrence.status == OccurrenceStatus.Missed || occurrence.countState() == app.obey.api.CountState.Over) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
                 occurrence.mood?.let { m ->
                     Row(Modifier.padding(top = 4.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                         Icon(app.obey.ui.common.moodIcon(m), null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -156,7 +164,7 @@ fun OccurrenceRow(
                     IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "More") }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         if (occurrence.status == OccurrenceStatus.Pending) {
-                            if (occurrence.isOpen() && !occurrence.isRitual) actions.onCompleteWithNote?.let {
+                            if (occurrence.isOpen() && !occurrence.isRitual && !occurrence.isCounted) actions.onCompleteWithNote?.let {
                                 DropdownMenuItem(
                                     text = { Text("Done, with a note") },
                                     leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Notes, null) },

@@ -208,6 +208,13 @@ export const taskSeries = pgTable(
     askMood: boolean("ask_mood").notNull().default(false),
     /** A journal task: completing it means writing a journal entry, prompted by the task's details. */
     asksJournal: boolean("asks_journal").notNull().default(false),
+    /** A count task is marked once per time it's done; it's done when the count is between these (either may be open). */
+    countMin: integer("count_min"),
+    countMax: integer("count_max"),
+    /** Whether points and point penalties are booked once ("task") or for each one counted, or short or over ("count"). */
+    countPer: text("count_per", { enum: ["task", "count"] })
+      .notNull()
+      .default("task"),
     active: boolean("active").notNull().default(true),
     /** Set on the consequence handed out automatically for this missed occurrence; unique, so it's issued once. */
     causedByOccurrenceId: uuid("caused_by_occurrence_id").references((): AnyPgColumn => occurrences.id, { onDelete: "set null" }),
@@ -246,6 +253,8 @@ export const occurrences = pgTable(
     commentCount: integer("comment_count").notNull().default(0),
     /** Ids of the ritual steps ticked off so far. */
     stepsDone: jsonb("steps_done").$type<string[]>().notNull().default([]),
+    /** How many times a count task has been marked so far. */
+    count: integer("count").notNull().default(0),
     /** The mood given at a check-in, 1 (worst) to 5 (best). */
     mood: integer("mood"),
     /** The journal entry written to complete a journal task. */
