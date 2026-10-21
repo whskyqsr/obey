@@ -144,7 +144,7 @@ export function Fab({ icon, label, onClick, extended = true, className }: { icon
       onClick={onClick}
       aria-label={label}
       className={cx(
-        "state-layer fixed right-4 bottom-24 z-20 inline-flex h-14 items-center gap-3 rounded-lg bg-primary-container text-on-primary-container shadow-elev-3 md:right-8 md:bottom-8",
+        "state-layer fixed right-4 bottom-[calc(108px+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-3 rounded-lg bg-primary-container text-on-primary-container shadow-elev-3 md:right-8 md:bottom-8",
         extended ? "px-4 pr-5" : "w-14 justify-center",
         className,
       )}
@@ -480,7 +480,7 @@ export function SnackbarProvider({ children }: { children: ReactNode }) {
           <div
             key={msg.key}
             role="status"
-            className="fixed bottom-24 left-1/2 z-[60] flex min-h-12 w-[min(92vw,560px)] -translate-x-1/2 animate-fade-in items-center gap-2 rounded-xs bg-inverse-surface px-4 py-3 text-body-medium text-inverse-on-surface shadow-elev-3 md:bottom-6"
+            className="fixed bottom-[calc(108px+env(safe-area-inset-bottom))] left-1/2 z-[60] flex min-h-12 w-[min(92vw,560px)] -translate-x-1/2 animate-fade-in items-center gap-2 rounded-xs bg-inverse-surface px-4 py-3 text-body-medium text-inverse-on-surface shadow-elev-3 md:bottom-6"
           >
             <span className="flex-1">{msg.text}</span>
             {msg.action ? (

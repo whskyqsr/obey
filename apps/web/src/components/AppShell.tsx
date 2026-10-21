@@ -214,7 +214,7 @@ export function AppShell() {
           ))}
         </nav>
 
-        <main className={cx(editing ? "pb-10" : "pb-28", "md:pb-10 md:pl-24 lg:pl-64")}>
+        <main className={cx(editing ? "pb-10" : "pb-44", "md:pb-10 md:pl-24 lg:pl-64")}>
           {/* Today brings its own side panel on wide screens, so it gets the full width. */}
           <div className={cx("mx-auto", pathname === "/" ? "max-w-5xl xl:max-w-none" : "max-w-5xl")}>
             {rel.endedAt && pathname !== "/dynamic" && (
