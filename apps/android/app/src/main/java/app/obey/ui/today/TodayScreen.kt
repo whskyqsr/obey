@@ -82,6 +82,8 @@ fun TodayScreen(
     val offlineSince by vm.offlineSince.collectAsStateWithLifecycle()
     val locationReady by vm.locationReady.collectAsStateWithLifecycle()
     val curfew by vm.curfew.collectAsStateWithLifecycle()
+    var askingMore by remember { mutableStateOf<app.obey.api.CurfewNight?>(null) }
+    var approvingOther by remember { mutableStateOf<app.obey.api.CurfewRequest?>(null) }
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     MessageEffect(message, snackbar, vm::messageShown)
@@ -101,6 +103,7 @@ fun TodayScreen(
     var dayTasks by remember { mutableStateOf<List<Occurrence>?>(null) }
     var instead by remember { mutableStateOf<app.obey.api.RescheduleRequest?>(null) }
     val session = vm.session
+    val askWho = session?.partners.orEmpty().filter { it.role != app.obey.api.Role.Submissive }.let { if (it.size == 1) it[0].displayName else "your Dominant" }
 
     Scaffold(
         topBar = {
@@ -172,17 +175,31 @@ fun TodayScreen(
                     if (session?.readOnly == true) item(key = "ended") { EndedBanner(onOpenSettings) }
                     curfew?.night?.let { n ->
                         item(key = "curfew") {
+                            val mine = n.assigneeId == me
+                            val asked = curfew?.requests?.firstOrNull { it.occurrenceId == n.occurrenceId }
+                            val beforeCurfew = runCatching { java.time.Instant.parse(n.dueAt).isAfter(java.time.Instant.now()) }.getOrDefault(false)
                             CurfewStrip(
                                 night = n,
-                                mine = n.assigneeId == me,
+                                mine = mine,
                                 name = session?.nameOf(n.assigneeId) ?: "Your partner",
                                 canDecide = session?.canManage == true,
                                 cost = curfew?.cost,
                                 onHome = { vm.homeForCurfew(n) },
                                 onExcuse = { vm.excuseCurfew(n.occurrenceId, "Excused") },
                                 onConfirm = { vm.confirmCurfewMiss(n) },
+                                waiting = if (asked != null && beforeCurfew) " · asked ${if (mine) askWho else "you"} for ${app.obey.ui.common.formatTime(asked.untilAt)}" else "",
+                                onMoreTime = if (mine && beforeCurfew && n.arrivedAt == null && n.status == OccurrenceStatus.Pending && asked == null) ({ askingMore = n }) else null,
                             )
                         }
+                    }
+                    if (isDom) items(curfew?.requests.orEmpty(), key = { "ask-${it.id}" }) { r ->
+                        CurfewAskCard(
+                            r,
+                            session?.nameOf(r.requestedBy) ?: "Your partner",
+                            onApprove = { vm.approveCurfew(r, null) },
+                            onChange = { approvingOther = r },
+                            onDecline = { vm.declineCurfew(r) },
+                        )
                     }
                     items(curfew?.clashes.orEmpty(), key = { "curfew-${it.occurrenceId}" }) { c ->
                         CurfewClashCard(c, onExcuse = { vm.excuseCurfew(c.occurrenceId, "Curfew excused that night") }, onLeave = { vm.leaveClash(c) })
@@ -317,4 +334,11 @@ fun TodayScreen(
     }
 
     noting?.let { o -> DoneDialog(o, onDismiss = { noting = null }, onDone = { note, mood, entry -> vm.complete(o, note, mood, entry); noting = null }) }
+    val busy by vm.busy.collectAsStateWithLifecycle()
+    askingMore?.let { n ->
+        MoreTimeSheet(n, askWho, busy, onDismiss = { askingMore = null }) { until, reason -> vm.askCurfew(n, until, reason, askWho) { askingMore = null } }
+    }
+    approvingOther?.let { r ->
+        ApproveOtherTimeSheet(r, session?.nameOf(r.requestedBy) ?: "They", busy, onDismiss = { approvingOther = null }) { until -> vm.approveCurfew(r, until) { approvingOther = null } }
+    }
 }

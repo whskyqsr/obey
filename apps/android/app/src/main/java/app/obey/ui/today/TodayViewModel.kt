@@ -48,7 +48,7 @@ import kotlinx.coroutines.launch
 import retrofit2.HttpException
 
 /** Tonight's curfew night (if Today shows one), plans that run past curfew, and what a broken night costs. */
-data class TodayCurfew(val night: CurfewNight?, val clashes: List<CurfewClash>, val cost: String?)
+data class TodayCurfew(val night: CurfewNight?, val clashes: List<CurfewClash>, val cost: String?, val requests: List<app.obey.api.CurfewRequest> = emptyList())
 
 data class TodayData(
     /** Before today and still open (not yet marked missed). */
@@ -238,7 +238,7 @@ class TodayViewModel @Inject constructor(
             runCatching { api.consequences(relId).firstOrNull { it.id == s.consequenceId }?.title }.getOrNull()
         } else null
         val cost = listOfNotNull(s?.missPenalty?.takeIf { features.points && it > 0 }?.let { "−$it pts" }, consequence).joinToString(", ").ifEmpty { null }
-        _curfew.value = TodayCurfew(c.night, c.clashes, cost)
+        _curfew.value = TodayCurfew(c.night, c.clashes, cost, c.requests)
     }
 
     fun homeForCurfew(n: CurfewNight) = action {
@@ -256,6 +256,27 @@ class TodayViewModel @Inject constructor(
     fun confirmCurfewMiss(n: CurfewNight) = action {
         api.confirmMiss(n.occurrenceId)
         say("Left as missed")
+        refresh()
+    }
+
+    fun askCurfew(n: CurfewNight, until: String, reason: String?, who: String, onDone: () -> Unit) = action {
+        api.askCurfew(sessions.requireRelationshipId(), app.obey.api.CurfewRequestInput(n.occurrenceId, until, reason))
+        say("Asked $who")
+        onDone()
+        refresh()
+    }
+
+    /** [until] null approves the time asked for. */
+    fun approveCurfew(r: app.obey.api.CurfewRequest, until: String?, onDone: () -> Unit = {}) = action {
+        api.approveCurfew(r.id, app.obey.api.ApproveCurfewRequestInput(until))
+        say("Curfew moved")
+        onDone()
+        refresh()
+    }
+
+    fun declineCurfew(r: app.obey.api.CurfewRequest) = action {
+        api.declineCurfew(r.id)
+        say("Declined")
         refresh()
     }
 

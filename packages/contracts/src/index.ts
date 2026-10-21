@@ -391,7 +391,7 @@ export const curfewRequestInput = z.object({
   eventId: id.nullable().optional(),
 });
 /** A Dominant approving, optionally at an earlier time than asked. */
-export const approveCurfewRequestInput = z.object({ until: z.string().datetime({ offset: true }).optional() });
+export const approveCurfewRequestInput = z.object({ until: z.string().datetime({ offset: true }).nullable().optional() });
 
 /** Whether a plan the person is making runs into one of their curfew nights. */
 export const curfewCheckInput = z.object({ startsAt: z.string().datetime({ offset: true }), endsAt: z.string().datetime({ offset: true }) });

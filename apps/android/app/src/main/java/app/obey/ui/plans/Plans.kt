@@ -17,8 +17,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.EventBusy
+import androidx.compose.material.icons.outlined.HourglassTop
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -154,9 +156,38 @@ class PlanViewModel @Inject constructor(
         }
     }
 
-    fun save(id: String?, input: CalendarEventInput, onSaved: (CalendarEvent) -> Unit) = action {
+    private val _curfew = MutableStateFlow<app.obey.api.Curfew?>(null)
+    /** The dynamic's curfew and my pending asks, for warning about plans that run past it. */
+    val curfew: StateFlow<app.obey.api.Curfew?> = _curfew.asStateFlow()
+
+    private val _night = MutableStateFlow<app.obey.api.CurfewCheckNight?>(null)
+    /** The curfew night the plan being edited runs into, if any. */
+    val night: StateFlow<app.obey.api.CurfewCheckNight?> = _night.asStateFlow()
+
+    fun loadCurfew() {
+        val rel = sessions.session?.relationship ?: return
+        if (!rel.features.location) return
+        viewModelScope.launch { _curfew.value = runCatching { api.curfew(rel.id) }.getOrNull() }
+    }
+
+    fun checkCurfew(startsAt: String?, endsAt: String?) {
+        if (startsAt == null || endsAt == null) {
+            _night.value = null
+            return
+        }
+        viewModelScope.launch {
+            _night.value = runCatching { api.curfewCheck(sessions.requireRelationshipId(), app.obey.api.CurfewCheckInput(startsAt, endsAt)).night }.getOrNull()
+        }
+    }
+
+    /** [ask] asks for that night's curfew to move to the plan's end once the plan is saved. */
+    fun save(id: String?, input: CalendarEventInput, ask: Pair<app.obey.api.CurfewCheckNight, String?>? = null, who: String = "", onSaved: (CalendarEvent) -> Unit) = action {
         val e = if (id == null) api.createEvent(sessions.requireRelationshipId(), input) else api.updateEvent(id, input)
-        if (e.conflictIds.isEmpty()) say(if (id == null) "Plan added" else "Plan updated")
+        val done = if (id == null) "Plan added" else "Plan updated"
+        if (ask != null) {
+            api.askCurfew(sessions.requireRelationshipId(), app.obey.api.CurfewRequestInput(ask.first.occurrenceId, e.endsAt, ask.second, e.id))
+            say("$done. Asked $who.")
+        } else if (e.conflictIds.isEmpty()) say(done)
         loadClashes(e)
         onSaved(e)
     }
@@ -306,7 +337,19 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
     var saved by remember { mutableStateOf(event) }
     var editing by remember { mutableStateOf(event == null) }
     var draft by remember { mutableStateOf(Draft.of(event, day)) }
-    LaunchedEffect(event?.id) { vm.loadClashes(event) }
+    LaunchedEffect(event?.id) {
+        vm.loadClashes(event)
+        vm.loadCurfew()
+    }
+    val curfew by vm.curfew.collectAsStateWithLifecycle()
+    val night by vm.night.collectAsStateWithLifecycle()
+    val onCurfew = curfew?.settings?.let { it.enabled && it.assigneeId == session?.userId } == true
+    val askWho = session?.partners.orEmpty().filter { it.role != app.obey.api.Role.Submissive }.let { if (it.size == 1) it[0].displayName else "your Dominant" }
+    // Asked from this plan and still waiting.
+    val pending = curfew?.requests?.firstOrNull { it.eventId != null && it.eventId == saved?.id }
+    var asking by remember { mutableStateOf(false) }
+    var askReason by remember { mutableStateOf("") }
+    var endedAt by remember { mutableStateOf<String?>(null) }
     val clashItems by vm.clashes.collectAsStateWithLifecycle()
     val form = remember { ClashForm() }
 
@@ -335,6 +378,7 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
                             Text(it, Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp))
                         }
                     }
+                    pending?.let { WaitingOn(askWho, it) }
                     if (session != null && plan != null) Clashes(clashItems, plan, form, session)
                 }
             },
@@ -401,6 +445,24 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
                 } else {
                     WhenRow("Starts", formatDate(draft.start.toLocalDate()), timeOf(draft.start), onDate = { picking = "startDate" }, onTime = { picking = "startTime" })
                     WhenRow("Ends", formatDate(draft.end.toLocalDate()), timeOf(draft.end), onDate = { picking = "endDate" }, onTime = { picking = "endTime" })
+                    if (onCurfew) {
+                        val zone = ZoneId.systemDefault()
+                        val endIso = draft.end.atZone(zone).iso()
+                        LaunchedEffect(draft.start, draft.end) {
+                            kotlinx.coroutines.delay(300)
+                            vm.checkCurfew(draft.start.atZone(zone).iso(), endIso)
+                        }
+                        val n = night
+                        when {
+                            pending != null -> WaitingOn(askWho, pending)
+                            n != null -> CurfewWarning(n, draft.end.atZone(zone).toInstant(), asking, askReason, askWho, onAsking = { asking = it }, onReason = { askReason = it }) {
+                                endedAt = n.dueAt
+                                asking = false
+                                draft = draft.copy(end = parseInstant(n.dueAt).local().toLocalDateTime())
+                            }
+                            endedAt?.let { parseInstant(it).local().toLocalDateTime() == draft.end } == true -> EndsAtCurfew(endedAt!!)
+                        }
+                    }
                 }
                 OutlinedTextField(
                     value = draft.note,
@@ -414,7 +476,9 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
             Button(
                 enabled = draft.valid && !busy,
                 onClick = {
-                    vm.save(current?.id, draft.toInput()) { e ->
+                    val n = night
+                    val ask = if (onCurfew && asking && n != null && pending == null && !draft.allDay) n to askReason.trim().ifEmpty { null } else null
+                    vm.save(current?.id, draft.toInput(), ask, askWho) { e ->
                         onChanged()
                         if (e.conflictIds.isEmpty()) onDismiss()
                         else {
@@ -424,7 +488,7 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
                         }
                     }
                 },
-            ) { Text("Save") }
+            ) { Text(if (onCurfew && asking && night != null && pending == null && !draft.allDay) "Save and ask $askWho" else "Save") }
         },
         dismissButton = { TextButton(onClick = { if (current == null) onDismiss() else editing = false }) { Text("Cancel") } },
     )
@@ -620,5 +684,93 @@ private fun Clashes(items: List<Occurrence>, plan: ClashPlan, form: ClashForm, s
     }
     picking?.let { o ->
         DeadlinePicker(timeOf(o), onPicked = { times[o.id] = it; picking = null }, onDismiss = { picking = null })
+    }
+}
+
+/** "Waiting on Sam": an ask for more curfew time sent from this plan. */
+@Composable
+private fun WaitingOn(who: String, r: app.obey.api.CurfewRequest) {
+    val night = parseInstant(r.fromDueAt).minusSeconds(12 * 3600).local().format(java.time.format.DateTimeFormatter.ofPattern("EEEE"))
+    Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.HourglassTop, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text("Waiting on $who", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "You asked to move $night's curfew from ${formatTime(r.fromDueAt)} to ${formatTime(r.untilAt)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EndsAtCurfew(dueAt: String) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Icon(Icons.Outlined.Bedtime, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text("Ends at curfew", style = MaterialTheme.typography.titleSmall)
+                Text("Curfew that night is ${formatTime(dueAt)}.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+/** A plan of mine running past one of my curfew nights: end it at curfew, or ask for that night's curfew to move to its end. */
+@Composable
+private fun CurfewWarning(
+    night: app.obey.api.CurfewCheckNight,
+    end: Instant,
+    asking: Boolean,
+    reason: String,
+    who: String,
+    onAsking: (Boolean) -> Unit,
+    onReason: (String) -> Unit,
+    onEndAtCurfew: () -> Unit,
+) {
+    val due = parseInstant(night.dueAt)
+    val canAsk = end.isBefore(parseInstant(night.endsAt))
+    val past = java.time.Duration.between(due, end).toMinutes()
+    val howLong = when {
+        past < 60 -> "$past min"
+        past == 60L -> "an hour"
+        past % 60 == 0L -> "${past / 60} hours"
+        else -> "${past / 60} h ${past % 60} min"
+    }
+    val nightName = due.minusSeconds(12 * 3600).local().format(java.time.format.DateTimeFormatter.ofPattern("EEEE"))
+    val c = MaterialTheme.colorScheme
+    Surface(color = c.errorContainer, contentColor = c.onErrorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row {
+                Icon(Icons.Outlined.Bedtime, null)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text("Runs $howLong past curfew", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Curfew $nightName is ${formatTime(night.dueAt)}." + if (canAsk) "" else " It runs past the stay-in time (${formatTime(night.endsAt)}), so end it earlier.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                val n = if (canAsk) 2 else 1
+                SegmentedButton(selected = false, onClick = onEndAtCurfew, shape = SegmentedButtonDefaults.itemShape(0, n)) { Text("End at ${formatTime(night.dueAt)}", maxLines = 1) }
+                if (canAsk) SegmentedButton(selected = asking, onClick = { onAsking(!asking) }, shape = SegmentedButtonDefaults.itemShape(1, n)) {
+                    Text("Ask until ${formatTime(end.toString())}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            if (asking && canAsk) {
+                OutlinedTextField(reason, { onReason(it.take(280)) }, label = { Text("Reason (optional)") }, modifier = Modifier.fillMaxWidth())
+                Text(
+                    "$who is asked to move $nightName's curfew to ${formatTime(end.toString())}. The plan is saved either way; if $who says no, curfew stays at ${formatTime(night.dueAt)}.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
     }
 }

@@ -1122,7 +1122,43 @@ data class CurfewClash(
 )
 
 @Serializable
-data class Curfew(val settings: CurfewInput? = null, val night: CurfewNight? = null, val clashes: List<CurfewClash> = emptyList())
+data class Curfew(
+    val settings: CurfewInput? = null,
+    val night: CurfewNight? = null,
+    val clashes: List<CurfewClash> = emptyList(),
+    /** Pending asks for more time: a sub sees their own, a Dominant all of them. */
+    val requests: List<CurfewRequest> = emptyList(),
+)
+
+/** A sub asking for a later curfew one night; it lapses at that night's curfew if nobody answers. */
+@Serializable
+data class CurfewRequest(
+    val id: String,
+    val occurrenceId: String,
+    /** The plan it was asked from, if any. */
+    val eventId: String? = null,
+    val eventTitle: String? = null,
+    val requestedBy: String,
+    val fromDueAt: String,
+    val untilAt: String,
+    val reason: String? = null,
+)
+
+@Serializable
+data class CurfewRequestInput(val occurrenceId: String, val until: String, val reason: String? = null, val eventId: String? = null)
+
+@Serializable
+data class ApproveCurfewRequestInput(val until: String? = null)
+
+@Serializable
+data class CurfewCheckInput(val startsAt: String, val endsAt: String)
+
+/** The curfew night a plan being made runs into. */
+@Serializable
+data class CurfewCheckNight(val occurrenceId: String, val dueAt: String, val endsAt: String)
+
+@Serializable
+data class CurfewCheck(val night: CurfewCheckNight? = null)
 
 @Serializable
 data class ExcuseCurfewInput(val occurrenceId: String)

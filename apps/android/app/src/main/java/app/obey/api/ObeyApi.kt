@@ -375,6 +375,18 @@ interface ObeyApi {
     @POST("relationships/{id}/curfew/excuse")
     suspend fun excuseCurfew(@Path("id") relationshipId: String, @Body body: ExcuseCurfewInput): Occurrence
 
+    @POST("relationships/{id}/curfew/check")
+    suspend fun curfewCheck(@Path("id") relationshipId: String, @Body body: CurfewCheckInput): CurfewCheck
+
+    @POST("relationships/{id}/curfew/requests")
+    suspend fun askCurfew(@Path("id") relationshipId: String, @Body body: CurfewRequestInput): CurfewRequest
+
+    @POST("curfew-requests/{id}/approve")
+    suspend fun approveCurfew(@Path("id") requestId: String, @Body body: ApproveCurfewRequestInput): CurfewRequest
+
+    @POST("curfew-requests/{id}/decline")
+    suspend fun declineCurfew(@Path("id") requestId: String, @Body body: Map<String, String> = emptyMap()): CurfewRequest
+
     // Push
     @POST("devices")
     suspend fun registerDevice(@Body body: RegisterDeviceInput)

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.EventBusy
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.MoreTime
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -92,6 +93,10 @@ fun CurfewStrip(
     onHome: () -> Unit,
     onExcuse: () -> Unit,
     onConfirm: () -> Unit,
+    /** " · asked Sam for 11:00 PM" while an ask is waiting. */
+    waiting: String = "",
+    /** Set when the sub may still ask for more time tonight. */
+    onMoreTime: (() -> Unit)? = null,
 ) {
     val due = formatTime(night.dueAt)
     val until = formatTime(night.endsAt)
@@ -116,7 +121,8 @@ fun CurfewStrip(
             "Since ${formatTime(night.arrivedAt)} · ${if (mine) "stay" else "in"} until $until",
         )
         !mine -> Strip(Tone.Neutral, Icons.Outlined.Bedtime, if (started) "Curfew started at $due" else "Curfew at $due", "$name isn't home yet · in until $until")
-        night.canTap && !started -> Strip(Tone.Neutral, Icons.Outlined.Bedtime, "Curfew at $due", "Stay in until $until") {
+        night.canTap && !started -> Strip(Tone.Neutral, Icons.Outlined.Bedtime, "Curfew at $due", "Stay in until $until$waiting") {
+            onMoreTime?.let { IconButton(onClick = it) { Icon(Icons.Outlined.MoreTime, "More time") } }
             FilledTonalButton(onClick = onHome) {
                 Icon(Icons.Outlined.Home, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
@@ -129,8 +135,16 @@ fun CurfewStrip(
                 Tone.Soon,
                 Icons.AutoMirrored.Filled.DirectionsWalk,
                 if (started) "Curfew started at $due" else "Curfew in $mins min",
-                "Be home by $due, stay in until $until",
-            )
+                if (waiting.isNotEmpty()) "Be home by $due$waiting" else "Be home by $due, stay in until $until",
+            ) {
+                onMoreTime?.let {
+                    FilledTonalButton(onClick = it) {
+                        Icon(Icons.Outlined.MoreTime, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("More time")
+                    }
+                }
+            }
         }
     }
 }
