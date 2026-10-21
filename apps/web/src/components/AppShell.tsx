@@ -177,7 +177,10 @@ export function AppShell() {
     return () => io.disconnect();
   }, [headerButton]);
   useEffect(() => setMenuOpen(false), [pathname]);
-  const menu = useMemo<Menu>(() => ({ open: () => setMenuOpen(true), track: setHeaderButton, safeWord: canCall ? () => setSafeOpen(true) : undefined }), [canCall]);
+  const menu = useMemo<Menu>(
+    () => ({ open: () => setMenuOpen(true), track: setHeaderButton, safeWord: canCall ? () => setSafeOpen(true) : undefined, banner: <SafeCallBanner /> }),
+    [canCall],
+  );
 
   return (
     <MenuContext.Provider value={menu}>
@@ -223,7 +226,6 @@ export function AppShell() {
                 <Icon name="chevron_right" />
               </Link>
             )}
-            <SafeCallBanner />
             <Outlet />
           </div>
         </main>

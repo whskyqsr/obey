@@ -70,7 +70,7 @@ export function SafeCallBanner() {
     <div
       role="alert"
       className={cx(
-        "mx-4 mt-3 flex flex-col gap-2 rounded-[20px] px-4 pt-4 pb-3 md:mx-6",
+        "mx-4 mb-4 flex flex-col gap-2 rounded-[20px] px-4 pt-4 pb-3 md:mx-6",
         red ? (mine ? "bg-error-container text-on-error-container" : "bg-error text-on-error") : "bg-[#F6D57A] text-[#3A2E00]",
       )}
     >

@@ -90,7 +90,6 @@ import app.obey.ui.common.LocalSafeWord
 import app.obey.api.SafeCall
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.layout.statusBars
 import app.obey.api.Features
 import app.obey.ui.common.LocalFeatures
 import app.obey.auth.AuthState
@@ -289,12 +288,12 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
     }
 }
 
-/** An open safe call sits above every screen, under the status bar, until someone clears it. */
+/** An open safe call sits under every screen, just above the bar, until someone clears it; the top bar never moves. */
 @Composable
 private fun SafeCallFrame(vm: SafeCallViewModel, call: SafeCall?, content: @Composable () -> Unit) {
     Column(Modifier.fillMaxSize()) {
-        if (call != null) SafeCallBanner(vm, call, Modifier.windowInsetsPadding(WindowInsets.statusBars))
-        Box(Modifier.weight(1f).then(if (call != null) Modifier.consumeWindowInsets(WindowInsets.statusBars) else Modifier)) { content() }
+        Box(Modifier.weight(1f)) { content() }
+        if (call != null) SafeCallBanner(vm, call)
     }
 }
 

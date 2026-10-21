@@ -514,38 +514,41 @@ export const useSnackbar = () => useContext(SnackContext);
 export function PageHeader({ title, subtitle, actions }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode }) {
   const menu = useMenu();
   return (
-    <header className="flex items-end gap-2 px-4 pt-6 pb-4 md:px-6">
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1">
-          {menu && (
-            <button
-              ref={menu.track}
-              type="button"
-              aria-label="Menu"
-              title="Menu"
-              onClick={menu.open}
-              className="state-layer -my-1 -ml-3 flex size-12 shrink-0 items-center justify-center rounded-full text-on-surface md:hidden"
-            >
-              <Icon name="menu" />
-            </button>
-          )}
-          <h1 className="min-w-0 flex-1 text-headline-medium text-on-surface md:text-headline-large">{title}</h1>
-          {menu?.safeWord && (
-            <button
-              type="button"
-              aria-label="Safe word"
-              title="Safe word"
-              onClick={menu.safeWord}
-              className="state-layer -my-1 -mr-3 flex size-12 shrink-0 items-center justify-center rounded-full text-error"
-            >
-              <Icon name="front_hand" filled />
-            </button>
-          )}
+    <>
+      <header className="flex items-end gap-2 px-4 pt-6 pb-4 md:px-6">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1">
+            {menu && (
+              <button
+                ref={menu.track}
+                type="button"
+                aria-label="Menu"
+                title="Menu"
+                onClick={menu.open}
+                className="state-layer -my-1 -ml-3 flex size-12 shrink-0 items-center justify-center rounded-full text-on-surface md:hidden"
+              >
+                <Icon name="menu" />
+              </button>
+            )}
+            <h1 className="min-w-0 flex-1 text-headline-medium text-on-surface md:text-headline-large">{title}</h1>
+            {menu?.safeWord && (
+              <button
+                type="button"
+                aria-label="Safe word"
+                title="Safe word"
+                onClick={menu.safeWord}
+                className="state-layer -my-1 -mr-3 flex size-12 shrink-0 items-center justify-center rounded-full text-error"
+              >
+                <Icon name="front_hand" filled />
+              </button>
+            )}
+          </div>
+          {subtitle && <p className={cx("mt-1 text-body-medium text-on-surface-variant", menu && "pl-10 md:pl-0")}>{subtitle}</p>}
         </div>
-        {subtitle && <p className={cx("mt-1 text-body-medium text-on-surface-variant", menu && "pl-10 md:pl-0")}>{subtitle}</p>}
-      </div>
-      {actions && <div className="flex items-center gap-1">{actions}</div>}
-    </header>
+        {actions && <div className="flex items-center gap-1">{actions}</div>}
+      </header>
+      {menu?.banner}
+    </>
   );
 }
 

@@ -1,4 +1,4 @@
-import { createContext, useContext } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 
 /**
  * The phone's navigation menu. Page headers put its button on the title line; once that button scrolls away, the
@@ -10,6 +10,8 @@ export interface Menu {
   track(el: HTMLElement | null): void;
   /** Opens the safe-word sheet; set for subs and switches, who get its button on every page header. */
   safeWord?(): void;
+  /** Shown under every page header, such as an open safe call, so the title and menu never move. */
+  banner?: ReactNode;
 }
 
 export const MenuContext = createContext<Menu | null>(null);
