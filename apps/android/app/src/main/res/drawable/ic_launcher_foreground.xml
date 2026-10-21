@@ -1,20 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Placeholder mark: a ring with a check. 108dp canvas, art kept inside the 66dp safe zone. -->
+<!-- Fealty "Links" mark: two linked diamonds. 108dp canvas, art kept inside the 66dp safe zone.
+     The gaps are real breaks in the paths (not background-coloured overlays) so the themed
+     monochrome icon keeps the interlace. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="@color/launcher_foreground"
-        android:strokeWidth="5"
-        android:pathData="M54,30a24,24 0,1 1,0 48a24,24 0,1 1,0 -48z" />
-    <path
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="@color/launcher_foreground"
-        android:strokeWidth="5"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M43,55l8,8l15,-17" />
+    <group
+        android:translateX="21"
+        android:translateY="21"
+        android:scaleX="0.66"
+        android:scaleY="0.66">
+        <path
+            android:pathData="M38.31,45.52 L32,35 L50,5 L68,35 L50,65 L43.69,54.48"
+            android:strokeColor="@color/launcher_foreground"
+            android:strokeWidth="5.5"
+            android:strokeLineJoin="miter"
+            android:strokeMiterLimit="10" />
+        <path
+            android:pathData="M61.69,54.48 L68,65 L50,95 L32,65 L50,35 L56.31,45.52"
+            android:strokeColor="@color/launcher_foreground"
+            android:strokeWidth="5.5"
+            android:strokeLineJoin="miter"
+            android:strokeMiterLimit="10" />
+    </group>
 </vector>
