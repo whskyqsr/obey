@@ -85,7 +85,6 @@ fun TodayScreen(
     var askingMore by remember { mutableStateOf<app.obey.api.CurfewNight?>(null) }
     var approvingOther by remember { mutableStateOf<app.obey.api.CurfewRequest?>(null) }
     var changingEnd by remember { mutableStateOf<app.obey.api.CurfewClash?>(null) }
-    val partnerNames = session?.partners.orEmpty().joinToString(" and ") { it.displayName }.ifEmpty { "them" }
     val planChanges by vm.planChanges.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -106,6 +105,7 @@ fun TodayScreen(
     var dayTasks by remember { mutableStateOf<List<Occurrence>?>(null) }
     var instead by remember { mutableStateOf<app.obey.api.RescheduleRequest?>(null) }
     val session = vm.session
+    val partnerNames = session?.partners.orEmpty().joinToString(" and ") { it.displayName }.ifEmpty { "them" }
     val askWho = session?.partners.orEmpty().filter { it.role != app.obey.api.Role.Submissive }.let { if (it.size == 1) it[0].displayName else "your Dominant" }
 
     Scaffold(
