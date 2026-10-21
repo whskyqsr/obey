@@ -52,6 +52,7 @@ export function TaskHistory({ taskId }: { taskId: string }) {
                     <div className="text-body-large text-on-surface">{fmtDate(h.originalDate, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</div>
                     <div className="truncate text-body-small text-on-surface-variant">
                       {h.completedAt ? `Done ${fmtDateTime(h.completedAt)}` : `Due ${fmtDateTime(h.dueAt)}`}
+                      {h.syncedAt && ` · offline, synced ${fmtDateTime(h.syncedAt)}`}
                       {h.editedBy && ` · edited by ${h.editedBy === me.user.id ? "you" : memberName(h.editedBy)}`}
                     </div>
                   </div>
@@ -135,7 +136,9 @@ function EditEntry({ entry, onClose }: { entry: HistoryEntry; onClose(): void })
         />
         {status === "completed" && <TextField label="Done at" type="datetime-local" value={doneAt} onChange={(e) => setDoneAt(e.target.value)} />}
         <TextArea label="Note" value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
-        {features.points && <p className="text-body-small text-on-surface-variant">Points follow the status: done earns the task's points, missed costs its penalty, excused is neither.</p>}
+        {features.points && (
+          <p className="text-body-small text-on-surface-variant">Points follow the status: done earns the task's points, missed costs its penalty, excused is neither.</p>
+        )}
       </div>
     </Dialog>
   );

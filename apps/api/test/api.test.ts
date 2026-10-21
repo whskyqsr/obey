@@ -668,6 +668,28 @@ describe("background jobs", () => {
     ctx.clock.now = new Date("2026-10-16T12:00:00Z");
   });
 
+  it("takes a completion made offline at the time it was done, even after the miss job ran", async () => {
+    const { dom, sub, relId } = await ctx.pair();
+    await dom.post(`/relationships/${relId}/tasks`, task((await sub.get("/me")).body.user.id, { missPenalty: 5 }));
+    ctx.clock.now = new Date("2026-10-17T02:01:00Z");
+    await runJobs(ctx.db, ctx.notifier, ctx.clock.now, { materializeDays: 14, reminderLeadMinutes: 30 });
+    const [occ] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    expect(occ.status).toBe("missed");
+
+    // Done at 8:50 pm New York with no signal; it reaches the server an hour later.
+    const done = await sub.post(`/occurrences/${occ.id}/complete`, { doneAt: "2026-10-17T00:50:00.000Z" });
+    expect(done.body).toMatchObject({ status: "completed", completedAt: "2026-10-17T00:50:00.000Z", syncedAt: ctx.clock.now.toISOString() });
+    expect((await dom.get(`/relationships/${relId}/balances`)).body[0]?.balance ?? 0).toBe(occ.points);
+
+    // Too old to sync, or done after the miss was due, it stays as it is.
+    ctx.clock.now = new Date("2026-10-20T02:01:00Z");
+    await runJobs(ctx.db, ctx.notifier, ctx.clock.now, { materializeDays: 14, reminderLeadMinutes: 30 });
+    const [late] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-19&to=2026-10-19`)).body;
+    expect((await sub.post(`/occurrences/${late.id}/complete`, { doneAt: "2026-10-20T01:30:00.000Z" })).status).toBe(409);
+    expect((await sub.post(`/occurrences/${late.id}/complete`, { doneAt: "2026-10-18T23:00:00.000Z" })).status).toBe(409);
+    ctx.clock.now = new Date("2026-10-16T12:00:00Z");
+  });
+
   it("sends one reminder per occurrence", async () => {
     const { dom, relId, subId } = await ctx.pair();
     await dom.post(`/relationships/${relId}/tasks`, task(subId));

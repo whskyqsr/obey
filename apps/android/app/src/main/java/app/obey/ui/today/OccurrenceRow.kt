@@ -83,6 +83,7 @@ fun OccurrenceRow(
         if (showPoints && occurrence.points != 0) add("${signed(occurrence.points)} pts")
         if (occurrence.status == OccurrenceStatus.Pending && occurrence.isRitual && occurrence.stepsDone.isNotEmpty()) add(occurrence.stepProgress)
         if (occurrence.status == OccurrenceStatus.Pending && actions.onComplete != null && !occurrence.isOpen()) add(occurrence.opensLabel())
+        if (occurrence.waitingToSync) add("waiting to sync")
         when (occurrence.status) {
             OccurrenceStatus.Submitted -> add("awaiting approval")
             OccurrenceStatus.Missed -> add("missed")

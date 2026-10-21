@@ -377,7 +377,19 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   app.post<{ Params: { id: string } }>("/occurrences/:id/complete", async (req) => {
     const body = completeBody.parse(req.body ?? {});
     const { occ, series, member } = await loadOccurrence(db, req.params.id, req.user.id);
-    const updated = await db.transaction((tx) => completeOccurrence(tx, series, occ, { userId: req.user.id, role: member.role }, body.noteMd, deps.now(), body.mood, body.journal));
+    const updated = await db.transaction((tx) =>
+      completeOccurrence(
+        tx,
+        series,
+        occ,
+        { userId: req.user.id, role: member.role },
+        body.noteMd,
+        deps.now(),
+        body.mood,
+        body.journal,
+        body.doneAt ? new Date(body.doneAt) : undefined,
+      ),
+    );
     if (req.user.id === series.assigneeId) {
       const submitted = updated.status === "submitted";
       await notifier.send(await managers(db, series.relationshipId, req.user.id), {

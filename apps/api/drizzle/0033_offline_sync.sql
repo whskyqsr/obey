@@ -1,0 +1,1 @@
+ALTER TABLE "occurrences" ADD COLUMN "synced_at" timestamp with time zone;

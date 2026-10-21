@@ -48,6 +48,7 @@ sealed interface SessionState {
 class SessionRepository @Inject constructor(
     private val api: ObeyApi,
     private val settings: SettingsStore,
+    private val offline: OfflineStore,
 ) {
     private val _state = MutableStateFlow<SessionState>(SessionState.Loading)
     val state: StateFlow<SessionState> = _state.asStateFlow()
@@ -61,7 +62,12 @@ class SessionRepository @Inject constructor(
     suspend fun refresh() {
         if (_state.value !is SessionState.Ready) _state.value = SessionState.Loading
         try {
-            val me = api.me()
+            val me = try {
+                api.me().also { offline.saveMe(it) }
+            } catch (e: java.io.IOException) {
+                // No signal: open with what we knew last time, so Today still works.
+                offline.me() ?: throw e
+            }
             val selectedId = settings.selectedRelationshipId.first()
             // An ended dynamic is still there to look back on, but a live one opens first.
             val rel = me.relationships.firstOrNull { it.id == selectedId } ?: me.relationships.firstOrNull { !it.ended } ?: me.relationships.firstOrNull()
@@ -89,7 +95,9 @@ class SessionRepository @Inject constructor(
         refresh()
     }
 
-    fun clear() {
+    /** On sign-out: forget the session and everything kept for offline use. */
+    suspend fun clear() {
         _state.value = SessionState.Loading
+        offline.clear()
     }
 }
