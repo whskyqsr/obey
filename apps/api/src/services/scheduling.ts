@@ -473,7 +473,7 @@ async function issueMissConsequence(db: Tx, series: Series, occ: Occurrence, now
 }
 
 /** Takes back the automatic consequence for an occurrence that's no longer missed, if it hasn't been dealt with yet. */
-async function withdrawMissConsequence(db: Tx, occ: Occurrence) {
+export async function withdrawMissConsequence(db: Tx, occ: Occurrence) {
   const issued = await db
     .update(taskSeries)
     .set({ active: false, updatedAt: new Date() })

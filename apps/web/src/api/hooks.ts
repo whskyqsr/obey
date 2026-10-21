@@ -124,6 +124,15 @@ export function useConfirmMiss(rel: string) {
   });
 }
 
+/** A Dominant keeps a miss but drops the consequence it handed out. */
+export function useDropConsequence(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (id: string) => api<Occurrence>(`/occurrences/${id}/drop-consequence`, { method: "POST", body: {} }),
+    onSuccess: () => invalidate(),
+  });
+}
+
 // ---- me & relationships
 
 export function useMe(enabled = true) {

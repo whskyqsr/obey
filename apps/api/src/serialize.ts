@@ -41,7 +41,7 @@ export const taskDto = (s: Series) => ({
   createdAt: iso(s.createdAt),
 });
 
-export const occurrenceDto = (o: typeof occurrences.$inferSelect, s: Series) => ({
+export const occurrenceDto = (o: typeof occurrences.$inferSelect, s: Series, missConsequence: string | null = null) => ({
   id: o.id,
   seriesId: o.seriesId,
   title: s.title,
@@ -68,6 +68,7 @@ export const occurrenceDto = (o: typeof occurrences.$inferSelect, s: Series) => 
   journalPrompt: s.asksJournal ? s.bodyMd : null,
   journalNoteId: o.journalNoteId,
   missConfirmed: o.missConfirmedAt !== null,
+  missConsequence,
   countMin: s.countMin,
   countMax: s.countMax,
   countPer: s.countPer,

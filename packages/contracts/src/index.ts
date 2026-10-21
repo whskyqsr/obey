@@ -270,6 +270,8 @@ export const occurrence = z.object({
   journalNoteId: id.nullable().default(null),
   /** A Dominant saw this miss and left it missed, so it no longer needs them. */
   missConfirmed: z.boolean().default(false),
+  /** In occurrence lists, a miss's consequence still to be done (its title), which a Dominant can drop while keeping the miss. */
+  missConsequence: z.string().nullable().default(null),
   /** A count task's bounds (both null for an ordinary task) and how many have been marked. */
   countMin: z.number().int().nullable().default(null),
   countMax: z.number().int().nullable().default(null),

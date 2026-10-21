@@ -2,7 +2,7 @@ import { MOODS, MOOD_LABELS } from "./Mood";
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import type { Occurrence } from "../api/types";
-import { useCompleteOccurrence, useConfirmMiss, useEditOccurrence, useReviewOccurrence, useUndoComplete } from "../api/hooks";
+import { useCompleteOccurrence, useConfirmMiss, useDropConsequence, useEditOccurrence, useReviewOccurrence, useUndoComplete } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { fmtDate, fmtDateTime, fmtRelative, fmtTime, isAllDayDue, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
@@ -203,13 +203,17 @@ export function ReviewActions({ o }: { o: Occurrence }) {
   );
 }
 
-/** Decide a miss: excuse it (no penalty, streak intact) or leave it missed, which keeps the penalty. Either clears it from Needs you. */
+/**
+ * Decide a miss: excuse it (no penalty, streak intact), leave it missed, which keeps the penalty, or keep the miss and drop
+ * the consequence it handed out. Each clears it from Needs you.
+ */
 export function MissActions({ o }: { o: Occurrence }) {
   const { rel } = useRel();
   const snack = useSnackbar();
   const edit = useEditOccurrence(rel.id);
   const confirm = useConfirmMiss(rel.id);
-  const busy = edit.isPending || confirm.isPending;
+  const drop = useDropConsequence(rel.id);
+  const busy = edit.isPending || confirm.isPending || drop.isPending;
   return (
     <>
       <IconButton
@@ -218,6 +222,14 @@ export function MissActions({ o }: { o: Occurrence }) {
         disabled={busy}
         onClick={() => edit.mutate({ id: o.id, change: { status: "excused" } }, { onSuccess: () => snack("Excused"), onError: (e) => snack(errorMessage(e)) })}
       />
+      {o.missConsequence && (
+        <IconButton
+          icon="remove_done"
+          label={`Drop “${o.missConsequence}”: it stays missed`}
+          disabled={busy}
+          onClick={() => drop.mutate(o.id, { onSuccess: () => snack(`Dropped “${o.missConsequence}”`), onError: (e) => snack(errorMessage(e)) })}
+        />
+      )}
       <IconButton
         icon="check"
         label="Accept: it stays missed"

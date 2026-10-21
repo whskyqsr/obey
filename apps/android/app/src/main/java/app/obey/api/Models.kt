@@ -394,6 +394,8 @@ data class Occurrence(
     val journalNoteId: String? = null,
     /** A Dominant saw this miss and left it missed, so it no longer needs them. */
     val missConfirmed: Boolean = false,
+    /** In occurrence lists, a miss's consequence still to be done (its title), which a Dominant can drop while keeping the miss. */
+    val missConsequence: String? = null,
     /** A count task's bounds (both null for an ordinary task) and how many have been marked. */
     val countMin: Int? = null,
     val countMax: Int? = null,

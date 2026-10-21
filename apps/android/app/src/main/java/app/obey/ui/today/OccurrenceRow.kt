@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material.icons.outlined.RemoveCircleOutline
+import androidx.compose.material.icons.outlined.RemoveDone
 import androidx.compose.material.icons.automirrored.outlined.Notes
 import androidx.compose.material.icons.outlined.AddComment
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
@@ -59,6 +60,8 @@ data class OccurrenceActions(
     val onExcuse: (() -> Unit)? = null,
     /** A Dominant leaving a miss as missed: the penalty stays and it stops needing them. */
     val onConfirmMiss: (() -> Unit)? = null,
+    /** Keep the miss but drop the consequence it handed out (only when one is still to be done). */
+    val onDropConsequence: (() -> Unit)? = null,
     /** Opens the comments on this due date. */
     val onComments: (() -> Unit)? = null,
     /** A count task: a tap adds one; holding opens the dialog to change the count. */
@@ -158,6 +161,7 @@ fun OccurrenceRow(
             if (actions.onExcuse != null || actions.onConfirmMiss != null) {
                 Row {
                     actions.onExcuse?.let { IconButton(onClick = it) { Icon(Icons.Outlined.RemoveCircleOutline, "Excuse: no penalty") } }
+                    actions.onDropConsequence?.let { IconButton(onClick = it) { Icon(Icons.Outlined.RemoveDone, "Drop “${occurrence.missConsequence}”: it stays missed") } }
                     actions.onConfirmMiss?.let { FilledTonalIconButton(onClick = it) { Icon(Icons.Outlined.Check, "Accept: it stays missed") } }
                 }
             } else if (actions.onApprove != null || actions.onReject != null) {
