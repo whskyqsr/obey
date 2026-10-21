@@ -8,6 +8,7 @@ import { calendarEvents, curfewRequests, memberships, occurrences, relationships
 import { HttpError, forbidden, notFound } from "../errors.js";
 import { canManage, requireMember } from "../services/access.js";
 import { nightForPlan } from "../services/curfew.js";
+import { sendWithWords } from "../notify.js";
 
 type Event = typeof calendarEvents.$inferSelect;
 type Due = { id: string; dueAt: Date; assigneeId: string };
@@ -172,11 +173,12 @@ export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         const [rel] = await db.select({ curfew: relationships.curfew }).from(relationships).where(eq(relationships.id, found.relationshipId));
         const [author] = await db.select({ timezone: users.timezone }).from(users).where(eq(users.id, found.authorId));
         const at = clock(end, author?.timezone ?? rel?.curfew?.timezone);
-        await notifier.send([found.authorId], {
+        const push = {
           title: "Fealty",
           body: `${req.user.displayName} changed ${found.title}: it now ends at ${at}${movesCurfew ? `, and curfew moves to ${at} that night` : ""}`,
           data: { type: "event_changed", eventId: found.id },
-        });
+        };
+        await sendWithWords(db, notifier, [found.authorId], push, e!.changeNote ? { ...push, body: `${push.body}. “${e!.changeNote}”` } : null);
       }
       return withConflicts(e!);
     }
