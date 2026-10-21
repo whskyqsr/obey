@@ -4,7 +4,7 @@ import type { Features } from "../api/types";
 import { MenuContext, type Menu } from "../lib/menu";
 import { useRel } from "../lib/relationship";
 import { useNeedsYou } from "../lib/today";
-import { BrandMark } from "./BrandMark";
+import { DynamicSwitcher } from "./DynamicSwitcher";
 import { Icon, cx } from "./ui";
 
 interface Dest {
@@ -74,7 +74,6 @@ function BarItem({ d, active, badge }: { d: Dest; active: boolean; badge?: numbe
 /** The phone's menu: everything that isn't in the bar, sliding in from the left. */
 function MenuDrawer({ open, onClose, items }: { open: boolean; onClose(): void; items: Dest[] }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { title, rel, partners } = useRel();
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -107,12 +106,8 @@ function MenuDrawer({ open, onClose, items }: { open: boolean; onClose(): void; 
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="mb-3 flex items-center gap-3 px-4">
-          <BrandMark className="size-10 rounded-md" />
-          <div className="min-w-0">
-            <div className="text-title-large text-on-surface">Fealty</div>
-            <div className="truncate text-body-medium text-on-surface-variant">{rel.name || !partners.length ? title : `with ${title}`}</div>
-          </div>
+        <div className="mb-2">
+          <DynamicSwitcher inline onSwitched={onClose} />
         </div>
         {items.filter((d) => !DRAWER_BOTTOM.includes(d.to)).map(row)}
         <hr className="mx-4 my-2 border-outline-variant" />
@@ -162,7 +157,7 @@ function DrawerItem({ d, active, badge }: { d: Dest; active: boolean; badge?: nu
 
 export function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { title, me, rel } = useRel();
+  const { rel } = useRel();
   const todayBadge = useNeedsYou().count;
   const { all, bar, more } = useDestinations();
   // The editor's Save is the only action that matters while editing, so the phone bar steps aside.
@@ -185,10 +180,9 @@ export function AppShell() {
       <div className="min-h-dvh bg-surface">
         {/* Navigation drawer (large): one list, with Settings at the bottom */}
         <nav className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col gap-1 overflow-y-auto border-r border-outline-variant/40 bg-surface px-3 py-4 lg:flex">
-          <Link to="/" className="mb-3 flex items-center gap-3 px-3" title={title}>
-            <BrandMark className="size-10 rounded-md" />
-            <span className="text-title-large text-on-surface">Fealty</span>
-          </Link>
+          <div className="mb-3">
+            <DynamicSwitcher />
+          </div>
           {all
             .filter((d) => !DRAWER_BOTTOM.includes(d.to))
             .map((d) => (
@@ -204,9 +198,9 @@ export function AppShell() {
 
         {/* Navigation rail (medium) */}
         <nav className="fixed inset-y-0 left-0 z-30 hidden w-24 flex-col items-center gap-3 overflow-y-auto bg-surface pt-4 pb-4 md:flex lg:hidden">
-          <Link to="/" className="mb-4" title={title}>
-            <BrandMark className="size-14 rounded-lg" />
-          </Link>
+          <div className="mb-4">
+            <DynamicSwitcher compact />
+          </div>
           {all.map((d) => (
             <NavItem key={d.to} d={d} active={isActive(pathname, d.to)} badge={d.to === "/" ? todayBadge : 0} />
           ))}
