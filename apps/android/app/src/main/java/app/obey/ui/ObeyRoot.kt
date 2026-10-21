@@ -54,6 +54,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.outlined.AutoStories
+import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.FactCheck
 import androidx.compose.material.icons.outlined.Menu
@@ -79,6 +80,7 @@ import app.obey.ui.rewards.RewardsScreen
 import app.obey.ui.protocols.ProtocolEditorScreen
 import app.obey.ui.protocols.ProtocolsScreen
 import app.obey.ui.rulelog.RuleLogScreen
+import app.obey.ui.stats.StatsScreen
 import app.obey.ui.kits.KitsScreen
 import app.obey.ui.kits.describe
 import app.obey.ui.rules.RulesScreen
@@ -155,6 +157,7 @@ private fun topLevels(f: Features) = listOfNotNull(
     if (f.protocols) TopLevel(ProtocolsRoute, "Protocols", Icons.Outlined.FactCheck) { it.hasRoute<ProtocolsRoute>() } else null,
     TopLevel(NotesRoute, "Notes", Icons.AutoMirrored.Outlined.Notes) { it.hasRoute<NotesRoute>() },
     if (f.journal) TopLevel(JournalRoute, "Journal", Icons.Outlined.AutoStories) { it.hasRoute<JournalRoute>() } else null,
+    if (f.stats) TopLevel(StatsRoute, "Stats", Icons.Outlined.Insights) { it.hasRoute<StatsRoute>() } else null,
     // Tasks open from Today and Calendar; the full list is for managing them, so it sits under More.
     TopLevel(TaskListRoute, "All tasks", Icons.Outlined.Checklist) { it.hasRoute<TaskListRoute>() },
 )
@@ -181,7 +184,7 @@ private fun MainScaffold() {
     var moreOpen by remember { mutableStateOf(false) }
     // A tab the dynamic just switched off (say, from Settings) shouldn't stay reachable underneath.
     val switchedOff = destination != null && !isTopLevel && destination.hierarchy.any {
-        it.hasRoute<RewardsRoute>() || it.hasRoute<ConsequencesRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<ProtocolsRoute>() || it.hasRoute<JournalRoute>()
+        it.hasRoute<RewardsRoute>() || it.hasRoute<ConsequencesRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<ProtocolsRoute>() || it.hasRoute<JournalRoute>() || it.hasRoute<StatsRoute>()
     }
     LaunchedEffect(switchedOff) { if (switchedOff) nav.navigate(TodayRoute) { popUpTo(nav.graph.findStartDestination().id) } }
 
@@ -310,6 +313,7 @@ private fun ObeyNavHost(nav: NavHostController) {
                 onOpenSettings = settings,
             )
         }
+        composable<StatsRoute> { StatsScreen(onOpenSettings = settings, onOpenTask = openTask) }
         composable<TaskListRoute> {
             TaskListScreen(
                 onOpen = openTask,

@@ -134,6 +134,9 @@ interface ObeyApi {
     @GET("relationships/{id}/streaks")
     suspend fun streaks(@Path("id") relationshipId: String): List<TaskStreak>
 
+    @GET("relationships/{id}/stats")
+    suspend fun stats(@Path("id") relationshipId: String, @Query("days") days: Int, @Query("zone") zone: String, @Query("userId") userId: String?): DynamicStats
+
     @GET("relationships/{id}/moods")
     suspend fun moods(@Path("id") relationshipId: String, @Query("days") days: Int): List<MoodEntry>
 

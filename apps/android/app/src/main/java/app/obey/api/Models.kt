@@ -175,6 +175,7 @@ data class Features(
     val rules: Boolean = true,
     val protocols: Boolean = true,
     val journal: Boolean = true,
+    val stats: Boolean = true,
 )
 
 /** The relationship's name, or the partners' names when it has none. */
@@ -425,6 +426,31 @@ data class CompleteOccurrenceInput(
 
 @Serializable
 data class JournalEntryInput(val title: String = "", val bodyMd: String)
+
+/** Done, missed and excused counts; [rate] is done / (done + missed), null when nothing was due. */
+@Serializable
+data class Tally(val done: Int = 0, val missed: Int = 0, val excused: Int = 0, val rate: Double? = null)
+
+@Serializable
+data class StatsTotals(val done: Int, val missed: Int, val excused: Int, val rate: Double? = null, val onTime: Int = 0, val moved: Int = 0)
+
+@Serializable
+data class StatsBucket(val start: String, val done: Int, val missed: Int, val excused: Int, val rate: Double? = null)
+
+@Serializable
+data class TaskTally(val taskId: String, val title: String, val active: Boolean, val streak: Int, val done: Int, val missed: Int, val excused: Int, val rate: Double? = null)
+
+/** How one person's tasks went over the last [days] days. [bucket] is "day", "week" or "month"; [weekdays] starts on Sunday. */
+@Serializable
+data class DynamicStats(
+    val days: Int,
+    val totals: StatsTotals,
+    val previous: Tally,
+    val bucket: String,
+    val buckets: List<StatsBucket>,
+    val weekdays: List<Tally>,
+    val tasks: List<TaskTally>,
+)
 
 /** One point on the mood graph: a check-in answer, or a journal entry with a mood. */
 @Serializable
