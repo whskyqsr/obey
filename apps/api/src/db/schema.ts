@@ -206,6 +206,8 @@ export const taskSeries = pgTable(
     windowMinutes: integer("window_minutes"),
     /** A check-in: completing it asks the assignee how they feel (1 to 5). */
     askMood: boolean("ask_mood").notNull().default(false),
+    /** A journal task: completing it means writing a journal entry, prompted by the task's details. */
+    asksJournal: boolean("asks_journal").notNull().default(false),
     active: boolean("active").notNull().default(true),
     /** Set on the consequence handed out automatically for this missed occurrence; unique, so it's issued once. */
     causedByOccurrenceId: uuid("caused_by_occurrence_id").references((): AnyPgColumn => occurrences.id, { onDelete: "set null" }),
@@ -244,6 +246,8 @@ export const occurrences = pgTable(
     stepsDone: jsonb("steps_done").$type<string[]>().notNull().default([]),
     /** The mood given at a check-in, 1 (worst) to 5 (best). */
     mood: integer("mood"),
+    /** The journal entry written to complete a journal task. */
+    journalNoteId: uuid("journal_note_id").references((): AnyPgColumn => notes.id, { onDelete: "set null" }),
     reviewedBy: uuid("reviewed_by").references(() => users.id),
     reviewedAt: ts("reviewed_at"),
     /** Cancelled because someone called it off around a plan (not because its series was edited); history shows these. */

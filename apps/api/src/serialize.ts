@@ -27,6 +27,7 @@ export const taskDto = (s: Series) => ({
   steps: s.steps,
   windowMinutes: s.windowMinutes,
   askMood: s.askMood,
+  asksJournal: s.asksJournal,
   summary: describe(s.schedule),
   assignedConsequenceId: s.assignedConsequenceId,
   active: s.active,
@@ -56,6 +57,9 @@ export const occurrenceDto = (o: typeof occurrences.$inferSelect, s: Series) => 
   opensAt: s.windowMinutes ? iso(new Date(o.dueAt.getTime() - s.windowMinutes * 60_000)) : null,
   askMood: s.askMood,
   mood: o.mood,
+  asksJournal: s.asksJournal,
+  journalPrompt: s.asksJournal ? s.bodyMd : null,
+  journalNoteId: o.journalNoteId,
 });
 
 /** `title` is the task's, so a request card can say which task it's about. */

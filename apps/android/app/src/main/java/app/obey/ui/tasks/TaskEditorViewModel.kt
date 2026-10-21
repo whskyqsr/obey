@@ -59,6 +59,7 @@ data class TaskForm(
     /** Only doable this many minutes before it's due; null for any time. */
     val windowMinutes: Int? = null,
     val askMood: Boolean = false,
+    val asksJournal: Boolean = false,
 ) {
     val titleError: String? get() = if (title.isBlank()) "Give it a title" else null
     val valid: Boolean get() = titleError == null && assigneeId.isNotEmpty() &&
@@ -160,6 +161,7 @@ class TaskEditorViewModel @Inject constructor(
         steps = t.steps,
         windowMinutes = t.windowMinutes,
         askMood = t.askMood,
+        asksJournal = t.asksJournal,
     )
 
     fun update(change: (TaskForm) -> TaskForm) = _form.update(change)
@@ -191,6 +193,7 @@ class TaskEditorViewModel @Inject constructor(
             // A window counts back from a due time, so an all-day task has none.
             windowMinutes = if (f.allDay) null else f.windowMinutes,
             askMood = f.askMood,
+            asksJournal = f.asksJournal,
         )
         action {
             if (original == null) api.createTask(sessions.requireRelationshipId(), input)

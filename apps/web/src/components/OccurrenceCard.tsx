@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Suspense, lazy, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import type { Occurrence, OccurrenceStatus } from "@obey/contracts";
 import { useCompleteOccurrence, useReviewOccurrence } from "../api/hooks";
@@ -11,7 +11,10 @@ import { MOODS, MOOD_LABELS, MoodPicker } from "./Mood";
 import { RitualDialog, StepList, isRitual, stepProgress } from "./Ritual";
 import { RescheduleSheet } from "./RescheduleSheet";
 import { StreakStrip } from "./StreakStrip";
-import { Badge, Button, Dialog, Icon, TextArea, cx, useSnackbar } from "./ui";
+import { Badge, Button, Dialog, Icon, Spinner, TextArea, cx, useSnackbar } from "./ui";
+import { importPage } from "../lib/staleBuild";
+
+const MarkdownEditor = lazy(importPage(() => import("./MarkdownEditor").then((m) => ({ default: m.MarkdownEditor }))));
 
 const STATUS: Record<OccurrenceStatus, { label: string; tone: "primary" | "error" | "tertiary" | "neutral" }> = {
   pending: { label: "To do", tone: "neutral" },
@@ -96,6 +99,11 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
           <div className="text-label-large text-on-surface-variant">{stepProgress(o)}</div>
           <StepList o={o} />
         </div>
+      )}
+      {o.journalNoteId && (
+        <Link to="/journal/$noteId" params={{ noteId: o.journalNoteId }} className="relative z-10 flex items-center gap-1.5 self-start text-label-large text-primary">
+          <Icon name="auto_stories" size={18} /> Read the journal entry
+        </Link>
       )}
       {o.mood && (
         <p className="flex items-center gap-1.5 text-body-medium text-on-surface-variant">
@@ -186,17 +194,21 @@ export function CompleteDialog({ o, open, onClose }: { o: Occurrence; open: bool
   const { rel } = useRel();
   const snack = useSnackbar();
   const complete = useCompleteOccurrence(rel.id);
-  const { me } = useRel();
+  const { me, partners } = useRel();
+  const partnerNames = partners.map((m) => m.displayName).join(" and ");
   const [note, setNote] = useState("");
   const [mood, setMood] = useState<number | null>(null);
   // Only the assignee answers a check-in; a Dominant marking it done skips the mood.
   const asksMood = o.askMood && o.assigneeId === me.user.id;
-  const needsProof = o.proofRequired && o.photoCount === 0 && !note.trim();
+  // A journal task is done by writing the entry, which also counts as proof.
+  const asksJournal = o.asksJournal && o.assigneeId === me.user.id;
+  const [entry, setEntry] = useState("");
+  const needsProof = o.proofRequired && o.photoCount === 0 && !note.trim() && !(asksJournal && entry.trim());
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      title={asksMood ? o.title : `Done: ${o.title}`}
+      title={asksMood || asksJournal ? o.title : `Done: ${o.title}`}
       actions={
         <>
           <Button variant="text" onClick={onClose}>
@@ -204,23 +216,29 @@ export function CompleteDialog({ o, open, onClose }: { o: Occurrence; open: bool
           </Button>
           <Button
             busy={complete.isPending}
-            disabled={needsProof || (asksMood && !mood)}
+            disabled={needsProof || (asksMood && !mood) || (asksJournal && !entry.trim())}
             onClick={() =>
               complete.mutate(
-                { id: o.id, noteMd: note.trim() || undefined, mood: asksMood ? mood! : undefined },
+                {
+                  id: o.id,
+                  noteMd: note.trim() || undefined,
+                  mood: asksMood ? mood! : undefined,
+                  journal: asksJournal ? { title: o.title, bodyMd: entry } : undefined,
+                },
                 {
                   onSuccess: (res) => {
                     onClose();
                     setNote("");
                     setMood(null);
-                    snack(res?.status === "submitted" ? "Sent for approval" : asksMood ? "Checked in" : "Marked done");
+                    setEntry("");
+                    snack(res?.status === "submitted" ? "Sent for approval" : asksJournal ? "Saved to your journal" : asksMood ? "Checked in" : "Marked done");
                   },
                   onError: (e) => snack(errorMessage(e)),
                 },
               )
             }
           >
-            {asksMood ? "Check in" : "Mark done"}
+            {asksJournal ? "Save entry" : asksMood ? "Check in" : "Mark done"}
           </Button>
         </>
       }
@@ -232,14 +250,30 @@ export function CompleteDialog({ o, open, onClose }: { o: Occurrence; open: bool
             <MoodPicker value={mood} onChange={setMood} />
           </>
         )}
-        {o.proofRequired && <p>This one needs proof: add a photo, a note, or both.</p>}
-        <ProofPhotos o={o} canAdd />
-        <TextArea
-          label={o.proofRequired ? "Note" : asksMood ? "Anything to add? (optional)" : "Note (optional)"}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          maxLength={5000}
-        />
+        {asksJournal ? (
+          <>
+            {o.journalPrompt?.trim() && (
+              <blockquote className="border-l-4 border-primary pl-3 text-body-large whitespace-pre-wrap text-on-surface">{o.journalPrompt.trim()}</blockquote>
+            )}
+            <div>
+              <Suspense fallback={<Spinner />}>
+                <MarkdownEditor value={entry} onChange={setEntry} editable placeholder="Write your entry" label="Your entry" compact />
+              </Suspense>
+              <p className="mt-1 px-1 text-body-small text-on-surface-variant">Saved to your journal and shared with {partnerNames || "your partner"}.</p>
+            </div>
+          </>
+        ) : (
+          <>
+            {o.proofRequired && <p>This one needs proof: add a photo, a note, or both.</p>}
+            <ProofPhotos o={o} canAdd />
+            <TextArea
+              label={o.proofRequired ? "Note" : asksMood ? "Anything to add? (optional)" : "Note (optional)"}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              maxLength={5000}
+            />
+          </>
+        )}
       </div>
     </Dialog>
   );

@@ -405,6 +405,22 @@ describe("tasks and occurrences", () => {
     expect((await sub.get(`/relationships/${relId}/moods`)).body).toHaveLength(3);
   });
 
+  it("completes a journal task by writing the entry", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    await dom.post(`/relationships/${relId}/tasks`, task(subId, { title: "Journal tonight", bodyMd: "What made you proud today?", asksJournal: true }));
+    const [first] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    expect(first).toMatchObject({ asksJournal: true, journalPrompt: "What made you proud today?", journalNoteId: null });
+    expect((await sub.post(`/occurrences/${first.id}/complete`)).status).toBe(409);
+    expect((await sub.post(`/occurrences/${first.id}/complete`, { journal: { bodyMd: "  " } })).status).toBe(400);
+    const done = (await sub.post(`/occurrences/${first.id}/complete`, { journal: { bodyMd: "Finished the report early." } })).body;
+    expect(done.status).toBe("completed");
+    const entry = (await dom.get(`/relationships/${relId}/notes`)).body.find((n: { id: string }) => n.id === done.journalNoteId);
+    expect(entry).toMatchObject({ kind: "journal", title: "Journal tonight", bodyMd: "Finished the report early.", authorId: subId, visibility: "shared" });
+    // Undo takes the entry back too, so redoing it doesn't leave two.
+    expect((await sub.post(`/occurrences/${first.id}/undo`)).body).toMatchObject({ status: "pending", journalNoteId: null });
+    expect((await dom.get(`/relationships/${relId}/notes`)).body.filter((n: { kind: string }) => n.kind === "journal")).toHaveLength(0);
+  });
+
   it("accepts a note as proof", async () => {
     const { dom, sub, relId, subId } = await ctx.pair();
     await dom.post(`/relationships/${relId}/tasks`, task(subId, { proofRequired: true }));

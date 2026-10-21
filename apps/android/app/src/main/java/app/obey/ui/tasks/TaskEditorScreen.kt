@@ -176,7 +176,7 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                     Fold(
                         Icons.Outlined.Person,
                         "For ${assignee?.displayName ?: "nobody yet"}",
-                        listOfNotNull(if (form.approvalRequired) "Needs your approval" else "No approval needed", if (form.proofRequired) "proof required" else "no proof", if (form.askMood) "mood check-in" else null).joinToString(" · "),
+                        listOfNotNull(if (form.approvalRequired) "Needs your approval" else "No approval needed", if (form.proofRequired) "proof required" else "no proof", if (form.askMood) "mood check-in" else null, if (form.asksJournal) "journal task" else null).joinToString(" · "),
                     ) {
                         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             d.value.members.forEach { m ->
@@ -195,6 +195,11 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                         }
                         LabeledSwitch("Mood check-in", "Marking it done asks how they feel, for the mood graph in Your dynamic", form.askMood) { v ->
                             vm.update { it.copy(askMood = v) }
+                        }
+                        if (features.journal || form.asksJournal) {
+                            LabeledSwitch("Journal task", "Marking it done means writing a journal entry, shared with you. The details are the prompt.", form.asksJournal) { v ->
+                                vm.update { it.copy(asksJournal = v) }
+                            }
                         }
                     }
 

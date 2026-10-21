@@ -14,7 +14,7 @@ import {
   splitSeries,
 } from "@obey/recurrence";
 import type { Tx } from "../db/index.js";
-import { consequences, occurrences, pointsLedger, relationships, reschedules, taskSeries } from "../db/schema.js";
+import { consequences, notes, occurrences, pointsLedger, relationships, reschedules, taskSeries } from "../db/schema.js";
 import { HttpError, forbidden } from "../errors.js";
 import { type Role, canManage } from "./access.js";
 
@@ -117,6 +117,7 @@ export async function completeOccurrence(
   noteMd: string | undefined,
   now: Date,
   mood?: number,
+  journal?: { title: string; bodyMd: string },
 ): Promise<Occurrence> {
   const isAssignee = actor.userId === series.assigneeId;
   if (!isAssignee && !canManage(actor.role)) throw forbidden("only the assignee can complete this");
@@ -127,14 +128,32 @@ export async function completeOccurrence(
   if (isAssignee && !canManage(actor.role)) assertWindowOpen(series, occ, now);
   if (isAssignee && !canManage(actor.role) && series.steps.some((s) => !occ.stepsDone.includes(s.id))) throw new HttpError(409, "finish every step first");
   // "Proof required" means a photo or a note; a Dominant marking it done needs neither.
-  if (series.proofRequired && isAssignee && !canManage(actor.role) && occ.photoCount === 0 && !(noteMd ?? occ.noteMd ?? "").trim())
+  if (series.proofRequired && isAssignee && !canManage(actor.role) && occ.photoCount === 0 && !(noteMd ?? occ.noteMd ?? "").trim() && !journal)
     throw new HttpError(409, "add a photo or a note as proof");
   // A check-in needs the assignee's mood; only they can give it.
   if (series.askMood && isAssignee && !canManage(actor.role) && mood === undefined) throw new HttpError(409, "pick how you feel");
-  if (noteMd !== undefined || (mood !== undefined && isAssignee))
+  // A journal task is done by writing the entry; it goes to the journal, shared, and stays linked here.
+  if (series.asksJournal && isAssignee && !canManage(actor.role) && !journal) throw new HttpError(409, "write your journal entry first");
+  let journalNoteId: string | undefined;
+  if (journal && isAssignee && series.asksJournal) {
+    const [entry] = await db
+      .insert(notes)
+      .values({
+        relationshipId: series.relationshipId,
+        authorId: actor.userId,
+        kind: "journal",
+        title: journal.title.trim() || series.title,
+        bodyMd: journal.bodyMd,
+        visibility: "shared",
+        mood: mood ?? null,
+      })
+      .returning({ id: notes.id });
+    journalNoteId = entry!.id;
+  }
+  if (noteMd !== undefined || (mood !== undefined && isAssignee) || journalNoteId)
     await db
       .update(occurrences)
-      .set({ ...(noteMd !== undefined ? { noteMd } : {}), ...(mood !== undefined && isAssignee ? { mood } : {}) })
+      .set({ ...(noteMd !== undefined ? { noteMd } : {}), ...(mood !== undefined && isAssignee ? { mood } : {}), ...(journalNoteId ? { journalNoteId } : {}) })
       .where(eq(occurrences.id, occ.id));
   if (series.approvalRequired && isAssignee && !canManage(actor.role)) {
     const [submitted] = await db.update(occurrences).set({ status: "submitted", completedAt: now }).where(eq(occurrences.id, occ.id)).returning();
@@ -180,7 +199,13 @@ export async function undoCompletion(db: Tx, series: Series, occ: Occurrence, ac
     const recent = occ.completedAt && now.getTime() - occ.completedAt.getTime() <= UNDO_MINUTES * 60_000;
     if (!recent || occ.reviewedBy) throw new HttpError(409, "too late to undo");
   }
-  const [reopened] = await db.update(occurrences).set({ status: "pending", completedAt: null, reviewedBy: null, reviewedAt: null }).where(eq(occurrences.id, occ.id)).returning();
+  const [reopened] = await db
+    .update(occurrences)
+    .set({ status: "pending", completedAt: null, reviewedBy: null, reviewedAt: null, journalNoteId: null })
+    .where(eq(occurrences.id, occ.id))
+    .returning();
+  // The entry written to complete it goes with the undo, so doing it again doesn't leave two.
+  if (occ.journalNoteId) await db.delete(notes).where(eq(notes.id, occ.journalNoteId));
   await db.delete(pointsLedger).where(and(eq(pointsLedger.occurrenceId, occ.id), eq(pointsLedger.kind, "completion")));
   // A completion-anchored task made its next occurrence on completion; it goes with the undo.
   if (series.schedule.anchor === "completion")

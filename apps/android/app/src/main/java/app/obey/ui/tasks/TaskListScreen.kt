@@ -97,8 +97,8 @@ class TaskListViewModel @Inject constructor(
         }
     }
 
-    fun complete(o: Occurrence, note: String? = null, mood: Int? = null) = action {
-        val r = api.complete(o.id, CompleteOccurrenceInput(noteMd = note?.takeIf { it.isNotBlank() }, mood = mood))
+    fun complete(o: Occurrence, note: String? = null, mood: Int? = null, entry: String? = null) = action {
+        val r = api.complete(o.id, CompleteOccurrenceInput(noteMd = note?.takeIf { it.isNotBlank() }, mood = mood, journal = entry?.let { app.obey.api.JournalEntryInput(o.title, it) }))
         say(if (r.status == OccurrenceStatus.Submitted) "Sent for approval" else "Marked “${o.title}” done")
         refresh()
     }
@@ -175,7 +175,7 @@ fun TaskListScreen(
         }
     }
     running?.let { o -> app.obey.ui.today.RitualSheet(o, onDismiss = { running = null; vm.refresh() }, onNeedsProof = { running = null; noting = it }) }
-    noting?.let { o -> app.obey.ui.today.DoneDialog(o, onDismiss = { noting = null }, onDone = { note, mood -> vm.complete(o, note, mood); noting = null }) }
+    noting?.let { o -> app.obey.ui.today.DoneDialog(o, onDismiss = { noting = null }, onDone = { note, mood, entry -> vm.complete(o, note, mood, entry); noting = null }) }
 }
 
 /** Today's state for a task, with a one-tap Done when it's the viewer's to do. */

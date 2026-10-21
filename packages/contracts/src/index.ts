@@ -189,6 +189,8 @@ export const taskInput = z.object({
     .default(null),
   /** A check-in: marking it done asks the assignee for a mood. */
   askMood: z.boolean().default(false),
+  /** A journal task: marking it done means writing a journal entry; the details are the prompt. */
+  asksJournal: z.boolean().default(false),
 });
 export type TaskInput = z.input<typeof taskInput>;
 
@@ -233,6 +235,10 @@ export const occurrence = z.object({
   /** A check-in asks for a mood when it's marked done; mood is the answer, 1 (worst) to 5 (best). */
   askMood: z.boolean().default(false),
   mood: z.number().int().min(1).max(5).nullable().default(null),
+  /** A journal task: its prompt (the task's details), and the entry written for it once done. */
+  asksJournal: z.boolean().default(false),
+  journalPrompt: z.string().nullable().default(null),
+  journalNoteId: id.nullable().default(null),
 });
 export type Occurrence = z.infer<typeof occurrence>;
 
@@ -284,7 +290,12 @@ export const editOccurrence = z.object({
 });
 
 export const mood = z.number().int().min(1).max(5);
-export const completeOccurrence = z.object({ noteMd: z.string().max(5_000).optional(), mood: mood.optional() });
+export const completeOccurrence = z.object({
+  noteMd: z.string().max(5_000).optional(),
+  mood: mood.optional(),
+  /** A journal task's entry; it's saved to the journal, shared with the dynamic. */
+  journal: z.object({ title: z.string().max(200).default(""), bodyMd: z.string().trim().min(1).max(100_000) }).optional(),
+});
 
 /** One point on the mood graph: a check-in, or a journal entry with a mood. */
 export const moodEntry = z.object({
@@ -573,6 +584,8 @@ export interface KitItem {
   dueTime?: string;
   /** Tasks: a check-in that asks for a mood. */
   askMood?: boolean;
+  /** Tasks: done by writing a journal entry; bodyMd is the prompt. */
+  asksJournal?: boolean;
   /** Protocols: the key of the kit rule it spells out. */
   ruleKey?: string;
 }
@@ -602,7 +615,7 @@ export const starterKits: StarterKit[] = [
         askMood: true,
       },
       { key: "bed", kind: "task", title: "Make the bed", repeat: { freq: "daily" }, dueTime: "10:00" },
-      { key: "journal", kind: "task", title: "One line in your journal", bodyMd: "One good thing, one thing to do better.", repeat: { freq: "daily" }, dueTime: "21:30" },
+      { key: "journal", kind: "task", title: "One line in your journal", bodyMd: "One good thing, one thing to do better.", repeat: { freq: "daily" }, dueTime: "21:30", asksJournal: true },
       { key: "lights", kind: "task", title: "Lights out", repeat: { freq: "daily" }, dueTime: "23:00" },
     ],
   },

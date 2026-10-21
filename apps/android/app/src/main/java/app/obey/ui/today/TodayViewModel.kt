@@ -114,8 +114,8 @@ class TodayViewModel @Inject constructor(
     val completed: StateFlow<Occurrence?> = _completed.asStateFlow()
     fun completedShown() { _completed.value = null }
 
-    fun complete(o: Occurrence, note: String? = null, mood: Int? = null) = action {
-        val r = api.complete(o.id, CompleteOccurrenceInput(noteMd = note?.takeIf { it.isNotBlank() }, mood = mood))
+    fun complete(o: Occurrence, note: String? = null, mood: Int? = null, entry: String? = null) = action {
+        val r = api.complete(o.id, CompleteOccurrenceInput(noteMd = note?.takeIf { it.isNotBlank() }, mood = mood, journal = entry?.let { app.obey.api.JournalEntryInput(o.title, it) }))
         _completed.value = r.copy(title = o.title)
         refresh()
     }

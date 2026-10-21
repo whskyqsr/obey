@@ -267,5 +267,5 @@ fun TodayScreen(
     }
 
     running?.let { o -> RitualSheet(o, onDismiss = { running = null; vm.refresh() }, onNeedsProof = { running = null; noting = it }) }
-    noting?.let { o -> DoneDialog(o, onDismiss = { noting = null }, onDone = { note, mood -> vm.complete(o, note, mood); noting = null }) }
+    noting?.let { o -> DoneDialog(o, onDismiss = { noting = null }, onDone = { note, mood, entry -> vm.complete(o, note, mood, entry); noting = null }) }
 }
