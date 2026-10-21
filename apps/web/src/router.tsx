@@ -16,6 +16,7 @@ import { Onboarding } from "./pages/Onboarding";
 import { RewardsPage } from "./pages/Rewards";
 import { ProtocolsPage } from "./pages/Protocols";
 import { RuleLogPage } from "./pages/RuleLog";
+import { StatsPage } from "./pages/Stats";
 import { KitsPage } from "./pages/Kits";
 import { RulesPage } from "./pages/Rules";
 import { SettingsPage } from "./pages/Settings";
@@ -204,6 +205,7 @@ const routeTree = rootRoute.addChildren([
     gated("journal", () => <NotesPage kind="journal" />),
   ),
   journalEntryRoute,
+  page("/stats", gated("stats", StatsPage)),
   page("/settings", SettingsPage),
   page("/dynamic", DynamicPage),
   page("/admin/reports", AdminReportsPage),

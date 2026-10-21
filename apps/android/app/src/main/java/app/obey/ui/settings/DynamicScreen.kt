@@ -113,6 +113,7 @@ internal val featureRows = listOf(
     FeatureRow("Rules", "A shared list of standing rules.", { it.rules }, { f, on -> f.copy(rules = on) }),
     FeatureRow("Protocols", "Exactly what's expected, and when and how it's done.", { it.protocols }, { f, on -> f.copy(protocols = on) }),
     FeatureRow("Journal", "Dated entries with a mood.", { it.journal }, { f, on -> f.copy(journal = on) }),
+    FeatureRow("Stats", "How tasks are going: done and missed over time, by weekday and by task.", { it.stats }, { f, on -> f.copy(stats = on) }),
 )
 
 /** "Jake & Kitten": the relationship's own name, or everyone in it with you first. */
