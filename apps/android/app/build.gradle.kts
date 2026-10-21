@@ -109,6 +109,9 @@ dependencies {
     implementation(libs.reorderable)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.fragment)
+    // Location tasks: geofences to notice arriving and leaving, and a map for placing the pin (OpenStreetMap tiles, no key).
+    implementation(libs.play.services.location)
+    implementation(libs.maplibre)
     debugImplementation(libs.compose.ui.tooling)
 
     implementation(libs.hilt.android)

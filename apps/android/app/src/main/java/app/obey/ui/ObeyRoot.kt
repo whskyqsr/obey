@@ -128,6 +128,7 @@ fun ObeyRoot(vm: RootViewModel = hiltViewModel()) {
     val auth by vm.authState.collectAsStateWithLifecycle()
     val session by vm.session.collectAsStateWithLifecycle()
     val welcome by vm.welcome.collectAsStateWithLifecycle()
+    val places by vm.places.collectAsStateWithLifecycle()
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         when {
@@ -143,7 +144,8 @@ fun ObeyRoot(vm: RootViewModel = hiltViewModel()) {
                     } else {
                         // A new NavHost (and fresh ViewModels) per relationship.
                         key(s.session.relationship.id) {
-                            CompositionLocalProvider(LocalFeatures provides s.session.relationship.features) {
+                            val byId = remember(places, s.session.relationship.id) { places[s.session.relationship.id].orEmpty().associateBy { it.id } }
+                            CompositionLocalProvider(LocalFeatures provides s.session.relationship.features, app.obey.ui.location.LocalPlaces provides byId) {
                                 if (welcome == s.session.relationship.id) WelcomeScreen() else MainScaffold(s.session)
                             }
                         }
@@ -215,6 +217,13 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
         it.hasRoute<RewardsRoute>() || it.hasRoute<ConsequencesRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<ProtocolsRoute>() || it.hasRoute<JournalRoute>() || it.hasRoute<StatsRoute>() || it.hasRoute<MonthReviewRoute>()
     }
     LaunchedEffect(switchedOff) { if (switchedOff) nav.navigate(TodayRoute) { popUpTo(nav.graph.findStartDestination().id) } }
+    // A push asking to set up location opens its screen.
+    LaunchedEffect(Unit) {
+        app.obey.push.PendingNav.target.collect { target ->
+            if (target == app.obey.push.PendingNav.LOCATION && features.location) nav.navigate(LocationRoute)
+            if (target != null) app.obey.push.PendingNav.target.value = null
+        }
+    }
 
     // Ask for notification permission once we're in the app (Android 13+).
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -355,6 +364,7 @@ private fun ObeyNavHost(nav: NavHostController) {
                 onOpenTask = openTask,
                 onOpenSettings = settings,
                 onKits = { nav.navigate(KitsRoute) },
+                onOpenLocation = { nav.navigate(LocationRoute) },
             )
         }
         composable<UpcomingRoute> {
@@ -429,6 +439,8 @@ private fun ObeyNavHost(nav: NavHostController) {
         composable<TaskEditorRoute> { TaskEditorScreen(onDone = { nav.popBackStack() }) }
         composable<NoteEditorRoute> { NoteEditorScreen(onDone = { nav.popBackStack() }) }
         composable<SettingsRoute> { SettingsScreen(onBack = { nav.popBackStack() }, onOpenDynamic = { nav.navigate(DynamicRoute) }) }
-        composable<DynamicRoute> { DynamicScreen(onBack = { nav.popBackStack() }) }
+        composable<DynamicRoute> { DynamicScreen(onBack = { nav.popBackStack() }, onPlaces = { nav.navigate(PlacesRoute) }, onLocation = { nav.navigate(LocationRoute) }) }
+        composable<PlacesRoute> { app.obey.ui.location.PlacesScreen(onBack = { nav.popBackStack() }) }
+        composable<LocationRoute> { app.obey.ui.location.LocationScreen(onBack = { nav.popBackStack() }) }
     }
 }

@@ -68,6 +68,8 @@ class TodayViewModel @Inject constructor(
     private val api: ObeyApi,
     private val sessions: SessionRepository,
     private val offline: OfflineStore,
+    private val watcher: app.obey.location.LocationWatcher,
+    private val placeStore: app.obey.location.PlaceStore,
     @ApplicationContext context: Context,
 ) : BaseViewModel() {
     private val _state = MutableStateFlow<Load<TodayData>>(Load.Loading)
@@ -113,6 +115,8 @@ class TodayViewModel @Inject constructor(
                 _refreshing.value = true
             }
             syncPending()
+            _locationReady.value = watcher.status() == app.obey.api.LocationStatus.Ready
+            if (sessions.session?.relationship?.features?.location == true) launch { runCatching { placeStore.refresh(relId) } }
             try {
                 val snap = snapshot(relId)
                 offline.saveToday(relId, snap)
@@ -207,6 +211,40 @@ class TodayViewModel @Inject constructor(
         val r = api.count(o.id, app.obey.api.CountChange(by = by, to = to))
         say("${o.title}: ${r.copy(title = o.title).countLine}")
         refresh()
+    }
+
+    private val _locationReady = MutableStateFlow(true)
+    /** Whether this phone can notice arriving at places while closed; checked on every refresh. */
+    val locationReady: StateFlow<Boolean> = _locationReady.asStateFlow()
+
+    private val _askLocation = MutableStateFlow<Occurrence?>(null)
+    /** A check-in waiting on the location permission; the screen asks, then calls [checkIn] again. */
+    val askLocation: StateFlow<Occurrence?> = _askLocation.asStateFlow()
+
+    /** "I'm here": one fresh fix, which the server checks against the place. */
+    fun checkIn(o: Occurrence, afterAsking: Boolean = false) {
+        _askLocation.value = null
+        if (!watcher.hasAny) {
+            if (afterAsking) say("Allow location for Fealty to check in") else _askLocation.value = o
+            return
+        }
+        action {
+            say("Finding where you are…")
+            val fix = watcher.currentFix() ?: run {
+                say(if (watcher.servicesOn) "Couldn't tell where you are; try again" else "Turn on location to check in")
+                return@action
+            }
+            val r = api.arrive(o.id, app.obey.api.ArriveOccurrenceInput("checkin", fix.latitude, fix.longitude, fix.accuracy.toInt()))
+            say(
+                when (r.status) {
+                    OccurrenceStatus.Pending -> "Checked in. Stay for ${r.stayMinutes} min"
+                    OccurrenceStatus.Submitted -> "Checked in; sent for approval"
+                    else -> "Done: ${o.title}"
+                },
+            )
+            refresh()
+            watcher.sync()
+        }
     }
 
     fun complete(o: Occurrence, note: String? = null, mood: Int? = null, entry: String? = null) = action {

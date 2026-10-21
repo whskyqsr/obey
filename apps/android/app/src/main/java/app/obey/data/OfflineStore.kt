@@ -42,6 +42,18 @@ data class PendingCompletion(
     val journal: JournalEntryInput? = null,
 )
 
+/** An arrival at or departure from a task's place, noticed with no signal and sent once back online. */
+@Serializable
+data class PendingLocationReport(
+    val occurrenceId: String,
+    /** "enter" or "exit". */
+    val kind: String,
+    val lat: Double? = null,
+    val lng: Double? = null,
+    val accuracyM: Int? = null,
+    val at: String,
+)
+
 /**
  * Keeps the signed-in person's profile, each dynamic's Today and completions waiting to sync in the app's private
  * storage. Everything here is wiped on sign-out.
@@ -77,6 +89,10 @@ class OfflineStore @Inject constructor(
     suspend fun pending(): List<PendingCompletion> = read("pending.json") ?: emptyList()
     suspend fun addPending(p: PendingCompletion) = write("pending.json", pending().filter { it.occurrenceId != p.occurrenceId } + p)
     suspend fun removePending(occurrenceId: String) = write("pending.json", pending().filter { it.occurrenceId != occurrenceId })
+
+    suspend fun locationReports(): List<PendingLocationReport> = read("location.json") ?: emptyList()
+    suspend fun addLocationReport(r: PendingLocationReport) = write("location.json", locationReports() + r)
+    suspend fun removeLocationReport(r: PendingLocationReport) = write("location.json", locationReports() - r)
 
     suspend fun clear() = withContext(Dispatchers.IO) { lock.withLock { dir.deleteRecursively() } }
 }

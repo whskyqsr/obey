@@ -5,6 +5,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { Deps } from "../app.js";
 import { occurrences, proofPhotos, reports, users } from "../db/schema.js";
 import { notFound } from "../errors.js";
+import { usageSince } from "../services/usage.js";
 
 /** Same answer as a missing route, so the admin area doesn't show itself to anyone else. */
 function requireAdmin(req: FastifyRequest) {
@@ -44,6 +45,13 @@ export const adminRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       createdAt: r.createdAt.toISOString(),
       resolvedAt: r.resolvedAt?.toISOString() ?? null,
     }));
+  });
+
+  /** Calls to outside services by day, for keeping an eye on free tiers. */
+  app.get<{ Querystring: { days?: string } }>("/admin/usage", async (req) => {
+    requireAdmin(req);
+    const days = Math.min(366, Math.max(1, Number(req.query.days) || 90));
+    return (await usageSince(db, deps.now(), days)).map((r) => ({ day: r.day, kind: r.kind, count: r.count }));
   });
 
   /** A reported photo, for the person reviewing the report. */

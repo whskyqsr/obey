@@ -483,6 +483,84 @@ describe("tasks and occurrences", () => {
     }
   });
 
+  it("searches places through the server and counts each search for the admin", async () => {
+    const { dom } = await ctx.pair();
+    expect((await dom.get("/places/search?q=gy")).body).toEqual([]);
+    const found = await dom.get("/places/search?q=Gym%20on%205th&lat=40.7&lng=-74");
+    expect(found.status).toBe(200);
+    expect(found.body).toEqual([{ name: "Gym on 5th", address: "Near you", lat: 40.7, lng: -74 }]);
+    await dom.get("/places/search?q=Work");
+    expect((await dom.get("/admin/usage")).status).toBe(404);
+    const mod = { "x-dev-user": crypto.randomUUID(), "x-dev-email": "mod@example.com" };
+    const usage = (await ctx.app.inject({ method: "GET", url: "/admin/usage", headers: mod })).json();
+    expect(usage).toEqual([{ day: "2026-10-16", kind: "place_search", count: 2 }]);
+  });
+
+  it("runs location tasks: places, arriving in time, staying, leaving early, and pausing", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    const opts = { materializeDays: 14, reminderLeadMinutes: 30 };
+    const day = (id: string) =>
+      sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`).then((r) => r.body.find((o: { seriesId: string }) => o.seriesId === id));
+    const gym = { lat: 40.7128, lng: -74.006 };
+    expect((await sub.post(`/relationships/${relId}/places`, { name: "Gym", ...gym })).status).toBe(403);
+    expect((await dom.post(`/relationships/${relId}/places`, { name: "Gym", ...gym, radiusM: 50 })).status).toBe(400);
+    const place = (await dom.post(`/relationships/${relId}/places`, { name: "Gym", ...gym, radiusM: 150 })).body;
+    expect((await dom.post(`/relationships/${relId}/tasks`, task(subId, { stayMinutes: 30 }))).status).toBe(400);
+    expect((await dom.post(`/relationships/${relId}/tasks`, task(subId, { placeId: place.id, countMin: 2 }))).status).toBe(400);
+
+    // Arrive-by: a check-in near enough completes it; one across town doesn't.
+    const arrive = (await dom.post(`/relationships/${relId}/tasks`, task(subId, { title: "Be at the gym", placeId: place.id }))).body;
+    expect((await sub.get(`/relationships/${relId}/places`)).body[0]).toMatchObject({ name: "Gym", taskTitles: ["Be at the gym"] });
+    expect((await dom.del(`/places/${place.id}`)).status).toBe(409);
+    const a = await day(arrive.id);
+    expect(a).toMatchObject({ placeId: place.id, arrivedAt: null });
+    expect((await sub.post(`/occurrences/${a.id}/complete`)).status).toBe(409);
+    expect((await sub.post(`/occurrences/${a.id}/arrive`, { kind: "checkin", lat: 40.73, lng: -74.0, accuracyM: 20 })).status).toBe(422);
+    expect((await sub.post(`/occurrences/${a.id}/arrive`, { kind: "checkin", ...gym, accuracyM: 900 })).status).toBe(422);
+    expect((await dom.post(`/occurrences/${a.id}/arrive`, { kind: "checkin", ...gym, accuracyM: 20 })).status).toBe(403);
+    const done = await sub.post(`/occurrences/${a.id}/arrive`, { kind: "checkin", lat: 40.7135, lng: -74.006, accuracyM: 30 });
+    expect(done.body).toMatchObject({ status: "completed" });
+    expect(done.body.arrivedAt).toBeTruthy();
+
+    // A stay: arriving starts it, leaving early is a miss, staying long enough completes it.
+    const stay = (await dom.post(`/relationships/${relId}/tasks`, task(subId, { title: "Gym hour", placeId: place.id, stayMinutes: 60, missPenalty: 3 }))).body;
+    const s1 = await day(stay.id);
+    expect((await sub.post(`/occurrences/${s1.id}/arrive`, { kind: "enter", ...gym, accuracyM: 40 })).body).toMatchObject({ status: "pending" });
+    const left = await sub.post(`/occurrences/${s1.id}/leave`, { at: "2026-10-16T12:00:00Z" });
+    expect(left.body).toMatchObject({ status: "missed" });
+    expect(left.body.leftAt).toBeTruthy();
+
+    const stay2 = (await dom.post(`/relationships/${relId}/tasks`, task(subId, { title: "Gym again", placeId: place.id, stayMinutes: 60 }))).body;
+    const s2 = await day(stay2.id);
+    await sub.post(`/occurrences/${s2.id}/arrive`, { kind: "enter", ...gym, accuracyM: 40 });
+    // Still there past the deadline isn't late: the stay finishes it.
+    const lateStay = (await dom.post(`/relationships/${relId}/tasks`, task(subId, { title: "Late stay", placeId: place.id, stayMinutes: 120 }))).body;
+    const s3 = await day(lateStay.id);
+    // Paused: a location task due meanwhile is excused.
+    const paused = (await dom.post(`/relationships/${relId}/tasks`, task(subId, { title: "Paused one", placeId: place.id }))).body;
+    try {
+      ctx.clock.now = new Date("2026-10-17T00:00:00Z");
+      await sub.post(`/occurrences/${s3.id}/arrive`, { kind: "enter", ...gym, accuracyM: 40 });
+      expect((await sub.put(`/relationships/${relId}/location/pause`, { until: null })).status).toBe(204);
+      expect((await dom.get("/me")).body.relationships[0].members.find((m: { userId: string }) => m.userId === subId)).toMatchObject({ locationPaused: true });
+      ctx.clock.now = new Date("2026-10-17T01:30:00Z");
+      await runJobs(ctx.db, ctx.notifier, ctx.clock.now, opts);
+      expect((await day(stay2.id)).status).toBe("completed");
+      expect((await day(lateStay.id)).status).toBe("pending");
+      expect((await day(paused.id)).status).toBe("excused");
+      expect((await day(arrive.id)).status).toBe("completed");
+      ctx.clock.now = new Date("2026-10-17T02:01:00Z");
+      await runJobs(ctx.db, ctx.notifier, ctx.clock.now, opts);
+      expect((await day(lateStay.id)).status).toBe("completed");
+    } finally {
+      ctx.clock.now = new Date("2026-10-16T12:00:00Z");
+    }
+
+    // The phone reports whether it can check; the Dominant sees it.
+    expect((await sub.put("/me/location", { status: "ready" })).status).toBe(204);
+    expect((await dom.get("/me")).body.relationships[0].members.find((m: { userId: string }) => m.userId === subId)).toMatchObject({ locationStatus: "ready" });
+  });
+
   it("schedules completion-anchored tasks from the completion date", async () => {
     const { dom, sub, relId, subId } = await ctx.pair();
     await dom.post(`/relationships/${relId}/tasks`, task(subId, { schedule: { start: "2026-10-16", anchor: "completion", rule: { freq: "daily", interval: 3 } } }));
@@ -1089,6 +1167,7 @@ describe("feature switches", () => {
       journal: true,
       stats: true,
       review: true,
+      location: true,
     });
     // Notes can't be switched off; the key is ignored.
     expect((await dom.patch(`/relationships/${relId}`, { features: { notes: false } })).body.features).not.toHaveProperty("notes");

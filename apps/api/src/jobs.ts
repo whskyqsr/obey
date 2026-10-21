@@ -1,5 +1,6 @@
 import type { Db } from "./db/index.js";
 import { managers } from "./services/access.js";
+import { finishStays } from "./services/location.js";
 import { claimReminders, markMissed, materializeAll } from "./services/scheduling.js";
 import type { Notifier } from "./notify.js";
 import { promptMonthReviews } from "./routes/months.js";
@@ -7,6 +8,17 @@ import { promptMonthReviews } from "./routes/months.js";
 /** One pass of the background work. Every step is idempotent, so overlapping or repeated runs are safe. */
 export async function runJobs(db: Db, notifier: Notifier, now: Date, opts: { materializeDays: number; reminderLeadMinutes: number }) {
   await materializeAll(db, opts.materializeDays, now);
+
+  // Stays that are up complete before misses are marked, so a stay running past the deadline isn't counted late.
+  const stayed = await db.transaction((tx) => finishStays(tx, now));
+  for (const { occ, series } of stayed) {
+    const submitted = occ.status === "submitted";
+    await notifier.send(await managers(db, series.relationshipId, series.assigneeId), {
+      title: "Fealty",
+      body: submitted ? "Your partner submitted a task for review" : "Your partner completed a task",
+      data: { type: submitted ? "occurrence_submitted" : "occurrence_completed", occurrenceId: occ.id },
+    });
+  }
 
   const missed = await db.transaction((tx) => markMissed(tx, now));
   for (const { occ, series, consequence } of missed) {

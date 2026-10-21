@@ -1,6 +1,8 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { useLibrary, useSaveTask, useTasks } from "../api/hooks";
+import { useLibrary, usePlaces, useSaveTask, useTasks } from "../api/hooks";
+import { PlaceDialog } from "../components/PlaceMap";
+import { AskLocationButton } from "./Places";
 import { errorMessage } from "../api/client";
 import type { Task, TaskInput, TaskStep } from "../api/types";
 import { RecurrencePicker } from "../components/RecurrencePicker";
@@ -40,6 +42,8 @@ interface Form {
   countN: number;
   countTo: number;
   countPer: "task" | "count";
+  placeId: string;
+  stayMinutes: number | null;
 }
 
 type CountKind = "exactly" | "atLeast" | "atMost" | "range";
@@ -113,6 +117,8 @@ function formFrom(task: Task | undefined, defaultAssignee: string, start?: strin
     countN: task?.countMin ?? task?.countMax ?? 3,
     countTo: task?.countMax ?? 5,
     countPer: task?.countPer ?? "task",
+    placeId: task?.placeId ?? "",
+    stayMinutes: task?.stayMinutes ?? null,
   };
 }
 
@@ -158,6 +164,8 @@ function toInput(f: Form): TaskInput {
     asksJournal: f.asksJournal,
     ...countBoundsOf(f),
     countPer: f.countPer,
+    placeId: f.placeId || null,
+    stayMinutes: f.placeId ? f.stayMinutes : null,
   };
 }
 
@@ -314,6 +322,13 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
             </Select>
             {form.counted ? (
               <p className="text-body-medium text-on-surface-variant">A counted task is marked by counting, so it doesn't take approval, proof, a mood or a journal entry.</p>
+            ) : form.placeId ? (
+              <Switch
+                checked={form.approvalRequired}
+                onChange={(approvalRequired) => set({ approvalRequired })}
+                label="Needs approval"
+                help="Getting there sends it to you to approve. A location task doesn't take proof, a mood or a journal entry."
+              />
             ) : (
               <div>
                 <Switch
@@ -394,8 +409,9 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
             )}
           </Fold>
 
-          {!form.counted && <StepsFold steps={form.steps} onChange={(steps) => set({ steps })} readOnly={readOnly} />}
-          <CountFold form={form} set={set} readOnly={readOnly} points={features.points} />
+          {(features.location || form.placeId) && !form.counted && !form.steps.length && <PlaceFold form={form} set={set} readOnly={readOnly} />}
+          {!form.counted && !form.placeId && <StepsFold steps={form.steps} onChange={(steps) => set({ steps })} readOnly={readOnly} />}
+          {!form.placeId && <CountFold form={form} set={set} readOnly={readOnly} points={features.points} />}
 
           {(features.points || features.consequences) && (
             <Fold icon="balance" title={stakesTitle} sub={stakesSub} open={readOnly}>
@@ -580,6 +596,113 @@ function CountFold({ form, set, readOnly, points }: { form: Form; set(p: Partial
           )}
         </>
       )}
+    </Fold>
+  );
+}
+
+const STAYS = [null, 30, 60] as const;
+const stayLabel = (m: number) => (m >= 60 && m % 60 === 0 ? `${m / 60} hr` : `${m} min`);
+
+/** A location task: done by getting to a place by the due time, and staying a while if it says so. */
+function PlaceFold({ form, set, readOnly }: { form: Form; set(p: Partial<Form>): void; readOnly: boolean }) {
+  const { rel, memberName } = useRel();
+  const places = usePlaces(rel.id);
+  const [adding, setAdding] = useState(false);
+  const [otherStay, setOtherStay] = useState(form.stayMinutes !== null && !STAYS.includes(form.stayMinutes as 30 | 60));
+  const assignee = rel.members.find((m) => m.userId === form.assigneeId);
+  const name = memberName(form.assigneeId);
+  // A place can only be set once the assignee's phone can notice arrivals; one already set stays editable.
+  const ready = assignee?.locationStatus === "ready" || !!form.placeId;
+  const place = places.data?.find((p) => p.id === form.placeId);
+  const due = form.allDay ? "the end of the day" : fmtClock(form.dueTime || "00:00");
+  const stay = form.stayMinutes ?? null;
+  return (
+    <Fold
+      icon="location_on"
+      title={place ? `At ${place.name} by ${due}${stay ? `, for ${stayLabel(stay)}` : ""}` : "Be somewhere"}
+      sub={
+        place
+          ? `Checked by ${name === "You" ? "your" : `${name}'s`} phone`
+          : ready
+            ? `${name === "You" ? "Your" : `${name}'s`} phone checks in on arrival`
+            : `Not set up on ${name === "You" ? "your" : `${name}'s`} phone yet`
+      }
+      open={readOnly && !!place}
+    >
+      {!ready ? (
+        <>
+          <Select label="Place" value="" disabled>
+            <option value="">Choose a place</option>
+          </Select>
+          <div className="flex items-start gap-3">
+            <Icon name="info" className="text-on-surface-variant" />
+            <div className="text-body-medium">
+              <div className="text-on-surface">{name} hasn't allowed location yet</div>
+              <div className="text-on-surface-variant">Location tasks need Fealty on {name}'s Android phone, with location allowed all the time.</div>
+            </div>
+          </div>
+          {!readOnly && assignee && (
+            <div>
+              <AskLocationButton name={name} />
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <Select
+            label="Place"
+            value={form.placeId}
+            onChange={(e) => (e.target.value === "+" ? setAdding(true) : set({ placeId: e.target.value, ...(e.target.value ? {} : { stayMinutes: null }) }))}
+          >
+            <option value="">None</option>
+            {(places.data ?? []).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+            {!readOnly && <option value="+">Add a place…</option>}
+          </Select>
+          {form.placeId && (
+            <>
+              <p className="-mt-2 px-1 text-body-small text-on-surface-variant">Arrive by {due}, the task's due time. Later than that is missed.</p>
+              <div>
+                <div className="text-body-large text-on-surface">Stay at least</div>
+                <SegmentedButtons
+                  value={otherStay ? "other" : String(stay)}
+                  onChange={(v) => {
+                    setOtherStay(v === "other");
+                    set({ stayMinutes: v === "other" ? (stay ?? 90) : v === "null" ? null : Number(v) });
+                  }}
+                  options={[
+                    { value: "null", label: "No" },
+                    { value: "30", label: "30 min" },
+                    { value: "60", label: "1 hr" },
+                    { value: "other", label: "Other" },
+                  ]}
+                  className="mt-2 w-full"
+                />
+                {otherStay && (
+                  <TextField
+                    label="Minutes"
+                    type="number"
+                    min={5}
+                    max={720}
+                    value={stay ?? ""}
+                    onChange={(e) => set({ stayMinutes: e.target.value === "" ? null : Math.min(720, Math.max(5, Math.trunc(Number(e.target.value)))) })}
+                    className="mt-3 w-36"
+                  />
+                )}
+                <p className="mt-1 px-1 text-body-small text-on-surface-variant">
+                  {stay
+                    ? `Done after ${stayLabel(stay)} there. Leaving sooner is marked left early, which counts like a miss unless you excuse it.`
+                    : "Done as soon as they get there."}
+                </p>
+              </div>
+            </>
+          )}
+        </>
+      )}
+      <PlaceDialog place={null} open={adding} onClose={() => setAdding(false)} onSaved={(p) => set({ placeId: p.id })} />
     </Fold>
   );
 }

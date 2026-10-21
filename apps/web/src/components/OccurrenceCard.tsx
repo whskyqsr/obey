@@ -11,6 +11,7 @@ import { MOODS, MOOD_LABELS, MoodPicker } from "./Mood";
 import { RitualDialog, StepList, isRitual, stepProgress } from "./Ritual";
 import { RescheduleSheet } from "./RescheduleSheet";
 import { CountRing, CountSheet, canCount, countLine, isCounted, useCountTap } from "./Count";
+import { CheckInButton, PlaceRing, canCheckIn, isPlaced, placeLine, usePlaceLookup } from "./Location";
 import { StreakStrip } from "./StreakStrip";
 import { Badge, Button, Dialog, Icon, Spinner, TextArea, cx, useSnackbar } from "./ui";
 import { importPage } from "../lib/staleBuild";
@@ -59,11 +60,14 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
   const [running, setRunning] = useState(false);
   const [counting, setCounting] = useState(false);
   const countTap = useCountTap();
+  const placeOf = usePlaceLookup();
 
   const mine = o.assigneeId === me.user.id;
   const counted = isCounted(o);
   const countable = counted && canCount(o, mine, isDom);
-  const overdue = isOverdue(o);
+  const placed = isPlaced(o);
+  // Someone still staying at a place past the deadline got there in time.
+  const overdue = isOverdue(o) && !o.arrivedAt;
   const done = o.status === "completed" || o.status === "excused" || o.status === "cancelled";
   const isToday = localDateOf(new Date(o.dueAt)) === today();
   const due = new Date(o.dueAt);
@@ -100,7 +104,7 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
               {o.points > 0 ? `+${o.points}` : o.points} pts{counted && o.countPer === "count" ? " each" : ""}
             </Badge>
           )}
-          {(o.status !== "pending" || overdue) && <Badge tone={overdue ? "error" : status.tone}>{overdue ? "Overdue" : status.label}</Badge>}
+          {(o.status !== "pending" || overdue) && <Badge tone={overdue ? "error" : status.tone}>{overdue ? "Overdue" : o.leftAt ? "Left early" : status.label}</Badge>}
         </div>
       </div>
       {counted && (
@@ -121,6 +125,18 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
               </Button>
             </div>
           )}
+        </div>
+      )}
+      {placed && (
+        <div className="relative z-10 flex flex-wrap items-center gap-3 rounded-sm bg-surface-container px-3 py-2">
+          <PlaceRing o={o} />
+          <span className="min-w-0 flex-1 text-body-medium text-on-surface">
+            {placeLine(o, placeOf(o.placeId)) ?? placeOf(o.placeId)?.name}
+            {o.status === "pending" && !o.arrivedAt && mine && (
+              <span className="block text-body-small text-on-surface-variant">Your phone checks in when you get there, or tap I'm here.</span>
+            )}
+          </span>
+          {canCheckIn(o, mine) && <CheckInButton o={o} />}
         </div>
       )}
       {counting && <CountSheet o={o} open onClose={() => setCounting(false)} />}
@@ -153,7 +169,7 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
 
       {(o.status === "pending" || (isDom && o.status === "submitted")) && (
         <div className="relative z-10 flex flex-wrap items-center gap-2">
-          {o.status === "pending" && mine && isOpen(o) && !isRitual(o) && !counted && (
+          {o.status === "pending" && mine && isOpen(o) && !isRitual(o) && !counted && !placed && (
             <Button variant="filled" icon="check" onClick={() => setCompleting(true)}>
               Done
             </Button>

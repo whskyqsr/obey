@@ -14,6 +14,8 @@ import type {
   InvitePreview,
   Balance,
   Features,
+  Place,
+  PlaceInput,
   EditOccurrence,
   HistoryEntry,
   TaskStats,
@@ -52,6 +54,7 @@ export const keys = {
   ledger: (rel: string) => ["rel", rel, "ledger"] as const,
   balances: (rel: string) => ["rel", rel, "balances"] as const,
   library: (rel: string, kind: LibraryKind) => ["rel", rel, kind] as const,
+  places: (rel: string) => ["rel", rel, "places"] as const,
 };
 
 /** Invalidate everything belonging to a relationship (occurrences, balances and so on interlock). */
@@ -652,4 +655,48 @@ export function useCountOccurrence(rel: string) {
     mutationFn: ({ id, ...change }: { id: string } & ({ by: number } | { to: number })) => api<Occurrence>(`/occurrences/${id}/count`, { method: "POST", body: change }),
     onSuccess: () => invalidate(),
   });
+}
+
+// ---- location
+
+export function usePlaces(rel: string, enabled = true) {
+  return useQuery({ queryKey: keys.places(rel), queryFn: () => api<Place[]>(`/relationships/${rel}/places`), enabled });
+}
+
+export function useSavePlace(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ id, input }: { id?: string; input: Partial<PlaceInput> }) =>
+      id ? api<Place>(`/places/${id}`, { method: "PATCH", body: input }) : api<Place>(`/relationships/${rel}/places`, { method: "POST", body: input }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useDeletePlace(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({ mutationFn: (id: string) => api(`/places/${id}`, { method: "DELETE" }), onSuccess: () => invalidate() });
+}
+
+/** "I'm here": the browser's one-off fix, checked against the task's place by the server. */
+export function useArrive(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ id, ...fix }: { id: string; lat: number; lng: number; accuracyM: number }) =>
+      api<Occurrence>(`/occurrences/${id}/arrive`, { method: "POST", body: { kind: "checkin", ...fix } }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+/** until null pauses until it's turned back on; pausing: false turns it back on. */
+export function usePauseLocation(rel: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (until: string | null | false) =>
+      until === false ? api(`/relationships/${rel}/location/pause`, { method: "DELETE" }) : api(`/relationships/${rel}/location/pause`, { method: "PUT", body: { until } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.me }),
+  });
+}
+
+export function useAskLocation(rel: string) {
+  return useMutation({ mutationFn: () => api(`/relationships/${rel}/location/ask`, { method: "POST" }) });
 }

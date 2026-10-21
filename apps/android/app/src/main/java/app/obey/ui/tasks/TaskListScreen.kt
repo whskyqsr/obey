@@ -199,6 +199,7 @@ private fun NowStatus(occurrences: List<Occurrence>, mine: Boolean, onComplete: 
     val open = occurrences.firstOrNull { it.status == OccurrenceStatus.Pending && (overdue(it) || day(it) == today) }
     val tint = if (open != null && overdue(open)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
     when {
+        open != null && open.isPlaced -> app.obey.ui.location.PlaceRing(open, null)
         open != null && open.isCounted -> app.obey.ui.today.CountRing(open, if (mine && open.canCount(true, false)) ({ onCount(open) }) else null, null)
         open != null && mine && open.isRitual -> IconButton(onClick = { onComplete(open) }) { Icon(Icons.Outlined.PlayCircle, "Start “${open.title}”", tint = tint) }
         open != null && mine -> IconButton(onClick = { onComplete(open) }) { Icon(Icons.Outlined.RadioButtonUnchecked, "Mark “${open.title}” done", tint = tint) }

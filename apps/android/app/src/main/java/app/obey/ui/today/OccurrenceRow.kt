@@ -64,6 +64,8 @@ data class OccurrenceActions(
     /** A count task: a tap adds one; holding opens the dialog to change the count. */
     val onCount: (() -> Unit)? = null,
     val onCountHold: (() -> Unit)? = null,
+    /** A location task: "I'm here", checking the phone's location against the place. */
+    val onCheckIn: (() -> Unit)? = null,
 )
 
 @Composable
@@ -79,9 +81,12 @@ fun OccurrenceRow(
     var menu by remember { mutableStateOf(false) }
     val done = occurrence.status == OccurrenceStatus.Completed || occurrence.status == OccurrenceStatus.Excused
     val showPoints = LocalFeatures.current.points
+    val place = app.obey.ui.location.LocalPlaces.current[occurrence.placeId]
     val supporting = buildList {
         if (occurrence.isCounted) add(occurrence.countLine)
-        add(formatDue(occurrence.dueAt))
+        if (occurrence.isPlaced) app.obey.ui.location.placeLine(occurrence, place)?.let { add(it) }
+        // While someone is staying, the clock that matters is the stay's, not the deadline.
+        if (!occurrence.isStaying) add(formatDue(occurrence.dueAt))
         if (occurrence.rescheduled) add("moved")
         if (assigneeName != null) add(assigneeName)
         if (showPoints && occurrence.points != 0) add("${signed(occurrence.points)} pts" + if (occurrence.isCounted && occurrence.countPer == "count") " each" else "")
@@ -90,7 +95,7 @@ fun OccurrenceRow(
         if (occurrence.waitingToSync) add("waiting to sync")
         when (occurrence.status) {
             OccurrenceStatus.Submitted -> add("awaiting approval")
-            OccurrenceStatus.Missed -> if (!occurrence.isCounted) add("missed")
+            OccurrenceStatus.Missed -> if (!occurrence.isCounted && occurrence.leftAt == null) add("missed")
             OccurrenceStatus.Excused -> add("excused")
             else -> Unit
         }
@@ -100,7 +105,9 @@ fun OccurrenceRow(
         modifier = if (onOpen != null) modifier.clickable(onClick = onOpen) else modifier,
         colors = ListItemDefaults.colors(),
         leadingContent = {
-            if (occurrence.isCounted) {
+            if (occurrence.isPlaced && (occurrence.status == OccurrenceStatus.Pending || occurrence.leftAt != null)) {
+                app.obey.ui.location.PlaceRing(occurrence, actions.onCheckIn)
+            } else if (occurrence.isCounted) {
                 CountRing(occurrence, actions.onCount, actions.onCountHold)
             } else {
             val canComplete = actions.onComplete != null && occurrence.status == OccurrenceStatus.Pending && occurrence.isOpen()
@@ -164,7 +171,7 @@ fun OccurrenceRow(
                     IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "More") }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         if (occurrence.status == OccurrenceStatus.Pending) {
-                            if (occurrence.isOpen() && !occurrence.isRitual && !occurrence.isCounted) actions.onCompleteWithNote?.let {
+                            if (occurrence.isOpen() && !occurrence.isRitual && !occurrence.isCounted && !occurrence.isPlaced) actions.onCompleteWithNote?.let {
                                 DropdownMenuItem(
                                     text = { Text("Done, with a note") },
                                     leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Notes, null) },

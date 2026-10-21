@@ -18,6 +18,8 @@ import { ProtocolsPage } from "./pages/Protocols";
 import { RuleLogPage } from "./pages/RuleLog";
 import { StatsPage } from "./pages/Stats";
 import { MonthReviewPage } from "./pages/MonthReview";
+import { PlacesPage } from "./pages/Places";
+import { LocationPage } from "./pages/LocationPage";
 import { KitsPage } from "./pages/Kits";
 import { RulesPage } from "./pages/Rules";
 import { SettingsPage } from "./pages/Settings";
@@ -210,6 +212,8 @@ const routeTree = rootRoute.addChildren([
   page("/review", gated("review", MonthReviewPage)),
   page("/settings", SettingsPage),
   page("/dynamic", DynamicPage),
+  page("/places", gated("location", PlacesPage)),
+  page("/location", gated("location", LocationPage)),
   page("/admin/reports", AdminReportsPage),
   page("/more", MorePage),
   page("/onboarding", OnboardingRoute),

@@ -1,6 +1,8 @@
 package app.obey.ui.settings
 
 import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.MyLocation
 import androidx.compose.material.icons.outlined.Block
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -115,6 +117,7 @@ internal val featureRows = listOf(
     FeatureRow("Journal", "Dated entries with a mood.", { it.journal }, { f, on -> f.copy(journal = on) }),
     FeatureRow("Stats", "How tasks are going: done and missed over time, by weekday and by task.", { it.stats }, { f, on -> f.copy(stats = on) }),
     FeatureRow("Monthly review", "A focus for each month, and a look back on it together at the end.", { it.review }, { f, on -> f.copy(review = on) }),
+    FeatureRow("Location tasks", "Tasks done by getting somewhere, like the gym by 6, checked by the sub's phone.", { it.location }, { f, on -> f.copy(location = on) }),
 )
 
 /** "Jake & Kitten": the relationship's own name, or everyone in it with you first. */
@@ -153,7 +156,7 @@ internal fun inviteDefault(role: Role?): Role? = when (role) {
 /** Everything about the relationship itself: who's in it, inviting, how it works, and which features are on. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun DynamicScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
+fun DynamicScreen(onBack: () -> Unit, onPlaces: () -> Unit = {}, onLocation: () -> Unit = {}, vm: SettingsViewModel = hiltViewModel()) {
     val sessionState by vm.session.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
@@ -251,6 +254,34 @@ fun DynamicScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
                             leadingContent = { Icon(Icons.Outlined.Add, null) },
                             headlineContent = { Text("Add a date") },
                             supportingContent = hint,
+                        )
+                    }
+                }
+
+                if (rel.features.location) {
+                    SectionHeader("Location")
+                    ListItem(
+                        modifier = Modifier.clickable(onClick = onPlaces),
+                        leadingContent = { Icon(Icons.Outlined.LocationOn, null) },
+                        headlineContent = { Text("Places") },
+                        supportingContent = { Text(if (s.canManage) "Where location tasks can send someone" else "The places location tasks use") },
+                        trailingContent = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
+                    )
+                    if (me != null && me.role != Role.Dominant && !rel.ended) {
+                        ListItem(
+                            modifier = Modifier.clickable(onClick = onLocation),
+                            leadingContent = { Icon(Icons.Outlined.MyLocation, null) },
+                            headlineContent = { Text("Your location") },
+                            supportingContent = {
+                                Text(
+                                    when {
+                                        me.locationPaused -> "Paused"
+                                        me.locationStatus == app.obey.api.LocationStatus.Ready -> "On, only for tasks"
+                                        else -> "Not set up on your phone"
+                                    },
+                                )
+                            },
+                            trailingContent = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
                         )
                     }
                 }

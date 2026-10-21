@@ -12,6 +12,7 @@ import { SendBackDialog } from "./Comments";
 import { RescheduleSheet } from "./RescheduleSheet";
 import { StreakStrip } from "./StreakStrip";
 import { CountRing, CountSheet, canCount, countLine, isCounted, useCountTap } from "./Count";
+import { CheckInButton, PlaceRing, canCheckIn, isPlaced, placeLine, useCheckIn, usePlaceLookup } from "./Location";
 import { Button, Icon, IconButton, cx, useSnackbar } from "./ui";
 
 /** Where a row opens its task. Today's wide layout points it at the side panel instead of the task page. */
@@ -45,13 +46,16 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
   const { me, isDom, memberName, features } = useRel();
   const quickComplete = useQuickComplete();
   const countTap = useCountTap();
+  const { checkIn } = useCheckIn();
+  const placeOf = usePlaceLookup();
   const [rescheduling, setRescheduling] = useState(false);
   const [counting, setCounting] = useState(false);
   // A task that needs proof opens the Done sheet instead of completing in one tap.
   const [completing, setCompleting] = useState(false);
   const [running, setRunning] = useState(false);
   const mine = o.assigneeId === me.user.id;
-  const overdue = isOverdue(o);
+  // Someone still staying at a place past the deadline got there in time.
+  const overdue = isOverdue(o) && !o.arrivedAt;
   const missed = o.status === "missed" || overdue;
   const done = o.status === "completed" || o.status === "excused";
   const canComplete = mine && o.status === "pending" && isOpen(o);
@@ -67,11 +71,14 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
       : fmtTime(o.dueAt);
   const counted = isCounted(o);
   const countable = counted && canCount(o, mine, isDom);
+  const placed = isPlaced(o);
+  const checkable = placed && canCheckIn(o, mine);
   const parts = [
     counted ? countLine(o) : null,
-    o.status === "missed" && !counted ? "Missed" : overdue ? "Overdue" : null,
-    when,
-    o.status === "pending" && !overdue ? fmtRelative(o.dueAt) : null,
+    placed ? placeLine(o, placeOf(o.placeId)) : null,
+    o.status === "missed" && !counted && !o.leftAt ? "Missed" : overdue ? "Overdue" : null,
+    o.arrivedAt && o.status === "pending" ? null : when,
+    o.status === "pending" && !overdue && !o.arrivedAt ? fmtRelative(o.dueAt) : null,
     o.status === "submitted" ? "waiting for approval" : null,
     o.status === "excused" ? "excused" : null,
     !mine ? memberName(o.assigneeId) : null,
@@ -89,7 +96,9 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
       )}
     >
       <div className="relative z-10">
-        {counted ? (
+        {placed && o.status !== "completed" && o.status !== "excused" && o.status !== "submitted" ? (
+          <PlaceRing o={o} onTap={checkable ? () => checkIn(o) : undefined} />
+        ) : counted ? (
           <CountRing o={o} onTap={countable && mine ? () => countTap(o) : undefined} onHold={countable ? () => setCounting(true) : undefined} disabled={!countable} />
         ) : canComplete ? (
           isRitual(o) ? (
@@ -149,6 +158,7 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
       </Link>
       <div className={"relative z-10 flex items-center gap-1"}>
         {actions}
+        {checkable && <CheckInButton o={o} className="max-md:hidden" />}
         {/* A Dominant moves anyone's deadline as easily as a sub asks for more time on their own. */}
         {!actions && o.status === "pending" && (mine || isDom) && (
           <IconButton icon="more_time" label={mine ? "More time" : "Reschedule"} data-action="more" onClick={() => setRescheduling(true)} />

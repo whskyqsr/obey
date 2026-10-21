@@ -326,6 +326,40 @@ interface ObeyApi {
     @DELETE("notes/{id}")
     suspend fun deleteNote(@Path("id") id: String)
 
+    // Location tasks
+    @GET("relationships/{id}/places")
+    suspend fun places(@Path("id") relationshipId: String): List<Place>
+
+    @GET("places/search")
+    suspend fun searchPlaces(@Query("q") q: String, @Query("lat") lat: Double?, @Query("lng") lng: Double?): List<PlaceSearchResult>
+
+    @POST("relationships/{id}/places")
+    suspend fun createPlace(@Path("id") relationshipId: String, @Body body: PlaceInput): Place
+
+    @PATCH("places/{id}")
+    suspend fun updatePlace(@Path("id") id: String, @Body body: PlaceInput): Place
+
+    @DELETE("places/{id}")
+    suspend fun deletePlace(@Path("id") id: String)
+
+    @POST("occurrences/{id}/arrive")
+    suspend fun arrive(@Path("id") occurrenceId: String, @Body body: ArriveOccurrenceInput): Occurrence
+
+    @POST("occurrences/{id}/leave")
+    suspend fun leave(@Path("id") occurrenceId: String, @Body body: LeaveOccurrenceInput): Occurrence
+
+    @PUT("me/location")
+    suspend fun reportLocation(@Body body: ReportLocationInput)
+
+    @POST("relationships/{id}/location/ask")
+    suspend fun askLocation(@Path("id") relationshipId: String, @Body body: Map<String, String> = emptyMap())
+
+    @PUT("relationships/{id}/location/pause")
+    suspend fun pauseLocation(@Path("id") relationshipId: String, @Body body: PauseLocationInput)
+
+    @DELETE("relationships/{id}/location/pause")
+    suspend fun resumeLocation(@Path("id") relationshipId: String)
+
     // Push
     @POST("devices")
     suspend fun registerDevice(@Body body: RegisterDeviceInput)

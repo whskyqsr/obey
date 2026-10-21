@@ -62,6 +62,7 @@ import app.obey.ui.proof.ProofPhotos
 import app.obey.ui.proof.proofViewModel
 import app.obey.ui.common.parseInstant
 import app.obey.ui.common.formatDue
+import app.obey.ui.location.canCheckIn
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -73,11 +74,13 @@ fun TodayScreen(
     onOpenTask: (String) -> Unit,
     onOpenSettings: () -> Unit,
     onKits: () -> Unit,
+    onOpenLocation: () -> Unit = {},
     vm: TodayViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val refreshing by vm.refreshing.collectAsStateWithLifecycle()
     val offlineSince by vm.offlineSince.collectAsStateWithLifecycle()
+    val locationReady by vm.locationReady.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     MessageEffect(message, snackbar, vm::messageShown)
@@ -132,13 +135,14 @@ fun TodayScreen(
                 fun nameFor(o: Occurrence) = if (o.assigneeId == me) null else session?.nameOf(o.assigneeId)
                 fun actionsFor(o: Occurrence) = OccurrenceActions(
                     // A task that needs proof opens the Done sheet instead of completing in one tap.
-                    onComplete = if (o.assigneeId == me) ({ if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) }) else null,
+                    onComplete = if (o.assigneeId == me && !o.isPlaced) ({ if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) }) else null,
                     onCompleteWithNote = if (o.assigneeId == me) ({ noting = o }) else null,
                     onReschedule = { rescheduling = o },
                     onEditTask = if (session?.canManage == true) ({ onEditTask(o.seriesId) }) else null,
                     onComments = { commenting = o },
                     onCount = if (o.assigneeId == me && o.canCount(true, session?.canManage == true)) ({ vm.count(o, by = 1) }) else null,
                     onCountHold = if (o.canCount(o.assigneeId == me, session?.canManage == true)) ({ counting = o }) else null,
+                    onCheckIn = if (o.canCheckIn(o.assigneeId == me)) ({ vm.checkIn(o) }) else null,
                 )
 
                 val isDom = session?.canManage == true
@@ -149,7 +153,9 @@ fun TodayScreen(
                 fun row(o: Occurrence, actions: OccurrenceActions = actionsFor(o)): @Composable () -> Unit = {
                     SwipeableRow(
                         o,
-                        onDone = if (o.isCounted) {
+                        onDone = if (o.isPlaced) {
+                            if (o.canCheckIn(o.assigneeId == me)) ({ vm.checkIn(o) }) else null
+                        } else if (o.isCounted) {
                             if (o.assigneeId == me && o.canCount(true, isDom)) ({ vm.count(o, by = 1) }) else null
                         } else if (o.assigneeId == me && o.status == OccurrenceStatus.Pending && o.isOpen()) ({ if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) }) else null,
                         // A Dominant moves anyone's deadline the same way a sub asks for more time on their own.
@@ -165,6 +171,11 @@ fun TodayScreen(
                     if (session?.readOnly == true) item(key = "ended") { EndedBanner(onOpenSettings) }
                     items(d.clashingPlans, key = { "plan-${it.id}" }) { e -> PlanHeadsUp(e, planTone(e, session?.relationship)) { plan = e } }
                     if (isDom && d.noTasks && session?.readOnly != true) item(key = "kits") { KitPrompt(onKits) }
+                    // Someone with location tasks whose phone can't notice them arriving.
+                    val paused = session?.myMember?.locationPaused == true
+                    if (!locationReady && !paused && (d.overdue + d.today + d.later.flatMap { it.second }).any { it.assigneeId == me && it.isPlaced && it.status == OccurrenceStatus.Pending }) {
+                        item(key = "location") { app.obey.ui.location.LocationSetupPrompt(onOpenLocation) }
+                    }
                     if (!isDom) {
                         val counted = d.today.filter { it.status != OccurrenceStatus.Excused }
                         if (counted.isNotEmpty()) item(key = "progress") { ProgressCard(counted) }
@@ -278,5 +289,14 @@ fun TodayScreen(
 
     running?.let { o -> RitualSheet(o, onDismiss = { running = null; vm.refresh() }, onNeedsProof = { running = null; noting = it }) }
     counting?.let { o -> CountDialog(o, onDismiss = { counting = null }, onSave = { n -> vm.count(o, to = n); counting = null }) }
+    // "I'm here" needs the phone's location once; the full setup lives on the Location screen.
+    val askLocation by vm.askLocation.collectAsStateWithLifecycle()
+    val locationPermission = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()) {
+        askLocation?.let { o -> vm.checkIn(o, afterAsking = true) }
+    }
+    LaunchedEffect(askLocation) {
+        if (askLocation != null) locationPermission.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION))
+    }
+
     noting?.let { o -> DoneDialog(o, onDismiss = { noting = null }, onDone = { note, mood, entry -> vm.complete(o, note, mood, entry); noting = null }) }
 }

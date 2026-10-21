@@ -29,6 +29,7 @@ export const FEATURE_ROWS: { key: keyof Features; label: string; help: string }[
   { key: "journal", label: "Journal", help: "Dated entries with a mood." },
   { key: "stats", label: "Stats", help: "How tasks are going: done and missed over time, by weekday and by task." },
   { key: "review", label: "Monthly review", help: "A focus for each month, and a look back on it together at the end." },
+  { key: "location", label: "Location tasks", help: "Tasks done by getting somewhere, like the gym by 6, checked by the sub's phone." },
 ];
 
 const DATE_PRESETS = ["Anniversary", "Collaring", "First met"];
@@ -240,6 +241,30 @@ export function DynamicPage() {
                   headline="Add a date"
                   supporting={dates.length ? undefined : "An anniversary, a collaring, the day you met"}
                   onClick={() => setEditingDate({ id: "", label: "", date: "" })}
+                />
+              )}
+            </Group>
+          </>
+        )}
+
+        {features.location && (
+          <>
+            <Label>Location</Label>
+            <Group>
+              <Row
+                leading={<Icon name="location_on" className="text-on-surface-variant" />}
+                headline="Places"
+                supporting={isDom ? "Where location tasks can send someone" : "The places location tasks use"}
+                trailing={<Icon name="chevron_right" className="text-on-surface-variant" />}
+                onClick={() => navigate({ to: "/places" })}
+              />
+              {self && self.role !== "dominant" && !ended && (
+                <Row
+                  leading={<Icon name="my_location" className="text-on-surface-variant" />}
+                  headline="Your location"
+                  supporting={self.locationPaused ? "Paused" : self.locationStatus === "ready" ? "On, only for tasks" : "Not set up on your phone"}
+                  trailing={<Icon name="chevron_right" className="text-on-surface-variant" />}
+                  onClick={() => navigate({ to: "/location" })}
                 />
               )}
             </Group>

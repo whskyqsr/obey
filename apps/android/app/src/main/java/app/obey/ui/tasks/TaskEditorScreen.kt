@@ -39,6 +39,7 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Schedule
@@ -191,7 +192,11 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                                 )
                             }
                         }
-                        if (form.counted) {
+                        if (form.placeId != null) {
+                            LabeledSwitch("Needs approval", "Getting there sends it to you to approve. A location task doesn't take proof, a mood or a journal entry.", form.approvalRequired) { v ->
+                                vm.update { it.copy(approvalRequired = v) }
+                            }
+                        } else if (form.counted) {
                             Text(
                                 "A counted task is marked by counting, so it doesn't take approval, proof, a mood or a journal entry.",
                                 style = MaterialTheme.typography.bodyMedium,
@@ -263,8 +268,11 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                         }
                     }
 
-                    if (!form.counted) StepsFold(form.steps) { steps -> vm.update { it.copy(steps = steps) } }
-                    CountFold(form, features.points) { change -> vm.update(change) }
+                    if ((features.location || form.placeId != null) && !form.counted && form.steps.isEmpty()) {
+                        PlaceFold(form, d.value.members, form.allDay, timeFmt) { change -> vm.update(change) }
+                    }
+                    if (!form.counted && form.placeId == null) StepsFold(form.steps) { steps -> vm.update { it.copy(steps = steps) } }
+                    if (form.placeId == null) CountFold(form, features.points) { change -> vm.update(change) }
 
                     if (features.points || features.consequences) {
                         val consequence = d.value.consequences.firstOrNull { it.id == form.consequenceId }
@@ -664,4 +672,103 @@ private fun Fold(
             }
         }
     }
+}
+
+private val STAYS = listOf<Int?>(null, 30, 60)
+
+/** A location task: done by getting to a place by the due time, and staying a while if it says so. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlaceFold(
+    form: TaskForm,
+    members: List<app.obey.api.Member>,
+    allDay: Boolean,
+    timeFmt: DateTimeFormatter,
+    update: ((TaskForm) -> TaskForm) -> Unit,
+) {
+    val location: app.obey.ui.location.LocationViewModel = hiltViewModel()
+    val places by location.places.collectAsStateWithLifecycle()
+    val busy by location.busy.collectAsStateWithLifecycle()
+    val saved by location.saved.collectAsStateWithLifecycle()
+    var adding by remember { mutableStateOf(false) }
+    var menu by remember { mutableStateOf(false) }
+    var otherStay by remember { mutableStateOf(form.stayMinutes != null && form.stayMinutes !in STAYS) }
+    LaunchedEffect(saved) {
+        saved?.let { p -> update { it.copy(placeId = p.id) }; location.savedSeen() }
+    }
+    val assignee = members.firstOrNull { it.userId == form.assigneeId }
+    val name = assignee?.displayName ?: "Their"
+    // A place can only be set once the assignee's phone can notice arrivals; one already set stays editable.
+    val ready = assignee?.locationStatus == app.obey.api.LocationStatus.Ready || form.placeId != null
+    val place = places?.firstOrNull { it.id == form.placeId }
+    val due = if (allDay) "the end of the day" else form.dueTime.format(timeFmt)
+    val stay = form.stayMinutes
+    Fold(
+        Icons.Outlined.LocationOn,
+        if (place != null) "At ${place.name} by $due" + (stay?.let { ", for ${app.obey.ui.location.stayLabel(it)}" } ?: "") else "Be somewhere",
+        when {
+            place != null -> "Checked by $name's phone"
+            ready -> "$name's phone checks in on arrival"
+            else -> "Not set up on $name's phone yet"
+        },
+    ) {
+        if (!ready) {
+            Text("$name hasn't allowed location yet", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "Location tasks need Fealty on $name's Android phone, with location allowed all the time.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (assignee != null) FilledTonalButton(onClick = { location.ask(name) }, enabled = !busy) { Text("Ask $name to set it up") }
+        } else {
+            Box {
+                OutlinedButton(onClick = { menu = true }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Outlined.LocationOn, null)
+                    Text("  " + (place?.name ?: "Choose a place"), modifier = Modifier.weight(1f))
+                    Icon(Icons.Outlined.ExpandMore, null)
+                }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text("None") }, onClick = { menu = false; update { it.copy(placeId = null, stayMinutes = null) } })
+                    places.orEmpty().forEach { p ->
+                        DropdownMenuItem(text = { Text(p.name) }, onClick = { menu = false; update { it.copy(placeId = p.id) } })
+                    }
+                    DropdownMenuItem(text = { Text("Add a place…") }, onClick = { menu = false; adding = true })
+                }
+            }
+            if (form.placeId != null) {
+                Text("Arrive by $due, the task's due time. Later than that is missed.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Stay at least", style = MaterialTheme.typography.bodyLarge)
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    val options = listOf("No", "30 min", "1 hr", "Other")
+                    options.forEachIndexed { i, label ->
+                        val selected = if (i == 3) otherStay else !otherStay && stay == STAYS[i]
+                        SegmentedButton(
+                            selected = selected,
+                            onClick = {
+                                otherStay = i == 3
+                                update { it.copy(stayMinutes = if (i == 3) (stay ?: 90) else STAYS[i]) }
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(i, options.size),
+                        ) { Text(label, maxLines = 1, softWrap = false) }
+                    }
+                }
+                if (otherStay) {
+                    OutlinedTextField(
+                        value = stay?.toString().orEmpty(),
+                        onValueChange = { v -> update { it.copy(stayMinutes = v.filter(Char::isDigit).take(3).toIntOrNull()?.coerceAtMost(720)) } },
+                        label = { Text("Minutes") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    )
+                }
+                Text(
+                    if (stay != null) "Done after ${app.obey.ui.location.stayLabel(stay)} there. Leaving sooner is marked left early, which counts like a miss unless you excuse it."
+                    else "Done as soon as they get there.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+    if (adding) app.obey.ui.location.PlaceEditor(location, null, busy) { adding = false }
 }
