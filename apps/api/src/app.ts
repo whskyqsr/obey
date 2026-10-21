@@ -11,6 +11,7 @@ import { adminRoutes } from "./routes/admin.js";
 import { commentRoutes } from "./routes/comments.js";
 import { limitRoutes } from "./routes/limits.js";
 import { ruleLogRoutes } from "./routes/ruleLog.js";
+import { safeCallRoutes } from "./routes/safeCalls.js";
 import { kitRoutes } from "./routes/kits.js";
 import { verificationRoutes } from "./routes/verification.js";
 import { eventRoutes } from "./routes/events.js";
@@ -99,6 +100,7 @@ export function buildApp(deps: Deps) {
   app.register(commentRoutes(deps));
   app.register(limitRoutes(deps));
   app.register(ruleLogRoutes(deps));
+  app.register(safeCallRoutes(deps));
   app.register(kitRoutes(deps));
   app.register(verificationRoutes(deps));
   return app;

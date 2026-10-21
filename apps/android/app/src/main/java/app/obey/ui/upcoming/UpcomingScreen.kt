@@ -45,6 +45,7 @@ import app.obey.ui.common.Load
 import app.obey.ui.common.LoadingBox
 import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.MenuButton
+import app.obey.ui.common.SafeWordAction
 import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.formatDate
 import app.obey.ui.today.OccurrenceActions
@@ -129,6 +130,7 @@ fun UpcomingScreen(
                         plan = null to day
                     }) { Icon(Icons.Outlined.EditCalendar, "New plan") }
                     IconButton(onClick = onAllTasks) { Icon(Icons.AutoMirrored.Outlined.List, "All tasks") }
+                    SafeWordAction()
                     SettingsAction(onOpenSettings)
                 },
             )

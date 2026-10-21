@@ -23,6 +23,8 @@ import type {
   QuietHours,
   NotifyCategory,
   RuleLogEntry,
+  SafeCall,
+  SafeCalls,
   Invite,
   LedgerEntry,
   LibraryKind,
@@ -559,6 +561,24 @@ export function useAddRuleLog(rel: string) {
 export function useDeleteRuleLog(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({ mutationFn: (id: string) => api(`/rule-log/${id}`, { method: "DELETE" }), onSuccess: () => invalidate() });
+}
+
+/** The open safe call, checked often so a partner sees one soon even without a push. */
+export function useSafeCalls(rel: string) {
+  return useQuery({ queryKey: ["rel", rel, "safe-calls"], queryFn: () => api<SafeCalls>(`/relationships/${rel}/safe-calls`), refetchInterval: 20_000 });
+}
+
+export function useCallSafeWord(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (input: { level: SafeCall["level"]; note: string }) => api<SafeCall>(`/relationships/${rel}/safe-calls`, { method: "POST", body: input }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useClearSafeCall(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({ mutationFn: (id: string) => api<SafeCall>(`/safe-calls/${id}/clear`, { method: "POST" }), onSuccess: () => invalidate() });
 }
 
 export function useDeleteLibraryItem(rel: string, kind: LibraryKind) {

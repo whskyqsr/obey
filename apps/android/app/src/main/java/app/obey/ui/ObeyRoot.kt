@@ -86,6 +86,10 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.launch
 import app.obey.ui.common.LocalOpenMenu
+import app.obey.ui.common.LocalSafeWord
+import app.obey.api.SafeCall
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import app.obey.api.Features
 import app.obey.ui.common.LocalFeatures
 import app.obey.auth.AuthState
@@ -194,7 +198,7 @@ private fun splitBar(all: List<TopLevel>): Pair<List<TopLevel>, List<TopLevel>> 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltViewModel()) {
+private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltViewModel(), safeVm: SafeCallViewModel = hiltViewModel(key = "safe-${session.relationship?.id}")) {
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val destination = entry?.destination
@@ -222,6 +226,16 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
     }
     fun selected(t: TopLevel) = destination?.hierarchy?.any(t.matches) == true
     // Joining and starting another dynamic live on Your dynamic.
+    val activeCall by safeVm.active.collectAsStateWithLifecycle()
+    var safeOpen by remember { mutableStateOf(false) }
+    val openSafe = remember { { safeOpen = true } }
+    if (safeOpen) SafeWordSheet(safeVm) { safeOpen = false }
+    // A failed call must never pass silently.
+    val safeError by safeVm.message.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(safeError) {
+        safeError?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show(); safeVm.messageShown() }
+    }
     val switcher = SwitcherActions(session, settingsVm::loadAvatar, { settingsVm.selectRelationship(it) }, { nav.navigate(DynamicRoute) }, { nav.navigate(DynamicRoute) })
 
     if (wide) {
@@ -236,7 +250,9 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
                     )
                 }
             }
-            Box(Modifier.weight(1f)) { ObeyNavHost(nav) }
+            CompositionLocalProvider(LocalSafeWord provides openSafe.takeIf { safeVm.canCall() }) {
+                Box(Modifier.weight(1f)) { SafeCallFrame(safeVm, activeCall) { ObeyNavHost(nav) } }
+            }
         }
     } else {
         val drawer = rememberDrawerState(DrawerValue.Closed)
@@ -261,14 +277,23 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
                 }
             },
         ) {
-            CompositionLocalProvider(LocalOpenMenu provides openMenu) {
+            CompositionLocalProvider(LocalOpenMenu provides openMenu, LocalSafeWord provides openSafe.takeIf { safeVm.canCall() }) {
                 Scaffold(bottomBar = { if (isTopLevel) FloatingBar(bar, ::selected) { go(it.route) } }) { padding ->
                     // Only the bottom bar's space is reserved here; each screen's own Scaffold handles the top insets.
                     val bottomOnly = androidx.compose.foundation.layout.PaddingValues(bottom = padding.calculateBottomPadding())
-                    Box(Modifier.padding(bottomOnly).consumeWindowInsets(bottomOnly)) { ObeyNavHost(nav) }
+                    Box(Modifier.padding(bottomOnly).consumeWindowInsets(bottomOnly)) { SafeCallFrame(safeVm, activeCall) { ObeyNavHost(nav) } }
                 }
             }
         }
+    }
+}
+
+/** An open safe call sits under every screen, just above the bar, until someone clears it; the top bar never moves. */
+@Composable
+private fun SafeCallFrame(vm: SafeCallViewModel, call: SafeCall?, content: @Composable () -> Unit) {
+    Column(Modifier.fillMaxSize()) {
+        Box(Modifier.weight(1f)) { content() }
+        if (call != null) SafeCallBanner(vm, call)
     }
 }
 

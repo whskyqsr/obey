@@ -854,3 +854,29 @@ data class ApplyKitResult(val tasks: Int, val rules: Int, val protocols: Int)
 /** "That's fine": keep these tasks as they are alongside a plan; they stop counting as clashes. */
 @Serializable
 data class DismissClashesInput(val occurrenceIds: List<String>)
+
+/** Yellow: slow down and check in. Red: stop; tasks that slip while it's on are excused. */
+@Serializable
+enum class SafeLevel {
+    @SerialName("yellow") Yellow,
+    @SerialName("red") Red,
+}
+
+@Serializable
+data class SafeCall(
+    val id: String,
+    val relationshipId: String,
+    val callerId: String,
+    val level: SafeLevel,
+    val note: String = "",
+    val createdAt: String,
+    val clearedAt: String? = null,
+    val clearedBy: String? = null,
+)
+
+/** The dynamic's open safe call, if any, and the most recent ones. */
+@Serializable
+data class SafeCalls(val active: SafeCall? = null, val recent: List<SafeCall> = emptyList())
+
+@Serializable
+data class SafeCallInput(val level: SafeLevel, val note: String = "")

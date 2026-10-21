@@ -517,6 +517,24 @@ export const ruleLogEntry = z.object({
 });
 export type RuleLogEntry = z.infer<typeof ruleLogEntry>;
 
+/** Yellow: slow down and check in. Red: stop; while it's on, tasks that slip are excused instead of missed. */
+export const SAFE_LEVELS = ["yellow", "red"] as const;
+export const safeCallInput = z.object({ level: z.enum(SAFE_LEVELS), note: z.string().trim().max(500).default("") });
+export const safeCall = z.object({
+  id,
+  relationshipId: id,
+  callerId: id,
+  level: z.enum(SAFE_LEVELS),
+  note: z.string(),
+  createdAt: z.string(),
+  clearedAt: z.string().nullable(),
+  clearedBy: id.nullable(),
+});
+export type SafeCall = z.infer<typeof safeCall>;
+/** The dynamic's open safe call, if any, and the most recent ones. */
+export const safeCalls = z.object({ active: safeCall.nullable(), recent: z.array(safeCall) });
+export type SafeCalls = z.infer<typeof safeCalls>;
+
 /** A full ordering of a relationship's rules or protocols, top first. */
 export const reorderInput = z.object({ ids: z.array(id).max(1000) });
 
@@ -650,7 +668,15 @@ export const starterKits: StarterKit[] = [
         askMood: true,
       },
       { key: "bed", kind: "task", title: "Make the bed", repeat: { freq: "daily" }, dueTime: "10:00" },
-      { key: "journal", kind: "task", title: "One line in your journal", bodyMd: "One good thing, one thing to do better.", repeat: { freq: "daily" }, dueTime: "21:30", asksJournal: true },
+      {
+        key: "journal",
+        kind: "task",
+        title: "One line in your journal",
+        bodyMd: "One good thing, one thing to do better.",
+        repeat: { freq: "daily" },
+        dueTime: "21:30",
+        asksJournal: true,
+      },
       { key: "lights", kind: "task", title: "Lights out", repeat: { freq: "daily" }, dueTime: "23:00" },
     ],
   },

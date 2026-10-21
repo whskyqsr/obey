@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FrontHand
 import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
@@ -75,6 +76,13 @@ fun SectionHeader(text: String, modifier: Modifier = Modifier, horizontalPadding
 fun MenuButton() {
     val open = LocalOpenMenu.current ?: return
     IconButton(onClick = open) { Icon(Icons.Outlined.Menu, contentDescription = "Menu") }
+}
+
+/** The safe word, before Settings in a main page's top bar; nothing for a Dominant. */
+@Composable
+fun SafeWordAction() {
+    val open = LocalSafeWord.current ?: return
+    IconButton(onClick = open) { Icon(Icons.Filled.FrontHand, contentDescription = "Safe word", tint = MaterialTheme.colorScheme.error) }
 }
 
 @Composable

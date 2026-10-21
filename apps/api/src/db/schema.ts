@@ -278,7 +278,9 @@ export const reschedules = pgTable("reschedules", {
   decidedBy: uuid("decided_by").references(() => users.id),
   scope: text("scope", { enum: ["this", "following"] }).notNull(),
   /** `cancel` asks to call this occurrence off (it becomes excused); its toDueAt is just fromDueAt. */
-  kind: text("kind", { enum: ["move", "cancel"] }).notNull().default("move"),
+  kind: text("kind", { enum: ["move", "cancel"] })
+    .notNull()
+    .default("move"),
   fromDueAt: ts("from_due_at").notNull(),
   toDueAt: ts("to_due_at").notNull(),
   reason: text("reason"),
@@ -489,4 +491,24 @@ export const noteRevisions = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("note_revisions_note_idx").on(t.noteId, t.createdAt)],
+);
+
+/** A safe word called in a dynamic: yellow (slow down, check in) or red (stop). Open until someone clears it. */
+export const safeCalls = pgTable(
+  "safe_calls",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    callerId: uuid("caller_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    level: text("level", { enum: ["yellow", "red"] }).notNull(),
+    note: text("note").notNull().default(""),
+    createdAt: createdAt(),
+    clearedAt: timestamp("cleared_at", { withTimezone: true }),
+    clearedBy: uuid("cleared_by").references(() => users.id, { onDelete: "set null" }),
+  },
+  (t) => [index("safe_calls_relationship_idx").on(t.relationshipId, t.createdAt)],
 );

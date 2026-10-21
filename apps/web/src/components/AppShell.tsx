@@ -5,6 +5,7 @@ import { MenuContext, type Menu } from "../lib/menu";
 import { useRel } from "../lib/relationship";
 import { useNeedsYou } from "../lib/today";
 import { DynamicSwitcher } from "./DynamicSwitcher";
+import { SafeCallBanner, SafeWordSheet } from "./SafeCall";
 import { Icon, cx } from "./ui";
 
 interface Dest {
@@ -157,12 +158,15 @@ function DrawerItem({ d, active, badge }: { d: Dest; active: boolean; badge?: nu
 
 export function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { rel } = useRel();
+  const { rel, self } = useRel();
   const todayBadge = useNeedsYou().count;
   const { all, bar, more } = useDestinations();
   // The editor's Save is the only action that matters while editing, so the phone bar steps aside.
   const editing = /^\/tasks\/(new|[^/]+\/edit)$/.test(pathname);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [safeOpen, setSafeOpen] = useState(false);
+  // Subs and switches get the safe word on every page; an ended dynamic has no one to tell.
+  const canCall = !!self && self.role !== "dominant" && !rel.endedAt;
   // The header's menu button, and whether it has scrolled out of view (then a floating copy takes its place).
   const [headerButton, setHeaderButton] = useState<HTMLElement | null>(null);
   const [buttonHidden, setButtonHidden] = useState(false);
@@ -173,7 +177,10 @@ export function AppShell() {
     return () => io.disconnect();
   }, [headerButton]);
   useEffect(() => setMenuOpen(false), [pathname]);
-  const menu = useMemo<Menu>(() => ({ open: () => setMenuOpen(true), track: setHeaderButton }), []);
+  const menu = useMemo<Menu>(
+    () => ({ open: () => setMenuOpen(true), track: setHeaderButton, safeWord: canCall ? () => setSafeOpen(true) : undefined, banner: <SafeCallBanner /> }),
+    [canCall],
+  );
 
   return (
     <MenuContext.Provider value={menu}>
@@ -247,6 +254,7 @@ export function AppShell() {
           </button>
         )}
         <MenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} items={more} />
+        {canCall && <SafeWordSheet open={safeOpen} onClose={() => setSafeOpen(false)} />}
       </div>
     </MenuContext.Provider>
   );

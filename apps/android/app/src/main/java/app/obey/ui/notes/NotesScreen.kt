@@ -53,6 +53,7 @@ import app.obey.ui.common.Load
 import app.obey.ui.common.LoadingBox
 import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.MenuButton
+import app.obey.ui.common.SafeWordAction
 import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.formatDateTime
 
@@ -86,6 +87,7 @@ fun NotesScreen(
                 title = { Text(if (journal) "Journal" else "Notes") },
                 actions = {
                     IconButton(onClick = { searching = !searching; if (!searching) query = "" }) { Icon(Icons.Outlined.Search, "Search") }
+                    SafeWordAction()
                     SettingsAction(onOpenSettings)
                 },
             )

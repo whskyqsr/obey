@@ -176,6 +176,15 @@ interface ObeyApi {
     @DELETE("rule-log/{id}")
     suspend fun deleteRuleLog(@Path("id") id: String)
 
+    @GET("relationships/{id}/safe-calls")
+    suspend fun safeCalls(@Path("id") relationshipId: String): SafeCalls
+
+    @POST("relationships/{id}/safe-calls")
+    suspend fun callSafeWord(@Path("id") relationshipId: String, @Body body: SafeCallInput): SafeCall
+
+    @POST("safe-calls/{id}/clear")
+    suspend fun clearSafeCall(@Path("id") id: String): SafeCall
+
     @GET("occurrences/{id}/comments")
     suspend fun comments(@Path("id") occurrenceId: String): List<OccurrenceComment>
 
