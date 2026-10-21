@@ -144,8 +144,8 @@
 
 /* Fallback before the theme script runs (DEFAULT_SEED, light). */
 :root {
-  --md-surface: #fff8f8;
-  --md-on-surface: #22191c;
+  --md-surface: #fff8f6;
+  --md-on-surface: #231918;
 }
 
 html,

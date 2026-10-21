@@ -2,6 +2,7 @@ import { useState } from "react";
 import { FIREBASE_ENABLED, API_URL } from "../env";
 import { UUID_RE, authErrorMessage, createAccount, signInDev, signInWithEmail, signInWithGoogle } from "../auth/session";
 import { errorMessage } from "../api/client";
+import { BrandMark } from "../components/BrandMark";
 import { Button, Icon, TextField } from "../components/ui";
 import { pendingInvite } from "../lib/invite";
 
@@ -39,9 +40,7 @@ export function SignInPage() {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-surface-container-low p-4">
       <div className="w-full max-w-md rounded-xl bg-surface p-8 shadow-elev-1">
-        <div className="mb-6 flex size-16 items-center justify-center rounded-lg bg-primary-container text-on-primary-container">
-          <Icon name="link" filled size={32} />
-        </div>
+        <BrandMark className="mb-6 size-16 rounded-lg" />
         <h1 className="text-headline-large text-on-surface">Fealty</h1>
         <p className="mt-2 mb-8 text-body-large text-on-surface-variant">Tasks, rules and rewards for the two (or more) of you.</p>
         {pendingInvite() && (

@@ -1,9 +1,9 @@
 import { type DynamicColor, type DynamicScheme, Hct, MaterialDynamicColors, SchemeTonalSpot, TonalPalette, argbFromHex, hexFromArgb } from "@material/material-color-utilities";
 
-export const DEFAULT_SEED = "#8b3a62";
+export const DEFAULT_SEED = "#8c3a2b";
 
 /** Seed presets offered in Settings. */
-export const SEED_PRESETS = ["#8b3a62", "#6750a4", "#b3261e", "#7d5260", "#006a6a", "#386a20", "#00639b", "#8c4f00"];
+export const SEED_PRESETS = ["#8c3a2b", "#8b3a62", "#6750a4", "#7d5260", "#006a6a", "#386a20", "#00639b", "#8c4f00"];
 
 /** M3 color roles we expose as `--md-<role>` CSS variables, in kebab-case. */
 const ROLES = {

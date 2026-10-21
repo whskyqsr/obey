@@ -1,7 +1,7 @@
 <resources>
-    <color name="window_background">#FFFFF7FA</color>
-    <color name="launcher_background">#FF5B1A3A</color>
-    <color name="launcher_foreground">#FFFFD9E4</color>
+    <color name="window_background">#FFFFF8F6</color>
+    <color name="launcher_background">#FF7D2C1D</color>
+    <color name="launcher_foreground">#FFFFDAD3</color>
     <color name="disguise_notes_background">#FFFFC94D</color>
     <color name="disguise_notes_foreground">#FF4A3500</color>
     <color name="disguise_calendar_background">#FF3D6FD9</color>
