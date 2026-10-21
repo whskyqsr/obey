@@ -28,7 +28,7 @@ import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.EventUpcoming
+import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.HourglassTop
 import androidx.compose.material3.AlertDialog
@@ -444,7 +444,7 @@ private fun ReviewSoon(s: MonthSummary, session: Session) {
     val who = if (session.canManage) "you set" else "${dom ?: "your Dominant"} sets"
     Card {
         Row(verticalAlignment = Alignment.Top) {
-            Icon(Icons.Outlined.EventUpcoming, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(Icons.Outlined.Event, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Column(Modifier.padding(start = 12.dp)) {
                 Text("Review opens ${shortDate(s.reviewOpensOn)}", style = MaterialTheme.typography.titleMedium)
                 Text(
