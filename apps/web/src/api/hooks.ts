@@ -12,7 +12,9 @@ import type {
   CalendarEvent,
   CalendarEventInput,
   Curfew,
+  CurfewCheck,
   CurfewInput,
+  CurfewRequest,
   InvitePreview,
   Balance,
   Features,
@@ -58,6 +60,7 @@ export const keys = {
   library: (rel: string, kind: LibraryKind) => ["rel", rel, kind] as const,
   places: (rel: string) => ["rel", rel, "places"] as const,
   curfew: (rel: string) => ["rel", rel, "curfew"] as const,
+  planChanges: (rel: string) => ["rel", rel, "planChanges"] as const,
 };
 
 /** Invalidate everything belonging to a relationship (occurrences, balances and so on interlock). */
@@ -732,6 +735,58 @@ export function useExcuseCurfew(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({
     mutationFn: (occurrenceId: string) => api<Occurrence>(`/relationships/${rel}/curfew/excuse`, { method: "POST", body: { occurrenceId } }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+/** Whether a plan being made runs into one of my curfew nights. */
+export function useCurfewCheck(rel: string, startsAt: string | null, endsAt: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ["curfewCheck", rel, startsAt, endsAt],
+    queryFn: () => api<CurfewCheck>(`/relationships/${rel}/curfew/check`, { method: "POST", body: { startsAt, endsAt } }),
+    enabled: enabled && !!startsAt && !!endsAt && endsAt > startsAt,
+    staleTime: 30_000,
+  });
+}
+
+/** More time on one night's curfew, from Today or from a plan. */
+export function useAskCurfew(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (body: { occurrenceId: string; until: string; reason?: string | null; eventId?: string | null }) =>
+      api<CurfewRequest>(`/relationships/${rel}/curfew/requests`, { method: "POST", body }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+/** A Dominant's answer; approving can give an earlier time than asked. */
+export function useDecideCurfew(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ id, approve, until }: { id: string; approve: boolean; until?: string }) =>
+      api<CurfewRequest>(`/curfew-requests/${id}/${approve ? "approve" : "decline"}`, { method: "POST", body: approve && until ? { until } : {} }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+/** A Dominant moving when someone else's plan ends. */
+export function useChangePlanEnd(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ id, endsAt }: { id: string; endsAt: string }) => api<CalendarEvent>(`/events/${id}`, { method: "PATCH", body: { endsAt } }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+/** My plans someone else changed, until I've seen them. */
+export function usePlanChanges(rel: string) {
+  return useQuery({ queryKey: keys.planChanges(rel), queryFn: () => api<CalendarEvent[]>(`/relationships/${rel}/events/changes`) });
+}
+
+export function useSeenPlanChange(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (id: string) => api(`/events/${id}/seen`, { method: "POST", body: {} }),
     onSuccess: () => invalidate(),
   });
 }

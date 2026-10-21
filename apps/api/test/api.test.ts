@@ -648,6 +648,83 @@ describe("tasks and occurrences", () => {
     }
   });
 
+  it("asks for more curfew time, from Today or a plan, and lets a Dominant move a plan's end", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    const opts = { materializeDays: 14, reminderLeadMinutes: 30 };
+    const place = (await dom.post(`/relationships/${relId}/places`, { name: "Home", lat: 40.7128, lng: -74.006 })).body;
+    await dom.put(`/relationships/${relId}/curfew`, { enabled: true, assigneeId: subId, placeId: place.id, time: "22:00", until: "06:00", timezone: NY });
+    const night = (date: string) =>
+      sub.get(`/relationships/${relId}/occurrences?from=${date}&to=${date}&curfew=include`).then((r) => r.body.find((o: { curfew: boolean }) => o.curfew));
+    const at = (iso: string) => (ctx.clock.now = new Date(iso));
+    try {
+      // Friday, an hour before: more time tonight.
+      at("2026-10-17T01:00:00Z");
+      const fri = await night("2026-10-16");
+      const ask = (body: object) => sub.post(`/relationships/${relId}/curfew/requests`, { occurrenceId: fri.id, ...body });
+      expect((await ask({ until: "2026-10-17T01:30:00Z" })).status).toBe(400);
+      expect((await ask({ until: "2026-10-17T11:00:00Z" })).status).toBe(400);
+      expect((await dom.post(`/relationships/${relId}/curfew/requests`, { occurrenceId: fri.id, until: "2026-10-17T03:00:00Z" })).status).toBe(403);
+      const req = (await ask({ until: "2026-10-17T03:00:00Z", reason: "The movie runs late" })).body;
+      expect(req).toMatchObject({ status: "pending", fromDueAt: "2026-10-17T02:00:00.000Z", untilAt: "2026-10-17T03:00:00.000Z", reason: "The movie runs late" });
+      expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Sub asks to be home by 11:00 PM tonight");
+      expect((await ask({ until: "2026-10-17T03:00:00Z" })).status).toBe(409);
+      expect((await sub.get(`/relationships/${relId}/curfew`)).body.requests).toMatchObject([{ id: req.id }]);
+      expect((await sub.post(`/curfew-requests/${req.id}/approve`, {})).status).toBe(403);
+      // Approving earlier than asked moves tonight's curfew to that time.
+      expect((await dom.post(`/curfew-requests/${req.id}/approve`, { until: "2026-10-17T02:30:00Z" })).body).toMatchObject({ status: "approved" });
+      expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Dom moved your curfew to 10:30 PM tonight");
+      expect((await night("2026-10-16")).dueAt).toBe("2026-10-17T02:30:00.000Z");
+      at("2026-10-17T02:10:00Z");
+      await runJobs(ctx.db, ctx.notifier, ctx.clock.now, opts);
+      expect((await night("2026-10-16")).status).toBe("pending");
+      expect((await dom.get(`/relationships/${relId}/curfew`)).body.requests).toEqual([]);
+
+      // A plan that runs past Tuesday's curfew is spotted while it's being made, even weeks out.
+      const check = (startsAt: string, endsAt: string) => sub.post(`/relationships/${relId}/curfew/check`, { startsAt, endsAt }).then((r) => r.body.night);
+      const tue = await night("2026-10-20");
+      expect(await check("2026-10-21T00:00:00Z", "2026-10-21T05:00:00Z")).toEqual({ occurrenceId: tue.id, dueAt: "2026-10-21T02:00:00.000Z", endsAt: "2026-10-21T10:00:00.000Z" });
+      expect(await check("2026-10-21T00:00:00Z", "2026-10-21T02:00:00Z")).toBeNull();
+      expect(await check("2026-11-25T01:00:00Z", "2026-11-25T06:00:00Z")).toMatchObject({ dueAt: "2026-11-25T03:00:00.000Z" });
+      expect((await dom.post(`/relationships/${relId}/curfew/check`, { startsAt: "2026-10-21T00:00:00Z", endsAt: "2026-10-21T05:00:00Z" })).body.night).toBeNull();
+
+      // Saved with an ask: the Dominant sees the request instead of a clash; saying no brings the clash back.
+      const plan = (await sub.post(`/relationships/${relId}/events`, { title: "Dinner with Jess", startsAt: "2026-10-21T00:00:00Z", endsAt: "2026-10-21T05:00:00Z" })).body;
+      const ask2 = (await sub.post(`/relationships/${relId}/curfew/requests`, { occurrenceId: tue.id, until: plan.endsAt, eventId: plan.id })).body;
+      expect(ask2).toMatchObject({ eventId: plan.id });
+      expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Sub asks to be home by 1:00 AM on Tuesday night");
+      expect((await dom.get(`/relationships/${relId}/curfew`)).body).toMatchObject({ clashes: [], requests: [{ id: ask2.id, eventTitle: "Dinner with Jess" }] });
+      await dom.post(`/curfew-requests/${ask2.id}/decline`);
+      expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Dom said no: curfew stays at 10:00 PM on Tuesday night");
+      expect((await dom.get(`/relationships/${relId}/curfew`)).body.clashes).toMatchObject([{ eventId: plan.id }]);
+
+      // The Dominant moves the plan's end to curfew; only the end, and the author is told.
+      expect((await dom.patch(`/events/${plan.id}`, { title: "Nope" })).status).toBe(400);
+      expect((await dom.patch(`/events/${plan.id}`, { endsAt: "2026-10-21T02:00:00Z" })).body).toMatchObject({
+        endsAt: "2026-10-21T02:00:00.000Z",
+        previousEndsAt: "2026-10-21T05:00:00.000Z",
+      });
+      expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [subId], push: { body: "Dom changed Dinner with Jess: it now ends at 10:00 PM" } });
+      expect((await dom.get(`/relationships/${relId}/curfew`)).body.clashes).toEqual([]);
+      expect((await sub.get(`/relationships/${relId}/events/changes`)).body).toMatchObject([{ id: plan.id, previousEndsAt: "2026-10-21T05:00:00.000Z" }]);
+      expect((await dom.get(`/relationships/${relId}/events/changes`)).body).toEqual([]);
+      expect((await dom.post(`/events/${plan.id}/seen`)).status).toBe(403);
+      expect((await sub.post(`/events/${plan.id}/seen`)).status).toBe(204);
+      expect((await sub.get(`/relationships/${relId}/events/changes`)).body).toEqual([]);
+      // A sub can't do the same to a Dominant's plan.
+      const domPlan = (await dom.post(`/relationships/${relId}/events`, { title: "Work trip", startsAt: "2026-10-22T00:00:00Z", endsAt: "2026-10-22T05:00:00Z" })).body;
+      expect((await sub.patch(`/events/${domPlan.id}`, { endsAt: "2026-10-22T02:00:00Z" })).status).toBe(403);
+
+      // An ask nobody answers lapses at curfew.
+      at("2026-10-21T22:00:00Z");
+      const wed = await night("2026-10-21");
+      await sub.post(`/relationships/${relId}/curfew/requests`, { occurrenceId: wed.id, until: "2026-10-22T03:00:00Z" });
+      at("2026-10-22T02:01:00Z");
+      expect((await dom.get(`/relationships/${relId}/curfew`)).body.requests).toEqual([]);
+    } finally {
+      at("2026-10-16T12:00:00Z");
+    }
+  });
+
   it("schedules completion-anchored tasks from the completion date", async () => {
     const { dom, sub, relId, subId } = await ctx.pair();
     await dom.post(`/relationships/${relId}/tasks`, task(subId, { schedule: { start: "2026-10-16", anchor: "completion", rule: { freq: "daily", interval: 3 } } }));

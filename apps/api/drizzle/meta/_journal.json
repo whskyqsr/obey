@@ -267,6 +267,13 @@
       "when": 1792608055527,
       "tag": "0037_curfew",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792610870794,
+      "tag": "0038_curfew_requests",
+      "breakpoints": true
     }
   ]
 }

@@ -1,12 +1,12 @@
-import { and, eq, gt, gte, isNull, lt, ne } from "drizzle-orm";
+import { and, eq, gt, gte, isNotNull, isNull, lt, ne } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { calendarEventInput, plainDate } from "@obey/contracts";
 import type { Deps } from "../app.js";
 import type { Tx } from "../db/index.js";
-import { calendarEvents, memberships, occurrences, taskSeries } from "../db/schema.js";
-import { forbidden, notFound } from "../errors.js";
-import { requireMember } from "../services/access.js";
+import { calendarEvents, memberships, occurrences, relationships, taskSeries, users } from "../db/schema.js";
+import { HttpError, forbidden, notFound } from "../errors.js";
+import { canManage, requireMember } from "../services/access.js";
 
 type Event = typeof calendarEvents.$inferSelect;
 type Due = { id: string; dueAt: Date; assigneeId: string };
@@ -49,7 +49,19 @@ const eventDto = (e: Event, due: Due[]) => ({
   withPartner: e.withPartner,
   noteMd: e.noteMd,
   conflictIds: clashes(e, due).map((o) => o.id),
+  changedBy: e.changedBy,
+  previousEndsAt: e.previousEndsAt?.toISOString() ?? null,
 });
+
+/** "12:00 AM" in the person's own zone, as best we know it. */
+function clock(at: Date, zone: string | null | undefined) {
+  const tz = zone ?? "UTC";
+  try {
+    return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: tz }).format(at);
+  } catch {
+    return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" }).format(at);
+  }
+}
 
 export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   const { db, notifier } = deps;
@@ -123,7 +135,37 @@ export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   });
 
   app.patch<{ Params: { id: string } }>("/events/:id", async (req) => {
-    const current = await loadOwn(req.params.id, req.user.id);
+    if (!z.string().uuid().safeParse(req.params.id).success) throw notFound();
+    const [found] = await db.select().from(calendarEvents).where(eq(calendarEvents.id, req.params.id));
+    if (!found) throw notFound();
+    const m = await requireMember(db, found.relationshipId, req.user.id);
+    if (found.authorId !== req.user.id) {
+      // A Dominant may move when someone else's plan ends (say, to curfew); the author is told.
+      if (!canManage(m.role)) throw forbidden("only the person who added an event can change it");
+      const { endsAt } = z
+        .object({ endsAt: z.string().datetime({ offset: true }) })
+        .strict()
+        .parse(req.body);
+      const end = new Date(endsAt);
+      if (end <= found.startsAt) throw new HttpError(400, "a plan has to end after it starts");
+      if (found.allDay) throw new HttpError(400, "an all-day plan can't be given an end time");
+      const [e] = await db
+        .update(calendarEvents)
+        .set({ endsAt: end, changedBy: req.user.id, previousEndsAt: found.endsAt, changeSeenAt: null, updatedAt: deps.now() })
+        .where(eq(calendarEvents.id, found.id))
+        .returning();
+      if (end.getTime() !== found.endsAt.getTime()) {
+        const [rel] = await db.select({ curfew: relationships.curfew }).from(relationships).where(eq(relationships.id, found.relationshipId));
+        const [author] = await db.select({ timezone: users.timezone }).from(users).where(eq(users.id, found.authorId));
+        await notifier.send([found.authorId], {
+          title: "Fealty",
+          body: `${req.user.displayName} changed ${found.title}: it now ends at ${clock(end, author?.timezone ?? rel?.curfew?.timezone)}`,
+          data: { type: "event_changed", eventId: found.id },
+        });
+      }
+      return withConflicts(e!);
+    }
+    const current = found;
     // Validate the merged event, so moving only the start can't put it after the end.
     const body = calendarEventInput.parse({
       title: current.title,
@@ -143,6 +185,10 @@ export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         allDay: body.allDay,
         withPartner: body.withPartner,
         noteMd: body.noteMd?.trim() || null,
+        // The author's own edit settles any change made for them.
+        changedBy: null,
+        previousEndsAt: null,
+        changeSeenAt: null,
         updatedAt: deps.now(),
       })
       .where(eq(calendarEvents.id, current.id))
@@ -165,6 +211,32 @@ export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       .where(eq(calendarEvents.id, e.id))
       .returning();
     return withConflicts(updated!);
+  });
+
+  /** My plans someone else changed that I haven't seen yet, for Today. */
+  app.get<{ Params: { id: string } }>("/relationships/:id/events/changes", async (req) => {
+    await requireMember(db, req.params.id, req.user.id);
+    const rows = await db
+      .select()
+      .from(calendarEvents)
+      .where(
+        and(
+          eq(calendarEvents.relationshipId, req.params.id),
+          eq(calendarEvents.authorId, req.user.id),
+          isNotNull(calendarEvents.changedBy),
+          ne(calendarEvents.changedBy, req.user.id),
+          isNull(calendarEvents.changeSeenAt),
+          gt(calendarEvents.endsAt, deps.now()),
+        ),
+      )
+      .orderBy(calendarEvents.startsAt);
+    return rows.map((e) => eventDto(e, []));
+  });
+
+  app.post<{ Params: { id: string } }>("/events/:id/seen", async (req, reply) => {
+    const e = await loadOwn(req.params.id, req.user.id);
+    await db.update(calendarEvents).set({ changeSeenAt: deps.now() }).where(eq(calendarEvents.id, e.id));
+    return reply.status(204).send();
   });
 
   app.delete<{ Params: { id: string } }>("/events/:id", async (req, reply) => {

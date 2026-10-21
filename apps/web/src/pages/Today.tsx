@@ -8,6 +8,7 @@ import { DayRescheduleSheet } from "../components/DayRescheduleSheet";
 import { isOverdue } from "../components/OccurrenceCard";
 import { MissActions, ReviewActions, RowGroup, RowLink, TaskRow } from "../components/TaskRow";
 import { CurfewStrip } from "../components/CurfewStrip";
+import { PlanChanges } from "../components/PlanChanges";
 import { KitPrompt } from "./Kits";
 import { Button, Dialog, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, Section, TextField, useSnackbar, cx } from "../components/ui";
 import { addDays, fmtDate, fmtDateTime, fmtRelative, fromLocalInput, localDateOf, toLocalInput, today } from "../lib/dates";
@@ -78,6 +79,7 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
               .join(" · ")}
           />
           <CurfewStrip />
+          <PlanChanges />
           {!isDom && occ.data && todays.length > 0 && <Progress today={todays} done={doneToday} points={features.points} />}
           <PlanClashes />
           <KitPrompt />

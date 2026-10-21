@@ -370,7 +370,43 @@ export const curfewClash = z.object({
 });
 export type CurfewClash = z.infer<typeof curfewClash>;
 
-export const curfew = z.object({ settings: curfewInput.nullable(), night: curfewNight.nullable(), clashes: z.array(curfewClash) });
+/** A sub asking for a later curfew one night; pending ones show until that night's curfew, when they lapse. */
+export const curfewRequest = z.object({
+  id,
+  occurrenceId: id,
+  /** The plan it was asked from, if any. */
+  eventId: id.nullable(),
+  eventTitle: z.string().nullable().default(null),
+  requestedBy: id,
+  fromDueAt: z.string(),
+  untilAt: z.string(),
+  reason: z.string().nullable(),
+  status: z.enum(["pending", "approved", "declined"]),
+});
+export type CurfewRequest = z.infer<typeof curfewRequest>;
+export const curfewRequestInput = z.object({
+  occurrenceId: id,
+  until: z.string().datetime({ offset: true }),
+  reason: z.string().trim().max(280).nullable().optional(),
+  eventId: id.nullable().optional(),
+});
+/** A Dominant approving, optionally at an earlier time than asked. */
+export const approveCurfewRequestInput = z.object({ until: z.string().datetime({ offset: true }).optional() });
+
+/** Whether a plan the person is making runs into one of their curfew nights. */
+export const curfewCheckInput = z.object({ startsAt: z.string().datetime({ offset: true }), endsAt: z.string().datetime({ offset: true }) });
+export const curfewCheck = z.object({
+  night: z.object({ occurrenceId: id, dueAt: z.string(), endsAt: z.string() }).nullable(),
+});
+export type CurfewCheck = z.infer<typeof curfewCheck>;
+
+export const curfew = z.object({
+  settings: curfewInput.nullable(),
+  night: curfewNight.nullable(),
+  clashes: z.array(curfewClash),
+  /** Pending asks for more time: a sub sees their own, a Dominant all of them. */
+  requests: z.array(curfewRequest).default([]),
+});
 export type Curfew = z.infer<typeof curfew>;
 export const excuseCurfewInput = z.object({ occurrenceId: id });
 
@@ -779,6 +815,9 @@ export const calendarEvent = z.object({
   noteMd: z.string().nullable(),
   /** Timed tasks still to do that fall due during the event, for the people it involves. */
   conflictIds: z.array(id),
+  /** Set when someone other than the author changed it (a Dominant moving its end). */
+  changedBy: id.nullable().default(null),
+  previousEndsAt: z.string().nullable().default(null),
 });
 export type CalendarEvent = z.infer<typeof calendarEvent>;
 
