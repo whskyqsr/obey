@@ -699,7 +699,8 @@ describe("tasks and occurrences", () => {
 
       // The Dominant moves the plan's end to curfew; only the end, and the author is told.
       expect((await dom.patch(`/events/${plan.id}`, { title: "Nope" })).status).toBe(403);
-      expect((await dom.patch(`/events/${plan.id}`, { endsAt: "2026-10-21T02:00:00Z" })).body).toMatchObject({
+      expect((await dom.patch(`/events/${plan.id}`, { endsAt: "2026-10-21T02:00:00Z", note: "Early start Wednesday" })).body).toMatchObject({
+        changeNote: "Early start Wednesday",
         endsAt: "2026-10-21T02:00:00.000Z",
         previousEndsAt: "2026-10-21T05:00:00.000Z",
       });
@@ -722,6 +723,14 @@ describe("tasks and occurrences", () => {
       // A sub can't do the same to a Dominant's plan.
       const domPlan = (await dom.post(`/relationships/${relId}/events`, { title: "Work trip", startsAt: "2026-10-22T00:00:00Z", endsAt: "2026-10-22T05:00:00Z" })).body;
       expect((await sub.patch(`/events/${domPlan.id}`, { endsAt: "2026-10-22T02:00:00Z" })).status).toBe(403);
+
+      // A note after a decision is a comment on that night, shown on the sub's strip.
+      at("2026-10-17T02:00:00Z");
+      await dom.post(`/occurrences/${fri.id}/comments`, { body: "Text me when you leave" });
+      expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [subId], push: { body: "Dom left you a note about curfew" } });
+      expect((await sub.get(`/relationships/${relId}/curfew`)).body.night).toMatchObject({ occurrenceId: fri.id, note: "Text me when you leave" });
+      await sub.post(`/occurrences/${fri.id}/comments`, { body: "Will do" });
+      expect((await sub.get(`/relationships/${relId}/curfew`)).body.night.note).toBe("Text me when you leave");
 
       // An ask nobody answers lapses at curfew.
       at("2026-10-21T22:00:00Z");

@@ -6,6 +6,7 @@ import { App } from "./App";
 import { initSession } from "./auth/session";
 import { captureInviteLink } from "./lib/invite";
 import { watchForNewBuild } from "./lib/staleBuild";
+import { DecisionNoteProvider } from "./components/DecisionNote";
 import { SnackbarProvider } from "./components/ui";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import "./index.css";
@@ -29,7 +30,9 @@ createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <SnackbarProvider>
-          <App />
+          <DecisionNoteProvider>
+            <App />
+          </DecisionNoteProvider>
         </SnackbarProvider>
       </ThemeProvider>
     </QueryClientProvider>

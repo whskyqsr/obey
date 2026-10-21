@@ -48,6 +48,9 @@ import kotlinx.coroutines.launch
 import retrofit2.HttpException
 
 /** Tonight's curfew night (if Today shows one), plans that run past curfew, and what a broken night costs. */
+/** A decision a note can follow: [text] for the snackbar, kept with [occurrenceId], sent to [to]. */
+data class NoteTarget(val text: String, val occurrenceId: String, val to: String, val about: String)
+
 data class TodayCurfew(val night: CurfewNight?, val clashes: List<CurfewClash>, val cost: String?, val requests: List<app.obey.api.CurfewRequest> = emptyList())
 
 data class TodayData(
@@ -248,15 +251,31 @@ class TodayViewModel @Inject constructor(
         refresh()
     }
 
-    fun excuseCurfew(occurrenceId: String, message: String) = action {
+    private val _noteFor = MutableStateFlow<NoteTarget?>(null)
+    /** A decision just made, for the screen's snackbar offering "Add a note". */
+    val noteFor: StateFlow<NoteTarget?> = _noteFor.asStateFlow()
+    fun noteForShown() { _noteFor.value = null }
+
+    private fun nameOf(userId: String) = sessions.session?.nameOf(userId) ?: "them"
+    private fun partners() = sessions.session?.partners.orEmpty().joinToString(" and ") { it.displayName }.ifEmpty { "them" }
+
+    /** A note after a decision: a comment on that task or curfew night, and a notification. */
+    fun addNote(t: NoteTarget, body: String, onDone: () -> Unit) = action {
+        api.addComment(t.occurrenceId, app.obey.api.CommentInput(body))
+        say("Note sent to ${t.to}")
+        onDone()
+        refresh()
+    }
+
+    fun excuseCurfew(occurrenceId: String, message: String, to: String? = null) = action {
         api.excuseCurfew(sessions.requireRelationshipId(), ExcuseCurfewInput(occurrenceId))
-        say(message)
+        _noteFor.value = NoteTarget(message, occurrenceId, to ?: partners(), "excusing curfew")
         refresh()
     }
 
     fun confirmCurfewMiss(n: CurfewNight) = action {
         api.confirmMiss(n.occurrenceId)
-        say("Left as missed")
+        _noteFor.value = NoteTarget("Left as missed", n.occurrenceId, nameOf(n.assigneeId), "leaving curfew missed")
         refresh()
     }
 
@@ -268,16 +287,23 @@ class TodayViewModel @Inject constructor(
     }
 
     /** [until] null approves the time asked for. */
-    fun approveCurfew(r: app.obey.api.CurfewRequest, until: String?, onDone: () -> Unit = {}) = action {
+    fun approveCurfew(r: app.obey.api.CurfewRequest, until: String?, note: String? = null, onDone: () -> Unit = {}) = action {
         api.approveCurfew(r.id, app.obey.api.ApproveCurfewRequestInput(until))
-        say("Curfew moved")
+        when {
+            note != null -> {
+                api.addComment(r.occurrenceId, app.obey.api.CommentInput(note))
+                say("Curfew moved")
+            }
+            until != null -> say("Curfew moved")
+            else -> _noteFor.value = NoteTarget("Curfew moved", r.occurrenceId, nameOf(r.requestedBy), "moving curfew")
+        }
         onDone()
         refresh()
     }
 
     fun declineCurfew(r: app.obey.api.CurfewRequest) = action {
         api.declineCurfew(r.id)
-        say("Declined")
+        _noteFor.value = NoteTarget("Declined", r.occurrenceId, nameOf(r.requestedBy), "saying no to more time")
         refresh()
     }
 
@@ -291,8 +317,8 @@ class TodayViewModel @Inject constructor(
     }
 
     /** A Dominant moving when a plan that runs past curfew ends; its author is told. */
-    fun changePlanEnd(c: CurfewClash, endsAt: String, onDone: () -> Unit = {}) = action {
-        api.changePlanEnd(c.eventId, app.obey.api.PlanEndInput(endsAt))
+    fun changePlanEnd(c: CurfewClash, endsAt: String, note: String?, onDone: () -> Unit = {}) = action {
+        api.changePlanEnd(c.eventId, app.obey.api.PlanEndInput(endsAt, note))
         say("Plan changed")
         onDone()
         refresh()
@@ -359,19 +385,19 @@ class TodayViewModel @Inject constructor(
 
     fun excuse(o: Occurrence) = action {
         api.editOccurrence(o.id, EditOccurrenceInput(status = OccurrenceStatus.Excused))
-        say("Excused")
+        _noteFor.value = NoteTarget("Excused", o.id, nameOf(o.assigneeId), "excusing “${o.title}”")
         refresh()
     }
 
     fun dropConsequence(o: Occurrence) = action {
         api.dropConsequence(o.id)
-        say("Dropped “${o.missConsequence}”")
+        _noteFor.value = NoteTarget("Dropped “${o.missConsequence}”", o.id, nameOf(o.assigneeId), "dropping “${o.missConsequence}” for “${o.title}”")
         refresh()
     }
 
     fun confirmMiss(o: Occurrence) = action {
         api.confirmMiss(o.id)
-        say("Kept as missed")
+        _noteFor.value = NoteTarget("Kept as missed", o.id, nameOf(o.assigneeId), "keeping “${o.title}” as missed")
         refresh()
     }
 
@@ -408,7 +434,13 @@ class TodayViewModel @Inject constructor(
     fun decide(rows: List<RescheduleRequest>, approve: Boolean) = action {
         api.decideReschedule(rows.first().id, DecideInput(approve))
         val n = if (rows.size > 1) " for ${rows.size} tasks" else ""
-        say(if (approve) "Extension$n approved" else "Extension$n declined")
+        val r = rows.first()
+        _noteFor.value = NoteTarget(
+            if (approve) "Extension$n approved" else "Extension$n declined",
+            r.occurrenceId,
+            nameOf(r.requestedBy),
+            "${if (approve) "approving" else "declining"} the request for “${r.title}”",
+        )
         refresh()
     }
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { useNoteAfter } from "../components/DecisionNote";
 import { useBalances, useDecideReschedule, useEvents, useLibrary, usePendingReschedules } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { CalendarEvent, Occurrence, RescheduleRequest } from "../api/types";
@@ -314,6 +315,7 @@ function PendingRequests({ bare }: { bare?: boolean }) {
   const snack = useSnackbar();
   const pending = usePendingReschedules(rel.id);
   const decide = useDecideReschedule(rel.id);
+  const noteAfter = useNoteAfter();
 
   const cards = useMemo(() => {
     const map = new Map<string, RescheduleRequest[]>();
@@ -336,7 +338,13 @@ function PendingRequests({ bare }: { bare?: boolean }) {
     decide.mutate(
       { id: r.id, approve },
       {
-        onSuccess: () => snack(`${approve ? "Approved" : "Declined"}${n > 1 ? ` ${n} tasks` : ""}`),
+        onSuccess: () =>
+          noteAfter(`${approve ? "Approved" : "Declined"}${n > 1 ? ` ${n} tasks` : ""}`, {
+            relId: rel.id,
+            occurrenceId: r.occurrenceId,
+            to: memberName(r.requestedBy),
+            about: `${approve ? "approving" : "declining"} the request for “${r.title}”`,
+          }),
         onError: (e) => snack(errorMessage(e)),
       },
     );

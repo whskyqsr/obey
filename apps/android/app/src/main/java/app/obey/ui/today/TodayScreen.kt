@@ -105,6 +105,7 @@ fun TodayScreen(
     var dayTasks by remember { mutableStateOf<List<Occurrence>?>(null) }
     var instead by remember { mutableStateOf<app.obey.api.RescheduleRequest?>(null) }
     val session = vm.session
+    val partnerNames = session?.partners.orEmpty().joinToString(" and ") { it.displayName }.ifEmpty { "them" }
     val askWho = session?.partners.orEmpty().filter { it.role != app.obey.api.Role.Submissive }.let { if (it.size == 1) it[0].displayName else "your Dominant" }
 
     Scaffold(
@@ -187,9 +188,10 @@ fun TodayScreen(
                                 canDecide = session?.canManage == true,
                                 cost = curfew?.cost,
                                 onHome = { vm.homeForCurfew(n) },
-                                onExcuse = { vm.excuseCurfew(n.occurrenceId, "Excused") },
+                                onExcuse = { vm.excuseCurfew(n.occurrenceId, "Excused", session?.nameOf(n.assigneeId)) },
                                 onConfirm = { vm.confirmCurfewMiss(n) },
                                 waiting = if (asked != null && beforeCurfew) " · asked ${if (mine) askWho else "you"} for ${app.obey.ui.common.formatTime(asked.untilAt)}" else "",
+                                note = n.note?.takeIf { mine }?.let { " · $askWho: “$it”" } ?: "",
                                 onMoreTime = if (mine && beforeCurfew && n.arrivedAt == null && n.status == OccurrenceStatus.Pending && asked == null) ({ askingMore = n }) else null,
                             )
                         }
@@ -344,9 +346,19 @@ fun TodayScreen(
         MoreTimeSheet(n, askWho, busy, onDismiss = { askingMore = null }) { until, reason -> vm.askCurfew(n, until, reason, askWho) { askingMore = null } }
     }
     approvingOther?.let { r ->
-        ApproveOtherTimeSheet(r, session?.nameOf(r.requestedBy) ?: "They", busy, onDismiss = { approvingOther = null }) { until -> vm.approveCurfew(r, until) { approvingOther = null } }
+        ApproveOtherTimeSheet(r, session?.nameOf(r.requestedBy) ?: "They", busy, onDismiss = { approvingOther = null }) { until, note -> vm.approveCurfew(r, until, note) { approvingOther = null } }
     }
     changingEnd?.let { c ->
-        PlanEndSheet(c, busy, onDismiss = { changingEnd = null }) { endsAt -> vm.changePlanEnd(c, endsAt) { changingEnd = null } }
+        PlanEndSheet(c, partnerNames, busy, onDismiss = { changingEnd = null }) { endsAt, note -> vm.changePlanEnd(c, endsAt, note) { changingEnd = null } }
     }
+
+    // A one-tap decision's snackbar offers "Add a note" for a few seconds.
+    val noteFor by vm.noteFor.collectAsStateWithLifecycle()
+    var writingNote by remember { mutableStateOf<NoteTarget?>(null) }
+    LaunchedEffect(noteFor) {
+        val t = noteFor ?: return@LaunchedEffect
+        vm.noteForShown()
+        if (snackbar.showSnackbar(t.text, actionLabel = "Add a note", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) writingNote = t
+    }
+    writingNote?.let { t -> NoteDialog(t, busy, onDismiss = { writingNote = null }) { body -> vm.addNote(t, body) { writingNote = null } } }
 }

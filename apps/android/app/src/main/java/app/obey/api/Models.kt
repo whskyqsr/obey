@@ -938,11 +938,12 @@ data class CalendarEvent(
     /** Someone else (a Dominant) moved its end; the author is shown it until they close the card. */
     val changedBy: String? = null,
     val previousEndsAt: String? = null,
+    val changeNote: String? = null,
 )
 
 /** A Dominant moving when someone else's plan ends; nothing else of theirs can be changed. */
 @Serializable
-data class PlanEndInput(val endsAt: String)
+data class PlanEndInput(val endsAt: String, val note: String? = null)
 
 /** A broken rule or protocol; [title] is what it was called when logged. */
 @Serializable
@@ -1116,6 +1117,8 @@ data class CurfewNight(
     val missConfirmed: Boolean = false,
     /** Their phone can't check location, so they say "I'm home" themselves. */
     val canTap: Boolean = false,
+    /** The latest note a Dominant left about this night (say, with a declined ask). */
+    val note: String? = null,
 )
 
 /** A plan in the coming week that runs into a curfew night. */
