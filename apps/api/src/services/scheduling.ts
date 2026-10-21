@@ -1,4 +1,4 @@
-import { and, count, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNotNull, isNull, lte, notInArray, or, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import {
   type PlainDate,
@@ -517,9 +517,10 @@ export async function markMissed(db: Tx, now: Date) {
       )
       .limit(1);
     // Someone who got there in time and is still staying isn't late; finishStays completes it when the stay is up.
-    if (series.placeId && series.stayMinutes && occ.arrivedAt && !occ.leftAt) continue;
+    if (series.placeId && (series.stayMinutes || series.curfewUntil) && occ.arrivedAt && !occ.leftAt) continue;
     // A location task that came due while its assignee had location paused is excused, like under a red safe call.
-    const paused = series.placeId !== null && (await locationPausedAt(db, series.relationshipId, series.assigneeId, occ.dueAt));
+    // Not a curfew: with location paused, the sub says "I'm home" instead.
+    const paused = series.placeId !== null && !series.curfewUntil && (await locationPausedAt(db, series.relationshipId, series.assigneeId, occ.dueAt));
     // A count task kept within its bounds is done at the deadline ("no more than 3" has nothing to reach before then).
     if (!red && isCountTask(series) && countState(series, occ.count) === "ok") {
       await finalizeCompletion(db, series, occ, occ.dueAt, null, countedPoints(series, occ.count));
@@ -575,7 +576,16 @@ export async function claimReminders(db: Tx, now: Date, leadMinutes: number) {
   const due = await db
     .update(occurrences)
     .set({ reminderSentAt: now })
-    .where(and(eq(occurrences.status, "pending"), isNull(occurrences.reminderSentAt), lte(occurrences.dueAt, horizon), gte(occurrences.dueAt, now)))
+    .where(
+      and(
+        eq(occurrences.status, "pending"),
+        isNull(occurrences.reminderSentAt),
+        lte(occurrences.dueAt, horizon),
+        gte(occurrences.dueAt, now),
+        // Curfews get their own nudge, and only when the sub isn't home yet.
+        notInArray(occurrences.seriesId, db.select({ id: taskSeries.id }).from(taskSeries).where(isNotNull(taskSeries.curfewUntil))),
+      ),
+    )
     .returning();
   if (due.length === 0) return [];
   const series = await db
@@ -584,6 +594,11 @@ export async function claimReminders(db: Tx, now: Date, leadMinutes: number) {
     .where(inArray(taskSeries.id, [...new Set(due.map((o) => o.seriesId))]));
   const byId = new Map(series.map((s) => [s.id, s]));
   return due.map((occ) => ({ occ, series: byId.get(occ.seriesId)! }));
+}
+
+/** A curfew night isn't moved or called off like a task; a Dominant excuses it from the curfew instead. */
+function notCurfew(series: Series) {
+  if (series.curfewUntil) throw new HttpError(409, "a curfew night can't be moved; a Dominant can excuse it");
 }
 
 export interface RescheduleChange {
@@ -696,6 +711,7 @@ export async function requestReschedule(
 ) {
   if (occ.status !== "pending" && occ.status !== "missed") throw new HttpError(409, `occurrence is ${occ.status}`);
   if (!canManage(actor.role) && actor.userId !== series.assigneeId) throw forbidden();
+  notCurfew(series);
   const toDue = targetDue(series, occ, change);
   if (toDue.getTime() <= now.getTime()) throw new HttpError(400, "the new deadline must be in the future");
 
@@ -741,6 +757,7 @@ export async function requestGroupReschedule(
     if (series.relationshipId !== rel.id) throw new HttpError(400, "all tasks must belong to this relationship");
     if (occ.status !== "pending" && occ.status !== "missed") throw new HttpError(409, `occurrence is ${occ.status}`);
     if (!canManage(actor.role) && actor.userId !== series.assigneeId) throw forbidden();
+    notCurfew(series);
   }
   const { direct, usedAllowance } = await rescheduleAuthority(db, rel, actor, now);
   const groupId = randomUUID();
@@ -801,6 +818,7 @@ export async function requestPlanReschedule(
     if (series.relationshipId !== rel.id) throw new HttpError(400, "all tasks must belong to this relationship");
     if (occ.status !== "pending" && occ.status !== "missed") throw new HttpError(409, `occurrence is ${occ.status}`);
     if (!canManage(actor.role) && actor.userId !== series.assigneeId) throw forbidden();
+    notCurfew(series);
     if (action === "move" && (!dueAt || dueAt.getTime() <= now.getTime())) throw new HttpError(400, "the new deadline must be in the future");
   }
   const { direct, usedAllowance } = await rescheduleAuthority(db, rel, actor, now);

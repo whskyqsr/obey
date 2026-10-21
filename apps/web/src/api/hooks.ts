@@ -11,6 +11,8 @@ import type {
   ReportReason,
   CalendarEvent,
   CalendarEventInput,
+  Curfew,
+  CurfewInput,
   InvitePreview,
   Balance,
   Features,
@@ -55,6 +57,7 @@ export const keys = {
   balances: (rel: string) => ["rel", rel, "balances"] as const,
   library: (rel: string, kind: LibraryKind) => ["rel", rel, kind] as const,
   places: (rel: string) => ["rel", rel, "places"] as const,
+  curfew: (rel: string) => ["rel", rel, "curfew"] as const,
 };
 
 /** Invalidate everything belonging to a relationship (occurrences, balances and so on interlock). */
@@ -699,4 +702,36 @@ export function usePauseLocation(rel: string) {
 
 export function useAskLocation(rel: string) {
   return useMutation({ mutationFn: () => api(`/relationships/${rel}/location/ask`, { method: "POST" }) });
+}
+
+// ---- curfew
+
+/** The curfew's settings, tonight's night for Today, and (for a Dominant) plans that run into one. Refreshes each minute so the strip keeps time. */
+export function useCurfew(rel: string, enabled = true) {
+  return useQuery({ queryKey: keys.curfew(rel), queryFn: () => api<Curfew>(`/relationships/${rel}/curfew`), enabled, refetchInterval: 60_000 });
+}
+
+export function useSaveCurfew(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (input: CurfewInput) => api<Curfew>(`/relationships/${rel}/curfew`, { method: "PUT", body: input }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+/** "I'm home", for someone whose phone can't check. */
+export function useHomeForCurfew(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (occurrenceId: string) => api<Occurrence>(`/occurrences/${occurrenceId}/home`, { method: "POST", body: {} }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useExcuseCurfew(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (occurrenceId: string) => api<Occurrence>(`/relationships/${rel}/curfew/excuse`, { method: "POST", body: { occurrenceId } }),
+    onSuccess: () => invalidate(),
+  });
 }

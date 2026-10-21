@@ -81,6 +81,7 @@ fun TodayScreen(
     val refreshing by vm.refreshing.collectAsStateWithLifecycle()
     val offlineSince by vm.offlineSince.collectAsStateWithLifecycle()
     val locationReady by vm.locationReady.collectAsStateWithLifecycle()
+    val curfew by vm.curfew.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     MessageEffect(message, snackbar, vm::messageShown)
@@ -169,6 +170,23 @@ fun TodayScreen(
                 LazyColumn(Modifier.fillMaxSize()) {
                     offlineSince?.let { at -> item(key = "offline") { OfflineBanner(at) } }
                     if (session?.readOnly == true) item(key = "ended") { EndedBanner(onOpenSettings) }
+                    curfew?.night?.let { n ->
+                        item(key = "curfew") {
+                            CurfewStrip(
+                                night = n,
+                                mine = n.assigneeId == me,
+                                name = session?.nameOf(n.assigneeId) ?: "Your partner",
+                                canDecide = session?.canManage == true,
+                                cost = curfew?.cost,
+                                onHome = { vm.homeForCurfew(n) },
+                                onExcuse = { vm.excuseCurfew(n.occurrenceId, "Excused") },
+                                onConfirm = { vm.confirmCurfewMiss(n) },
+                            )
+                        }
+                    }
+                    items(curfew?.clashes.orEmpty(), key = { "curfew-${it.occurrenceId}" }) { c ->
+                        CurfewClashCard(c, onExcuse = { vm.excuseCurfew(c.occurrenceId, "Curfew excused that night") }, onLeave = { vm.leaveClash(c) })
+                    }
                     items(d.clashingPlans, key = { "plan-${it.id}" }) { e -> PlanHeadsUp(e, planTone(e, session?.relationship)) { plan = e } }
                     if (isDom && d.noTasks && session?.readOnly != true) item(key = "kits") { KitPrompt(onKits) }
                     // Someone with location tasks whose phone can't notice them arriving.

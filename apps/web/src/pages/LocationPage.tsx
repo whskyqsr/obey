@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import type { Member } from "../api/types";
-import { useOccurrences, usePauseLocation } from "../api/hooks";
+import { useCurfew, useOccurrences, usePauseLocation } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { usePlaceLookup } from "../components/Location";
 import { Button, Chip, Icon, IconButton, useSnackbar } from "../components/ui";
@@ -71,6 +71,8 @@ export function LocationPage() {
   const doms = rel.members.filter((m) => m.userId !== me.user.id).map((m) => memberName(m.userId));
   const who = doms.join(" and ") || "Your partner";
   const ready = self?.locationStatus === "ready";
+  const curfew = useCurfew(rel.id);
+  const onCurfew = curfew.data?.settings?.enabled && curfew.data.settings.assigneeId === me.user.id;
   const endOfDay = () => {
     const d = new Date();
     d.setHours(23, 59, 0, 0);
@@ -133,7 +135,10 @@ export function LocationPage() {
             </>
           ) : (
             <>
-              <p className="text-body-medium text-on-surface-variant">Stops watching every place. Location tasks due while paused are excused, and {who} is told you paused.</p>
+              <p className="text-body-medium text-on-surface-variant">
+                Stops watching every place. Location tasks due while paused are excused, and {who} is told you paused.
+                {onCurfew && " Curfew still counts: tap I'm home on Today instead."}
+              </p>
               <div className="flex flex-wrap gap-2">
                 <Chip onClick={() => setPause(new Date(Date.now() + 3_600_000).toISOString(), "Paused for an hour")}>1 hour</Chip>
                 <Chip onClick={() => setPause(endOfDay(), "Paused for the rest of today")}>Rest of today</Chip>

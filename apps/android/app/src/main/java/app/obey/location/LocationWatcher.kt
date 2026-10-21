@@ -159,7 +159,7 @@ class LocationWatcher @Inject constructor(
                 mine.locationPausedUntil?.let { wakeAt(Instant.parse(it)) }
                 continue
             }
-            val due = api.occurrences(rel.id, today.minusDays(1).toString(), today.plusDays(1).toString())
+            val due = api.occurrences(rel.id, today.minusDays(1).toString(), today.plusDays(1).toString(), curfew = "include")
                 .filter { it.assigneeId == me.user.id && it.isPlaced && it.status == OccurrenceStatus.Pending && it.leftAt == null }
             if (due.isEmpty()) continue
             val places = api.places(rel.id).associateBy { it.id }
@@ -167,8 +167,8 @@ class LocationWatcher @Inject constructor(
                 val place = places[o.placeId] ?: continue
                 val dueAt = Instant.parse(o.dueAt)
                 if (o.arrivedAt != null) {
-                    // Watching for leaving until the stay is up; the server finishes it then.
-                    val until = Instant.parse(o.arrivedAt).plusSeconds((o.stayMinutes ?: 0) * 60L)
+                    // Watching for leaving until the stay (or the curfew) is up; the server finishes it then.
+                    val until = o.stayUntil?.let { Instant.parse(it) } ?: continue
                     if (until.isAfter(now)) staying += geofence(o, place, until.plusSeconds(3600), now)
                     continue
                 }

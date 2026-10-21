@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { boolean, customType, date, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
-import type { DynamicDate, Features } from "@obey/contracts";
+import type { CurfewSettings, DynamicDate, Features } from "@obey/contracts";
 import type { Schedule } from "@obey/recurrence";
 
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
@@ -48,6 +48,8 @@ export const relationships = pgTable("relationships", {
   subNotes: boolean("sub_notes").notNull().default(true),
   /** Anniversaries and other dates the dynamic marks. */
   dates: jsonb("dates").$type<DynamicDate[]>().notNull().default([]),
+  /** The sub's curfew as a Dominant set it; its nights are hidden task series (see task_series.curfew_until). */
+  curfew: jsonb("curfew").$type<CurfewSettings>(),
   createdAt: createdAt(),
   /** Set when a partner leaves or blocks: the dynamic stays readable for both, and nothing in it can change. */
   endedAt: ts("ended_at"),
@@ -225,6 +227,8 @@ export const taskSeries = pgTable(
     placeId: uuid("place_id").references((): AnyPgColumn => places.id, { onDelete: "set null" }),
     /** With a place: how long to stay once there; leaving sooner is a miss ("left early"). */
     stayMinutes: integer("stay_minutes"),
+    /** Set on a curfew's hidden series: due is the curfew, and the assignee stays at the place until this local time. */
+    curfewUntil: text("curfew_until"),
     active: boolean("active").notNull().default(true),
     /** Set on the consequence handed out automatically for this missed occurrence; unique, so it's issued once. */
     causedByOccurrenceId: uuid("caused_by_occurrence_id").references((): AnyPgColumn => occurrences.id, { onDelete: "set null" }),
@@ -479,7 +483,7 @@ export const locationEvents = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["enter", "exit", "checkin"] }).notNull(),
+    kind: text("kind", { enum: ["enter", "exit", "checkin", "tap"] }).notNull(),
     lat: doublePrecision("lat"),
     lng: doublePrecision("lng"),
     accuracyM: integer("accuracy_m"),

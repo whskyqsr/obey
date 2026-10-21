@@ -280,6 +280,10 @@ export const occurrence = z.object({
   stayMinutes: z.number().int().nullable().default(null),
   arrivedAt: z.string().nullable().default(null),
   leftAt: z.string().nullable().default(null),
+  /** When the assignee may leave the place: the end of their stay once they've arrived, or a curfew's end. */
+  stayUntil: z.string().nullable().default(null),
+  /** One night of a curfew; these never show as tasks. */
+  curfew: z.boolean().default(false),
 });
 export type Occurrence = z.infer<typeof occurrence>;
 
@@ -317,6 +321,58 @@ export const leaveOccurrence = z.object({ at: z.string().datetime().optional() }
 export const reportLocation = z.object({ status: locationStatus });
 /** Pauses location watching; until null means until turned back on. */
 export const pauseLocation = z.object({ until: z.string().datetime().nullable() });
+
+/**
+ * A sub's curfew: home by a set time each night, at the Home place, and in until morning. A time before noon means just
+ * after midnight ("12:00 AM" on a Friday is the start of Saturday). With weekendTime, time is for Sun–Thu nights and
+ * weekendTime for Fri–Sat nights. Each night is kept, broken and excused like a task.
+ */
+export const curfewInput = z.object({
+  enabled: z.boolean(),
+  assigneeId: id,
+  placeId: id,
+  time: timeOfDay,
+  weekendTime: timeOfDay.nullable().default(null),
+  until: timeOfDay,
+  points: z.number().int().min(0).max(10_000).default(0),
+  missPenalty: z.number().int().min(0).max(10_000).default(0),
+  consequenceId: id.nullable().default(null),
+  timezone: z.string().min(1),
+});
+export type CurfewInput = z.input<typeof curfewInput>;
+export type CurfewSettings = z.infer<typeof curfewInput>;
+
+/** The night Today shows a strip for: from an hour before curfew until it ends, or a broken one the Dominant hasn't settled. */
+export const curfewNight = z.object({
+  occurrenceId: id,
+  assigneeId: id,
+  placeId: id,
+  dueAt: z.string(),
+  endsAt: z.string(),
+  status: occurrenceStatus,
+  arrivedAt: z.string().nullable(),
+  leftAt: z.string().nullable(),
+  missConfirmed: z.boolean(),
+  /** The assignee's phone can't check location, so they say "I'm home" themselves. */
+  canTap: z.boolean(),
+});
+export type CurfewNight = z.infer<typeof curfewNight>;
+
+/** A plan in the coming week that runs into a curfew night; a Dominant excuses that night or leaves it. */
+export const curfewClash = z.object({
+  occurrenceId: id,
+  dueAt: z.string(),
+  endsAt: z.string(),
+  eventId: id,
+  eventTitle: z.string(),
+  eventStartsAt: z.string(),
+  eventEndsAt: z.string(),
+});
+export type CurfewClash = z.infer<typeof curfewClash>;
+
+export const curfew = z.object({ settings: curfewInput.nullable(), night: curfewNight.nullable(), clashes: z.array(curfewClash) });
+export type Curfew = z.infer<typeof curfew>;
+export const excuseCurfewInput = z.object({ occurrenceId: id });
 
 /** Adds to a count task's count (a tap is by: 1), or sets it outright to fix a mistake. */
 export const countOccurrence = z.union([z.object({ by: z.number().int().min(-1_000).max(1_000) }), z.object({ to: z.number().int().min(0).max(10_000) })]);

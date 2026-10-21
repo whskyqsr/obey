@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { useCreateInvite, useLeaveRelationship, useUpdateRelationship } from "../api/hooks";
+import { useCreateInvite, useCurfew, useLeaveRelationship, useUpdateRelationship } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { DynamicDate, Features, Invite, Member, Relationship, ReschedulePolicy, Role } from "../api/types";
 import { Avatar } from "../components/Avatar";
@@ -14,6 +14,7 @@ import { anniversary, describeDate } from "../lib/dynamicDates";
 import { inviteLink } from "../lib/invite";
 import { ROLE_LABEL, isCollared, relTitle, useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
+import { describeCurfew } from "./Curfew";
 
 const POLICIES: { value: ReschedulePolicy; label: string; help: string }[] = [
   { value: "dominant_only", label: "Dominant only", help: "Only a Dominant can move deadlines." },
@@ -140,6 +141,7 @@ export function DynamicPage() {
   const navigate = useNavigate();
   const snack = useSnackbar();
   const update = useUpdateRelationship(rel.id);
+  const curfew = useCurfew(rel.id, features.location);
   const back = useBack(() => navigate({ to: "/settings" }));
   const title = useDynamicTitle();
   const [sheet, setSheet] = useState<"invite" | "name" | "deadlines" | null>(null);
@@ -258,6 +260,15 @@ export function DynamicPage() {
                 trailing={<Icon name="chevron_right" className="text-on-surface-variant" />}
                 onClick={() => navigate({ to: "/places" })}
               />
+              {(isDom || curfew.data?.settings?.enabled) && (
+                <Row
+                  leading={<Icon name="bedtime" className="text-on-surface-variant" />}
+                  headline="Curfew"
+                  supporting={curfew.data?.settings?.enabled ? describeCurfew(curfew.data.settings) : "Off"}
+                  trailing={<Icon name="chevron_right" className="text-on-surface-variant" />}
+                  onClick={() => navigate({ to: "/curfew" })}
+                />
+              )}
               {self && self.role !== "dominant" && !ended && (
                 <Row
                   leading={<Icon name="my_location" className="text-on-surface-variant" />}

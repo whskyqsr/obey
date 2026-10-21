@@ -1,5 +1,6 @@
 import { describe, opensOn } from "@obey/recurrence";
 import type { consequences, notes, occurrences, pointsLedger, protocols, reschedules, rewards, rules, taskSeries } from "./db/schema.js";
+import { stayEnd } from "./services/location.js";
 
 const iso = (d: Date) => d.toISOString();
 const isoOrNull = (d: Date | null) => (d ? d.toISOString() : null);
@@ -75,6 +76,8 @@ export const occurrenceDto = (o: typeof occurrences.$inferSelect, s: Series) => 
   stayMinutes: s.placeId ? s.stayMinutes : null,
   arrivedAt: isoOrNull(o.arrivedAt),
   leftAt: isoOrNull(o.leftAt),
+  stayUntil: s.placeId ? isoOrNull(stayEnd(s, o)) : null,
+  curfew: s.curfewUntil !== null,
 });
 
 /** `title` is the task's, so a request card can say which task it's about. */

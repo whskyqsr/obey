@@ -67,6 +67,16 @@ class SettingsViewModel @Inject constructor(
     private val _invite = MutableStateFlow<Invite?>(null)
     val invite: StateFlow<Invite?> = _invite.asStateFlow()
 
+    private val _curfew = MutableStateFlow<app.obey.api.CurfewInput?>(null)
+    /** The dynamic's curfew settings, for its row in Your dynamic. */
+    val curfew: StateFlow<app.obey.api.CurfewInput?> = _curfew.asStateFlow()
+
+    fun loadCurfew() {
+        val rel = sessions.session?.relationship ?: return
+        if (!rel.features.location) return
+        viewModelScope.launch { _curfew.value = runCatching { api.curfew(rel.id).settings }.getOrNull() }
+    }
+
     fun setDevUser(id: String) = action {
         settings.setDevUserId(id)
         sessions.refresh()

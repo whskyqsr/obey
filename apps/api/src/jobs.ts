@@ -1,5 +1,6 @@
 import type { Db } from "./db/index.js";
 import { managers } from "./services/access.js";
+import { claimCurfewNudges, clockTime } from "./services/curfew.js";
 import { finishStays } from "./services/location.js";
 import { claimReminders, markMissed, materializeAll } from "./services/scheduling.js";
 import type { Notifier } from "./notify.js";
@@ -12,6 +13,8 @@ export async function runJobs(db: Db, notifier: Notifier, now: Date, opts: { mat
   // Stays that are up complete before misses are marked, so a stay running past the deadline isn't counted late.
   const stayed = await db.transaction((tx) => finishStays(tx, now));
   for (const { occ, series } of stayed) {
+    // A kept curfew is the quiet, expected outcome; only a broken one is news.
+    if (series.curfewUntil) continue;
     const submitted = occ.status === "submitted";
     await notifier.send(await managers(db, series.relationshipId, series.assigneeId), {
       title: "Fealty",
@@ -22,6 +25,19 @@ export async function runJobs(db: Db, notifier: Notifier, now: Date, opts: { mat
 
   const missed = await db.transaction((tx) => markMissed(tx, now));
   for (const { occ, series, consequence } of missed) {
+    if (series.curfewUntil) {
+      await notifier.send([series.assigneeId], {
+        title: "Fealty",
+        body: consequence ? "You weren't home by curfew, and a consequence was added" : "You weren't home by curfew",
+        data: { type: "occurrence_missed", occurrenceId: occ.id },
+      });
+      await notifier.send(await managers(db, series.relationshipId, series.assigneeId), {
+        title: "Fealty",
+        body: "Your partner wasn't home by curfew",
+        data: { type: "occurrence_missed", occurrenceId: occ.id },
+      });
+      continue;
+    }
     await notifier.send([series.assigneeId], {
       title: "Fealty",
       body: consequence ? "A task was missed, and a consequence was added" : "A task was missed",
@@ -37,6 +53,14 @@ export async function runJobs(db: Db, notifier: Notifier, now: Date, opts: { mat
   const reminders = await claimReminders(db, now, opts.reminderLeadMinutes);
   for (const { occ, series } of reminders) {
     await notifier.send([series.assigneeId], { title: "Fealty", body: "A task is due soon", data: { type: "reminder", occurrenceId: occ.id } });
+  }
+  const nudges = await db.transaction((tx) => claimCurfewNudges(tx, now));
+  for (const { occ, series } of nudges) {
+    await notifier.send([series.assigneeId], {
+      title: "Fealty",
+      body: `Curfew at ${clockTime(occ.dueAt, series.timezone)}. Time to head home.`,
+      data: { type: "curfew", relationshipId: series.relationshipId },
+    });
   }
   const reviews = await promptMonthReviews(db, notifier, now);
   return { missed: missed.length, reminders: reminders.length, reviews };
