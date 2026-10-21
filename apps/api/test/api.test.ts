@@ -1255,6 +1255,19 @@ describe("assigned consequences", () => {
       const [miss] = (await sub.get(`/tasks/${t.id}/history`)).body;
       await dom.patch(`/occurrences/${miss.id}`, { status: "excused" });
       expect(await issued()).toHaveLength(0);
+
+      // Missed again: a Dominant can drop the consequence and keep the miss, with its penalty and Needs you cleared.
+      ctx.clock.now = new Date("2026-10-18T12:00:00Z");
+      await runJobs(ctx.db, ctx.notifier, ctx.clock.now, { materializeDays: 14, reminderLeadMinutes: 30 });
+      expect(await issued()).toHaveLength(1);
+      const listed = (await dom.get(`/relationships/${relId}/occurrences?from=2026-10-17&to=2026-10-17`)).body.find((o: { seriesId: string }) => o.seriesId === t.id);
+      expect(listed).toMatchObject({ status: "missed", missConsequence: "Corner time" });
+      expect((await sub.post(`/occurrences/${listed.id}/drop-consequence`)).status).toBe(403);
+      expect((await dom.post(`/occurrences/${listed.id}/drop-consequence`)).body).toMatchObject({ status: "missed", missConfirmed: true });
+      expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [subId], push: { body: "Dom dropped “Corner time” for “Kneel and write lines”. It still counts as missed." } });
+      expect(await issued()).toHaveLength(0);
+      expect((await dom.get(`/relationships/${relId}/occurrences?from=2026-10-17&to=2026-10-17`)).body.find((o: { id: string }) => o.id === listed.id).missConsequence).toBeNull();
+      expect((await dom.post(`/occurrences/${listed.id}/drop-consequence`)).status).toBe(409);
     } finally {
       ctx.clock.now = new Date("2026-10-16T12:00:00Z");
     }

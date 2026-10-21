@@ -185,6 +185,9 @@ interface ObeyApi {
     @POST("occurrences/{id}/confirm-miss")
     suspend fun confirmMiss(@Path("id") occurrenceId: String, @Body body: Map<String, String> = emptyMap()): Occurrence
 
+    @POST("occurrences/{id}/drop-consequence")
+    suspend fun dropConsequence(@Path("id") occurrenceId: String, @Body body: Map<String, String> = emptyMap()): Occurrence
+
     @POST("occurrences/{id}/review")
     suspend fun review(@Path("id") occurrenceId: String, @Body body: ReviewOccurrenceInput): Occurrence
 

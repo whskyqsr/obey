@@ -363,6 +363,12 @@ class TodayViewModel @Inject constructor(
         refresh()
     }
 
+    fun dropConsequence(o: Occurrence) = action {
+        api.dropConsequence(o.id)
+        say("Dropped “${o.missConsequence}”")
+        refresh()
+    }
+
     fun confirmMiss(o: Occurrence) = action {
         api.confirmMiss(o.id)
         say("Kept as missed")

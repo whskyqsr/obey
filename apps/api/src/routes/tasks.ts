@@ -39,9 +39,21 @@ import {
   reviewOccurrence,
   tickStep,
   undoCompletion,
+  withdrawMissConsequence,
 } from "../services/scheduling.js";
 
 const MAX_RANGE_DAYS = 62;
+
+/** For missed occurrences, the title of the consequence each one handed out that's still to be done. */
+async function missConsequences(db: Tx, missedIds: string[]) {
+  if (!missedIds.length) return new Map<string, string>();
+  const rows = await db
+    .select({ causedBy: taskSeries.causedByOccurrenceId, title: taskSeries.title })
+    .from(taskSeries)
+    .innerJoin(occurrences, eq(occurrences.seriesId, taskSeries.id))
+    .where(and(inArray(taskSeries.causedByOccurrenceId, missedIds), eq(taskSeries.active, true), eq(occurrences.status, "pending")));
+  return new Map(rows.map((r) => [r.causedBy!, r.title]));
+}
 const STREAK_RECENT = 7;
 
 function validZone(zone: string) {
@@ -260,12 +272,15 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         ),
       )
       .orderBy(asc(occurrences.dueAt));
-    return rows
-      .filter(({ occ, series }) => {
-        const d = localDate(occ.dueAt, series.timezone);
-        return d >= q.from && d <= q.to && occ.status !== "cancelled" && (q.curfew === "include" || !series.curfewUntil);
-      })
-      .map(({ occ, series }) => occurrenceDto(occ, series));
+    const shown = rows.filter(({ occ, series }) => {
+      const d = localDate(occ.dueAt, series.timezone);
+      return d >= q.from && d <= q.to && occ.status !== "cancelled" && (q.curfew === "include" || !series.curfewUntil);
+    });
+    const consequence = await missConsequences(
+      db,
+      shown.filter(({ occ }) => occ.status === "missed").map(({ occ }) => occ.id),
+    );
+    return shown.map(({ occ, series }) => occurrenceDto(occ, series, consequence.get(occ.id) ?? null));
   });
 
   /** Finished occurrences of a task, newest first, including those from before a "this and following" split. */
@@ -481,6 +496,30 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     if (occ.status !== "missed") throw new HttpError(409, `occurrence is ${occ.status}`);
     const [updated] = await db.update(occurrences).set({ missConfirmedAt: deps.now() }).where(eq(occurrences.id, occ.id)).returning();
     return occurrenceDto(updated!, series);
+  });
+
+  // A Dominant keeps a miss (status, penalty, streak) but lets the sub off its consequence.
+  app.post<{ Params: { id: string } }>("/occurrences/:id/drop-consequence", async (req) => {
+    const { occ, series, member } = await loadOccurrence(db, req.params.id, req.user.id);
+    if (!canManage(member.role) || req.user.id === series.assigneeId) throw forbidden("only a Dominant can do this");
+    if (occ.status !== "missed") throw new HttpError(409, `occurrence is ${occ.status}`);
+    const title = (await missConsequences(db, [occ.id])).get(occ.id);
+    if (!title) throw new HttpError(409, "there's no consequence to drop");
+    const updated = await db.transaction(async (tx) => {
+      await withdrawMissConsequence(tx, occ);
+      const [u] = await tx
+        .update(occurrences)
+        .set({ missConfirmedAt: occ.missConfirmedAt ?? deps.now() })
+        .where(eq(occurrences.id, occ.id))
+        .returning();
+      return u!;
+    });
+    await notifier.send([series.assigneeId], {
+      title: "Fealty",
+      body: `${req.user.displayName} dropped “${title}” for “${series.title}”. It still counts as missed.`,
+      data: { type: "consequence_dropped", occurrenceId: occ.id },
+    });
+    return occurrenceDto(updated, series);
   });
 
   app.post<{ Params: { id: string } }>("/occurrences/:id/review", async (req) => {
