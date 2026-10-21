@@ -201,7 +201,12 @@ export function MissActions({ o }: { o: Occurrence }) {
       >
         Excuse
       </Button>
-      <Button variant="tonal" busy={confirm.isPending} disabled={busy} onClick={() => confirm.mutate(o.id, { onSuccess: () => snack("Left as missed"), onError: (e) => snack(errorMessage(e)) })}>
+      <Button
+        variant="tonal"
+        busy={confirm.isPending}
+        disabled={busy}
+        onClick={() => confirm.mutate(o.id, { onSuccess: () => snack("Left as missed"), onError: (e) => snack(errorMessage(e)) })}
+      >
         Mark missed
       </Button>
     </>
