@@ -58,7 +58,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -69,7 +68,6 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -84,19 +82,16 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.colorResource
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.launch
-import app.obey.R
-import app.obey.api.Relationship
-import app.obey.api.title
 import app.obey.ui.common.LocalOpenMenu
 import app.obey.api.Features
 import app.obey.ui.common.LocalFeatures
 import app.obey.auth.AuthState
+import app.obey.data.Session
 import app.obey.data.SessionState
+import androidx.compose.foundation.layout.Spacer
 import app.obey.ui.common.LoadingBox
 import app.obey.ui.notes.NoteEditorScreen
 import app.obey.ui.notes.NotesScreen
@@ -143,7 +138,7 @@ fun ObeyRoot(vm: RootViewModel = hiltViewModel()) {
                         // A new NavHost (and fresh ViewModels) per relationship.
                         key(s.session.relationship.id) {
                             CompositionLocalProvider(LocalFeatures provides s.session.relationship.features) {
-                                if (welcome == s.session.relationship.id) WelcomeScreen() else MainScaffold(menuSubtitle(s.session.relationship, s.session.userId))
+                                if (welcome == s.session.relationship.id) WelcomeScreen() else MainScaffold(s.session)
                             }
                         }
                     }
@@ -197,15 +192,9 @@ private fun splitBar(all: List<TopLevel>): Pair<List<TopLevel>, List<TopLevel>> 
     return bar to all.filter { it !in bar }
 }
 
-/** Under "Fealty" in the menu: the dynamic's name, or "with" the partners' names. */
-private fun menuSubtitle(rel: Relationship, myId: String): String {
-    val title = rel.title(myId)
-    return if (rel.name != null || rel.members.none { it.userId != myId }) title else "with $title"
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MainScaffold(menuSubtitle: String) {
+private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltViewModel()) {
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val destination = entry?.destination
@@ -232,10 +221,12 @@ private fun MainScaffold(menuSubtitle: String) {
         restoreState = true
     }
     fun selected(t: TopLevel) = destination?.hierarchy?.any(t.matches) == true
+    // Joining and starting another dynamic live on Your dynamic.
+    val switcher = SwitcherActions(session, settingsVm::loadAvatar, { settingsVm.selectRelationship(it) }, { nav.navigate(DynamicRoute) }, { nav.navigate(DynamicRoute) })
 
     if (wide) {
         Row(Modifier.fillMaxSize()) {
-            NavigationRail {
+            NavigationRail(header = { DynamicSwitcherCompact(switcher) }) {
                 all.forEach { t ->
                     NavigationRailItem(
                         selected = selected(t),
@@ -260,17 +251,8 @@ private fun MainScaffold(menuSubtitle: String) {
             drawerContent = {
                 ModalDrawerSheet(Modifier.width(300.dp), drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)) {
                     Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 12.dp)) {
-                        Row(Modifier.padding(horizontal = 28.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Image(
-                                painterResource(R.drawable.ic_launcher_foreground),
-                                contentDescription = null,
-                                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(colorResource(R.color.launcher_background)),
-                            )
-                            Column(Modifier.weight(1f)) {
-                                Text("Fealty", style = MaterialTheme.typography.titleLarge)
-                                Text(menuSubtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                        }
+                        DynamicSwitcher(switcher) { scope.launch { drawer.close() } }
+                        Spacer(Modifier.height(8.dp))
                         overflow.forEach { t -> MenuItem(t.label, t.icon, selected(t)) { go(t.route) } }
                         HorizontalDivider(Modifier.padding(horizontal = 28.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         MenuItem("Your dynamic", Icons.Outlined.FavoriteBorder, destination?.hasRoute<DynamicRoute>() == true) { nav.navigate(DynamicRoute) }
