@@ -137,6 +137,18 @@ interface ObeyApi {
     @GET("relationships/{id}/stats")
     suspend fun stats(@Path("id") relationshipId: String, @Query("days") days: Int, @Query("zone") zone: String, @Query("userId") userId: String?): DynamicStats
 
+    @GET("relationships/{id}/months/{month}")
+    suspend fun month(@Path("id") relationshipId: String, @Path("month") month: String, @Query("zone") zone: String): MonthSummary
+
+    @GET("relationships/{id}/months")
+    suspend fun pastMonths(@Path("id") relationshipId: String, @Query("zone") zone: String): List<PastMonth>
+
+    @PUT("relationships/{id}/months/{month}/focus")
+    suspend fun setMonthFocus(@Path("id") relationshipId: String, @Path("month") month: String, @Body body: MonthFocusInput): MonthFocus
+
+    @PUT("relationships/{id}/months/{month}/review")
+    suspend fun saveMonthReview(@Path("id") relationshipId: String, @Path("month") month: String, @Body body: MonthReviewInput, @Query("zone") zone: String): MonthReview
+
     @GET("relationships/{id}/moods")
     suspend fun moods(@Path("id") relationshipId: String, @Query("days") days: Int): List<MoodEntry>
 
