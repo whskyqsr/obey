@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useLibrary, useSaveLibraryItem } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { Note } from "../api/types";
+import { MOODS, MoodCard } from "../components/Mood";
 import { Chip, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, TextField, cx, useSnackbar } from "../components/ui";
 import { fmtDateTime } from "../lib/dates";
 import { useRel } from "../lib/relationship";
@@ -44,8 +45,6 @@ const COPY = {
   },
 } as const;
 
-export const MOODS = ["sentiment_very_dissatisfied", "sentiment_dissatisfied", "sentiment_neutral", "sentiment_satisfied", "sentiment_very_satisfied"];
-
 /** Notes and the journal share storage but are separate lists, told apart by `kind`. */
 export function NotesPage({ kind }: { kind: "note" | "journal" }) {
   const copy = COPY[kind];
@@ -78,6 +77,7 @@ export function NotesPage({ kind }: { kind: "note" | "journal" }) {
     <>
       <PageHeader title={copy.title} subtitle={copy.subtitle} />
       <div className="flex flex-col gap-3 px-4 pb-4 md:px-6">
+        {kind === "journal" && !q && !tag && <MoodCard />}
         <TextField placeholder={copy.search} value={q} onChange={(e) => setQ(e.target.value)} aria-label={copy.search} type="search" />
         {tags.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-1">

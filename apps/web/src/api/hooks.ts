@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { api, apiObjectUrl } from "./client";
+import type { MoodEntry } from "@obey/contracts";
 import type {
   AdminReport,
   OccurrenceComment,
@@ -77,6 +78,10 @@ export function useTaskStats(rel: string, taskId: string) {
 
 export function useStreaks(rel: string) {
   return useQuery({ queryKey: ["rel", rel, "streaks"], queryFn: () => api<TaskStreak[]>(`/relationships/${rel}/streaks`), staleTime: 60_000 });
+}
+
+export function useMoods(rel: string, days: number) {
+  return useQuery({ queryKey: ["rel", rel, "moods", days], queryFn: () => api<MoodEntry[]>(`/relationships/${rel}/moods?days=${days}`), staleTime: 60_000 });
 }
 
 export function useEditOccurrence(rel: string) {
@@ -310,7 +315,8 @@ export function useDeleteEvent(rel: string) {
 export function useCompleteOccurrence(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({
-    mutationFn: ({ id, noteMd }: { id: string; noteMd?: string }) => api<Occurrence>(`/occurrences/${id}/complete`, { method: "POST", body: noteMd ? { noteMd } : {} }),
+    mutationFn: ({ id, noteMd, mood }: { id: string; noteMd?: string; mood?: number }) =>
+      api<Occurrence>(`/occurrences/${id}/complete`, { method: "POST", body: { ...(noteMd ? { noteMd } : {}), ...(mood ? { mood } : {}) } }),
     onSuccess: () => invalidate(),
   });
 }

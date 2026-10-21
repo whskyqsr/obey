@@ -127,7 +127,7 @@ fun TodayScreen(
                 fun nameFor(o: Occurrence) = if (o.assigneeId == me) null else session?.nameOf(o.assigneeId)
                 fun actionsFor(o: Occurrence) = OccurrenceActions(
                     // A task that needs proof opens the Done sheet instead of completing in one tap.
-                    onComplete = if (o.assigneeId == me) ({ if (o.isRitual) running = o else if (o.proofRequired) noting = o else vm.complete(o) }) else null,
+                    onComplete = if (o.assigneeId == me) ({ if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) }) else null,
                     onCompleteWithNote = if (o.assigneeId == me) ({ noting = o }) else null,
                     onReschedule = { rescheduling = o },
                     onEditTask = if (session?.canManage == true) ({ onEditTask(o.seriesId) }) else null,
@@ -142,7 +142,7 @@ fun TodayScreen(
                 fun row(o: Occurrence, actions: OccurrenceActions = actionsFor(o)): @Composable () -> Unit = {
                     SwipeableRow(
                         o,
-                        onDone = if (o.assigneeId == me && o.status == OccurrenceStatus.Pending && o.isOpen()) ({ if (o.isRitual) running = o else if (o.proofRequired) noting = o else vm.complete(o) }) else null,
+                        onDone = if (o.assigneeId == me && o.status == OccurrenceStatus.Pending && o.isOpen()) ({ if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) }) else null,
                         // A Dominant moves anyone's deadline the same way a sub asks for more time on their own.
                         onMoreTime = if ((o.assigneeId == me || isDom) && o.status == OccurrenceStatus.Pending) ({ rescheduling = o }) else null,
                         moreTimeLabel = if (o.assigneeId == me) "More time" else "Reschedule",
@@ -267,31 +267,5 @@ fun TodayScreen(
     }
 
     running?.let { o -> RitualSheet(o, onDismiss = { running = null; vm.refresh() }, onNeedsProof = { running = null; noting = it }) }
-    noting?.let { o ->
-        var note by remember(o.id) { mutableStateOf("") }
-        val photos by proofViewModel(o.id).photos.collectAsStateWithLifecycle()
-        val needsProof = o.proofRequired && photos.isEmpty() && note.isBlank()
-        AlertDialog(
-            onDismissRequest = { noting = null },
-            title = { Text("Mark done") },
-            text = {
-                androidx.compose.foundation.layout.Column {
-                    Text("${o.title} · ${formatDue(o.dueAt)}", style = MaterialTheme.typography.bodyMedium)
-                    if (o.proofRequired) {
-                        Text("This one needs proof: add a photo, a note, or both.", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
-                    }
-                    ProofPhotos(o.id, canAdd = true, modifier = Modifier.padding(top = 12.dp))
-                    OutlinedTextField(
-                        value = note,
-                        onValueChange = { note = it.take(5000) },
-                        label = { Text(if (o.proofRequired) "Note" else "Note for your partner") },
-                        minLines = 3,
-                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                    )
-                }
-            },
-            confirmButton = { Button(onClick = { vm.complete(o, note); noting = null }, enabled = !needsProof) { Text("Done") } },
-            dismissButton = { TextButton(onClick = { noting = null }) { Text("Cancel") } },
-        )
-    }
+    noting?.let { o -> DoneDialog(o, onDismiss = { noting = null }, onDone = { note, mood -> vm.complete(o, note, mood); noting = null }) }
 }

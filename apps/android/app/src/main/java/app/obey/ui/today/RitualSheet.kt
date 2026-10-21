@@ -192,7 +192,7 @@ fun RitualSheet(o: Occurrence, onDismiss: () -> Unit, onNeedsProof: ((Occurrence
                     }
                 } else {
                     Button(
-                        onClick = { if (o.proofRequired && onNeedsProof != null) onNeedsProof(o) else vm.finish(o) },
+                        onClick = { if (o.needsDoneDialog && onNeedsProof != null) onNeedsProof(o) else vm.finish(o) },
                         enabled = !busy,
                     ) {
                         Icon(Icons.Outlined.TaskAlt, null)

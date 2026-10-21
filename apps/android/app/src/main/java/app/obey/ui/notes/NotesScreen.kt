@@ -131,6 +131,7 @@ fun NotesScreen(
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
+                        if (journal && q.isEmpty()) item(key = "mood") { app.obey.ui.common.MoodCard() }
                         if (shown.isEmpty()) {
                             item {
                                 when {

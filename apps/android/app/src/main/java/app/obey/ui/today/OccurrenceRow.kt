@@ -110,6 +110,12 @@ fun OccurrenceRow(
         supportingContent = {
             Column {
                 Text(supporting, color = if (occurrence.status == OccurrenceStatus.Missed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                occurrence.mood?.let { m ->
+                    Row(Modifier.padding(top = 4.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Icon(app.obey.ui.common.moodIcon(m), null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(" Felt ${app.obey.ui.common.moodLabel(m).lowercase()}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
                 if (occurrence.commentCount > 0) {
                     val n = occurrence.commentCount
                     Row(

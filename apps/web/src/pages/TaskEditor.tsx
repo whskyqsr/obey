@@ -33,6 +33,7 @@ interface Form {
   graceMinutes: number;
   steps: TaskStep[];
   windowMinutes: number | null;
+  askMood: boolean;
 }
 
 /** Grace chips. "midnight" follows the due time, so moving the time keeps it meaning "until midnight". */
@@ -91,6 +92,7 @@ function formFrom(task: Task | undefined, defaultAssignee: string, start?: strin
     graceMinutes: task?.graceMinutes ?? 0,
     steps: task?.steps ?? [],
     windowMinutes: task?.windowMinutes ?? null,
+    askMood: task?.askMood ?? false,
   };
 }
 
@@ -114,6 +116,7 @@ function toInput(f: Form): TaskInput {
     steps: f.steps.map((s) => ({ ...s, title: s.title.trim() })).filter((s) => s.title),
     // A window counts back from a due time, so an all-day task has none.
     windowMinutes: f.allDay ? null : f.windowMinutes,
+    askMood: f.askMood,
   };
 }
 
@@ -251,7 +254,9 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
           <Fold
             icon="person"
             title={`For ${memberName(form.assigneeId).replace(/^You$/, "you")}`}
-            sub={[form.approvalRequired ? "Needs your approval" : "No approval needed", form.proofRequired ? "proof required" : "no proof"].join(" · ")}
+            sub={[form.approvalRequired ? "Needs your approval" : "No approval needed", form.proofRequired ? "proof required" : "no proof", form.askMood ? "mood check-in" : null]
+              .filter(Boolean)
+              .join(" · ")}
             open={readOnly}
           >
             <Select label="Assigned to" value={form.assigneeId} onChange={(e) => set({ assigneeId: e.target.value })}>
@@ -273,6 +278,12 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
                 onChange={(proofRequired) => set({ proofRequired })}
                 label="Proof required"
                 help="A note or photo must accompany the completion."
+              />
+              <Switch
+                checked={form.askMood}
+                onChange={(askMood) => set({ askMood })}
+                label="Mood check-in"
+                help="Marking it done asks how they feel. Their answers build the mood graph in Your dynamic."
               />
             </div>
           </Fold>

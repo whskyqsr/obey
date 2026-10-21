@@ -116,6 +116,7 @@ export async function completeOccurrence(
   actor: { userId: string; role: Role },
   noteMd: string | undefined,
   now: Date,
+  mood?: number,
 ): Promise<Occurrence> {
   const isAssignee = actor.userId === series.assigneeId;
   if (!isAssignee && !canManage(actor.role)) throw forbidden("only the assignee can complete this");
@@ -128,7 +129,13 @@ export async function completeOccurrence(
   // "Proof required" means a photo or a note; a Dominant marking it done needs neither.
   if (series.proofRequired && isAssignee && !canManage(actor.role) && occ.photoCount === 0 && !(noteMd ?? occ.noteMd ?? "").trim())
     throw new HttpError(409, "add a photo or a note as proof");
-  if (noteMd !== undefined) await db.update(occurrences).set({ noteMd }).where(eq(occurrences.id, occ.id));
+  // A check-in needs the assignee's mood; only they can give it.
+  if (series.askMood && isAssignee && !canManage(actor.role) && mood === undefined) throw new HttpError(409, "pick how you feel");
+  if (noteMd !== undefined || (mood !== undefined && isAssignee))
+    await db
+      .update(occurrences)
+      .set({ ...(noteMd !== undefined ? { noteMd } : {}), ...(mood !== undefined && isAssignee ? { mood } : {}) })
+      .where(eq(occurrences.id, occ.id));
   if (series.approvalRequired && isAssignee && !canManage(actor.role)) {
     const [submitted] = await db.update(occurrences).set({ status: "submitted", completedAt: now }).where(eq(occurrences.id, occ.id)).returning();
     return submitted!;

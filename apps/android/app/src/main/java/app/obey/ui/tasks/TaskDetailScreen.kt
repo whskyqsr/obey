@@ -84,6 +84,7 @@ import app.obey.ui.common.local
 import app.obey.ui.common.parseInstant
 import app.obey.ui.common.signed
 import app.obey.ui.notes.MarkdownPreview
+import app.obey.ui.today.needsDoneDialog
 import app.obey.ui.today.OccurrenceActions
 import app.obey.ui.today.OccurrenceRow
 import app.obey.ui.today.RescheduleSheet
@@ -133,9 +134,9 @@ class TaskDetailViewModel @Inject constructor(
         TaskDetail(task, stats.await(), currentByTask(occ.await().filter { it.seriesId == taskId })[taskId].orEmpty())
     }
 
-    fun complete(o: Occurrence, note: String? = null) = action {
-        val r = api.complete(o.id, CompleteOccurrenceInput(noteMd = note?.takeIf { it.isNotBlank() }))
-        say(if (r.status == OccurrenceStatus.Submitted) "Sent for approval" else "Marked done")
+    fun complete(o: Occurrence, note: String? = null, mood: Int? = null) = action {
+        val r = api.complete(o.id, CompleteOccurrenceInput(noteMd = note?.takeIf { it.isNotBlank() }, mood = mood))
+        say(if (r.status == OccurrenceStatus.Submitted) "Sent for approval" else if (mood != null) "Checked in" else "Marked done")
         refresh()
     }
 
@@ -282,7 +283,7 @@ fun TaskDetailScreen(
                                 OccurrenceActions(onApprove = { vm.review(o, true) }, onReject = { sendingBack = o }, onComments = { commenting = o })
                             } else {
                                 OccurrenceActions(
-                                    onComplete = if (mine) ({ if (o.isRitual) running = o else if (o.proofRequired) noting = o else vm.complete(o) }) else null,
+                                    onComplete = if (mine) ({ if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) }) else null,
                                     onCompleteWithNote = if (mine) ({ noting = o }) else null,
                                     onReschedule = { rescheduling = o },
                                     onComments = { commenting = o },
@@ -317,18 +318,7 @@ fun TaskDetailScreen(
     }
     rescheduling?.let { o -> RescheduleSheet(o, onDismiss = { rescheduling = null }, onSubmit = { vm.reschedule(o, it) }) }
     running?.let { o -> app.obey.ui.today.RitualSheet(o, onDismiss = { running = null; vm.refresh() }, onNeedsProof = { running = null; noting = it }) }
-    noting?.let { o ->
-        var note by remember(o.id) { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { noting = null },
-            title = { Text("Mark done") },
-            text = {
-                OutlinedTextField(note, { note = it.take(5000) }, label = { Text("Note for your partner") }, minLines = 3, modifier = Modifier.fillMaxWidth())
-            },
-            confirmButton = { Button(onClick = { vm.complete(o, note); noting = null }) { Text("Done") } },
-            dismissButton = { TextButton(onClick = { noting = null }) { Text("Cancel") } },
-        )
-    }
+    noting?.let { o -> app.obey.ui.today.DoneDialog(o, onDismiss = { noting = null }, onDone = { note, mood -> vm.complete(o, note, mood); noting = null }) }
 }
 
 @Composable

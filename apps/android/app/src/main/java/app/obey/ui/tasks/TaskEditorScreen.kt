@@ -176,7 +176,7 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                     Fold(
                         Icons.Outlined.Person,
                         "For ${assignee?.displayName ?: "nobody yet"}",
-                        listOf(if (form.approvalRequired) "Needs your approval" else "No approval needed", if (form.proofRequired) "proof required" else "no proof").joinToString(" · "),
+                        listOfNotNull(if (form.approvalRequired) "Needs your approval" else "No approval needed", if (form.proofRequired) "proof required" else "no proof", if (form.askMood) "mood check-in" else null).joinToString(" · "),
                     ) {
                         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             d.value.members.forEach { m ->
@@ -192,6 +192,9 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                         }
                         LabeledSwitch("Proof required", "A photo or text must be attached", form.proofRequired) { v ->
                             vm.update { it.copy(proofRequired = v) }
+                        }
+                        LabeledSwitch("Mood check-in", "Marking it done asks how they feel, for the mood graph in Your dynamic", form.askMood) { v ->
+                            vm.update { it.copy(askMood = v) }
                         }
                     }
 

@@ -386,6 +386,25 @@ describe("tasks and occurrences", () => {
     expect((await dom.post(`/relationships/${relId}/tasks`, task(subId, { steps: [steps[0], steps[0]] }))).status).toBe(400);
   });
 
+  it("asks for a mood at a check-in and graphs it with journal moods", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    await dom.post(`/relationships/${relId}/tasks`, task(subId, { askMood: true }));
+    const [first] = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
+    expect(first).toMatchObject({ askMood: true, mood: null });
+    expect((await sub.post(`/occurrences/${first.id}/complete`, { noteMd: "Tired" })).status).toBe(409);
+    expect((await sub.post(`/occurrences/${first.id}/complete`, { mood: 6 })).status).toBe(400);
+    expect((await sub.post(`/occurrences/${first.id}/complete`, { mood: 2, noteMd: "Tired" })).body).toMatchObject({ status: "completed", mood: 2 });
+    await sub.post(`/relationships/${relId}/notes`, { kind: "journal", title: "Good day", bodyMd: "x", mood: 4, visibility: "shared" });
+    await sub.post(`/relationships/${relId}/notes`, { kind: "journal", title: "Secret", bodyMd: "x", mood: 1, visibility: "private" });
+    const seen = (await dom.get(`/relationships/${relId}/moods`)).body;
+    expect(seen.map((m: { mood: number; source: string }) => [m.source, m.mood])).toEqual([
+      ["checkin", 2],
+      ["journal", 4],
+    ]);
+    expect(seen[0]).toMatchObject({ userId: subId, note: "Tired" });
+    expect((await sub.get(`/relationships/${relId}/moods`)).body).toHaveLength(3);
+  });
+
   it("accepts a note as proof", async () => {
     const { dom, sub, relId, subId } = await ctx.pair();
     await dom.post(`/relationships/${relId}/tasks`, task(subId, { proofRequired: true }));
