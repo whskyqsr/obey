@@ -18,6 +18,7 @@ import { ProtocolsPage } from "./pages/Protocols";
 import { RuleLogPage } from "./pages/RuleLog";
 import { StatsPage } from "./pages/Stats";
 import { MonthReviewPage } from "./pages/MonthReview";
+import { AgreementPage } from "./pages/Agreement";
 import { PlacesPage } from "./pages/Places";
 import { LocationPage } from "./pages/LocationPage";
 import { CurfewPage } from "./pages/Curfew";
@@ -211,6 +212,7 @@ const routeTree = rootRoute.addChildren([
   journalEntryRoute,
   page("/stats", gated("stats", StatsPage)),
   page("/review", gated("review", MonthReviewPage)),
+  page("/agreement", gated("agreement", AgreementPage)),
   page("/settings", SettingsPage),
   page("/dynamic", DynamicPage),
   page("/places", gated("location", PlacesPage)),
