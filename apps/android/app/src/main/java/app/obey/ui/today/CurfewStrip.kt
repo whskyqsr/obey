@@ -98,6 +98,8 @@ fun CurfewStrip(
     onConfirm: () -> Unit,
     /** " · asked Sam for 11:00 PM" while an ask is waiting. */
     waiting: String = "",
+    /** " · Sam: “Text me when you leave”", a Dominant's note about tonight, for the sub. */
+    note: String = "",
     /** Set when the sub may still ask for more time tonight. */
     onMoreTime: (() -> Unit)? = null,
 ) {
@@ -110,7 +112,7 @@ fun CurfewStrip(
             Tone.Broken,
             Icons.Filled.WrongLocation,
             if (mine) "You broke curfew" else "$name broke curfew",
-            listOfNotNull(night.leftAt?.let { "Left home at ${formatTime(it)}" } ?: "Not home by $due", cost).joinToString(" · "),
+            listOfNotNull(night.leftAt?.let { "Left home at ${formatTime(it)}" } ?: "Not home by $due", cost).joinToString(" · ") + note,
         ) {
             if (canDecide && !mine) {
                 IconButton(onClick = onExcuse) { Icon(Icons.Outlined.EventAvailable, "Excuse this night") }
@@ -121,10 +123,10 @@ fun CurfewStrip(
             Tone.Home,
             Icons.Filled.Home,
             if (mine) "Home for curfew" else "$name is home for curfew",
-            "Since ${formatTime(night.arrivedAt)} · ${if (mine) "stay" else "in"} until $until",
+            "Since ${formatTime(night.arrivedAt)} · ${if (mine) "stay" else "in"} until $until$note",
         )
         !mine -> Strip(Tone.Neutral, Icons.Outlined.Bedtime, if (started) "Curfew started at $due" else "Curfew at $due", "$name isn't home yet · in until $until")
-        night.canTap && !started -> Strip(Tone.Neutral, Icons.Outlined.Bedtime, "Curfew at $due", "Stay in until $until$waiting") {
+        night.canTap && !started -> Strip(Tone.Neutral, Icons.Outlined.Bedtime, "Curfew at $due", "Stay in until $until$waiting$note") {
             onMoreTime?.let { IconButton(onClick = it) { Icon(Icons.Outlined.MoreTime, "More time") } }
             FilledTonalButton(onClick = onHome) {
                 Icon(Icons.Outlined.Home, null, Modifier.size(18.dp))
@@ -138,7 +140,7 @@ fun CurfewStrip(
                 Tone.Soon,
                 Icons.AutoMirrored.Filled.DirectionsWalk,
                 if (started) "Curfew started at $due" else "Curfew in $mins min",
-                if (waiting.isNotEmpty()) "Be home by $due$waiting" else "Be home by $due, stay in until $until",
+                (if (waiting.isNotEmpty()) "Be home by $due$waiting" else "Be home by $due, stay in until $until") + note,
             ) {
                 onMoreTime?.let {
                     FilledTonalButton(onClick = it) {

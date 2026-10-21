@@ -209,23 +209,25 @@ fun CurfewAskCard(request: CurfewRequest, name: String, onApprove: () -> Unit, o
 
 /** Approving a different time than asked: half-hour steps up to it, or any time in between. */
 @Composable
-fun ApproveOtherTimeSheet(request: CurfewRequest, name: String, busy: Boolean, onDismiss: () -> Unit, onApprove: (until: String) -> Unit) {
+fun ApproveOtherTimeSheet(request: CurfewRequest, name: String, busy: Boolean, onDismiss: () -> Unit, onApprove: (until: String, note: String?) -> Unit) {
     val from = parseInstant(request.fromDueAt)
     val asked = parseInstant(request.untilAt)
     val steps = generateSequence(30L) { it + 30 }.map { from.plus(Duration.ofMinutes(it)) }.takeWhile { it.isBefore(asked) }.take(3).map { formatTime(it.iso()) to it }.toList()
     val options = steps + ("${formatTime(request.untilAt)} · asked" to asked)
     var until by remember { mutableStateOf<Instant?>(options.first().second) }
+    var note by remember { mutableStateOf("") }
     Sheet(
         Icons.Outlined.Bedtime,
         "Home by, ${nightLabel(request.fromDueAt)}",
         onDismiss,
         actions = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
-            Button(onClick = { until?.let { onApprove(it.iso()) } }, enabled = until != null && !busy) { Text("Approve ${until?.let { formatTime(it.iso()) } ?: ""}") }
+            Button(onClick = { until?.let { onApprove(it.iso(), note.trim().ifEmpty { null }) } }, enabled = until != null && !busy) { Text("Approve ${until?.let { formatTime(it.iso()) } ?: ""}") }
         },
     ) {
         TimeChoices(options, until, from, null) { until = it }
         until?.let { Summary(Icons.Filled.Home, "Home by ${formatTime(it.iso())}", "$name asked for ${formatTime(request.untilAt)}") }
+        OutlinedTextField(note, { note = it.take(1000) }, label = { Text("Note to $name (optional)") }, modifier = Modifier.fillMaxWidth())
     }
 }
 
@@ -233,26 +235,28 @@ private val planDay = DateTimeFormatter.ofPattern("EEE, MMM d")
 
 /** A Dominant moving when a plan ends, to curfew or earlier; its author is told. */
 @Composable
-fun PlanEndSheet(clash: CurfewClash, busy: Boolean, onDismiss: () -> Unit, onChange: (endsAt: String) -> Unit) {
+fun PlanEndSheet(clash: CurfewClash, to: String, busy: Boolean, onDismiss: () -> Unit, onChange: (endsAt: String, note: String?) -> Unit) {
     val due = parseInstant(clash.dueAt)
     val starts = parseInstant(clash.eventStartsAt)
     val ends = parseInstant(clash.eventEndsAt)
     val earlier = due.minus(Duration.ofMinutes(30))
     val options = listOf("At curfew · ${formatTime(clash.dueAt)}" to due, formatTime(earlier.iso()) to earlier)
     var endsAt by remember { mutableStateOf<Instant?>(due) }
+    var note by remember { mutableStateOf("") }
     Sheet(
         Icons.Outlined.Event,
         "When does ${clash.eventTitle} end?",
         onDismiss,
         actions = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
-            Button(onClick = { endsAt?.let { onChange(it.iso()) } }, enabled = endsAt != null && !busy) { Text("Change end") }
+            Button(onClick = { endsAt?.let { onChange(it.iso(), note.trim().ifEmpty { null }) } }, enabled = endsAt != null && !busy) { Text("Change end") }
         },
     ) {
         TimeChoices(options, endsAt, starts, ends) { endsAt = it }
         endsAt?.let {
             Summary(Icons.Outlined.Event, "${starts.local().format(planDay)}, ${formatTime(clash.eventStartsAt)} – ${formatTime(it.iso())}", "Was until ${formatTime(clash.eventEndsAt)}")
         }
+        OutlinedTextField(note, { note = it.take(280) }, label = { Text("Note to $to (optional)") }, modifier = Modifier.fillMaxWidth())
         Text(
             "They're told the plan now ends at ${endsAt?.let { formatTime(it.iso()) } ?: "the new time"}. " +
                 if (endsAt?.isAfter(due) == true) "Curfew moves to ${formatTime(endsAt!!.iso())} that night." else "Curfew stays at ${formatTime(clash.dueAt)}.",
@@ -278,8 +282,27 @@ fun PlanChangeCard(event: CalendarEvent, name: String, onSeen: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = c.onSurfaceVariant,
                 )
+                event.changeNote?.let { Text("“$it”", style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic, modifier = Modifier.padding(top = 4.dp)) }
             }
             IconButton(onClick = onSeen) { Icon(Icons.Outlined.Close, "Got it") }
         }
     }
+}
+
+/** "Note to …" after a one-tap decision: a comment on that task or curfew night, with a notification. */
+@Composable
+fun NoteDialog(target: NoteTarget, busy: Boolean, onDismiss: () -> Unit, onSend: (String) -> Unit) {
+    var body by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Note to ${target.to}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("About ${target.about}. ${target.to} is sent a notification.", style = MaterialTheme.typography.bodyMedium)
+                OutlinedTextField(body, { body = it.take(1000) }, label = { Text("Note") }, minLines = 3, modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = { Button(onClick = { onSend(body.trim()) }, enabled = body.isNotBlank() && !busy) { Text("Send") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
