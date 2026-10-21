@@ -961,9 +961,11 @@ describe("background jobs", () => {
     expect((await dom.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body[0].status).toBe("excused");
     expect((await dom.get(`/relationships/${relId}/balances`)).body[0]?.balance ?? 0).toBe(0);
 
-    const cleared = await dom.post(`/safe-calls/${yellow.body.id}/clear`);
-    expect(cleared.body).toMatchObject({ clearedBy: domId, clearedAt: ctx.clock.now.toISOString() });
-    expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [subId], push: { data: { type: "safe_call_cleared" } } });
+    // Only whoever made the call can clear it.
+    expect((await dom.post(`/safe-calls/${yellow.body.id}/clear`)).status).toBe(403);
+    const cleared = await sub.post(`/safe-calls/${yellow.body.id}/clear`);
+    expect(cleared.body).toMatchObject({ clearedBy: subId, clearedAt: ctx.clock.now.toISOString() });
+    expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [domId], push: { data: { type: "safe_call_cleared" } } });
     expect((await sub.get(`/relationships/${relId}/safe-calls`)).body).toMatchObject({ active: null, recent: [{ id: yellow.body.id }] });
 
     // Once it's cleared, the next miss counts.
