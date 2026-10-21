@@ -407,12 +407,12 @@ function MoreTimeSheet({ night, onClose }: { night: CurfewNight; onClose(): void
       }
     >
       <div className="flex flex-col gap-4">
+        <TextField label={`Tell ${who} why (optional)`} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={280} />
         <p>
           Curfew is {due}. Ask {who} to make it:
         </p>
         <TimeChoices options={options} value={until} onChange={setUntil} after={night.dueAt} before={night.endsAt} />
         {until && <Summary icon="home" title={`Home by ${fmtTime(until)} tonight`} body={`Still in until ${fmtTime(night.endsAt)}`} />}
-        <TextField label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={280} />
         <p className="text-body-small">
           Only tonight. If {who} hasn't answered by {due}, curfew stays at {due}.
         </p>

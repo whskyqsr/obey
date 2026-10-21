@@ -765,7 +765,7 @@ private fun CurfewWarning(
                 }
             }
             if (asking && canAsk) {
-                OutlinedTextField(reason, { onReason(it.take(280)) }, label = { Text("Reason (optional)") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(reason, { onReason(it.take(280)) }, label = { Text("Tell $who why (optional)") }, modifier = Modifier.fillMaxWidth())
                 Text(
                     "$who is asked to move $nightName's curfew to ${formatTime(end.toString())}. The plan is saved either way; if $who says no, curfew stays at ${formatTime(night.dueAt)}.",
                     style = MaterialTheme.typography.bodySmall,

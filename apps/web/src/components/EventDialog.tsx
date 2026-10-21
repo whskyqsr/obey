@@ -325,7 +325,7 @@ function useCurfewWarning(active: boolean, draft: Draft, current: CalendarEvent 
           className="w-full whitespace-nowrap"
           options={[{ value: "end", label: `End at ${fmtTime(night.dueAt)}` }, ...(canAsk ? [{ value: "ask" as const, label: `Ask until ${fmtTime(endsAt!)}` }] : [])]}
         />
-        {asking && <TextField label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={280} />}
+        {asking && <TextField label={`Tell ${who} why (optional)`} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={280} />}
         {asking && (
           <p className="text-body-small">
             {who} is asked to move {nightName}'s curfew to {fmtTime(endsAt!)}. The plan is saved either way; if {who} says no, curfew stays at {fmtTime(night.dueAt)}.
