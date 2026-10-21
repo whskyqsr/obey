@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, customType, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { boolean, customType, date, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
 import type { DynamicDate, Features } from "@obey/contracts";
 import type { Schedule } from "@obey/recurrence";
 
@@ -28,6 +28,9 @@ export const users = pgTable("users", {
   timezone: text("timezone"),
   /** Notification categories turned off (see notifyCategory). */
   mutedNotifications: jsonb("muted_notifications").$type<string[]>().notNull().default([]),
+  /** What their Android app last said about location: whether arrivals can be noticed while it's closed. Null: never reported. */
+  locationStatus: text("location_status", { enum: ["ready", "foreground_only", "denied", "services_off"] }),
+  locationStatusAt: ts("location_status_at"),
   createdAt: createdAt(),
 });
 
@@ -61,6 +64,9 @@ export const memberships = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     role: text("role", { enum: ["dominant", "submissive", "switch"] }).notNull(),
+    /** Location watching paused by this member: from, and until (null until they turn it back on). */
+    locationPausedAt: ts("location_paused_at"),
+    locationPausedUntil: ts("location_paused_until"),
     createdAt: createdAt(),
   },
   (t) => [primaryKey({ columns: [t.relationshipId, t.userId] }), index("memberships_user_idx").on(t.userId)],
@@ -215,6 +221,10 @@ export const taskSeries = pgTable(
     countPer: text("count_per", { enum: ["task", "count"] })
       .notNull()
       .default("task"),
+    /** A location task: done by arriving at this place by the deadline. */
+    placeId: uuid("place_id").references((): AnyPgColumn => places.id, { onDelete: "set null" }),
+    /** With a place: how long to stay once there; leaving sooner is a miss ("left early"). */
+    stayMinutes: integer("stay_minutes"),
     active: boolean("active").notNull().default(true),
     /** Set on the consequence handed out automatically for this missed occurrence; unique, so it's issued once. */
     causedByOccurrenceId: uuid("caused_by_occurrence_id").references((): AnyPgColumn => occurrences.id, { onDelete: "set null" }),
@@ -255,6 +265,9 @@ export const occurrences = pgTable(
     stepsDone: jsonb("steps_done").$type<string[]>().notNull().default([]),
     /** How many times a count task has been marked so far. */
     count: integer("count").notNull().default(0),
+    /** A location task: when the assignee got there, and when they left before their stay was up. */
+    arrivedAt: ts("arrived_at"),
+    leftAt: ts("left_at"),
     /** The mood given at a check-in, 1 (worst) to 5 (best). */
     mood: integer("mood"),
     /** The journal entry written to complete a journal task. */
@@ -434,6 +447,46 @@ export const calendarEvents = pgTable(
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
   (t) => [index("calendar_events_relationship_idx").on(t.relationshipId, t.startsAt)],
+);
+
+/** A named spot a Dominant saved, for location tasks. Arriving inside the radius counts. */
+export const places = pgTable(
+  "places",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    address: text("address"),
+    lat: doublePrecision("lat").notNull(),
+    lng: doublePrecision("lng").notNull(),
+    radiusM: integer("radius_m").notNull().default(150),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("places_relationship_idx").on(t.relationshipId)],
+);
+
+/** An arrival, departure or check-in a phone or browser reported for a location task. Kept as the record. */
+export const locationEvents = pgTable(
+  "location_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    occurrenceId: uuid("occurrence_id")
+      .notNull()
+      .references(() => occurrences.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["enter", "exit", "checkin"] }).notNull(),
+    lat: doublePrecision("lat"),
+    lng: doublePrecision("lng"),
+    accuracyM: integer("accuracy_m"),
+    at: ts("at").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("location_events_occurrence_idx").on(t.occurrenceId)],
 );
 
 /** Someone a person never wants to pair with again. Checked both ways when joining. */

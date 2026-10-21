@@ -44,6 +44,7 @@ const AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"];
 export async function relationshipDto(db: Tx, ids: string[]) {
   if (ids.length === 0) return [];
   const rels = await db.select().from(relationships).where(inArray(relationships.id, ids));
+  const now = new Date();
   const members = await db
     .select({
       relationshipId: memberships.relationshipId,
@@ -51,6 +52,9 @@ export async function relationshipDto(db: Tx, ids: string[]) {
       displayName: users.displayName,
       role: memberships.role,
       avatarUpdatedAt: users.avatarUpdatedAt,
+      locationStatus: users.locationStatus,
+      locationPausedAt: memberships.locationPausedAt,
+      locationPausedUntil: memberships.locationPausedUntil,
     })
     .from(memberships)
     .innerJoin(users, eq(users.id, memberships.userId))
@@ -68,7 +72,18 @@ export async function relationshipDto(db: Tx, ids: string[]) {
     endedBy: r.endedBy,
     members: members
       .filter((m) => m.relationshipId === r.id)
-      .map(({ userId, displayName, role, avatarUpdatedAt }) => ({ userId, displayName, role, avatarVersion: avatarVersion(avatarUpdatedAt) })),
+      .map(({ userId, displayName, role, avatarUpdatedAt, locationStatus, locationPausedAt, locationPausedUntil }) => {
+        const paused = locationPausedAt !== null && (locationPausedUntil === null || locationPausedUntil > now);
+        return {
+          userId,
+          displayName,
+          role,
+          avatarVersion: avatarVersion(avatarUpdatedAt),
+          locationStatus,
+          locationPaused: paused,
+          locationPausedUntil: paused ? (locationPausedUntil?.toISOString() ?? null) : null,
+        };
+      }),
   }));
 }
 

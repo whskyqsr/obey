@@ -19,7 +19,7 @@ import {
 import { addDays, dueInstant, localDate } from "@obey/recurrence";
 import type { Deps } from "../app.js";
 import type { Tx } from "../db/index.js";
-import { consequences, notes, occurrences, pointsLedger, relationships, reschedules, taskSeries } from "../db/schema.js";
+import { consequences, notes, occurrences, places, pointsLedger, relationships, reschedules, taskSeries } from "../db/schema.js";
 import { HttpError, forbidden, notFound, parsePatch } from "../errors.js";
 import { occurrenceDto, rescheduleDto, taskDto } from "../serialize.js";
 import { addComment } from "./comments.js";
@@ -79,6 +79,34 @@ function checkCount(t: {
     throw new HttpError(400, "a counted task can't also be a ritual, need approval or proof, or ask for a mood or a journal entry");
 }
 
+/** A location task is done by getting there, so it can't also be counted, a ritual, or need proof, a mood or an entry. */
+async function checkPlace(
+  db: Tx,
+  relationshipId: string,
+  t: {
+    placeId: string | null;
+    stayMinutes: number | null;
+    countMin: number | null;
+    countMax: number | null;
+    steps: unknown[];
+    proofRequired: boolean;
+    askMood: boolean;
+    asksJournal: boolean;
+  },
+) {
+  if (!t.placeId) {
+    if (t.stayMinutes !== null) throw new HttpError(400, "a stay needs a place");
+    return;
+  }
+  const [p] = await db
+    .select({ id: places.id })
+    .from(places)
+    .where(and(eq(places.id, t.placeId), eq(places.relationshipId, relationshipId)));
+  if (!p) throw new HttpError(400, "that place isn't in this dynamic");
+  if (isCountTask(t) || t.steps.length || t.proofRequired || t.askMood || t.asksJournal)
+    throw new HttpError(400, "a location task can't also be counted or a ritual, need proof, or ask for a mood or a journal entry");
+}
+
 /** Rows oldest first. Excused occurrences neither count against the rate nor break a streak. */
 export function taskStats(rows: { status: string; completedAt: Date | null }[]): TaskStats {
   let done = 0,
@@ -134,6 +162,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const body = taskInput.parse(req.body);
     validZone(body.timezone);
     checkCount(body);
+    await checkPlace(db, req.params.id, body);
     if (!(await membership(db, req.params.id, body.assigneeId))) throw new HttpError(400, "assignee is not in this relationship");
     const series = await db.transaction(async (tx) => {
       const [s] = await tx
@@ -171,6 +200,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const body = parsePatch(taskInput.partial(), req.body);
     if (body.timezone) validZone(body.timezone);
     checkCount({ ...series, ...body });
+    await checkPlace(db, series.relationshipId, { ...series, ...body });
     if (body.assigneeId && !(await membership(db, series.relationshipId, body.assigneeId))) throw new HttpError(400, "assignee is not in this relationship");
     const timingChanged = body.schedule !== undefined || body.dueTime !== undefined || body.timezone !== undefined;
     const updated = await db.transaction(async (tx) => {

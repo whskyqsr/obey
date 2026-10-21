@@ -253,6 +253,13 @@
       "when": 1792603060661,
       "tag": "0035_count_tasks",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792604833413,
+      "tag": "0036_location_tasks",
+      "breakpoints": true
     }
   ]
 }

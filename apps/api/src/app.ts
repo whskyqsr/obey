@@ -10,6 +10,7 @@ import { requestScope } from "./services/access.js";
 import { adminRoutes } from "./routes/admin.js";
 import { commentRoutes } from "./routes/comments.js";
 import { limitRoutes } from "./routes/limits.js";
+import { locationRoutes } from "./routes/location.js";
 import { ruleLogRoutes } from "./routes/ruleLog.js";
 import { safeCallRoutes } from "./routes/safeCalls.js";
 import { kitRoutes } from "./routes/kits.js";
@@ -101,6 +102,7 @@ export function buildApp(deps: Deps) {
   app.register(adminRoutes(deps));
   app.register(commentRoutes(deps));
   app.register(limitRoutes(deps));
+  app.register(locationRoutes(deps));
   app.register(ruleLogRoutes(deps));
   app.register(safeCallRoutes(deps));
   app.register(kitRoutes(deps));

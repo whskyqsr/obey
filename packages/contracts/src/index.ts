@@ -38,7 +38,7 @@ export const reschedulePolicy = z.enum(["dominant_only", "request", "allowance"]
 /** Changes whenever the picture does; null when there is none. Fetch it from /users/:id/avatar. */
 const avatarVersion = z.string().nullable();
 /** Parts of the app a dynamic can switch off. Points covers rewards too; tasks and notes are always on. */
-export const FEATURES = ["points", "consequences", "rules", "protocols", "journal", "stats", "review"] as const;
+export const FEATURES = ["points", "consequences", "rules", "protocols", "journal", "stats", "review", "location"] as const;
 export const features = z.object(Object.fromEntries(FEATURES.map((f) => [f, z.boolean()])) as Record<(typeof FEATURES)[number], z.ZodBoolean>);
 export type Features = z.infer<typeof features>;
 export const allFeatures = (stored: Partial<Features> = {}): Features => Object.fromEntries(FEATURES.map((f) => [f, stored[f] ?? true])) as Features;
@@ -75,7 +75,25 @@ export type User = z.infer<typeof user>;
 export const dynamicDate = z.object({ id: z.string().min(1).max(40), label: z.string().trim().min(1).max(40), date: plainDate });
 export type DynamicDate = z.infer<typeof dynamicDate>;
 
-export const member = z.object({ userId: id, displayName: z.string(), role, avatarVersion });
+/**
+ * What a person's Android app last reported about location. `ready`: allowed all the time with location on;
+ * `foreground_only`: allowed only while the app is open; `denied`; `services_off`: location is off on the phone.
+ */
+export const LOCATION_STATUSES = ["ready", "foreground_only", "denied", "services_off"] as const;
+export const locationStatus = z.enum(LOCATION_STATUSES);
+export type LocationStatus = z.infer<typeof locationStatus>;
+
+export const member = z.object({
+  userId: id,
+  displayName: z.string(),
+  role,
+  avatarVersion,
+  /** Null when no Android app of theirs has reported yet. */
+  locationStatus: locationStatus.nullable().default(null),
+  /** Location watching paused by them; until null means until they turn it back on. */
+  locationPaused: z.boolean().default(false),
+  locationPausedUntil: z.string().nullable().default(null),
+});
 export const relationship = z.object({
   id,
   /** Optional; apps show the partners' names instead. */
@@ -196,6 +214,10 @@ export const taskInput = z.object({
   countMax: z.number().int().min(1).max(1_000).nullable().default(null),
   /** Points and point penalties once per task, or for each one counted (and each one short or over). */
   countPer: z.enum(["task", "count"]).default("task"),
+  /** A location task: done by arriving at this place by the due time. */
+  placeId: id.nullable().default(null),
+  /** With a place: how long to stay once there; leaving sooner counts as missed ("left early"). */
+  stayMinutes: z.number().int().min(5).max(720).nullable().default(null),
 });
 export type TaskInput = z.input<typeof taskInput>;
 
@@ -253,8 +275,44 @@ export const occurrence = z.object({
   countMax: z.number().int().nullable().default(null),
   countPer: z.enum(["task", "count"]).default("task"),
   count: z.number().int().default(0),
+  /** A location task's place (see the relationship's places) and stay, when it got there, and when it left before the stay was up. */
+  placeId: id.nullable().default(null),
+  stayMinutes: z.number().int().nullable().default(null),
+  arrivedAt: z.string().nullable().default(null),
+  leftAt: z.string().nullable().default(null),
 });
 export type Occurrence = z.infer<typeof occurrence>;
+
+/** A spot a Dominant saved for location tasks; arriving anywhere inside the radius counts. */
+export const placeInput = z.object({
+  name: z.string().trim().min(1).max(40),
+  address: z.string().trim().max(200).nullable().default(null),
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  /** Phones can't tell much closer than 100 m. */
+  radiusM: z.number().int().min(100).max(2_000).default(150),
+});
+export const place = placeInput.extend({
+  id,
+  relationshipId: id,
+  createdAt: z.string(),
+  /** Active tasks that use it. */ taskTitles: z.array(z.string()),
+});
+export type Place = z.infer<typeof place>;
+
+/** A phone reporting arrival at a task's place (`enter`), or a browser's one-off "I'm here" (`checkin`). */
+export const arriveOccurrence = z.object({
+  kind: z.enum(["enter", "checkin"]),
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  accuracyM: z.number().int().min(0).max(10_000),
+  /** When it happened, if it was queued offline; defaults to now. */
+  at: z.string().datetime().optional(),
+});
+export const leaveOccurrence = z.object({ at: z.string().datetime().optional() });
+export const reportLocation = z.object({ status: locationStatus });
+/** Pauses location watching; until null means until turned back on. */
+export const pauseLocation = z.object({ until: z.string().datetime().nullable() });
 
 /** Adds to a count task's count (a tap is by: 1), or sets it outright to fix a mistake. */
 export const countOccurrence = z.union([z.object({ by: z.number().int().min(-1_000).max(1_000) }), z.object({ to: z.number().int().min(0).max(10_000) })]);

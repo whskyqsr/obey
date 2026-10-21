@@ -14,7 +14,7 @@ import {
   splitSeries,
 } from "@obey/recurrence";
 import type { Tx } from "../db/index.js";
-import { consequences, notes, occurrences, pointsLedger, relationships, reschedules, safeCalls, taskSeries } from "../db/schema.js";
+import { consequences, memberships, notes, occurrences, pointsLedger, relationships, reschedules, safeCalls, taskSeries } from "../db/schema.js";
 import { HttpError, forbidden } from "../errors.js";
 import { type Role, canManage } from "./access.js";
 
@@ -84,7 +84,7 @@ export async function pointsEnabled(db: Tx, relationshipId: string): Promise<boo
   return rel?.features.points !== false;
 }
 
-async function finalizeCompletion(db: Tx, series: Series, occ: Occurrence, completedAt: Date, reviewerId: string | null, points = series.points) {
+export async function finalizeCompletion(db: Tx, series: Series, occ: Occurrence, completedAt: Date, reviewerId: string | null, points = series.points) {
   const [updated] = await db
     .update(occurrences)
     .set({ status: "completed", completedAt, reviewedBy: reviewerId, reviewedAt: reviewerId ? new Date() : null })
@@ -130,6 +130,7 @@ export async function completeOccurrence(
   if (offline && occ.status === "missed" && !occ.missConfirmedAt && at.getTime() < occ.dueAt.getTime() + series.graceMinutes * 60_000) occ = await takeBackMiss(db, series, occ);
   if (occ.status !== "pending") throw new HttpError(409, `occurrence is ${occ.status}`);
   if (isCountTask(series)) throw new HttpError(409, "this one is counted; mark each one instead");
+  if (series.placeId && isAssignee && !canManage(actor.role)) throw new HttpError(409, "this one is done by getting there");
   // The assignee can't work ahead into the next occurrence's turn (tomorrow's daily check-in today); a Dominant can.
   const opens = opensOn(series.schedule, occ.originalDate);
   if (isAssignee && !canManage(actor.role) && opens && localDate(at, series.timezone) < opens) throw new HttpError(409, `this one opens on ${opens}`);
@@ -515,6 +516,10 @@ export async function markMissed(db: Tx, now: Date) {
         ),
       )
       .limit(1);
+    // Someone who got there in time and is still staying isn't late; finishStays completes it when the stay is up.
+    if (series.placeId && series.stayMinutes && occ.arrivedAt && !occ.leftAt) continue;
+    // A location task that came due while its assignee had location paused is excused, like under a red safe call.
+    const paused = series.placeId !== null && (await locationPausedAt(db, series.relationshipId, series.assigneeId, occ.dueAt));
     // A count task kept within its bounds is done at the deadline ("no more than 3" has nothing to reach before then).
     if (!red && isCountTask(series) && countState(series, occ.count) === "ok") {
       await finalizeCompletion(db, series, occ, occ.dueAt, null, countedPoints(series, occ.count));
@@ -522,32 +527,46 @@ export async function markMissed(db: Tx, now: Date) {
     }
     const [updated] = await db
       .update(occurrences)
-      .set({ status: red ? "excused" : "missed", missConfirmedAt: null })
+      .set({ status: red || paused ? "excused" : "missed", missConfirmedAt: null })
       .where(and(eq(occurrences.id, occ.id), eq(occurrences.status, "pending")))
       .returning();
     if (!updated) continue;
-    if (red) {
+    if (red || paused) {
       await advanceCompletionSeries(db, series, localDate(occ.dueAt, series.timezone));
       continue;
     }
-    if (countedPenalty(series, occ.count) > 0 && (await pointsEnabled(db, series.relationshipId))) {
-      await db
-        .insert(pointsLedger)
-        .values({
-          relationshipId: series.relationshipId,
-          userId: series.assigneeId,
-          delta: -countedPenalty(series, occ.count),
-          kind: "miss",
-          note: series.title,
-          occurrenceId: occ.id,
-        })
-        .onConflictDoNothing();
-    }
-    // A missed chore shouldn't vanish: count the next one from when it was due.
-    await advanceCompletionSeries(db, series, localDate(occ.dueAt, series.timezone));
-    missed.push({ occ: updated, series, consequence: await issueMissConsequence(db, series, updated, now) });
+    missed.push({ occ: updated, series, consequence: await applyMiss(db, series, updated, now) });
   }
   return missed;
+}
+
+/** Whether the assignee had location watching paused at [at]. */
+async function locationPausedAt(db: Tx, relationshipId: string, userId: string, at: Date): Promise<boolean> {
+  const [m] = await db
+    .select({ from: memberships.locationPausedAt, until: memberships.locationPausedUntil })
+    .from(memberships)
+    .where(and(eq(memberships.relationshipId, relationshipId), eq(memberships.userId, userId)));
+  return !!m?.from && m.from <= at && (m.until === null || m.until >= at);
+}
+
+/** Books a fresh miss: its point penalty, the next turn of a completion-anchored task, and its consequence (returned). */
+export async function applyMiss(db: Tx, series: Series, occ: Occurrence, now: Date): Promise<Series | null> {
+  if (countedPenalty(series, occ.count) > 0 && (await pointsEnabled(db, series.relationshipId))) {
+    await db
+      .insert(pointsLedger)
+      .values({
+        relationshipId: series.relationshipId,
+        userId: series.assigneeId,
+        delta: -countedPenalty(series, occ.count),
+        kind: "miss",
+        note: series.title,
+        occurrenceId: occ.id,
+      })
+      .onConflictDoNothing();
+  }
+  // A missed chore shouldn't vanish: count the next one from when it was due.
+  await advanceCompletionSeries(db, series, localDate(occ.dueAt, series.timezone));
+  return issueMissConsequence(db, series, occ, now);
 }
 
 /** Pending occurrences due within `leadMinutes` that haven't had a reminder yet; marks them reminded. */

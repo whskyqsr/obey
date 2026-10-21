@@ -31,6 +31,8 @@ export const taskDto = (s: Series) => ({
   countMin: s.countMin,
   countMax: s.countMax,
   countPer: s.countPer,
+  placeId: s.placeId,
+  stayMinutes: s.stayMinutes,
   summary: describe(s.schedule),
   assignedConsequenceId: s.assignedConsequenceId,
   active: s.active,
@@ -69,6 +71,10 @@ export const occurrenceDto = (o: typeof occurrences.$inferSelect, s: Series) => 
   countMax: s.countMax,
   countPer: s.countPer,
   count: o.count,
+  placeId: s.placeId,
+  stayMinutes: s.placeId ? s.stayMinutes : null,
+  arrivedAt: isoOrNull(o.arrivedAt),
+  leftAt: isoOrNull(o.leftAt),
 });
 
 /** `title` is the task's, so a request card can say which task it's about. */
