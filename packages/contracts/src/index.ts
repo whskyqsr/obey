@@ -38,7 +38,7 @@ export const reschedulePolicy = z.enum(["dominant_only", "request", "allowance"]
 /** Changes whenever the picture does; null when there is none. Fetch it from /users/:id/avatar. */
 const avatarVersion = z.string().nullable();
 /** Parts of the app a dynamic can switch off. Points covers rewards too; tasks and notes are always on. */
-export const FEATURES = ["points", "consequences", "rules", "protocols", "journal", "stats", "review", "location"] as const;
+export const FEATURES = ["points", "consequences", "rules", "protocols", "journal", "stats", "review", "location", "agreement"] as const;
 export const features = z.object(Object.fromEntries(FEATURES.map((f) => [f, z.boolean()])) as Record<(typeof FEATURES)[number], z.ZodBoolean>);
 export type Features = z.infer<typeof features>;
 export const allFeatures = (stored: Partial<Features> = {}): Features => Object.fromEntries(FEATURES.map((f) => [f, stored[f] ?? true])) as Features;
@@ -996,3 +996,72 @@ export const applyKit = z.object({
   start: plainDate,
 });
 export const applyKitResult = z.object({ tasks: z.number(), rules: z.number(), protocols: z.number() });
+
+/**
+ * The agreement: one versioned page both partners sign. Text sections are plain lines ("- " starts a bullet);
+ * a rules or protocols section lists that page's titles as they stood when the version was proposed.
+ */
+export const AGREEMENT_SECTION_KINDS = ["text", "rules", "protocols"] as const;
+export const agreementSectionInput = z.object({
+  id: z.string().min(1).max(40),
+  kind: z.enum(AGREEMENT_SECTION_KINDS).default("text"),
+  title: z.string().trim().min(1).max(80),
+  body: z.string().max(5000).default(""),
+  /** A note the section points to, such as Limits. */
+  noteId: id.nullable().default(null),
+});
+export type AgreementSectionInput = z.infer<typeof agreementSectionInput>;
+/** Proposing a version: the whole page, a review date, and a line for the partner about what changed. */
+export const agreementInput = z.object({
+  sections: z.array(agreementSectionInput).min(1).max(30),
+  reviewBy: plainDate.nullable().default(null),
+  note: z.string().trim().max(500).default(""),
+});
+export type AgreementInput = z.infer<typeof agreementInput>;
+export const agreementFeedbackInput = z.object({ note: z.string().trim().min(1).max(1000) });
+/** A line of a section against the version in force before it: unchanged, added or removed. */
+export const agreementLine = z.object({ op: z.enum(["same", "add", "del"]), text: z.string() });
+export type AgreementLine = z.infer<typeof agreementLine>;
+export const agreementSection = z.object({
+  id: z.string(),
+  kind: z.enum(AGREEMENT_SECTION_KINDS),
+  title: z.string(),
+  body: z.string(),
+  noteId: id.nullable(),
+  /** The linked note's title, or null when there's none or it was deleted. */
+  noteTitle: z.string().nullable(),
+  /** Rule or protocol titles, for those kinds. */
+  items: z.array(z.string()),
+  /** Against the version before: new section, changed, or the same. */
+  change: z.enum(["new", "changed", "same"]),
+  /** Body lines (or items) with what was added and removed. */
+  lines: z.array(agreementLine),
+});
+export type AgreementSection = z.infer<typeof agreementSection>;
+export const AGREEMENT_STATUSES = ["proposed", "changes_requested", "agreed", "superseded"] as const;
+export const agreementVersion = z.object({
+  id,
+  relationshipId: id,
+  number: z.number().int(),
+  status: z.enum(AGREEMENT_STATUSES),
+  sections: z.array(agreementSection),
+  /** Titles of sections the version before had and this one drops. */
+  removed: z.array(z.string()),
+  /** How many sections are new or changed, plus removed ones. */
+  changes: z.number().int(),
+  reviewBy: plainDate.nullable(),
+  note: z.string(),
+  proposedBy: id.nullable(),
+  proposedAt: z.string(),
+  /** Who has agreed to this version, and when. */
+  agreements: z.array(z.object({ userId: id, agreedAt: z.string() })),
+  agreedAt: z.string().nullable(),
+  /** The latest "ask for changes". */
+  feedback: z.object({ userId: id.nullable(), note: z.string(), at: z.string() }).nullable(),
+});
+export type AgreementVersion = z.infer<typeof agreementVersion>;
+export const agreementVersionSummary = agreementVersion.pick({ id: true, number: true, status: true, proposedBy: true, proposedAt: true, agreedAt: true, changes: true });
+export type AgreementVersionSummary = z.infer<typeof agreementVersionSummary>;
+/** The version in force, the open proposal if there is one, and every version newest first. */
+export const agreement = z.object({ current: agreementVersion.nullable(), proposal: agreementVersion.nullable(), versions: z.array(agreementVersionSummary) });
+export type Agreement = z.infer<typeof agreement>;

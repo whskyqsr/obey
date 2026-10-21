@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { boolean, customType, date, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
-import type { CurfewSettings, DynamicDate, Features } from "@obey/contracts";
+import type { AgreementSectionInput, CurfewSettings, DynamicDate, Features } from "@obey/contracts";
 import type { Schedule } from "@obey/recurrence";
 
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
@@ -701,4 +701,43 @@ export const curfewRequests = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("curfew_requests_relationship_idx").on(t.relationshipId, t.status)],
+);
+
+/** One version of a dynamic's agreement; at most one is open (proposed or sent back) at a time. */
+export const agreementVersions = pgTable(
+  "agreement_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    number: integer("number").notNull(),
+    status: text("status", { enum: ["proposed", "changes_requested", "agreed", "superseded"] }).notNull(),
+    sections: jsonb("sections").$type<AgreementSectionInput[]>().notNull(),
+    /** Rule and protocol titles as they stood when the version was proposed. */
+    items: jsonb("items").$type<{ rules: string[]; protocols: string[] }>().notNull(),
+    reviewBy: date("review_by"),
+    note: text("note").notNull().default(""),
+    proposedBy: uuid("proposed_by").references(() => users.id, { onDelete: "set null" }),
+    proposedAt: ts("proposed_at").notNull(),
+    agreedAt: ts("agreed_at"),
+    feedbackBy: uuid("feedback_by").references(() => users.id, { onDelete: "set null" }),
+    feedbackNote: text("feedback_note"),
+    feedbackAt: ts("feedback_at"),
+  },
+  (t) => [uniqueIndex("agreement_versions_number_idx").on(t.relationshipId, t.number)],
+);
+
+export const agreementSignatures = pgTable(
+  "agreement_signatures",
+  {
+    versionId: uuid("version_id")
+      .notNull()
+      .references(() => agreementVersions.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    agreedAt: ts("agreed_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.versionId, t.userId] })],
 );

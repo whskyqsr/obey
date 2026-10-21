@@ -135,6 +135,7 @@ class TodayViewModel @Inject constructor(
             launch { loadCurfew(relId) }
             launch { runCatching { api.planChanges(relId) }.onSuccess { _planChanges.value = it } }
             launch { loadForDom(relId) }
+            launch { loadAgreement(relId) }
             try {
                 val snap = snapshot(relId)
                 offline.saveToday(relId, snap)
@@ -279,6 +280,21 @@ class TodayViewModel @Inject constructor(
     private val _redemptions = MutableStateFlow<List<app.obey.api.LedgerEntry>>(emptyList())
     /** Rewards someone else spent points on that a Dominant hasn't marked redeemed yet. */
     val redemptions: StateFlow<List<app.obey.api.LedgerEntry>> = _redemptions.asStateFlow()
+
+    private val _agreement = MutableStateFlow<app.obey.api.AgreementVersion?>(null)
+    /** The agreement's open proposal when it waits on this person: a partner's to read, or changes asked of their own. */
+    val agreement: StateFlow<app.obey.api.AgreementVersion?> = _agreement.asStateFlow()
+
+    private suspend fun loadAgreement(relId: String) {
+        val session = sessions.session ?: return
+        if (session.relationship?.features?.agreement != true || session.readOnly) {
+            _agreement.value = null
+            return
+        }
+        runCatching { api.agreement(relId).proposal }.onSuccess { p ->
+            _agreement.value = p?.takeIf { app.obey.ui.agreement.agreementNeedsMe(it, session) }
+        }
+    }
 
     private suspend fun loadForDom(relId: String) {
         val session = sessions.session ?: return

@@ -14,6 +14,7 @@ import { locationRoutes } from "./routes/location.js";
 import { curfewRoutes } from "./routes/curfew.js";
 import { ruleLogRoutes } from "./routes/ruleLog.js";
 import { safeCallRoutes } from "./routes/safeCalls.js";
+import { agreementRoutes } from "./routes/agreement.js";
 import { kitRoutes } from "./routes/kits.js";
 import { verificationRoutes } from "./routes/verification.js";
 import { eventRoutes } from "./routes/events.js";
@@ -110,6 +111,7 @@ export function buildApp(deps: Deps) {
   app.register(curfewRoutes(deps));
   app.register(ruleLogRoutes(deps));
   app.register(safeCallRoutes(deps));
+  app.register(agreementRoutes(deps));
   app.register(kitRoutes(deps));
   app.register(verificationRoutes(deps));
   return app;

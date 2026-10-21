@@ -75,6 +75,7 @@ fun TodayScreen(
     onOpenSettings: () -> Unit,
     onKits: () -> Unit,
     onOpenLocation: () -> Unit = {},
+    onOpenAgreement: (edit: Boolean) -> Unit = {},
     vm: TodayViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -88,6 +89,7 @@ fun TodayScreen(
     val planChanges by vm.planChanges.collectAsStateWithLifecycle()
     val delays by vm.delays.collectAsStateWithLifecycle()
     val redemptions by vm.redemptions.collectAsStateWithLifecycle()
+    val agreement by vm.agreement.collectAsStateWithLifecycle()
     var telling by remember { mutableStateOf<app.obey.api.CurfewNight?>(null) }
     var redeeming by remember { mutableStateOf<app.obey.api.LedgerEntry?>(null) }
     var replying by remember { mutableStateOf<NoteTarget?>(null) }
@@ -215,6 +217,9 @@ fun TodayScreen(
                             onChange = { approvingOther = r },
                             onDecline = { vm.declineCurfew(r) },
                         )
+                    }
+                    agreement?.let { v ->
+                        if (session != null) item(key = "agreement") { app.obey.ui.agreement.AgreementTodayCard(v, session, onOpenAgreement) }
                     }
                     items(curfew?.clashes.orEmpty(), key = { "curfew-${it.occurrenceId}" }) { c ->
                         CurfewClashCard(c, onExcuse = { vm.excuseCurfew(c.occurrenceId, "Curfew excused that night") }, onChangeEnd = { changingEnd = c }, onLeave = { vm.leaveClash(c) })

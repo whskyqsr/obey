@@ -18,6 +18,7 @@ import { useRel } from "../lib/relationship";
 import { planTone } from "../lib/planColors";
 import { WIDE, useMediaQuery } from "../lib/useMediaQuery";
 import { useNeedsYou, useTodayOccurrences } from "../lib/today";
+import { AgreementCard } from "../components/AgreementCard";
 
 const byDue = (a: Occurrence, b: Occurrence) => a.dueAt.localeCompare(b.dueAt);
 const dueDay = (o: Occurrence) => localDateOf(new Date(o.dueAt));
@@ -82,6 +83,7 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
           />
           <CurfewStrip />
           <PlanChanges />
+          <AgreementCard />
           {isDom && <DelayCards />}
           {!isDom && occ.data && todays.length > 0 && <Progress today={todays} done={doneToday} points={features.points} />}
           <PlanClashes />

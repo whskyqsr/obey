@@ -31,6 +31,10 @@ import type {
   RuleLogEntry,
   SafeCall,
   SafeCalls,
+  Agreement,
+  AgreementInput,
+  AgreementSectionInput,
+  AgreementVersion,
   Invite,
   DelayUsed,
   LedgerEntry,
@@ -160,8 +164,7 @@ export function useUpdateMe() {
       quietHours?: QuietHours | null;
       mutedNotifications?: NotifyCategory[];
       notifyDetails?: boolean;
-    }) =>
-      api<User>("/me", { method: "PATCH", body }),
+    }) => api<User>("/me", { method: "PATCH", body }),
     // Names appear in member lists and request cards across every relationship.
     onSuccess: () => qc.invalidateQueries(),
   });
@@ -850,4 +853,49 @@ export function useSeenPlanChange(rel: string) {
     mutationFn: (id: string) => api(`/events/${id}/seen`, { method: "POST", body: {} }),
     onSuccess: () => invalidate(),
   });
+}
+
+export function useAgreement(rel: string, enabled = true) {
+  return useQuery({ queryKey: ["rel", rel, "agreement"], queryFn: () => api<Agreement>(`/relationships/${rel}/agreement`), enabled });
+}
+
+export function useAgreementVersion(id: string | null) {
+  return useQuery({ queryKey: ["agreement-version", id], queryFn: () => api<AgreementVersion>(`/agreement-versions/${id}`), enabled: !!id });
+}
+
+export function useAgreementTemplate(rel: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["rel", rel, "agreement", "template"],
+    queryFn: () => api<{ sections: AgreementSectionInput[] }>(`/relationships/${rel}/agreement/template`),
+    enabled,
+  });
+}
+
+export function useProposeAgreement(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (input: AgreementInput) => api<AgreementVersion>(`/relationships/${rel}/agreement`, { method: "POST", body: input }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useAgree(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (id: string) => api<AgreementVersion>(`/agreement-versions/${id}/agree`, { method: "POST" }),
+    onSuccess: () => invalidate(["agreement-version"]),
+  });
+}
+
+export function useRequestAgreementChanges(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ id, note }: { id: string; note: string }) => api<AgreementVersion>(`/agreement-versions/${id}/request-changes`, { method: "POST", body: { note } }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useWithdrawAgreement(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({ mutationFn: (id: string) => api(`/agreement-versions/${id}`, { method: "DELETE" }), onSuccess: () => invalidate() });
 }

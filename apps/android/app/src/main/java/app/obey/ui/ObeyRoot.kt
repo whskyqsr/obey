@@ -110,6 +110,8 @@ import app.obey.ui.protocols.ProtocolsScreen
 import app.obey.ui.rulelog.RuleLogScreen
 import app.obey.ui.stats.StatsScreen
 import app.obey.ui.stats.MonthReviewScreen
+import app.obey.ui.agreement.AgreementScreen
+import androidx.compose.material.icons.outlined.Handshake
 import app.obey.ui.kits.KitsScreen
 import app.obey.ui.kits.describe
 import app.obey.ui.rules.RulesScreen
@@ -190,6 +192,8 @@ private fun topLevels(f: Features) = listOfNotNull(
     if (f.journal) TopLevel(JournalRoute, "Journal", Icons.Outlined.AutoStories) { it.hasRoute<JournalRoute>() } else null,
     if (f.stats) TopLevel(StatsRoute, "Stats", Icons.Outlined.Insights) { it.hasRoute<StatsRoute>() } else null,
     if (f.review) TopLevel(MonthReviewRoute, "Monthly review", Icons.Outlined.Flag) { it.hasRoute<MonthReviewRoute>() } else null,
+    // The menu shows it next to Your dynamic rather than with the other pages.
+    if (f.agreement) TopLevel(AgreementRoute(), "Agreement", Icons.Outlined.Handshake) { it.hasRoute<AgreementRoute>() } else null,
     // Tasks open from Today and Calendar; the full list is for managing them, so it sits under More.
     TopLevel(TaskListRoute, "All tasks", Icons.Outlined.Checklist) { it.hasRoute<TaskListRoute>() },
 )
@@ -197,7 +201,7 @@ private fun topLevels(f: Features) = listOfNotNull(
 /** The phone's bar holds Today, Calendar, the next section that's on, and the first writing space; the rest go in the menu. Stats and the monthly review are always in the menu. */
 private fun splitBar(all: List<TopLevel>): Pair<List<TopLevel>, List<TopLevel>> {
     val writing = all.firstOrNull { it.route in writingRoutes }
-    val bar = all.filter { it.route !in writingRoutes && it.route != StatsRoute && it.route != MonthReviewRoute }.take(3) + listOfNotNull(writing)
+    val bar = all.filter { it.route !in writingRoutes && it.route != StatsRoute && it.route != MonthReviewRoute && it.route !is AgreementRoute }.take(3) + listOfNotNull(writing)
     return bar to all.filter { it !in bar }
 }
 
@@ -214,13 +218,14 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
     val wide = LocalConfiguration.current.screenWidthDp >= 600
     // A tab the dynamic just switched off (say, from Settings) shouldn't stay reachable underneath.
     val switchedOff = destination != null && !isTopLevel && destination.hierarchy.any {
-        it.hasRoute<RewardsRoute>() || it.hasRoute<ConsequencesRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<ProtocolsRoute>() || it.hasRoute<JournalRoute>() || it.hasRoute<StatsRoute>() || it.hasRoute<MonthReviewRoute>()
+        it.hasRoute<RewardsRoute>() || it.hasRoute<ConsequencesRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<ProtocolsRoute>() || it.hasRoute<JournalRoute>() || it.hasRoute<StatsRoute>() || it.hasRoute<MonthReviewRoute>() || it.hasRoute<AgreementRoute>()
     }
     LaunchedEffect(switchedOff) { if (switchedOff) nav.navigate(TodayRoute) { popUpTo(nav.graph.findStartDestination().id) } }
     // A push asking to set up location opens its screen.
     LaunchedEffect(Unit) {
         app.obey.push.PendingNav.target.collect { target ->
             if (target == app.obey.push.PendingNav.LOCATION && features.location) nav.navigate(LocationRoute)
+            if (target == app.obey.push.PendingNav.AGREEMENT && features.agreement) nav.navigate(AgreementRoute())
             if (target != null) app.obey.push.PendingNav.target.value = null
         }
     }
@@ -281,8 +286,9 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
                     Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 12.dp)) {
                         DynamicSwitcher(switcher) { scope.launch { drawer.close() } }
                         Spacer(Modifier.height(8.dp))
-                        overflow.forEach { t -> MenuItem(t.label, t.icon, selected(t)) { go(t.route) } }
+                        overflow.filter { it.route !is AgreementRoute }.forEach { t -> MenuItem(t.label, t.icon, selected(t)) { go(t.route) } }
                         HorizontalDivider(Modifier.padding(horizontal = 28.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        overflow.firstOrNull { it.route is AgreementRoute }?.let { t -> MenuItem(t.label, t.icon, selected(t)) { go(t.route) } }
                         MenuItem("Your dynamic", Icons.Outlined.FavoriteBorder, destination?.hasRoute<DynamicRoute>() == true) { nav.navigate(DynamicRoute) }
                         MenuItem("Settings", Icons.Outlined.Settings, destination?.hasRoute<SettingsRoute>() == true) { nav.navigate(SettingsRoute) }
                     }
@@ -365,6 +371,7 @@ private fun ObeyNavHost(nav: NavHostController) {
                 onOpenSettings = settings,
                 onKits = { nav.navigate(KitsRoute) },
                 onOpenLocation = { nav.navigate(LocationRoute) },
+                onOpenAgreement = { edit -> nav.navigate(if (edit) AgreementRoute(edit = true) else AgreementRoute(review = true)) },
             )
         }
         composable<UpcomingRoute> {
@@ -409,6 +416,7 @@ private fun ObeyNavHost(nav: NavHostController) {
         }
         composable<StatsRoute> { StatsScreen(onOpenSettings = settings, onOpenTask = openTask) }
         composable<MonthReviewRoute> { MonthReviewScreen(onOpenSettings = settings) }
+        composable<AgreementRoute> { AgreementScreen(onOpenSettings = settings, onOpenNote = { nav.navigate(NoteEditorRoute(noteId = it)) }) }
         composable<TaskListRoute> {
             TaskListScreen(
                 onOpen = openTask,
