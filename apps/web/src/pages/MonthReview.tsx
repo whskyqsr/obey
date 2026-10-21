@@ -224,8 +224,6 @@ function ProgressCard({ s }: { s: MonthSummary }) {
     ) : null;
   const isCurrent = s.month === monthOf(today());
   const who = memberName(s.subjectId);
-  const mood = s.mood != null ? MOOD_LABELS[Math.round(s.mood) - 1]! : null;
-  const before = s.previousMood != null ? MOOD_LABELS[Math.round(s.previousMood) - 1]! : null;
   return (
     <section className="flex flex-col gap-3 rounded-lg bg-surface-container-low p-4">
       <h2 className="text-title-medium text-on-surface">
@@ -261,13 +259,46 @@ function ProgressCard({ s }: { s: MonthSummary }) {
           ))}
         </>
       )}
-      {mood && (
-        <p className="flex items-center gap-2 text-body-medium text-on-surface-variant">
-          <Icon name={MOODS[Math.round(s.mood!) - 1]!} size={20} />
-          Mostly {mood.toLowerCase()} this month{before && before !== mood ? `, ${s.mood! > s.previousMood! ? "up" : "down"} from ${before.toLowerCase()}` : ""}
-        </p>
-      )}
+      {s.moods.length > 0 && <MonthMoodLine month={s.month} moods={s.moods} />}
     </section>
+  );
+}
+
+/**
+ * The sub's moods across the month as a line, one point per answer. Deliberately no average and nothing set against
+ * last month, so mood never reads as a score.
+ */
+function MonthMoodLine({ month, moods }: { month: string; moods: MonthSummary["moods"] }) {
+  const [y, m] = month.split("-").map(Number) as [number, number];
+  const days = new Date(y, m, 0).getDate();
+  const W = 300;
+  const H = 56;
+  const pts = moods.map((e) => {
+    const d = new Date(e.at);
+    const x = ((d.getDate() - 1 + (d.getHours() * 60 + d.getMinutes()) / 1440) / days) * W;
+    return { x, y: H - 4 - ((e.mood - 1) / 4) * (H - 8), mood: e.mood };
+  });
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-body-small text-on-surface-variant">Mood this month</p>
+      <div className="flex items-stretch gap-2">
+        <div className="flex flex-col justify-between text-on-surface-variant">
+          <Icon name={MOODS[4]!} size={16} />
+          <Icon name={MOODS[0]!} size={16} />
+        </div>
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-14 flex-1 overflow-visible" role="img" aria-label={`${moods.length} moods this month`}>
+          <line x1={0} x2={W} y1={H / 2} y2={H / 2} className="stroke-outline-variant" strokeDasharray="2 4" vectorEffect="non-scaling-stroke" />
+          {pts.length > 1 && (
+            <polyline points={pts.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" className="stroke-primary" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+          )}
+          {pts.map((p, i) => (
+            <circle key={i} cx={p.x} cy={p.y} r={3} className={p.mood <= 2 ? "fill-tertiary" : "fill-primary"} vectorEffect="non-scaling-stroke">
+              <title>{MOOD_LABELS[p.mood - 1]}</title>
+            </circle>
+          ))}
+        </svg>
+      </div>
+    </div>
   );
 }
 

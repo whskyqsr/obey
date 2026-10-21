@@ -133,7 +133,7 @@ export async function canTapHome(db: Tx, relationshipId: string, userId: string,
   return u?.status !== "ready" || paused;
 }
 
-const nightDto = (occ: Occurrence, series: Series, canTap: boolean, note: string | null = null): CurfewNight => ({
+const nightDto = (occ: Occurrence, series: Series, canTap: boolean, reportHome: boolean, note: string | null = null): CurfewNight => ({
   occurrenceId: occ.id,
   assigneeId: series.assigneeId,
   placeId: series.placeId!,
@@ -145,7 +145,16 @@ const nightDto = (occ: Occurrence, series: Series, canTap: boolean, note: string
   missConfirmed: occ.missConfirmedAt !== null,
   canTap,
   note,
+  reportHome,
+  toldAt: occ.homeToldAt?.toISOString() ?? null,
+  toldNote: occ.homeNote,
 });
+
+/** Whether this dynamic's curfew has the sub tell the Dominant they're home. */
+export async function reportsHome(db: Tx, relationshipId: string) {
+  const [rel] = await db.select({ curfew: relationships.curfew }).from(relationships).where(eq(relationships.id, relationshipId));
+  return !!rel?.curfew?.reportHome;
+}
 
 /** Curfew nights of this dynamic, newest first, due between the two instants. */
 async function nightsBetween(db: Tx, relationshipId: string, from: Date, to: Date) {
@@ -170,7 +179,7 @@ export async function curfewNightNow(db: Tx, relationshipId: string, now: Date):
     .where(and(eq(occurrenceComments.occurrenceId, pick.occ.id), ne(occurrenceComments.authorId, pick.series.assigneeId)))
     .orderBy(desc(occurrenceComments.createdAt))
     .limit(1);
-  return nightDto(pick.occ, pick.series, await canTapHome(db, relationshipId, pick.series.assigneeId, now), note?.body ?? null);
+  return nightDto(pick.occ, pick.series, await canTapHome(db, relationshipId, pick.series.assigneeId, now), await reportsHome(db, relationshipId), note?.body ?? null);
 }
 
 /** Plans in the coming week that overlap a curfew night still to come and involve the sub, unless left as they are. */

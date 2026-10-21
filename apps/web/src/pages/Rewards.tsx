@@ -4,7 +4,11 @@ import { errorMessage } from "../api/client";
 import type { LedgerEntry, Reward, RewardInput } from "../api/types";
 import { ItemDialog, type FieldDef } from "../components/ItemDialog";
 import { Badge, Button, Dialog, Empty, ErrorBox, Fab, Icon, Loading, PageHeader, Section, Select, TextField, cx, useSnackbar } from "../components/ui";
-import { fmtDateTime } from "../lib/dates";
+import { ago, fmtDateTime } from "../lib/dates";
+import { useTodayOccurrences } from "../lib/today";
+import { useAskWho } from "../components/CurfewStrip";
+import { RedemptionRow } from "../components/NeedsYou";
+import { RowGroup } from "../components/TaskRow";
 import { useRel } from "../lib/relationship";
 import { useConfirm } from "../lib/useConfirm";
 
@@ -12,7 +16,7 @@ const REWARD_FIELDS: FieldDef[] = [
   { key: "title", label: "Reward", type: "text", required: true, max: 200 },
   { key: "bodyMd", label: "Description", type: "textarea", max: 5000 },
   { key: "cost", label: "Cost (points)", type: "number", min: 0 },
-  { key: "needsApproval", label: "Needs approval to redeem", type: "switch" },
+  { key: "letsOff", label: "Gets them out of a consequence", type: "switch", help: "Redeeming it means picking a consequence of theirs; it's excused when you mark the reward redeemed." },
 ];
 
 const KIND_ICON: Record<LedgerEntry["kind"], string> = {
@@ -36,7 +40,11 @@ export function RewardsPage() {
   const [adjusting, setAdjusting] = useState(false);
   const [confirm, confirmEl] = useConfirm();
 
+  const [lettingOff, setLettingOff] = useState<Reward | null>(null);
   const myBalance = balances.data?.find((b) => b.userId === me.user.id)?.balance ?? 0;
+  const domName = useAskWho();
+  // Rewards spent but not yet given: a Dominant marks them redeemed; a sub sees what they're waiting on.
+  const waiting = (ledger.data ?? []).filter((e) => e.kind === "redemption" && !e.redeemedAt && (isDom ? e.userId !== me.user.id : e.userId === me.user.id));
   const current = editing && editing !== "new" ? editing : null;
 
   return (
@@ -99,7 +107,7 @@ export function RewardsPage() {
                 <Badge>{r.cost} pts</Badge>
               </div>
               <div className="flex items-center gap-2">
-                {r.needsApproval && <span className="text-body-small text-on-surface-variant">Needs approval</span>}
+                {r.letsOff && <span className="text-body-small text-on-surface-variant">Gets you out of a consequence</span>}
                 <div className="flex-1" />
                 {isDom && (
                   <Button variant="text" onClick={() => setEditing(r)}>
@@ -112,12 +120,11 @@ export function RewardsPage() {
                     icon="redeem"
                     disabled={myBalance < r.cost || redeem.isPending}
                     onClick={() =>
-                      confirm(`Redeem “${r.title}” for ${r.cost} points?`, () =>
-                        redeem.mutate(r.id, {
-                          onSuccess: () => snack(r.needsApproval ? "Redemption requested" : "Redeemed. Enjoy."),
-                          onError: (e) => snack(errorMessage(e)),
-                        }),
-                      )
+                      r.letsOff
+                        ? setLettingOff(r)
+                        : confirm(`Spend ${r.cost} points on “${r.title}”? ${domName} marks it redeemed once it's given.`, () =>
+                            redeem.mutate({ id: r.id }, { onSuccess: () => snack(`Spent ${r.cost} points. ${domName} has been told.`), onError: (e) => snack(errorMessage(e)) }),
+                          )
                     }
                   >
                     Redeem
@@ -128,6 +135,31 @@ export function RewardsPage() {
           ))}
         </div>
       </Section>
+
+      {waiting.length > 0 && (
+        <Section title={isDom ? "To redeem" : `Waiting on ${domName}`}>
+          <RowGroup>
+            {waiting.map((e) =>
+              isDom ? (
+                <RedemptionRow key={e.id} e={e} />
+              ) : (
+                <div key={e.id} className="flex min-h-16 items-center gap-2 bg-surface-container-low py-2 pr-4 pl-1">
+                  <span className="flex size-10 shrink-0 items-center justify-center">
+                    <Icon name="hourglass_top" className="text-tertiary" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-body-large text-on-surface">{e.note}</div>
+                    <div className="text-body-medium text-on-surface-variant">
+                      {-e.delta} pts spent {ago(e.createdAt)}
+                      {e.consequenceTitle ? ` · gets you out of ${e.consequenceTitle}` : ""}
+                    </div>
+                  </div>
+                </div>
+              ),
+            )}
+          </RowGroup>
+        </Section>
+      )}
 
       <Section title="History">
         {ledger.isLoading && <Loading />}
@@ -142,7 +174,9 @@ export function RewardsPage() {
                 <div className="text-body-small text-on-surface-variant">
                   {memberName(e.userId)} · {fmtDateTime(e.createdAt)}
                   {e.createdBy && e.createdBy !== e.userId ? ` · by ${memberName(e.createdBy)}` : ""}
+                  {e.kind === "redemption" && (e.redeemedAt ? ` · redeemed${e.consequenceTitle ? `, ${e.consequenceTitle} excused` : ""}` : ` · waiting on ${domName}`)}
                 </div>
+                {e.redeemNote && <div className="text-body-medium italic text-on-surface-variant">“{e.redeemNote}”</div>}
               </div>
               <div className={cx("text-title-medium", e.delta >= 0 ? "text-primary" : "text-error")}>{e.delta > 0 ? `+${e.delta}` : e.delta}</div>
             </div>
@@ -156,7 +190,7 @@ export function RewardsPage() {
         open={editing !== null}
         title={current ? "Edit reward" : "New reward"}
         fields={REWARD_FIELDS}
-        initial={current ? { ...current } : { title: "", bodyMd: "", cost: 10, needsApproval: true }}
+        initial={current ? { ...current } : { title: "", bodyMd: "", cost: 10, letsOff: false }}
         busy={save.isPending}
         onClose={() => setEditing(null)}
         onDelete={
@@ -169,14 +203,83 @@ export function RewardsPage() {
             title: String(v.title).trim(),
             bodyMd: String(v.bodyMd ?? ""),
             cost: Math.max(0, Number(v.cost) || 0),
-            needsApproval: Boolean(v.needsApproval),
+            needsApproval: current?.needsApproval ?? true,
+            letsOff: Boolean(v.letsOff),
           };
           save.mutate({ id: current?.id, input }, { onSuccess: () => setEditing(null), onError: (e) => snack(errorMessage(e)) });
         }}
       />
       <AdjustDialog open={adjusting} onClose={() => setAdjusting(false)} />
+      {lettingOff && <LetOffDialog reward={lettingOff} onClose={() => setLettingOff(null)} />}
       {confirmEl}
     </>
+  );
+}
+
+/** A "get out of a consequence" reward: the sub picks which of their consequences it's for. */
+function LetOffDialog({ reward, onClose }: { reward: Reward; onClose(): void }) {
+  const { rel, me } = useRel();
+  const snack = useSnackbar();
+  const redeem = useRedeemReward(rel.id);
+  const occ = useTodayOccurrences();
+  const who = useAskWho();
+  const mine = (occ.data ?? []).filter((o) => o.consequence && o.assigneeId === me.user.id && (o.status === "pending" || o.status === "missed"));
+  const [picked, setPicked] = useState<string | null>(null);
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      icon="redeem"
+      title={reward.title}
+      actions={
+        <>
+          <Button variant="text" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            busy={redeem.isPending}
+            disabled={!picked}
+            onClick={() =>
+              picked &&
+              redeem.mutate(
+                { id: reward.id, consequenceOccurrenceId: picked },
+                {
+                  onSuccess: () => {
+                    onClose();
+                    snack(`Spent ${reward.cost} points. ${who} has been told.`);
+                  },
+                  onError: (e) => snack(errorMessage(e)),
+                },
+              )
+            }
+          >
+            Spend {reward.cost} pts
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        {mine.length ? (
+          <>
+            <p>Which consequence is it for?</p>
+            <div className="flex flex-col gap-1">
+              {mine.map((o) => (
+                <label key={o.id} className="state-layer flex cursor-pointer items-center gap-3 rounded-md px-2 py-2">
+                  <input type="radio" name="letoff" checked={picked === o.id} onChange={() => setPicked(o.id)} className="size-5 accent-primary" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-body-large text-on-surface">{o.title}</div>
+                    <div className="text-body-medium text-on-surface-variant">{o.status === "missed" ? "Missed" : `Due ${fmtDateTime(o.dueAt)}`}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <p className="text-body-small">It's excused once {who} marks the reward redeemed. Until then it stays on your list.</p>
+          </>
+        ) : (
+          <p>You don't have a consequence to get out of right now.</p>
+        )}
+      </div>
+    </Dialog>
   );
 }
 

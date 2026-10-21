@@ -3,7 +3,7 @@ import { DateTime } from "luxon";
 import type { App as FirebaseApp } from "firebase-admin/app";
 import { type MulticastMessage, getMessaging } from "firebase-admin/messaging";
 import type { NotifyCategory } from "@obey/contracts";
-import type { Db } from "./db/index.js";
+import type { Db, Tx } from "./db/index.js";
 import { devices, users } from "./db/schema.js";
 
 export interface Push {
@@ -38,6 +38,8 @@ const CATEGORY: Record<string, NotifyCategory> = {
   rule_log: "assigned",
   event_changed: "plans",
   reward_redeemed: "rewards",
+  reward_honored: "rewards",
+  delay_used: "requests",
   month_review_open: "reminders",
   month_review: "comments",
 };
@@ -56,6 +58,25 @@ export function withPreferences(db: Db, inner: Notifier): Notifier {
       if (userIds.length) await inner.send(userIds, push);
     },
   };
+}
+
+/**
+ * Sends [push], but to people who let notifications carry a partner's words, [detailed] instead. Discreet by default:
+ * someone who hasn't turned details on only ever gets [push].
+ */
+export async function sendWithWords(db: Db | Tx, notifier: Notifier, userIds: string[], push: Push, detailed: Push | null) {
+  if (!detailed || !userIds.length) return notifier.send(userIds, push);
+  const rows = await db.select({ id: users.id, on: users.notifyDetails }).from(users).where(inArray(users.id, userIds));
+  const on = new Set(rows.filter((r) => r.on).map((r) => r.id));
+  const plain = userIds.filter((id) => !on.has(id));
+  if (on.size) await notifier.send([...on], detailed);
+  if (plain.length) await notifier.send(plain, push);
+}
+
+/** Whether [userId] lets notifications carry a partner's words (Settings, "Show your partner's words"). */
+export async function wantsDetails(db: Db | Tx, userId: string): Promise<boolean> {
+  const [row] = await db.select({ on: users.notifyDetails }).from(users).where(eq(users.id, userId));
+  return row?.on ?? false;
 }
 
 /** Records pushes instead of sending them; for tests. */

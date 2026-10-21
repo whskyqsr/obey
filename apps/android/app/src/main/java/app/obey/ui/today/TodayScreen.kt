@@ -86,6 +86,11 @@ fun TodayScreen(
     var approvingOther by remember { mutableStateOf<app.obey.api.CurfewRequest?>(null) }
     var changingEnd by remember { mutableStateOf<app.obey.api.CurfewClash?>(null) }
     val planChanges by vm.planChanges.collectAsStateWithLifecycle()
+    val delays by vm.delays.collectAsStateWithLifecycle()
+    val redemptions by vm.redemptions.collectAsStateWithLifecycle()
+    var telling by remember { mutableStateOf<app.obey.api.CurfewNight?>(null) }
+    var redeeming by remember { mutableStateOf<app.obey.api.LedgerEntry?>(null) }
+    var replying by remember { mutableStateOf<NoteTarget?>(null) }
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     MessageEffect(message, snackbar, vm::messageShown)
@@ -155,7 +160,7 @@ fun TodayScreen(
                 val isDom = session?.canManage == true
                 val reviewIds = d.awaitingReview.map { it.id }.toSet()
                 val missIds = d.recentMisses.map { it.id }.toSet()
-                val needs = if (isDom) d.requests.size + d.awaitingReview.size + d.recentMisses.size else 0
+                val needs = if (isDom) d.requests.size + d.awaitingReview.size + d.recentMisses.size + d.lowMoods.size + redemptions.size else 0
                 val restOfToday = if (isDom) d.today.filter { it.id !in reviewIds && it.id !in missIds } else d.today
                 fun row(o: Occurrence, actions: OccurrenceActions = actionsFor(o)): @Composable () -> Unit = {
                     SwipeableRow(
@@ -187,7 +192,13 @@ fun TodayScreen(
                                 name = session?.nameOf(n.assigneeId) ?: "Your partner",
                                 canDecide = session?.canManage == true,
                                 cost = curfew?.cost,
-                                onHome = { vm.homeForCurfew(n) },
+                                onHome = { if (n.reportHome) telling = n else vm.homeForCurfew(n) },
+                                askWho = askWho,
+                                onTell = { telling = n },
+                                onReply = {
+                                    val who = session?.nameOf(n.assigneeId) ?: "them"
+                                    replying = NoteTarget("", n.occurrenceId, who, "$who getting home tonight")
+                                },
                                 onExcuse = { vm.excuseCurfew(n.occurrenceId, "Excused", session?.nameOf(n.assigneeId)) },
                                 onConfirm = { vm.confirmCurfewMiss(n) },
                                 waiting = if (asked != null && beforeCurfew) " · asked ${if (mine) askWho else "you"} for ${app.obey.ui.common.formatTime(asked.untilAt)}" else "",
@@ -211,6 +222,9 @@ fun TodayScreen(
                     items(planChanges, key = { "changed-${it.id}" }) { e ->
                         PlanChangeCard(e, e.changedBy?.let { session?.nameOf(it) } ?: "Someone") { vm.seenPlanChange(e) }
                     }
+                    if (isDom) items(delays, key = { "delay-${it.id}" }) { x ->
+                        DelayCard(x, session?.nameOf(x.requestedBy) ?: "Your partner") { vm.seenDelay(x) }
+                    }
                     items(d.clashingPlans, key = { "plan-${it.id}" }) { e -> PlanHeadsUp(e, planTone(e, session?.relationship)) { plan = e } }
                     if (isDom && d.noTasks && session?.readOnly != true) item(key = "kits") { KitPrompt(onKits) }
                     // Someone with location tasks whose phone can't notice them arriving.
@@ -224,6 +238,15 @@ fun TodayScreen(
                     }
                     if (isDom && needs > 0) {
                         item(key = "h-needs") { SectionHeader("Needs you · $needs") }
+                    }
+                    if (isDom) items(d.lowMoods, key = { "mood-" + it.id }) { o ->
+                        val who = session?.nameOf(o.assigneeId) ?: "Your partner"
+                        MoodRow(
+                            o,
+                            who,
+                            onSeen = { vm.moodSeen(o) },
+                            onReply = { replying = NoteTarget("", o.id, who, "$who feeling ${app.obey.ui.common.moodLabel(o.mood ?: 1).lowercase()} (${o.title})") },
+                        )
                     }
                     if (d.requests.isNotEmpty()) {
                         if (!isDom) item(key = "h-req") { SectionHeader("Waiting for approval") }
@@ -246,6 +269,9 @@ fun TodayScreen(
                         }
                         items(d.recentMisses, key = { "m-" + it.id }) { o ->
                             OccurrenceRow(o, nameFor(o), OccurrenceActions(onExcuse = { vm.excuse(o) }, onConfirmMiss = { vm.confirmMiss(o) }, onDropConsequence = if (o.missConsequence != null) ({ vm.dropConsequence(o) }) else null, onComments = { commenting = o }), onOpen = { onOpenTask(o.seriesId) }, streak = d.streaks[o.seriesId])
+                        }
+                        items(redemptions, key = { "redeem-" + it.id }) { e ->
+                            RedemptionRow(e, session?.nameOf(e.userId) ?: "Your partner") { redeeming = e }
                         }
                     }
                     if (d.overdue.isNotEmpty()) {
@@ -359,6 +385,15 @@ fun TodayScreen(
         val t = noteFor ?: return@LaunchedEffect
         vm.noteForShown()
         if (snackbar.showSnackbar(t.text, actionLabel = "Add a note", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) writingNote = t
+    }
+    replying?.let { t -> NoteDialog(t, busy, title = "Reply to ${t.to}", onDismiss = { replying = null }) { body -> vm.addNote(t, body) { replying = null } } }
+    telling?.let { n ->
+        TellHomeDialog(askWho, busy, onDismiss = { telling = null }) { note ->
+            if (n.arrivedAt != null) vm.tellHome(n, note, askWho) { telling = null } else vm.homeForCurfew(n, note, askWho) { telling = null }
+        }
+    }
+    redeeming?.let { e ->
+        RedeemedDialog(e, session?.nameOf(e.userId) ?: "them", busy, onDismiss = { redeeming = null }) { note -> vm.markRedeemed(e, note) { redeeming = null } }
     }
     writingNote?.let { t -> NoteDialog(t, busy, onDismiss = { writingNote = null }) { body -> vm.addNote(t, body) { writingNote = null } } }
 }

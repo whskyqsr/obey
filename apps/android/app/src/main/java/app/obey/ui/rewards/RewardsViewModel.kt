@@ -29,6 +29,8 @@ data class RewardsData(
     val rewards: List<Reward>,
     val consequences: List<Consequence>,
     val ledger: List<LedgerEntry>,
+    /** The viewer's own consequences still to do or missed, which a "lets off" reward can excuse. */
+    val myConsequences: List<app.obey.api.Occurrence> = emptyList(),
 )
 
 @HiltViewModel
@@ -54,11 +56,21 @@ class RewardsViewModel @Inject constructor(
                     val r = async { api.rewards(rel) }
                     val c = async { api.consequences(rel) }
                     val l = async { api.ledger(rel) }
+                    val today = java.time.LocalDate.now()
+                    val me = sessions.session?.userId
+                    val mine = async {
+                        if (sessions.session?.canManage == true) emptyList()
+                        else runCatching { api.occurrences(rel, today.minusDays(14).toString(), today.plusDays(7).toString()) }.getOrDefault(emptyList()).filter {
+                            it.consequence && it.assigneeId == me &&
+                                (it.status == app.obey.api.OccurrenceStatus.Pending || it.status == app.obey.api.OccurrenceStatus.Missed)
+                        }
+                    }
                     RewardsData(
                         b.await(),
                         r.await().sortedBy { it.cost },
                         c.await().sortedByDescending { it.severity },
                         l.await().sortedByDescending { it.createdAt }.take(100),
+                        mine.await(),
                     )
                 }
             }
@@ -75,9 +87,17 @@ class RewardsViewModel @Inject constructor(
 
     fun deleteReward(r: Reward) = action { api.deleteReward(r.id); refresh() }
 
-    fun redeem(r: Reward) = action {
-        api.redeemReward(r.id)
-        say(if (r.needsApproval) "Requested “${r.title}”" else "Redeemed “${r.title}”")
+    /** Points are spent straight away; [who] marks it redeemed once it's given. */
+    fun redeem(r: Reward, who: String, consequenceOccurrenceId: String? = null) = action {
+        api.redeemReward(r.id, app.obey.api.RedeemInput(consequenceOccurrenceId))
+        say("Spent ${r.cost} points. $who has been told.")
+        refresh()
+    }
+
+    fun markRedeemed(e: LedgerEntry, note: String?, onDone: () -> Unit) = action {
+        api.markRedeemed(e.id, app.obey.api.MarkRedeemedInput(note))
+        say("Redeemed")
+        onDone()
         refresh()
     }
 

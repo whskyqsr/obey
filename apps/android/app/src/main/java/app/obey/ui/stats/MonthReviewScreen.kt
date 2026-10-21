@@ -60,6 +60,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role as SemanticsRole
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -90,8 +92,9 @@ import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.SafeWordAction
 import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.loadCatching
+import app.obey.ui.common.local
 import app.obey.ui.common.moodIcon
-import app.obey.ui.common.moodLabel
+import app.obey.ui.common.parseInstant
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
 import java.time.YearMonth
@@ -422,17 +425,50 @@ private fun ProgressCard(s: MonthSummary, session: Session) {
                 }
             }
         }
-        s.mood?.let { mood ->
-            val now = moodLabel(mood.roundToInt())
-            val before = s.previousMood?.let { moodLabel(it.roundToInt()) }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(moodIcon(mood.roundToInt()), null, Modifier.size(20.dp), tint = colors.onSurfaceVariant)
-                Text(
-                    "  Mostly ${now.lowercase()} this month" +
-                        if (before != null && before != now) ", ${if (mood > s.previousMood!!) "up" else "down"} from ${before.lowercase()}" else "",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.onSurfaceVariant,
+        if (s.moods.isNotEmpty()) MonthMoodLine(s.month, s.moods)
+    }
+}
+
+/** The sub's check-in moods across the month, low ones picked out; no average and no comparison with last month. */
+@Composable
+private fun MonthMoodLine(month: String, moods: List<app.obey.api.MoodPoint>) {
+    val colors = MaterialTheme.colorScheme
+    val ym = java.time.YearMonth.parse(month)
+    val days = ym.lengthOfMonth()
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("Mood this month", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+        Row(Modifier.height(56.dp)) {
+            Column(Modifier.fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
+                Icon(moodIcon(5), null, Modifier.size(16.dp), tint = colors.onSurfaceVariant)
+                Icon(moodIcon(1), null, Modifier.size(16.dp), tint = colors.onSurfaceVariant)
+            }
+            androidx.compose.foundation.Canvas(
+                Modifier.weight(1f).fillMaxHeight().padding(start = 8.dp)
+                    .semantics { contentDescription = "${moods.size} moods this month" },
+            ) {
+                val w = size.width
+                val h = size.height
+                val pad = 4.dp.toPx()
+                val pts = moods.map { e ->
+                    val at = parseInstant(e.at).local()
+                    val dayFrac = (at.dayOfMonth - 1 + (at.hour * 60 + at.minute) / 1440f) / days
+                    androidx.compose.ui.geometry.Offset(dayFrac * w, h - pad - (e.mood - 1) / 4f * (h - 2 * pad)) to e.mood
+                }
+                drawLine(
+                    colors.outlineVariant,
+                    androidx.compose.ui.geometry.Offset(0f, h / 2),
+                    androidx.compose.ui.geometry.Offset(w, h / 2),
+                    strokeWidth = 1.dp.toPx(),
+                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 4.dp.toPx())),
                 )
+                if (pts.size > 1) {
+                    val path = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(pts[0].first.x, pts[0].first.y)
+                        pts.drop(1).forEach { lineTo(it.first.x, it.first.y) }
+                    }
+                    drawPath(path, colors.primary, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx()))
+                }
+                pts.forEach { (o, mood) -> drawCircle(if (mood <= 2) colors.tertiary else colors.primary, 3.dp.toPx(), o) }
             }
         }
     }

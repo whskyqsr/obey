@@ -44,3 +44,14 @@ fun formatDate(date: LocalDate): String = date.format(dateFmt)
 fun formatDateTime(iso: String): String = parseInstant(iso).local().let { it.format(dateTimeFmt) + it.timeLabel() }
 
 fun signed(points: Int): String = if (points > 0) "+$points" else points.toString()
+
+/** "just now", "5 min ago", "2 h ago", then the day: how long since something happened. */
+fun ago(iso: String, now: Instant = Instant.now()): String {
+    val d = java.time.Duration.between(parseInstant(iso), now)
+    return when {
+        d.toMinutes() < 1 -> "just now"
+        d.toHours() < 1 -> "${d.toMinutes()} min ago"
+        d.toHours() < 24 -> "${d.toHours()} h ago"
+        else -> formatDateTime(iso)
+    }
+}

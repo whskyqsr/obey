@@ -281,6 +281,13 @@
       "when": 1792614346321,
       "tag": "0039_plan_change_note",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792615241487,
+      "tag": "0040_human_touch",
+      "breakpoints": true
     }
   ]
 }

@@ -32,6 +32,13 @@ export function NotificationTypes() {
       {NOTIFY_TYPES.filter((t) => !t.feature || features[t.feature]).map((t) => (
         <Switch key={t.key} checked={!muted.has(t.key)} onChange={(on) => set(t.key, on)} label={t.label} help={t.help} />
       ))}
+      <div className="my-2 border-t border-outline-variant" />
+      <Switch
+        checked={me.user.notifyDetails ?? false}
+        onChange={(notifyDetails) => updateMe.mutate({ notifyDetails }, { onError: (e) => snack(errorMessage(e)) })}
+        label="Show your partner's words"
+        help={`A reminder written for you, or the line sent with "I'm home", shows in the notification. Off, notifications only say who did what, so nothing personal is on your lock screen.`}
+      />
       <p className="py-2 text-body-small text-on-surface-variant">Someone joining or leaving your dynamic always comes through.</p>
     </div>
   );

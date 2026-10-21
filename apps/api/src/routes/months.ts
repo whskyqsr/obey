@@ -124,7 +124,10 @@ async function moodIn(db: Tx, relationshipId: string, subjectId: string, month: 
         lt(notes.createdAt, to),
       ),
     );
-  return average([...checkins, ...journal].filter((r) => r.at && localDate(r.at, zone).startsWith(month)).map((r) => r.mood!));
+  const inMonth = [...checkins, ...journal]
+    .filter((r) => r.at && localDate(r.at, zone).startsWith(month))
+    .sort((a, b) => a.at!.getTime() - b.at!.getTime());
+  return { mood: average(inMonth.map((r) => r.mood!)), moods: inMonth.map((r) => ({ at: r.at!.toISOString(), mood: r.mood! })) };
 }
 
 /**
@@ -171,8 +174,7 @@ export const monthRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       totals: r?.of(month) ?? empty,
       previous: r?.of(prev) ?? empty,
       focusTasks: r && focus ? focus.taskIds.map((taskId) => ({ taskId, title: r.titles.get(taskId) ?? "A task", ...r.of(month, taskId) })) : [],
-      mood: subjectId ? await moodIn(db, req.params.id, subjectId, month, zone) : null,
-      previousMood: subjectId ? await moodIn(db, req.params.id, subjectId, prev, zone) : null,
+      ...(subjectId ? await moodIn(db, req.params.id, subjectId, month, zone) : { mood: null, moods: [] }),
     };
   });
 

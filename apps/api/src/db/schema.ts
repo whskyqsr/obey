@@ -28,6 +28,8 @@ export const users = pgTable("users", {
   timezone: text("timezone"),
   /** Notification categories turned off (see notifyCategory). */
   mutedNotifications: jsonb("muted_notifications").$type<string[]>().notNull().default([]),
+  /** Let pushes carry a partner's own words (a reminder they wrote, a line sent with "I'm home"); off keeps them to who did what. */
+  notifyDetails: boolean("notify_details").notNull().default(false),
   /** What their Android app last said about location: whether arrivals can be noticed while it's closed. Null: never reported. */
   locationStatus: text("location_status", { enum: ["ready", "foreground_only", "denied", "services_off"] }),
   locationStatusAt: ts("location_status_at"),
@@ -98,6 +100,8 @@ export const rewards = pgTable("rewards", {
   bodyMd: text("body_md").notNull().default(""),
   cost: integer("cost").notNull(),
   needsApproval: boolean("needs_approval").notNull().default(true),
+  /** Gets the sub out of a consequence of their choosing, once a Dominant marks the redemption redeemed. */
+  letsOff: boolean("lets_off").notNull().default(false),
   createdAt: createdAt(),
 });
 
@@ -229,6 +233,11 @@ export const taskSeries = pgTable(
     stayMinutes: integer("stay_minutes"),
     /** Set on a curfew's hidden series: due is the curfew, and the assignee stays at the place until this local time. */
     curfewUntil: text("curfew_until"),
+    /** The push before it's due: the app's own words, the Dominant's (reminderText), or none at all. */
+    reminder: text("reminder", { enum: ["default", "custom", "none"] })
+      .notNull()
+      .default("default"),
+    reminderText: text("reminder_text"),
     active: boolean("active").notNull().default(true),
     /** Set on the consequence handed out automatically for this missed occurrence; unique, so it's issued once. */
     causedByOccurrenceId: uuid("caused_by_occurrence_id").references((): AnyPgColumn => occurrences.id, { onDelete: "set null" }),
@@ -282,6 +291,11 @@ export const occurrences = pgTable(
     calledOff: boolean("called_off").notNull().default(false),
     /** When a Dominant marked this miss as seen and left it missed, so it stops asking for a decision. */
     missConfirmedAt: ts("miss_confirmed_at"),
+    /** A low check-in (1 or 2) asks a Dominant's attention until they reply or mark it seen. */
+    moodSeenAt: ts("mood_seen_at"),
+    /** A curfew night where the sub tells the Dominant they're home: when they did, and the line they sent. */
+    homeToldAt: ts("home_told_at"),
+    homeNote: text("home_note"),
     /** Who last corrected this by hand from the task's history, and when. */
     editedBy: uuid("edited_by").references(() => users.id),
     editedAt: ts("edited_at"),
@@ -315,6 +329,8 @@ export const reschedules = pgTable("reschedules", {
   /** `applied` = made directly by someone allowed to; `approved` = requested then approved. */
   status: text("status", { enum: ["requested", "approved", "declined", "applied"] }).notNull(),
   usedAllowance: boolean("used_allowance").notNull().default(false),
+  /** A delay from the allowance stays on the Dominant's Today until they close it. */
+  seenAt: ts("seen_at"),
   createdAt: createdAt(),
   decidedAt: ts("decided_at"),
 });
@@ -334,6 +350,10 @@ export const pointsLedger = pgTable(
     note: text("note").notNull().default(""),
     occurrenceId: uuid("occurrence_id").references(() => occurrences.id, { onDelete: "set null" }),
     rewardId: uuid("reward_id").references(() => rewards.id, { onDelete: "set null" }),
+    /** A redemption waits on a Dominant until they mark it redeemed, with an optional note to the sub. */
+    redeemedAt: ts("redeemed_at"),
+    redeemedBy: uuid("redeemed_by").references(() => users.id, { onDelete: "set null" }),
+    redeemNote: text("redeem_note"),
     createdBy: uuid("created_by").references(() => users.id),
     createdAt: createdAt(),
   },

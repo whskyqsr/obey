@@ -78,7 +78,7 @@ function CommentThread<C extends AnyComment>({
  * The conversation on one due date ("why was this late"), so it stays with the task instead of another app.
  * Shown when there are comments or the person opens it with "Comment".
  */
-export function Comments({ o, open, onOpen }: { o: Occurrence; open: boolean; onOpen(): void }) {
+export function Comments({ o, open, onOpen }: { o: Pick<Occurrence, "id" | "commentCount">; open: boolean; onOpen(): void }) {
   const { rel } = useRel();
   const snack = useSnackbar();
   const comments = useComments(o.id, o.commentCount > 0 || open);
@@ -99,6 +99,28 @@ export function Comments({ o, open, onOpen }: { o: Occurrence; open: boolean; on
 }
 
 /** Replies under a journal entry or shared note, with the box to add one always open. */
+/** Answering something on Today (a low check-in, "I'm home") in its comments, without leaving the page. */
+export function ReplyDialog({ o, title, intro, onClose }: { o: Pick<Occurrence, "id" | "commentCount">; title: string; intro?: string; onClose(): void }) {
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      icon="chat"
+      title={title}
+      actions={
+        <Button variant="text" onClick={onClose}>
+          Done
+        </Button>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        {intro && <p className="text-body-medium text-on-surface-variant">{intro}</p>}
+        <Comments o={o} open onOpen={() => {}} />
+      </div>
+    </Dialog>
+  );
+}
+
 export function NoteComments({ note }: { note: Note }) {
   const { rel } = useRel();
   const snack = useSnackbar();

@@ -73,6 +73,9 @@ data class TaskForm(
     /** A location task: done by getting to this place by the due time, and staying [stayMinutes] if set. */
     val placeId: String? = null,
     val stayMinutes: Int? = null,
+    /** "default" (Fealty's reminder), "custom" ([reminderText], in the Dominant's words) or "none". */
+    val reminder: String = "default",
+    val reminderText: String = "",
 ) {
     /** The bounds this form describes; both null for an ordinary task. */
     val countBounds: Pair<Int?, Int?> get() {
@@ -86,7 +89,11 @@ data class TaskForm(
         }
     }
 
-    val titleError: String? get() = if (title.isBlank()) "Give it a title" else null
+    val titleError: String? get() = when {
+        title.isBlank() -> "Give it a title"
+        reminder == "custom" && reminderText.isBlank() -> "Write the reminder, or pick another"
+        else -> null
+    }
     val valid: Boolean get() = titleError == null && assigneeId.isNotEmpty() &&
         points.toIntOrNull() != null && missPenalty.toIntOrNull() != null && (grace != Grace.Custom || graceMinutes.toIntOrNull() != null)
 
@@ -198,6 +205,8 @@ class TaskEditorViewModel @Inject constructor(
         countPer = t.countPer,
         placeId = t.placeId,
         stayMinutes = t.stayMinutes,
+        reminder = t.reminder,
+        reminderText = t.reminderText.orEmpty(),
     )
 
     fun update(change: (TaskForm) -> TaskForm) = _form.update(change)
@@ -236,6 +245,8 @@ class TaskEditorViewModel @Inject constructor(
             countPer = f.countPer,
             placeId = f.placeId,
             stayMinutes = f.placeId?.let { f.stayMinutes?.coerceIn(5, 720) },
+            reminder = f.reminder,
+            reminderText = if (f.reminder == "custom") f.reminderText.trim().take(140) else null,
         )
         action {
             if (original == null) api.createTask(sessions.requireRelationshipId(), input)

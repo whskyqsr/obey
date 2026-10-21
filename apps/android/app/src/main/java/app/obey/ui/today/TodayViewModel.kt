@@ -47,6 +47,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 
+/** A check-in mood at or below this (low, awful) shows a Dominant in Needs you. */
+const val LOW_MOOD = 2
+
 /** Tonight's curfew night (if Today shows one), plans that run past curfew, and what a broken night costs. */
 /** A decision a note can follow: [text] for the snackbar, kept with [occurrenceId], sent to [to]. */
 data class NoteTarget(val text: String, val occurrenceId: String, val to: String, val about: String)
@@ -61,6 +64,8 @@ data class TodayData(
     val awaitingReview: List<Occurrence>,
     /** Misses from today and yesterday, for a Dominant to excuse. */
     val recentMisses: List<Occurrence>,
+    /** Someone else's low check-ins (awful or low) from today and yesterday that a Dominant hasn't seen. */
+    val lowMoods: List<Occurrence> = emptyList(),
     /** The next few days with something pending. */
     val later: List<Pair<LocalDate, List<Occurrence>>>,
     /** Pending extension requests, one entry per request; a whole-day request's rows share an entry. */
@@ -129,6 +134,7 @@ class TodayViewModel @Inject constructor(
             if (sessions.session?.relationship?.features?.location == true) launch { runCatching { placeStore.refresh(relId) } }
             launch { loadCurfew(relId) }
             launch { runCatching { api.planChanges(relId) }.onSuccess { _planChanges.value = it } }
+            launch { loadForDom(relId) }
             try {
                 val snap = snapshot(relId)
                 offline.saveToday(relId, snap)
@@ -197,6 +203,11 @@ class TodayViewModel @Inject constructor(
             today = live.filter { dueDate(it) == today }.sortedWith(byDue),
             awaitingReview = live.filter { it.status == OccurrenceStatus.Submitted }.sortedWith(byDue),
             recentMisses = live.filter { it.status == OccurrenceStatus.Missed && !it.missConfirmed && !dueDate(it).isBefore(today.minusDays(1)) }.sortedWith(byDue),
+            lowMoods = if (sessions.session?.canManage != true) emptyList() else live.filter { o ->
+                val mood = o.mood
+                mood != null && mood <= LOW_MOOD && !o.moodSeen && o.assigneeId != sessions.session?.userId &&
+                    o.completedAt?.let { !parseInstant(it).local().toLocalDate().isBefore(today.minusDays(1)) } == true
+            }.sortedByDescending { it.completedAt },
             later = live.filter { it.status == OccurrenceStatus.Pending && dueDate(it) > today }
                 .sortedWith(byDue).groupBy { dueDate(it) }.toList().take(3),
             requests = snap.requests
@@ -245,9 +256,61 @@ class TodayViewModel @Inject constructor(
         _curfew.value = TodayCurfew(c.night, c.clashes, cost, c.requests)
     }
 
-    fun homeForCurfew(n: CurfewNight) = action {
-        api.homeForCurfew(n.occurrenceId)
-        say("You're home for curfew")
+    /** "I'm home" without a phone that checks; with a curfew that asks, it tells the Dominant too, with [note]. */
+    fun homeForCurfew(n: CurfewNight, note: String? = null, who: String? = null, onDone: () -> Unit = {}) = action {
+        api.homeForCurfew(n.occurrenceId, app.obey.api.TellHomeInput(note))
+        say(if (who != null) "Told $who" else "You're home for curfew")
+        onDone()
+        refresh()
+    }
+
+    /** Home already (the phone noticed): tell the Dominant. */
+    fun tellHome(n: CurfewNight, note: String?, who: String, onDone: () -> Unit) = action {
+        api.tellHome(n.occurrenceId, app.obey.api.TellHomeInput(note))
+        say("Told $who")
+        onDone()
+        refresh()
+    }
+
+    private val _delays = MutableStateFlow<List<app.obey.api.DelayUsed>>(emptyList())
+    /** Delays a sub took from their allowance, for a Dominant to see. */
+    val delays: StateFlow<List<app.obey.api.DelayUsed>> = _delays.asStateFlow()
+
+    private val _redemptions = MutableStateFlow<List<app.obey.api.LedgerEntry>>(emptyList())
+    /** Rewards someone else spent points on that a Dominant hasn't marked redeemed yet. */
+    val redemptions: StateFlow<List<app.obey.api.LedgerEntry>> = _redemptions.asStateFlow()
+
+    private suspend fun loadForDom(relId: String) {
+        val session = sessions.session ?: return
+        val rel = session.relationship
+        if (!session.canManage || rel == null) {
+            _delays.value = emptyList()
+            _redemptions.value = emptyList()
+            return
+        }
+        _delays.value = if (rel.reschedulePolicy == app.obey.api.ReschedulePolicy.Allowance) runCatching { api.delays(relId) }.getOrDefault(_delays.value) else emptyList()
+        _redemptions.value = if (rel.features.points) {
+            runCatching {
+                api.ledger(relId).filter { it.kind == app.obey.api.LedgerKind.Redemption && it.redeemedAt == null && it.userId != session.userId }
+            }.getOrDefault(_redemptions.value)
+        } else emptyList()
+    }
+
+    fun seenDelay(d: app.obey.api.DelayUsed) = action {
+        _delays.value = _delays.value.filter { it.id != d.id }
+        api.seenDelay(d.id)
+    }
+
+    fun moodSeen(o: Occurrence) = action {
+        api.moodSeen(o.id)
+        say("Marked seen")
+        refresh()
+    }
+
+    fun markRedeemed(e: app.obey.api.LedgerEntry, note: String?, onDone: () -> Unit) = action {
+        api.markRedeemed(e.id, app.obey.api.MarkRedeemedInput(note))
+        say("Redeemed")
+        onDone()
         refresh()
     }
 
@@ -262,7 +325,7 @@ class TodayViewModel @Inject constructor(
     /** A note after a decision: a comment on that task or curfew night, and a notification. */
     fun addNote(t: NoteTarget, body: String, onDone: () -> Unit) = action {
         api.addComment(t.occurrenceId, app.obey.api.CommentInput(body))
-        say("Note sent to ${t.to}")
+        say(if (t.text.isEmpty()) "Reply sent to ${t.to}" else "Note sent to ${t.to}")
         onDone()
         refresh()
     }

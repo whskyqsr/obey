@@ -31,6 +31,9 @@ interface ObeyApi {
     @PATCH("me")
     suspend fun setMutedNotifications(@Body body: MutedNotificationsInput): User
 
+    @PATCH("me")
+    suspend fun setNotifyDetails(@Body body: NotifyDetailsInput): User
+
     /** A square JPEG; the app crops and shrinks it first. */
     @PUT("me/avatar")
     suspend fun setAvatar(@Body image: RequestBody): User
@@ -185,6 +188,17 @@ interface ObeyApi {
     @POST("occurrences/{id}/confirm-miss")
     suspend fun confirmMiss(@Path("id") occurrenceId: String, @Body body: Map<String, String> = emptyMap()): Occurrence
 
+    /** A Dominant saw a check-in's mood, without replying. */
+    @POST("occurrences/{id}/mood-seen")
+    suspend fun moodSeen(@Path("id") occurrenceId: String, @Body body: Map<String, String> = emptyMap()): Occurrence
+
+    /** Delays a sub took from their allowance this week that a Dominant hasn't seen yet. */
+    @GET("relationships/{id}/delays")
+    suspend fun delays(@Path("id") relationshipId: String): List<DelayUsed>
+
+    @POST("reschedules/{id}/seen")
+    suspend fun seenDelay(@Path("id") rescheduleId: String, @Body body: Map<String, String> = emptyMap())
+
     @POST("occurrences/{id}/drop-consequence")
     suspend fun dropConsequence(@Path("id") occurrenceId: String, @Body body: Map<String, String> = emptyMap()): Occurrence
 
@@ -278,7 +292,11 @@ interface ObeyApi {
     suspend fun deleteReward(@Path("id") id: String)
 
     @POST("rewards/{id}/redeem")
-    suspend fun redeemReward(@Path("id") id: String)
+    suspend fun redeemReward(@Path("id") id: String, @Body body: RedeemInput = RedeemInput())
+
+    /** A Dominant gave the reward a sub spent points on. */
+    @POST("ledger/{id}/redeemed")
+    suspend fun markRedeemed(@Path("id") ledgerId: String, @Body body: MarkRedeemedInput): LedgerEntry
 
     // Consequences
     @GET("relationships/{id}/consequences")
@@ -383,7 +401,11 @@ interface ObeyApi {
     suspend fun saveCurfew(@Path("id") relationshipId: String, @Body body: CurfewInput): Curfew
 
     @POST("occurrences/{id}/home")
-    suspend fun homeForCurfew(@Path("id") occurrenceId: String, @Body body: Map<String, String> = emptyMap()): Occurrence
+    suspend fun homeForCurfew(@Path("id") occurrenceId: String, @Body body: TellHomeInput = TellHomeInput()): Occurrence
+
+    /** After getting home, tell the Dominant (a curfew with reportHome). */
+    @POST("occurrences/{id}/tell-home")
+    suspend fun tellHome(@Path("id") occurrenceId: String, @Body body: TellHomeInput): Occurrence
 
     @POST("relationships/{id}/curfew/excuse")
     suspend fun excuseCurfew(@Path("id") relationshipId: String, @Body body: ExcuseCurfewInput): Occurrence

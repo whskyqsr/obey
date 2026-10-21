@@ -678,21 +678,24 @@ export async function applyReschedule(db: Tx, series: Series, occ: Occurrence, s
 async function rescheduleAuthority(db: Tx, rel: Relationship, actor: { userId: string; role: Role }, now: Date) {
   if (canManage(actor.role)) return { direct: true, usedAllowance: false };
   if (rel.reschedulePolicy === "dominant_only") throw forbidden("only a Dominant can reschedule tasks");
-  if (rel.reschedulePolicy === "allowance") {
-    const [{ n }] = (await db
-      .select({ n: sql<number>`count(distinct coalesce(${reschedules.groupId}, ${reschedules.id}))::int` })
-      .from(reschedules)
-      .where(
-        and(
-          eq(reschedules.requestedBy, actor.userId),
-          eq(reschedules.relationshipId, rel.id),
-          eq(reschedules.usedAllowance, true),
-          gte(reschedules.createdAt, new Date(now.getTime() - 7 * 86_400_000)),
-        ),
-      )) as [{ n: number }];
-    if (n < rel.weeklyDelayAllowance) return { direct: true, usedAllowance: true };
-  }
+  if (rel.reschedulePolicy === "allowance" && (await delaysLeft(db, rel, actor.userId, now)) > 0) return { direct: true, usedAllowance: true };
   return { direct: false, usedAllowance: false };
+}
+
+/** Delays left in someone's weekly allowance: a rolling seven days, where a whole-day or plan request counts once. */
+export async function delaysLeft(db: Tx, rel: Relationship, userId: string, now: Date) {
+  const [{ n }] = (await db
+    .select({ n: sql<number>`count(distinct coalesce(${reschedules.groupId}, ${reschedules.id}))::int` })
+    .from(reschedules)
+    .where(
+      and(
+        eq(reschedules.requestedBy, userId),
+        eq(reschedules.relationshipId, rel.id),
+        eq(reschedules.usedAllowance, true),
+        gte(reschedules.createdAt, new Date(now.getTime() - 7 * 86_400_000)),
+      ),
+    )) as [{ n: number }];
+  return Math.max(0, rel.weeklyDelayAllowance - n);
 }
 
 /**

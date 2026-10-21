@@ -1,13 +1,15 @@
 import { and, eq, isNotNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { approveCurfewRequestInput, curfewCheckInput, curfewInput, curfewRequestInput, excuseCurfewInput } from "@obey/contracts";
+import { approveCurfewRequestInput, curfewCheckInput, curfewInput, curfewRequestInput, excuseCurfewInput, tellHomeInput } from "@obey/contracts";
 import { dueInstant } from "@obey/recurrence";
 import type { Deps } from "../app.js";
 import { curfewRequests, occurrences, relationships, taskSeries } from "../db/schema.js";
 import { HttpError, forbidden, notFound } from "../errors.js";
 import { occurrenceDto } from "../serialize.js";
 import { canManage, managers, membership, requireManager, requireMember } from "../services/access.js";
-import { canTapHome, checkCurfew, checkHome, clockTime, curfewClashes, curfewNightNow, nightForPlan, pendingRequests, requestDto, saveCurfew } from "../services/curfew.js";
+import { canTapHome, checkCurfew, checkHome, clockTime, curfewClashes, curfewNightNow, nightForPlan, pendingRequests, reportsHome, requestDto, saveCurfew } from "../services/curfew.js";
+import { sendWithWords } from "../notify.js";
+import { addComment } from "./comments.js";
 import { arriveAt, curfewEnd } from "../services/location.js";
 import { editOccurrence } from "../services/scheduling.js";
 import { loadOccurrence } from "./tasks.js";
@@ -168,15 +170,42 @@ export const curfewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     return { settings: body, night: await curfewNightNow(db, req.params.id, deps.now()), clashes: await curfewClashes(db, req.params.id, deps.now()) };
   });
 
-  // "I'm home" from someone whose phone can't check: it counts like their phone noticing them get there.
+  // "I'm home" from someone whose phone can't check: it counts like their phone noticing them get there. When the curfew
+  // has them tell the Dominant, the tap tells them too, with the optional line.
   app.post<{ Params: { id: string } }>("/occurrences/:id/home", async (req) => {
+    const body = tellHomeInput.parse(req.body ?? {});
     const { occ, series } = await loadOccurrence(db, req.params.id, req.user.id);
     if (!series.curfewUntil) throw new HttpError(409, "this isn't a curfew");
     if (req.user.id !== series.assigneeId) throw forbidden("only the person on curfew can say they're home");
     if (!(await canTapHome(db, series.relationshipId, req.user.id, deps.now()))) throw new HttpError(409, "your phone checks this one; it'll notice when you're home");
-    const updated = await db.transaction((tx) => arriveAt(tx, series, occ, req.user.id, { kind: "tap" }, deps.now()));
+    const arrived = await db.transaction((tx) => arriveAt(tx, series, occ, req.user.id, { kind: "tap" }, deps.now()));
+    const updated = (await reportsHome(db, series.relationshipId)) ? await tellHome(arrived, series, req.user, body.note) : arrived;
     return occurrenceDto(updated, series);
   });
+
+  // "Tell Sam I'm home": once home (their phone noticed, or they tapped), the sub reports in, with an optional line.
+  app.post<{ Params: { id: string } }>("/occurrences/:id/tell-home", async (req) => {
+    const body = tellHomeInput.parse(req.body ?? {});
+    const { occ, series } = await loadOccurrence(db, req.params.id, req.user.id);
+    if (!series.curfewUntil) throw new HttpError(409, "this isn't a curfew");
+    if (req.user.id !== series.assigneeId) throw forbidden("only the person on curfew can say they're home");
+    if (!occ.arrivedAt || occ.leftAt) throw new HttpError(409, "you're not home yet");
+    if (occ.homeToldAt) throw new HttpError(409, "you've already said");
+    return occurrenceDto(await tellHome(occ, series, req.user, body.note), series);
+  });
+
+  async function tellHome(occ: typeof occurrences.$inferSelect, series: typeof taskSeries.$inferSelect, user: { id: string; displayName: string }, note?: string | null) {
+    const line = note?.trim() || null;
+    const updated = await db.transaction(async (tx) => {
+      const [u] = await tx.update(occurrences).set({ homeToldAt: deps.now(), homeNote: line }).where(eq(occurrences.id, occ.id)).returning();
+      // The line starts the night's comments, so the Dominant's reply sits under it.
+      if (line) await addComment(tx, occ.id, user.id, line);
+      return u!;
+    });
+    const push = { title: "Fealty", body: `${user.displayName} is home`, data: { type: "curfew_home", relationshipId: series.relationshipId, occurrenceId: occ.id } };
+    await sendWithWords(db, notifier, await managers(db, series.relationshipId, user.id), push, line ? { ...push, body: `${user.displayName} is home: “${line}”` } : null);
+    return { ...updated, commentCount: updated.commentCount + (line ? 1 : 0) };
+  }
 
   // A Dominant lets a night go: a broken one stops costing anything, and one still to come won't be checked.
   app.post<{ Params: { id: string } }>("/relationships/:id/curfew/excuse", async (req) => {

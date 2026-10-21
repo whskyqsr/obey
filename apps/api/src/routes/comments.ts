@@ -5,7 +5,7 @@ import type { Deps } from "../app.js";
 import type { Tx } from "../db/index.js";
 import { memberships, noteComments, notes, occurrenceComments, occurrences } from "../db/schema.js";
 import { forbidden, notFound } from "../errors.js";
-import { requireMember } from "../services/access.js";
+import { canManage, requireMember } from "../services/access.js";
 import { loadOccurrence } from "./tasks.js";
 
 const commentDto = (c: typeof occurrenceComments.$inferSelect) => ({
@@ -54,8 +54,13 @@ export const commentRoutes = (deps: Deps) => async (app: FastifyInstance) => {
 
   app.post<{ Params: { id: string } }>("/occurrences/:id/comments", async (req, reply) => {
     const body = commentInput.parse(req.body);
-    const { occ, series } = await loadOccurrence(db, req.params.id, req.user.id);
-    const c = await db.transaction((tx) => addComment(tx, occ.id, req.user.id, body.body));
+    const { occ, series, member } = await loadOccurrence(db, req.params.id, req.user.id);
+    const c = await db.transaction(async (tx) => {
+      // A Dominant replying to a check-in has seen its mood.
+      if (occ.mood !== null && !occ.moodSeenAt && canManage(member.role) && req.user.id !== series.assigneeId)
+        await tx.update(occurrences).set({ moodSeenAt: deps.now() }).where(eq(occurrences.id, occ.id));
+      return addComment(tx, occ.id, req.user.id, body.body);
+    });
     const others = (await db.select({ id: memberships.userId }).from(memberships).where(eq(memberships.relationshipId, series.relationshipId)))
       .map((m) => m.id)
       .filter((id) => id !== req.user.id);

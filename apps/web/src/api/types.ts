@@ -46,6 +46,7 @@ export type RescheduleInput = c.RescheduleInput;
 export type RescheduleDayInput = c.RescheduleDayInput;
 export type RescheduleRequest = c.RescheduleRequest;
 export type LedgerEntry = c.LedgerEntry;
+export type DelayUsed = c.DelayUsed;
 export type Balance = { userId: string; balance: number };
 export type Reward = z.infer<typeof c.reward>;
 export type RewardInput = z.infer<typeof c.rewardInput>;

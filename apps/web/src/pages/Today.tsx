@@ -10,6 +10,7 @@ import { isOverdue } from "../components/OccurrenceCard";
 import { MissActions, ReviewActions, RowGroup, RowLink, TaskRow } from "../components/TaskRow";
 import { CurfewStrip } from "../components/CurfewStrip";
 import { PlanChanges } from "../components/PlanChanges";
+import { DelayCards, MoodRow, RedemptionRow } from "../components/NeedsYou";
 import { KitPrompt } from "./Kits";
 import { Button, Dialog, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, Section, TextField, useSnackbar, cx } from "../components/ui";
 import { addDays, fmtDate, fmtDateTime, fmtRelative, fromLocalInput, localDateOf, toLocalInput, today } from "../lib/dates";
@@ -81,6 +82,7 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
           />
           <CurfewStrip />
           <PlanChanges />
+          {isDom && <DelayCards />}
           {!isDom && occ.data && todays.length > 0 && <Progress today={todays} done={doneToday} points={features.points} />}
           <PlanClashes />
           <KitPrompt />
@@ -90,13 +92,19 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
                 <Section title={`Needs you · ${needs.count}`}>
                   <div className="flex flex-col gap-2">
                     <PendingRequests bare />
-                    {(needs.review.length > 0 || needs.missed.length > 0) && (
+                    {(needs.review.length > 0 || needs.missed.length > 0 || needs.lowMoods.length > 0 || needs.redemptions.length > 0) && (
                       <RowGroup>
+                        {needs.lowMoods.map((o) => (
+                          <MoodRow key={`mood-${o.id}`} o={o} />
+                        ))}
                         {needs.review.map((o) => (
                           <TaskRow key={o.id} o={o} showDate={dueDay(o) !== t} actions={<ReviewActions o={o} />} />
                         ))}
                         {needs.missed.map((o) => (
                           <TaskRow key={o.id} o={o} showDate={dueDay(o) !== t} actions={<MissActions o={o} />} />
+                        ))}
+                        {needs.redemptions.map((e) => (
+                          <RedemptionRow key={e.id} e={e} />
                         ))}
                       </RowGroup>
                     )}

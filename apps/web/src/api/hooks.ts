@@ -32,6 +32,7 @@ import type {
   SafeCall,
   SafeCalls,
   Invite,
+  DelayUsed,
   LedgerEntry,
   LibraryKind,
   LibraryTypes,
@@ -61,6 +62,7 @@ export const keys = {
   places: (rel: string) => ["rel", rel, "places"] as const,
   curfew: (rel: string) => ["rel", rel, "curfew"] as const,
   planChanges: (rel: string) => ["rel", rel, "planChanges"] as const,
+  delays: (rel: string) => ["rel", rel, "delays"] as const,
 };
 
 /** Invalidate everything belonging to a relationship (occurrences, balances and so on interlock). */
@@ -124,6 +126,15 @@ export function useConfirmMiss(rel: string) {
   });
 }
 
+/** A Dominant has seen a low check-in without replying. */
+export function useMoodSeen(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (id: string) => api<Occurrence>(`/occurrences/${id}/mood-seen`, { method: "POST", body: {} }),
+    onSuccess: () => invalidate(),
+  });
+}
+
 /** A Dominant keeps a miss but drops the consequence it handed out. */
 export function useDropConsequence(rel: string) {
   const invalidate = useInvalidateRel(rel);
@@ -142,7 +153,14 @@ export function useMe(enabled = true) {
 export function useUpdateMe() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { displayName?: string; weekStart?: WeekStart; revealProofs?: boolean; quietHours?: QuietHours | null; mutedNotifications?: NotifyCategory[] }) =>
+    mutationFn: (body: {
+      displayName?: string;
+      weekStart?: WeekStart;
+      revealProofs?: boolean;
+      quietHours?: QuietHours | null;
+      mutedNotifications?: NotifyCategory[];
+      notifyDetails?: boolean;
+    }) =>
       api<User>("/me", { method: "PATCH", body }),
     // Names appear in member lists and request cards across every relationship.
     onSuccess: () => qc.invalidateQueries(),
@@ -489,8 +507,8 @@ export function useDecideReschedule(rel: string) {
 
 // ---- points
 
-export function useLedger(rel: string) {
-  return useQuery({ queryKey: keys.ledger(rel), queryFn: () => api<LedgerEntry[]>(`/relationships/${rel}/ledger`) });
+export function useLedger(rel: string, enabled = true) {
+  return useQuery({ queryKey: keys.ledger(rel), queryFn: () => api<LedgerEntry[]>(`/relationships/${rel}/ledger`), enabled });
 }
 
 export function useBalances(rel: string) {
@@ -508,7 +526,30 @@ export function useAdjustPoints(rel: string) {
 export function useRedeemReward(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({
-    mutationFn: (id: string) => api(`/rewards/${id}/redeem`, { method: "POST" }),
+    mutationFn: ({ id, consequenceOccurrenceId }: { id: string; consequenceOccurrenceId?: string }) =>
+      api<LedgerEntry>(`/rewards/${id}/redeem`, { method: "POST", body: { consequenceOccurrenceId } }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+/** A Dominant has honoured a redemption, with an optional note to the sub. */
+export function useMarkRedeemed(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ id, note }: { id: string; note?: string | null }) => api<LedgerEntry>(`/ledger/${id}/redeemed`, { method: "POST", body: { note } }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+/** Delays a sub took from the allowance that this Dominant hasn't closed yet. */
+export function useDelays(rel: string, enabled: boolean) {
+  return useQuery({ queryKey: keys.delays(rel), queryFn: () => api<DelayUsed[]>(`/relationships/${rel}/delays`), enabled });
+}
+
+export function useSeenDelay(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (id: string) => api(`/reschedules/${id}/seen`, { method: "POST", body: {} }),
     onSuccess: () => invalidate(),
   });
 }
@@ -735,7 +776,18 @@ export function useSaveCurfew(rel: string) {
 export function useHomeForCurfew(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({
-    mutationFn: (occurrenceId: string) => api<Occurrence>(`/occurrences/${occurrenceId}/home`, { method: "POST", body: {} }),
+    mutationFn: ({ occurrenceId, note }: { occurrenceId: string; note?: string | null }) =>
+      api<Occurrence>(`/occurrences/${occurrenceId}/home`, { method: "POST", body: { note } }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+/** "Tell Sam I'm home", once their phone noticed them get there. */
+export function useTellHome(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ occurrenceId, note }: { occurrenceId: string; note?: string | null }) =>
+      api<Occurrence>(`/occurrences/${occurrenceId}/tell-home`, { method: "POST", body: { note } }),
     onSuccess: () => invalidate(),
   });
 }

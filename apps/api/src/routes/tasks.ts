@@ -38,9 +38,14 @@ import {
   requestReschedule,
   reviewOccurrence,
   tickStep,
+  delaysLeft,
   undoCompletion,
   withdrawMissConsequence,
 } from "../services/scheduling.js";
+import { sendWithWords } from "../notify.js";
+
+/** A check-in at or below this asks a Dominant's attention. */
+export const LOW_MOOD = 2;
 
 const MAX_RANGE_DAYS = 62;
 
@@ -89,6 +94,15 @@ function checkCount(t: {
   if (t.countMin !== null && t.countMax !== null && t.countMin > t.countMax) throw new HttpError(400, "the minimum can't be more than the maximum");
   if (isCountTask(t) && (t.steps.length || t.approvalRequired || t.proofRequired || t.askMood || t.asksJournal))
     throw new HttpError(400, "a counted task can't also be a ritual, need approval or proof, or ask for a mood or a journal entry");
+}
+
+/** A reminder in the Dominant's words needs the words; any other kind keeps none. */
+function reminderFields<T extends { reminder?: "default" | "custom" | "none"; reminderText?: string | null }>(body: T, current?: { reminder: string; reminderText: string | null }): T {
+  const kind = body.reminder ?? current?.reminder ?? "default";
+  const text = body.reminderText !== undefined ? body.reminderText : (current?.reminderText ?? null);
+  if (kind === "custom" && !text?.trim()) throw new HttpError(400, "write the reminder, or pick another kind");
+  if (body.reminder === undefined && body.reminderText === undefined) return body;
+  return { ...body, reminderText: kind === "custom" ? text!.trim() : null };
 }
 
 /** A location task is done by getting there, so it can't also be counted, a ritual, or need proof, a mood or an entry. */
@@ -171,7 +185,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
 
   app.post<{ Params: { id: string } }>("/relationships/:id/tasks", async (req, reply) => {
     await requireManager(db, req.params.id, req.user.id);
-    const body = taskInput.parse(req.body);
+    const body = reminderFields(taskInput.parse(req.body));
     validZone(body.timezone);
     checkCount(body);
     await checkPlace(db, req.params.id, body);
@@ -210,7 +224,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     if (!series) throw notFound();
     await requireManager(db, series.relationshipId, req.user.id);
     if (series.curfewUntil) throw new HttpError(409, "change the curfew from Your dynamic");
-    const body = parsePatch(taskInput.partial(), req.body);
+    const body = reminderFields(parsePatch(taskInput.partial(), req.body), series);
     if (body.timezone) validZone(body.timezone);
     checkCount({ ...series, ...body });
     await checkPlace(db, series.relationshipId, { ...series, ...body });
@@ -460,9 +474,15 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     );
     if (req.user.id === series.assigneeId) {
       const submitted = updated.status === "submitted";
+      const low = updated.mood !== null && updated.mood <= LOW_MOOD;
       await notifier.send(await managers(db, series.relationshipId, req.user.id), {
         title: "Fealty",
-        body: submitted ? `${req.user.displayName} submitted a task for review` : `${req.user.displayName} completed a task`,
+        // A low check-in is someone reaching out, so it says so instead of reading like any other task.
+        body: low
+          ? `${req.user.displayName} checked in feeling ${updated.mood === 1 ? "awful" : "low"}`
+          : submitted
+            ? `${req.user.displayName} submitted a task for review`
+            : `${req.user.displayName} completed a task`,
         data: { type: submitted ? "occurrence_submitted" : "occurrence_completed", occurrenceId: occ.id },
       });
     }
@@ -495,6 +515,15 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     if (!canManage(member.role) || req.user.id === series.assigneeId) throw forbidden("only a Dominant can do this");
     if (occ.status !== "missed") throw new HttpError(409, `occurrence is ${occ.status}`);
     const [updated] = await db.update(occurrences).set({ missConfirmedAt: deps.now() }).where(eq(occurrences.id, occ.id)).returning();
+    return occurrenceDto(updated!, series);
+  });
+
+  // A Dominant has seen a low check-in; replying with a comment does this too.
+  app.post<{ Params: { id: string } }>("/occurrences/:id/mood-seen", async (req) => {
+    const { occ, series, member } = await loadOccurrence(db, req.params.id, req.user.id);
+    if (!canManage(member.role) || req.user.id === series.assigneeId) throw forbidden("only a Dominant can do this");
+    if (occ.mood === null) throw new HttpError(409, "this check-in has no mood");
+    const [updated] = await db.update(occurrences).set({ moodSeenAt: occ.moodSeenAt ?? deps.now() }).where(eq(occurrences.id, occ.id)).returning();
     return occurrenceDto(updated!, series);
   });
 
@@ -556,6 +585,8 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       });
     } else if (req.user.id !== series.assigneeId) {
       await notifier.send([series.assigneeId], { title: "Fealty", body: "A deadline changed", data: { type: "rescheduled", occurrenceId: result.occurrence.id } });
+    } else if (result.request.usedAllowance) {
+      await tellDelay(rel, req.user, result.request.reason);
     }
     return {
       applied: result.applied,
@@ -586,6 +617,8 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         body: `${req.user.displayName} asked for more time on ${items.length} tasks`,
         data: { type: "reschedule_requested", groupId: result.groupId },
       });
+    } else if (result.requests[0]?.usedAllowance) {
+      await tellDelay(rel!, req.user, body.reason ?? null);
     }
     return {
       applied: result.applied,
@@ -613,6 +646,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const result = await db.transaction((tx) => requestPlanReschedule(tx, rel!, items, { userId: req.user.id, role: m.role }, body.reason, deps.now(), deps.materializeDays));
     const titles = new Map(rows.map((r) => [r.occ.id, r.series.title]));
     const series = new Map(rows.map((r) => [r.series.id, r.series]));
+    if (result.requests.some((r) => r.usedAllowance)) await tellDelay(rel!, req.user, body.reason ?? null);
     if (result.asked) {
       await notifier.send(await managers(db, rel!.id, req.user.id), {
         title: "Fealty",
@@ -628,6 +662,64 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       requests: result.requests.map((r) => rescheduleDto(r, titles.get(r.occurrenceId)!)),
       occurrences: result.occurrences.map((o) => occurrenceDto(o, series.get(o.seriesId)!)),
     };
+  });
+
+  /** A sub's delay from the allowance applies without asking, but a Dominant still hears about it. */
+  async function tellDelay(rel: typeof relationships.$inferSelect, user: { id: string; displayName: string }, reason: string | null) {
+    const left = await delaysLeft(db, rel, user.id, deps.now());
+    const body = `${user.displayName} used a delay (${left} of ${rel.weeklyDelayAllowance} left this week)`;
+    const push = { title: "Fealty", body, data: { type: "delay_used", relationshipId: rel.id } };
+    await sendWithWords(db, notifier, await managers(db, rel.id, user.id), push, reason ? { ...push, body: `${body}: “${reason}”` } : null);
+  }
+
+  // Delays subs took from the allowance in the last week that this Dominant hasn't closed yet, newest first.
+  app.get<{ Params: { id: string } }>("/relationships/:id/delays", async (req) => {
+    const m = await requireMember(db, req.params.id, req.user.id);
+    if (!canManage(m.role)) return [];
+    const [rel] = await db.select().from(relationships).where(eq(relationships.id, req.params.id));
+    const rows = await db
+      .select({ r: reschedules, title: taskSeries.title })
+      .from(reschedules)
+      .innerJoin(occurrences, eq(reschedules.occurrenceId, occurrences.id))
+      .innerJoin(taskSeries, eq(occurrences.seriesId, taskSeries.id))
+      .where(
+        and(
+          eq(reschedules.relationshipId, req.params.id),
+          eq(reschedules.usedAllowance, true),
+          isNull(reschedules.seenAt),
+          sql`${reschedules.requestedBy} <> ${req.user.id}`,
+          gte(reschedules.createdAt, new Date(deps.now().getTime() - 7 * 86_400_000)),
+        ),
+      )
+      .orderBy(desc(reschedules.createdAt), asc(reschedules.toDueAt));
+    const groups = new Map<string, typeof rows>();
+    for (const row of rows) {
+      const key = row.r.groupId ?? row.r.id;
+      groups.set(key, [...(groups.get(key) ?? []), row]);
+    }
+    const left = new Map<string, number>();
+    for (const userId of new Set(rows.map((r) => r.r.requestedBy))) left.set(userId, await delaysLeft(db, rel!, userId, deps.now()));
+    return [...groups.values()].map((g) => ({
+      id: g[0]!.r.id,
+      requestedBy: g[0]!.r.requestedBy,
+      items: g.map(({ r, title }) => ({ occurrenceId: r.occurrenceId, title, fromDueAt: r.fromDueAt.toISOString(), toDueAt: r.toDueAt.toISOString() })),
+      reason: g[0]!.r.reason,
+      createdAt: g[0]!.r.createdAt.toISOString(),
+      left: left.get(g[0]!.r.requestedBy) ?? 0,
+      allowance: rel!.weeklyDelayAllowance,
+    }));
+  });
+
+  // A Dominant closes a delay card; the rest of its group goes with it.
+  app.post<{ Params: { id: string } }>("/reschedules/:id/seen", async (req) => {
+    const [r] = await db.select().from(reschedules).where(eq(reschedules.id, req.params.id));
+    if (!r) throw notFound();
+    await requireManager(db, r.relationshipId, req.user.id);
+    await db
+      .update(reschedules)
+      .set({ seenAt: deps.now() })
+      .where(and(r.groupId ? eq(reschedules.groupId, r.groupId) : eq(reschedules.id, r.id), isNull(reschedules.seenAt)));
+    return { ok: true };
   });
 
   app.get<{ Params: { id: string }; Querystring: { status?: string } }>("/relationships/:id/reschedules", async (req) => {

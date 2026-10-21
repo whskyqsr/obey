@@ -116,6 +116,11 @@ class SettingsViewModel @Inject constructor(
         sessions.refresh()
     }
 
+    fun setNotifyDetails(on: Boolean) = action {
+        api.setNotifyDetails(app.obey.api.NotifyDetailsInput(on))
+        sessions.refresh()
+    }
+
     fun selectRelationship(id: String) = action { sessions.select(id) }
 
     /** Ends the dynamic for everyone in it (it stays read-only); the people in [block] can't pair with you again. */

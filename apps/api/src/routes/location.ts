@@ -7,6 +7,7 @@ import { HttpError, notFound, parsePatch } from "../errors.js";
 import { occurrenceDto } from "../serialize.js";
 import { managers, requireManager, requireMember } from "../services/access.js";
 import { photonGeocoder } from "../services/geocode.js";
+import { reportsHome } from "../services/curfew.js";
 import { arriveAt, leaveFrom } from "../services/location.js";
 import { countUsage } from "../services/usage.js";
 import { loadOccurrence } from "./tasks.js";
@@ -96,6 +97,16 @@ export const locationRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const body = arriveOccurrence.parse(req.body);
     const { occ, series } = await loadOccurrence(db, req.params.id, req.user.id);
     const updated = await db.transaction((tx) => arriveAt(tx, series, occ, req.user.id, body, deps.now()));
+    // A curfew where the sub tells the Dominant: getting home is their cue.
+    if (series.curfewUntil && !occ.arrivedAt && updated.arrivedAt && !updated.homeToldAt && (await reportsHome(db, series.relationshipId))) {
+      const doms = await managers(db, series.relationshipId, req.user.id);
+      const [dom] = doms.length === 1 ? await db.select({ name: users.displayName }).from(users).where(eq(users.id, doms[0]!)) : [];
+      await notifier.send([req.user.id], {
+        title: "Fealty",
+        body: `You're home. Tell ${dom?.name ?? "your Dominant"}?`,
+        data: { type: "curfew_arrived", relationshipId: series.relationshipId, occurrenceId: occ.id },
+      });
+    }
     if (updated.status === "completed" || updated.status === "submitted") {
       const submitted = updated.status === "submitted";
       await notifier.send(await managers(db, series.relationshipId, req.user.id), {

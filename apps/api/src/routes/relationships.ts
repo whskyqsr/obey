@@ -27,6 +27,7 @@ export const userDto = (u: {
   quietEnd: string | null;
   timezone: string | null;
   mutedNotifications: string[];
+  notifyDetails: boolean;
 }) => ({
   id: u.id,
   displayName: u.displayName,
@@ -37,6 +38,7 @@ export const userDto = (u: {
   revealProofs: u.revealProofs,
   quietHours: u.quietStart && u.quietEnd && u.timezone ? { start: u.quietStart, end: u.quietEnd, timezone: u.timezone } : null,
   mutedNotifications: u.mutedNotifications,
+  notifyDetails: u.notifyDetails,
 });
 
 const AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -53,6 +55,7 @@ export async function relationshipDto(db: Tx, ids: string[]) {
       role: memberships.role,
       avatarUpdatedAt: users.avatarUpdatedAt,
       locationStatus: users.locationStatus,
+      notifyDetails: users.notifyDetails,
       locationPausedAt: memberships.locationPausedAt,
       locationPausedUntil: memberships.locationPausedUntil,
     })
@@ -72,7 +75,7 @@ export async function relationshipDto(db: Tx, ids: string[]) {
     endedBy: r.endedBy,
     members: members
       .filter((m) => m.relationshipId === r.id)
-      .map(({ userId, displayName, role, avatarUpdatedAt, locationStatus, locationPausedAt, locationPausedUntil }) => {
+      .map(({ userId, displayName, role, avatarUpdatedAt, locationStatus, notifyDetails, locationPausedAt, locationPausedUntil }) => {
         const paused = locationPausedAt !== null && (locationPausedUntil === null || locationPausedUntil > now);
         return {
           userId,
@@ -82,6 +85,7 @@ export async function relationshipDto(db: Tx, ids: string[]) {
           locationStatus,
           locationPaused: paused,
           locationPausedUntil: paused ? (locationPausedUntil?.toISOString() ?? null) : null,
+          notifyDetails,
         };
       }),
   }));

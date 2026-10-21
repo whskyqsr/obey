@@ -3,7 +3,7 @@ import { managers } from "./services/access.js";
 import { claimCurfewNudges, clockTime } from "./services/curfew.js";
 import { finishStays } from "./services/location.js";
 import { claimReminders, markMissed, materializeAll } from "./services/scheduling.js";
-import type { Notifier } from "./notify.js";
+import { type Notifier, sendWithWords } from "./notify.js";
 import { promptMonthReviews } from "./routes/months.js";
 
 /** One pass of the background work. Every step is idempotent, so overlapping or repeated runs are safe. */
@@ -52,7 +52,12 @@ export async function runJobs(db: Db, notifier: Notifier, now: Date, opts: { mat
 
   const reminders = await claimReminders(db, now, opts.reminderLeadMinutes);
   for (const { occ, series } of reminders) {
-    await notifier.send([series.assigneeId], { title: "Fealty", body: "A task is due soon", data: { type: "reminder", occurrenceId: occ.id } });
+    // "No reminder": the Dominant would rather nudge them themselves.
+    if (series.reminder === "none") continue;
+    const push = { title: "Fealty", body: "A task is due soon", data: { type: "reminder", occurrenceId: occ.id } };
+    // In the Dominant's words, but only for someone who lets partners' words onto their lock screen.
+    const own = series.reminder === "custom" && series.reminderText ? { ...push, body: series.reminderText } : null;
+    await sendWithWords(db, notifier, [series.assigneeId], push, own);
   }
   const nudges = await db.transaction((tx) => claimCurfewNudges(tx, now));
   for (const { occ, series } of nudges) {
