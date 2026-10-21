@@ -223,6 +223,12 @@ describe("tasks and occurrences", () => {
     expect(c.body).toMatchObject({ authorId: subId, body: "Running a little late" });
     expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [domId], push: { body: "Sub commented on a task" } });
     expect((await sub.post(`/occurrences/${first.id}/comments`, { body: "   " })).status).toBe(400);
+    // Someone who lets notifications carry their partner's words gets the comment itself.
+    await dom.patch("/me", { notifyDetails: true });
+    const words = await sub.post(`/occurrences/${first.id}/comments`, { body: "Nearly there" });
+    expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [domId], push: { body: `Sub on ${first.title}: “Nearly there”` } });
+    await sub.del(`/comments/${words.body.id}`);
+    await dom.patch("/me", { notifyDetails: false });
 
     await sub.post(`/occurrences/${first.id}/complete`);
     const back = await dom.post(`/occurrences/${first.id}/review`, { approve: false, comment: "Lines were sloppy, again please" });
@@ -729,6 +735,10 @@ describe("tasks and occurrences", () => {
       await dom.post(`/occurrences/${fri.id}/comments`, { body: "Text me when you leave" });
       expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [subId], push: { body: "Dom left you a note about curfew" } });
       expect((await sub.get(`/relationships/${relId}/curfew`)).body.night).toMatchObject({ occurrenceId: fri.id, note: "Text me when you leave" });
+      await sub.patch("/me", { notifyDetails: true });
+      await dom.post(`/occurrences/${fri.id}/comments`, { body: "Text me when you leave" });
+      expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [subId], push: { body: "Dom on curfew: “Text me when you leave”" } });
+      await sub.patch("/me", { notifyDetails: false });
       await sub.post(`/occurrences/${fri.id}/comments`, { body: "Will do" });
       expect((await sub.get(`/relationships/${relId}/curfew`)).body.night.note).toBe("Text me when you leave");
 

@@ -7,6 +7,7 @@ import { memberships, noteComments, notes, occurrenceComments, occurrences } fro
 import { forbidden, notFound } from "../errors.js";
 import { canManage, requireMember } from "../services/access.js";
 import { loadOccurrence } from "./tasks.js";
+import { sendWithWords } from "../notify.js";
 
 const commentDto = (c: typeof occurrenceComments.$inferSelect) => ({
   id: c.id,
@@ -64,12 +65,13 @@ export const commentRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const others = (await db.select({ id: memberships.userId }).from(memberships).where(eq(memberships.relationshipId, series.relationshipId)))
       .map((m) => m.id)
       .filter((id) => id !== req.user.id);
-    // Discreet like every push: who, not what.
-    await deps.notifier.send(others, {
+    // Discreet unless someone lets notifications carry their partner's words: who, not what.
+    const push = {
       title: "Fealty",
       body: series.curfewUntil ? `${req.user.displayName} left you a note about curfew` : `${req.user.displayName} commented on a task`,
       data: { type: "occurrence_comment", occurrenceId: occ.id },
-    });
+    };
+    await sendWithWords(db, deps.notifier, others, push, { ...push, body: `${req.user.displayName} on ${series.curfewUntil ? "curfew" : series.title}: “${c.body}”` });
     return reply.status(201).send(c);
   });
 
@@ -112,11 +114,12 @@ export const commentRoutes = (deps: Deps) => async (app: FastifyInstance) => {
             .map((m) => m.id)
             .filter((id) => id !== req.user.id)
         : [];
-    await deps.notifier.send(others, {
+    const push = {
       title: "Fealty",
       body: `${req.user.displayName} commented on ${note.kind === "journal" ? "a journal entry" : "a note"}`,
       data: { type: "note_comment", noteId: note.id },
-    });
+    };
+    await sendWithWords(db, deps.notifier, others, push, { ...push, body: `${req.user.displayName}: “${c.body}”` });
     return reply.status(201).send(c);
   });
 
