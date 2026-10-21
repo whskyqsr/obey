@@ -13,6 +13,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { useMenu } from "../lib/menu";
 import { useReadOnly } from "../lib/relationship";
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
@@ -509,12 +510,28 @@ export const useSnackbar = () => useContext(SnackContext);
 
 // ---------- Page scaffolding
 
+/** On phones the menu button leads the title line, and the subtitle lines up under the title. */
 export function PageHeader({ title, subtitle, actions }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode }) {
+  const menu = useMenu();
   return (
     <header className="flex items-end gap-2 px-4 pt-6 pb-4 md:px-6">
       <div className="min-w-0 flex-1">
-        <h1 className="text-headline-medium text-on-surface md:text-headline-large">{title}</h1>
-        {subtitle && <p className="mt-1 text-body-medium text-on-surface-variant">{subtitle}</p>}
+        <div className="flex items-center gap-1">
+          {menu && (
+            <button
+              ref={menu.track}
+              type="button"
+              aria-label="Menu"
+              title="Menu"
+              onClick={menu.open}
+              className="state-layer -my-1 -ml-3 flex size-12 shrink-0 items-center justify-center rounded-full text-on-surface md:hidden"
+            >
+              <Icon name="menu" />
+            </button>
+          )}
+          <h1 className="min-w-0 text-headline-medium text-on-surface md:text-headline-large">{title}</h1>
+        </div>
+        {subtitle && <p className={cx("mt-1 text-body-medium text-on-surface-variant", menu && "pl-10 md:pl-0")}>{subtitle}</p>}
       </div>
       {actions && <div className="flex items-center gap-1">{actions}</div>}
     </header>
