@@ -245,6 +245,8 @@ export async function editOccurrence(
       status,
       completedAt,
       ...(change.noteMd !== undefined ? { noteMd: change.noteMd } : {}),
+      // A Dominant setting it to missed has decided it: it stays missed and stops asking for a decision.
+      missConfirmedAt: status === "missed" ? (change.status === "missed" ? now : occ.missConfirmedAt) : null,
       editedBy: editorId,
       editedAt: now,
     })
@@ -365,7 +367,7 @@ export async function markMissed(db: Tx, now: Date) {
   for (const { occ, series } of overdue) {
     const [updated] = await db
       .update(occurrences)
-      .set({ status: "missed" })
+      .set({ status: "missed", missConfirmedAt: null })
       .where(and(eq(occurrences.id, occ.id), eq(occurrences.status, "pending")))
       .returning();
     if (!updated) continue;

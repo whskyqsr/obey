@@ -5,9 +5,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material.icons.automirrored.outlined.Notes
 import androidx.compose.material.icons.outlined.AddComment
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Edit
@@ -54,6 +57,8 @@ data class OccurrenceActions(
     val onReject: (() -> Unit)? = null,
     /** A Dominant excusing a miss: no penalty, and the streak holds. */
     val onExcuse: (() -> Unit)? = null,
+    /** A Dominant leaving a miss as missed: the penalty stays and it stops needing them. */
+    val onConfirmMiss: (() -> Unit)? = null,
     /** Opens the comments on this due date. */
     val onComments: (() -> Unit)? = null,
 )
@@ -134,8 +139,11 @@ fun OccurrenceRow(
             }
         },
         trailingContent = {
-            if (actions.onExcuse != null) {
-                androidx.compose.material3.TextButton(onClick = actions.onExcuse) { Text("Excuse") }
+            if (actions.onExcuse != null || actions.onConfirmMiss != null) {
+                Row {
+                    actions.onExcuse?.let { IconButton(onClick = it) { Icon(Icons.Outlined.RemoveCircleOutline, "Excuse: no penalty") } }
+                    actions.onConfirmMiss?.let { FilledTonalIconButton(onClick = it) { Icon(Icons.Outlined.Check, "Accept: it stays missed") } }
+                }
             } else if (actions.onApprove != null || actions.onReject != null) {
                 Row {
                     actions.onComments?.let { IconButton(onClick = it) { Icon(Icons.Outlined.AddComment, "Comment") } }

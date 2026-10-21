@@ -347,6 +347,8 @@ data class Occurrence(
     val asksJournal: Boolean = false,
     val journalPrompt: String? = null,
     val journalNoteId: String? = null,
+    /** A Dominant saw this miss and left it missed, so it no longer needs them. */
+    val missConfirmed: Boolean = false,
 ) {
     /**
      * Tomorrow's daily task waits for its day, and a task with a window waits for it to open; the API refuses

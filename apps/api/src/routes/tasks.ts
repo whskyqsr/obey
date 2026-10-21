@@ -396,6 +396,15 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     return occurrenceDto(updated, series);
   });
 
+  // A Dominant leaves a miss as missed: it keeps its status and penalty and stops asking for a decision.
+  app.post<{ Params: { id: string } }>("/occurrences/:id/confirm-miss", async (req) => {
+    const { occ, series, member } = await loadOccurrence(db, req.params.id, req.user.id);
+    if (!canManage(member.role) || req.user.id === series.assigneeId) throw forbidden("only a Dominant can do this");
+    if (occ.status !== "missed") throw new HttpError(409, `occurrence is ${occ.status}`);
+    const [updated] = await db.update(occurrences).set({ missConfirmedAt: deps.now() }).where(eq(occurrences.id, occ.id)).returning();
+    return occurrenceDto(updated!, series);
+  });
+
   app.post<{ Params: { id: string } }>("/occurrences/:id/review", async (req) => {
     const body = reviewBody.parse(req.body);
     const { occ, series, member } = await loadOccurrence(db, req.params.id, req.user.id);

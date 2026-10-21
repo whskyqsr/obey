@@ -182,7 +182,7 @@ fun TodayScreen(
                             }
                         }
                         items(d.recentMisses, key = { "m-" + it.id }) { o ->
-                            OccurrenceRow(o, nameFor(o), OccurrenceActions(onExcuse = { vm.excuse(o) }, onComments = { commenting = o }), onOpen = { onOpenTask(o.seriesId) }, streak = d.streaks[o.seriesId])
+                            OccurrenceRow(o, nameFor(o), OccurrenceActions(onExcuse = { vm.excuse(o) }, onConfirmMiss = { vm.confirmMiss(o) }, onComments = { commenting = o }), onOpen = { onOpenTask(o.seriesId) }, streak = d.streaks[o.seriesId])
                         }
                     }
                     if (d.overdue.isNotEmpty()) {

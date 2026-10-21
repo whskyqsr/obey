@@ -609,7 +609,7 @@ describe("rescheduling", () => {
 
 describe("background jobs", () => {
   it("marks missed occurrences, applies penalties, and reopening by reschedule reverses them", async () => {
-    const { dom, relId, subId } = await ctx.pair();
+    const { dom, sub, relId, subId } = await ctx.pair();
     await dom.post(`/relationships/${relId}/tasks`, task(subId, { missPenalty: 5, graceMinutes: 60 }));
     const [first] = (await dom.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body;
 
@@ -622,8 +622,17 @@ describe("background jobs", () => {
     expect((await dom.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body[0].status).toBe("missed");
     expect((await dom.get(`/relationships/${relId}/balances`)).body[0].balance).toBe(-5);
 
+    // A Dominant can leave it missed: the penalty stays and it stops needing them. Only a missed one can be.
+    expect((await sub.post(`/occurrences/${first.id}/confirm-miss`)).status).toBe(403);
+    expect((await dom.post(`/occurrences/${first.id}/confirm-miss`)).body).toMatchObject({ status: "missed", missConfirmed: true });
+    expect((await dom.get(`/relationships/${relId}/balances`)).body[0].balance).toBe(-5);
+    // Excusing it and setting it back to missed from the history leaves it decided too.
+    expect((await dom.patch(`/occurrences/${first.id}`, { status: "excused" })).body.missConfirmed).toBe(false);
+    expect((await dom.patch(`/occurrences/${first.id}`, { status: "missed" })).body).toMatchObject({ status: "missed", missConfirmed: true });
+
     const res = await dom.post(`/occurrences/${first.id}/reschedule`, { delayHours: 24 });
     expect(res.body.occurrence.status).toBe("pending");
+    expect((await dom.post(`/occurrences/${first.id}/confirm-miss`)).status).toBe(409);
     expect((await dom.get(`/relationships/${relId}/balances`)).body[0].balance).toBe(0);
     ctx.clock.now = new Date("2026-10-16T12:00:00Z");
   });

@@ -1,0 +1,1 @@
+ALTER TABLE "occurrences" ADD COLUMN "miss_confirmed_at" timestamp with time zone;

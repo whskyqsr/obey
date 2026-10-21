@@ -60,6 +60,7 @@ export const occurrenceDto = (o: typeof occurrences.$inferSelect, s: Series) => 
   asksJournal: s.asksJournal,
   journalPrompt: s.asksJournal ? s.bodyMd : null,
   journalNoteId: o.journalNoteId,
+  missConfirmed: o.missConfirmedAt !== null,
 });
 
 /** `title` is the task's, so a request card can say which task it's about. */

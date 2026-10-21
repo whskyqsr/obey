@@ -13,7 +13,7 @@ export function useTodayOccurrences() {
   return useOccurrences(rel.id, addDays(t, -30), addDays(t, 7));
 }
 
-/** What a Dominant has to decide: extension requests, completions to approve and fresh misses (today and yesterday). */
+/** What a Dominant has to decide: extension requests, completions to approve and fresh misses (today and yesterday) not yet excused or left as missed. */
 export function useNeedsYou() {
   const { rel, isDom } = useRel();
   const occ = useTodayOccurrences();
@@ -21,7 +21,7 @@ export function useNeedsYou() {
   const t = today();
   const list = occ.data ?? [];
   const review = list.filter((o) => o.status === "submitted").sort(byDue);
-  const missed = list.filter((o) => o.status === "missed" && dueDay(o) >= addDays(t, -1)).sort(byDue);
+  const missed = list.filter((o) => o.status === "missed" && !o.missConfirmed && dueDay(o) >= addDays(t, -1)).sort(byDue);
   const requests = new Set((pending.data ?? []).map((r) => r.groupId ?? r.id)).size;
   return { review, missed, count: isDom ? requests + review.length + missed.length : 0 };
 }
