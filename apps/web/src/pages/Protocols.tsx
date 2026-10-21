@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { importPage } from "../lib/staleBuild";
 import { Suspense, lazy, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useLibrary, useReorder } from "../api/hooks";
@@ -10,7 +11,7 @@ import { excerpt } from "./Notes";
 import { sortRules } from "./Rules";
 
 // TipTap is heavy; load it the first time a protocol is expanded.
-const MarkdownEditor = lazy(() => import("../components/MarkdownEditor").then((m) => ({ default: m.MarkdownEditor })));
+const MarkdownEditor = lazy(importPage(() => import("../components/MarkdownEditor").then((m) => ({ default: m.MarkdownEditor }))));
 
 export function ProtocolsPage() {
   const { rel, isDom, features } = useRel();

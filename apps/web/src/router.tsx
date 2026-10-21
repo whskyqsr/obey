@@ -1,4 +1,5 @@
 import { Suspense, lazy } from "react";
+import { importPage } from "./lib/staleBuild";
 import { createRootRoute, createRoute, createRouter, useNavigate } from "@tanstack/react-router";
 import { AppShell } from "./components/AppShell";
 import type { Features } from "./api/types";
@@ -24,11 +25,11 @@ import { TodayPage } from "./pages/Today";
 import { Welcome } from "./pages/Welcome";
 
 // The notes editor pulls in TipTap/ProseMirror; load it on demand.
-const NoteEditorPage = lazy(() => import("./pages/NoteEditor").then((m) => ({ default: m.NoteEditorPage })));
+const NoteEditorPage = lazy(importPage(() => import("./pages/NoteEditor").then((m) => ({ default: m.NoteEditorPage }))));
 // The task page renders Markdown details with the same editor.
-const TaskPage = lazy(() => import("./pages/TaskPage").then((m) => ({ default: m.TaskPage })));
-const TaskHistoryPage = lazy(() => import("./pages/TaskPage").then((m) => ({ default: m.TaskHistoryPage })));
-const ProtocolPage = lazy(() => import("./pages/ProtocolPage").then((m) => ({ default: m.ProtocolPage })));
+const TaskPage = lazy(importPage(() => import("./pages/TaskPage").then((m) => ({ default: m.TaskPage }))));
+const TaskHistoryPage = lazy(importPage(() => import("./pages/TaskPage").then((m) => ({ default: m.TaskHistoryPage }))));
+const ProtocolPage = lazy(importPage(() => import("./pages/ProtocolPage").then((m) => ({ default: m.ProtocolPage }))));
 
 /** The app, or the first-run setup for a dynamic someone just started or joined. */
 function Root() {
