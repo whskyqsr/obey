@@ -136,8 +136,8 @@ class UpcomingViewModel @Inject constructor(
         }
     }
 
-    fun complete(o: Occurrence, note: String? = null, mood: Int? = null) = action {
-        api.complete(o.id, CompleteOccurrenceInput(noteMd = note?.takeIf { it.isNotBlank() }, mood = mood))
+    fun complete(o: Occurrence, note: String? = null, mood: Int? = null, entry: String? = null) = action {
+        api.complete(o.id, CompleteOccurrenceInput(noteMd = note?.takeIf { it.isNotBlank() }, mood = mood, journal = entry?.let { app.obey.api.JournalEntryInput(o.title, it) }))
         say("Marked “${o.title}” done")
         refresh()
     }

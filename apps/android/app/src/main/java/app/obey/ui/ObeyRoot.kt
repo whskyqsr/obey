@@ -333,6 +333,7 @@ private fun ObeyNavHost(nav: NavHostController) {
                 onBack = { nav.popBackStack() },
                 onEdit = { nav.navigate(TaskEditorRoute(taskId = it)) },
                 onHistory = { nav.navigate(TaskHistoryRoute(it)) },
+                onOpenJournal = { nav.navigate(NoteEditorRoute(noteId = it, journal = true)) },
             )
         }
         composable<TaskHistoryRoute> { TaskHistoryScreen(onBack = { nav.popBackStack() }) }

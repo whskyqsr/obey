@@ -263,6 +263,8 @@ data class TaskInput(
     val windowMinutes: Int? = null,
     /** A check-in: marking it done asks the assignee how they feel. */
     val askMood: Boolean = false,
+    /** A journal task: marking it done means writing a journal entry; bodyMd is the prompt. */
+    val asksJournal: Boolean = false,
 )
 
 @Serializable
@@ -287,6 +289,7 @@ data class Task(
     val steps: List<TaskStep> = emptyList(),
     val windowMinutes: Int? = null,
     val askMood: Boolean = false,
+    val asksJournal: Boolean = false,
     val summary: String,
     /** Set when this one-off task is a consequence handed out on its own. */
     val assignedConsequenceId: String? = null,
@@ -299,7 +302,7 @@ data class Task(
         rewardId = rewardId, consequenceId = consequenceId, consequenceDueDays = consequenceDueDays,
         consequenceDueTime = consequenceDueTime, proofRequired = proofRequired,
         approvalRequired = approvalRequired, schedule = schedule, dueTime = dueTime, timezone = timezone,
-        graceMinutes = graceMinutes, steps = steps, windowMinutes = windowMinutes, askMood = askMood,
+        graceMinutes = graceMinutes, steps = steps, windowMinutes = windowMinutes, askMood = askMood, asksJournal = asksJournal,
     )
 }
 
@@ -340,6 +343,10 @@ data class Occurrence(
     /** A check-in asks for a mood when it's marked done; mood is the answer, 1 (awful) to 5 (great). */
     val askMood: Boolean = false,
     val mood: Int? = null,
+    /** A journal task: its prompt, and the entry written for it once done. */
+    val asksJournal: Boolean = false,
+    val journalPrompt: String? = null,
+    val journalNoteId: String? = null,
 ) {
     /**
      * Tomorrow's daily task waits for its day, and a task with a window waits for it to open; the API refuses
@@ -410,7 +417,12 @@ data class EditOccurrenceInput(
 data class CompleteOccurrenceInput(
     @EncodeDefault(EncodeDefault.Mode.NEVER) val noteMd: String? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER) val mood: Int? = null,
+    /** A journal task's entry, saved to the journal and shared. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val journal: JournalEntryInput? = null,
 )
+
+@Serializable
+data class JournalEntryInput(val title: String = "", val bodyMd: String)
 
 /** One point on the mood graph: a check-in answer, or a journal entry with a mood. */
 @Serializable
