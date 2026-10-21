@@ -237,6 +237,8 @@ export const occurrences = pgTable(
       .notNull()
       .default("pending"),
     completedAt: ts("completed_at"),
+    /** When a completion made offline reached the server; null when it was marked done live. */
+    syncedAt: ts("synced_at"),
     reminderSentAt: ts("reminder_sent_at"),
     noteMd: text("note_md"),
     /** Kept in step with proof_photos, so lists can show a count without a join. */

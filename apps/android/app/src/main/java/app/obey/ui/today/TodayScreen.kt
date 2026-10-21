@@ -77,6 +77,7 @@ fun TodayScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+    val offlineSince by vm.offlineSince.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     MessageEffect(message, snackbar, vm::messageShown)
@@ -155,6 +156,7 @@ fun TodayScreen(
                 }
 
                 LazyColumn(Modifier.fillMaxSize()) {
+                    offlineSince?.let { at -> item(key = "offline") { OfflineBanner(at) } }
                     if (session?.readOnly == true) item(key = "ended") { EndedBanner(onOpenSettings) }
                     items(d.clashingPlans, key = { "plan-${it.id}" }) { e -> PlanHeadsUp(e, planTone(e, session?.relationship)) { plan = e } }
                     if (isDom && d.noTasks && session?.readOnly != true) item(key = "kits") { KitPrompt(onKits) }
@@ -234,7 +236,7 @@ fun TodayScreen(
         vm.completedShown()
         val sent = o.status == OccurrenceStatus.Submitted
         val result = snackbar.showSnackbar(
-            "${if (sent) "Sent for approval" else "Done"}: ${o.title}",
+            if (o.waitingToSync) "Done offline: ${o.title}. It'll sync when you're back online." else "${if (sent) "Sent for approval" else "Done"}: ${o.title}",
             actionLabel = "Undo",
             duration = SnackbarDuration.Long,
         )

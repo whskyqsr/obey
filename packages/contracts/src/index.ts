@@ -220,6 +220,8 @@ export const occurrence = z.object({
   rescheduled: z.boolean(),
   status: occurrenceStatus,
   completedAt: z.string().nullable(),
+  /** Set when it was marked done offline and reached the server later; completedAt is still when it was done. */
+  syncedAt: z.string().nullable().default(null),
   noteMd: z.string().nullable(),
   /** The first day the assignee may complete it (the day after the previous occurrence); null when any time is fine. */
   opensOn: plainDate.nullable().default(null),
@@ -297,6 +299,8 @@ export const completeOccurrence = z.object({
   mood: mood.optional(),
   /** A journal task's entry; it's saved to the journal, shared with the dynamic. */
   journal: z.object({ title: z.string().max(200).default(""), bodyMd: z.string().trim().min(1).max(100_000) }).optional(),
+  /** When it was done, for a completion queued offline; the server takes it if it's within the last day. */
+  doneAt: z.string().datetime().optional(),
 });
 
 /** Done, missed and excused counts; `rate` is done / (done + missed), null when nothing was due. */

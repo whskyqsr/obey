@@ -46,6 +46,7 @@ export const occurrenceDto = (o: typeof occurrences.$inferSelect, s: Series) => 
   rescheduled: o.dueAt.getTime() !== o.originalDueAt.getTime() || s.supersededBy !== null,
   status: o.status,
   completedAt: isoOrNull(o.completedAt),
+  syncedAt: isoOrNull(o.syncedAt),
   noteMd: o.noteMd,
   opensOn: opensOn(s.schedule, o.originalDate),
   photoCount: o.photoCount,

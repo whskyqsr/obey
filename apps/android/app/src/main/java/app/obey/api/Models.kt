@@ -329,6 +329,8 @@ data class Occurrence(
     val rescheduled: Boolean,
     val status: OccurrenceStatus,
     val completedAt: String? = null,
+    /** Set when it was marked done offline and reached the server later. */
+    val syncedAt: String? = null,
     val noteMd: String? = null,
     /** "YYYY-MM-DD": the first day the assignee may complete it; null when any time is fine. */
     val opensOn: String? = null,
@@ -350,6 +352,8 @@ data class Occurrence(
     val journalNoteId: String? = null,
     /** A Dominant saw this miss and left it missed, so it no longer needs them. */
     val missConfirmed: Boolean = false,
+    /** Done on this phone with no signal and not sent yet; never from the server. */
+    @kotlinx.serialization.Transient val waitingToSync: Boolean = false,
 ) {
     /**
      * Tomorrow's daily task waits for its day, and a task with a window waits for it to open; the API refuses
@@ -403,6 +407,7 @@ data class HistoryEntry(
     val dueAt: String,
     val status: OccurrenceStatus,
     val completedAt: String? = null,
+    val syncedAt: String? = null,
     val noteMd: String? = null,
     val pointsDelta: Int = 0,
     val editedBy: String? = null,
@@ -422,6 +427,8 @@ data class CompleteOccurrenceInput(
     @EncodeDefault(EncodeDefault.Mode.NEVER) val mood: Int? = null,
     /** A journal task's entry, saved to the journal and shared. */
     @EncodeDefault(EncodeDefault.Mode.NEVER) val journal: JournalEntryInput? = null,
+    /** When it was done, for a completion made offline. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val doneAt: String? = null,
 )
 
 @Serializable

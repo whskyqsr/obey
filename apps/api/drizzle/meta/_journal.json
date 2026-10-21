@@ -232,6 +232,13 @@
       "when": 1792597690698,
       "tag": "0032_safe_calls",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792600182247,
+      "tag": "0033_offline_sync",
+      "breakpoints": true
     }
   ]
 }

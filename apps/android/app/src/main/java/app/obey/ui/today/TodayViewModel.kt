@@ -1,5 +1,8 @@
 package app.obey.ui.today
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
 import androidx.lifecycle.viewModelScope
 import app.obey.api.CalendarEvent
 import app.obey.api.CompleteOccurrenceInput
@@ -13,25 +16,32 @@ import app.obey.api.RescheduleInput
 import app.obey.api.RescheduleRequest
 import app.obey.api.ReviewOccurrenceInput
 import app.obey.api.TaskStreak
+import app.obey.api.userMessage
+import app.obey.data.OfflineStore
+import app.obey.data.PendingCompletion
 import app.obey.data.Session
 import app.obey.data.SessionRepository
+import app.obey.data.TodaySnapshot
 import app.obey.ui.common.BaseViewModel
 import app.obey.ui.common.Load
 import app.obey.ui.common.formatDue
-import app.obey.ui.common.loadCatching
 import app.obey.ui.common.local
 import app.obey.ui.common.parseInstant
 import app.obey.ui.plans.covers
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.IOException
 import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
 
 data class TodayData(
     /** Before today and still open (not yet marked missed). */
@@ -57,6 +67,8 @@ data class TodayData(
 class TodayViewModel @Inject constructor(
     private val api: ObeyApi,
     private val sessions: SessionRepository,
+    private val offline: OfflineStore,
+    @ApplicationContext context: Context,
 ) : BaseViewModel() {
     private val _state = MutableStateFlow<Load<TodayData>>(Load.Loading)
     val state: StateFlow<Load<TodayData>> = _state.asStateFlow()
@@ -64,18 +76,85 @@ class TodayViewModel @Inject constructor(
     private val _refreshing = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
 
+    /** When the Today on screen was saved, while the phone can't reach the server; null when it's live. */
+    private val _offlineSince = MutableStateFlow<Instant?>(null)
+    val offlineSince: StateFlow<Instant?> = _offlineSince.asStateFlow()
+
     val session: Session? get() = sessions.session
+
+    // Back online: send what was done offline and reload, without waiting for the person to pull.
+    private val connectivity = context.getSystemService(ConnectivityManager::class.java)
+    private val onNetwork = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            if (_offlineSince.value != null) refresh()
+        }
+    }
+
+    init {
+        runCatching { connectivity?.registerDefaultNetworkCallback(onNetwork) }
+    }
+
+    override fun onCleared() {
+        runCatching { connectivity?.unregisterNetworkCallback(onNetwork) }
+    }
 
     fun refresh() {
         viewModelScope.launch {
-            if (_state.value !is Load.Ready) _state.value = Load.Loading else _refreshing.value = true
-            _state.value = loadCatching { fetch() }
+            val relId = sessions.session?.relationship?.id
+            if (relId == null) {
+                _state.value = Load.Failed("No dynamic selected")
+                return@launch
+            }
+            if (_state.value !is Load.Ready) {
+                // Open straight away with what was saved last time; the live copy replaces it below.
+                val saved = offline.today(relId)
+                _state.value = if (saved != null) Load.Ready(derive(saved, offline.pending())) else Load.Loading
+            } else {
+                _refreshing.value = true
+            }
+            syncPending()
+            try {
+                val snap = snapshot(relId)
+                offline.saveToday(relId, snap)
+                _state.value = Load.Ready(derive(snap, offline.pending()))
+                _offlineSince.value = null
+            } catch (c: CancellationException) {
+                throw c
+            } catch (e: IOException) {
+                val saved = offline.today(relId)
+                if (saved != null) {
+                    _state.value = Load.Ready(derive(saved, offline.pending()))
+                    _offlineSince.value = Instant.parse(saved.savedAt)
+                } else {
+                    _state.value = Load.Failed(e.userMessage())
+                }
+            } catch (t: Throwable) {
+                _state.value = Load.Failed(t.userMessage())
+            }
             _refreshing.value = false
         }
     }
 
-    private suspend fun fetch(): TodayData = coroutineScope {
-        val relId = sessions.requireRelationshipId()
+    /** Sends completions made offline, oldest first. Stops at the first one that still can't get through. */
+    private suspend fun syncPending() {
+        for (p in offline.pending()) {
+            try {
+                api.complete(p.occurrenceId, CompleteOccurrenceInput(noteMd = p.noteMd, mood = p.mood, journal = p.journal, doneAt = p.doneAt))
+                offline.removePending(p.occurrenceId)
+            } catch (c: CancellationException) {
+                throw c
+            } catch (e: IOException) {
+                return
+            } catch (t: Throwable) {
+                offline.removePending(p.occurrenceId)
+                // An earlier try that got through but lost its reply leaves it done already; that's fine.
+                val already = t is HttpException && t.code() == 409 && t.userMessage().let { it.endsWith("is completed") || it.endsWith("is submitted") }
+                if (!already) say("A task done offline didn't sync: ${t.userMessage()}")
+            }
+        }
+    }
+
+    private suspend fun snapshot(relId: String): TodaySnapshot = coroutineScope {
         val today = LocalDate.now()
         // Overdue items can be up to the grace window old; two weeks back is plenty for a Today view.
         val occ = async { api.occurrences(relId, today.minusDays(14).toString(), today.plusDays(7).toString()) }
@@ -83,26 +162,35 @@ class TodayViewModel @Inject constructor(
         val streaks = async { runCatching { api.streaks(relId) }.getOrDefault(emptyList()) }
         val events = async { runCatching { api.events(relId, today.toString(), today.plusDays(1).toString()) }.getOrDefault(emptyList()) }
         val noTasks = async { sessions.session?.canManage == true && runCatching { api.tasks(relId).isEmpty() }.getOrDefault(false) }
-        val all = occ.await()
+        TodaySnapshot(Instant.now().toString(), occ.await(), reqs.await(), streaks.await(), events.await(), noTasks.await())
+    }
+
+    private fun derive(snap: TodaySnapshot, pending: List<PendingCompletion>): TodayData {
+        val today = LocalDate.now()
+        val queued = pending.associateBy { it.occurrenceId }
+        // Anything done offline shows as done until the server has it.
+        val all = snap.occurrences.map { o ->
+            queued[o.id]?.let { o.copy(status = OccurrenceStatus.Completed, completedAt = it.doneAt, waitingToSync = true) } ?: o
+        }
         val now = Instant.now()
         fun dueDate(o: Occurrence) = parseInstant(o.dueAt).local().toLocalDate()
         val byDue = compareBy<Occurrence> { parseInstant(it.dueAt) }
         val live = all.filter { it.status != OccurrenceStatus.Cancelled }
-        TodayData(
+        return TodayData(
             overdue = live.filter { it.status == OccurrenceStatus.Pending && parseInstant(it.dueAt).isBefore(now) && dueDate(it) < today }.sortedWith(byDue),
             today = live.filter { dueDate(it) == today }.sortedWith(byDue),
             awaitingReview = live.filter { it.status == OccurrenceStatus.Submitted }.sortedWith(byDue),
             recentMisses = live.filter { it.status == OccurrenceStatus.Missed && !it.missConfirmed && !dueDate(it).isBefore(today.minusDays(1)) }.sortedWith(byDue),
             later = live.filter { it.status == OccurrenceStatus.Pending && dueDate(it) > today }
                 .sortedWith(byDue).groupBy { dueDate(it) }.toList().take(3),
-            requests = reqs.await()
+            requests = snap.requests
                 // A Dom decides other people's requests; everyone else sees only their own, as "waiting".
                 .filter { sessions.session?.canManage == true || it.requestedBy == sessions.session?.userId }
                 .groupBy { it.groupId ?: it.id }
                 .values.toList(),
-            streaks = streaks.await().associateBy { it.taskId },
-            noTasks = noTasks.await(),
-            clashingPlans = events.await().filter {
+            streaks = snap.streaks.associateBy { it.taskId },
+            noTasks = snap.noTasks,
+            clashingPlans = snap.events.filter {
                 // The server pads the range by a day; keep only today's and tomorrow's, and only ones not over yet.
                 it.conflictIds.isNotEmpty() && parseInstant(it.endsAt).isAfter(now) && (it.covers(today) || it.covers(today.plusDays(1)))
             },
@@ -115,13 +203,21 @@ class TodayViewModel @Inject constructor(
     fun completedShown() { _completed.value = null }
 
     fun complete(o: Occurrence, note: String? = null, mood: Int? = null, entry: String? = null) = action {
-        val r = api.complete(o.id, CompleteOccurrenceInput(noteMd = note?.takeIf { it.isNotBlank() }, mood = mood, journal = entry?.let { app.obey.api.JournalEntryInput(o.title, it) }))
+        val input = CompleteOccurrenceInput(noteMd = note?.takeIf { it.isNotBlank() }, mood = mood, journal = entry?.let { app.obey.api.JournalEntryInput(o.title, it) })
+        val r = try {
+            api.complete(o.id, input)
+        } catch (e: IOException) {
+            // No signal: keep it on the phone with the time it was done, and send it when we're back.
+            val doneAt = Instant.now().toString()
+            offline.addPending(PendingCompletion(o.id, sessions.requireRelationshipId(), doneAt, input.noteMd, input.mood, input.journal))
+            o.copy(status = OccurrenceStatus.Completed, completedAt = doneAt, waitingToSync = true)
+        }
         _completed.value = r.copy(title = o.title)
         refresh()
     }
 
     fun undoComplete(o: Occurrence) = action {
-        api.undoComplete(o.id)
+        if (o.waitingToSync) offline.removePending(o.id) else api.undoComplete(o.id)
         refresh()
     }
 

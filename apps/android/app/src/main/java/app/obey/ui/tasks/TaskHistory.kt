@@ -75,6 +75,7 @@ fun TaskHistorySection(history: List<HistoryEntry>, onEdit: ((HistoryEntry, Occu
             supportingContent = {
                 Text(
                     (h.completedAt?.let { "Done ${formatDateTime(it)}" } ?: "Due ${formatDateTime(h.dueAt)}") +
+                        (h.syncedAt?.let { " · offline, synced ${formatDateTime(it)}" } ?: "") +
                         if (h.editedBy != null) " · edited" else "",
                 )
             },

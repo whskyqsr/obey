@@ -203,3 +203,23 @@ fun EndedBanner(onOpen: () -> Unit) {
         }
     }
 }
+
+/** No signal: Today is the copy saved at [savedAt], and anything marked done waits on the phone. */
+@Composable
+fun OfflineBanner(savedAt: java.time.Instant) {
+    androidx.compose.material3.Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = MaterialTheme.shapes.large,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(androidx.compose.material.icons.Icons.Outlined.CloudOff, null)
+            androidx.compose.foundation.layout.Spacer(Modifier.width(12.dp))
+            Text(
+                "You're offline. This is Today as of ${app.obey.ui.common.formatDateTime(savedAt.toString())}. Tasks you finish sync when you're back.",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}

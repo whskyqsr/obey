@@ -118,14 +118,21 @@ export async function completeOccurrence(
   now: Date,
   mood?: number,
   journal?: { title: string; bodyMd: string },
+  doneAt?: Date,
 ): Promise<Occurrence> {
   const isAssignee = actor.userId === series.assigneeId;
   if (!isAssignee && !canManage(actor.role)) throw forbidden("only the assignee can complete this");
+  // A completion queued offline counts from when it was done, as long as it reaches us within a day.
+  const at = doneAt && doneAt < now ? doneAt : now;
+  if (doneAt && now.getTime() - doneAt.getTime() > OFFLINE_HOURS * 3_600_000) throw new HttpError(409, "this was marked done too long ago to sync; ask for it to be corrected");
+  const offline = now.getTime() - at.getTime() > 2 * 60_000;
+  // It may have been marked missed while the phone was offline; done in time, the miss is taken back.
+  if (offline && occ.status === "missed" && !occ.missConfirmedAt && at.getTime() < occ.dueAt.getTime() + series.graceMinutes * 60_000) occ = await takeBackMiss(db, series, occ);
   if (occ.status !== "pending") throw new HttpError(409, `occurrence is ${occ.status}`);
   // The assignee can't work ahead into the next occurrence's turn (tomorrow's daily check-in today); a Dominant can.
   const opens = opensOn(series.schedule, occ.originalDate);
-  if (isAssignee && !canManage(actor.role) && opens && localDate(now, series.timezone) < opens) throw new HttpError(409, `this one opens on ${opens}`);
-  if (isAssignee && !canManage(actor.role)) assertWindowOpen(series, occ, now);
+  if (isAssignee && !canManage(actor.role) && opens && localDate(at, series.timezone) < opens) throw new HttpError(409, `this one opens on ${opens}`);
+  if (isAssignee && !canManage(actor.role)) assertWindowOpen(series, occ, at);
   if (isAssignee && !canManage(actor.role) && series.steps.some((s) => !occ.stepsDone.includes(s.id))) throw new HttpError(409, "finish every step first");
   // "Proof required" means a photo or a note; a Dominant marking it done needs neither.
   if (series.proofRequired && isAssignee && !canManage(actor.role) && occ.photoCount === 0 && !(noteMd ?? occ.noteMd ?? "").trim() && !journal)
@@ -150,16 +157,34 @@ export async function completeOccurrence(
       .returning({ id: notes.id });
     journalNoteId = entry!.id;
   }
-  if (noteMd !== undefined || (mood !== undefined && isAssignee) || journalNoteId)
+  if (noteMd !== undefined || (mood !== undefined && isAssignee) || journalNoteId || offline)
     await db
       .update(occurrences)
-      .set({ ...(noteMd !== undefined ? { noteMd } : {}), ...(mood !== undefined && isAssignee ? { mood } : {}), ...(journalNoteId ? { journalNoteId } : {}) })
+      .set({
+        ...(noteMd !== undefined ? { noteMd } : {}),
+        ...(mood !== undefined && isAssignee ? { mood } : {}),
+        ...(journalNoteId ? { journalNoteId } : {}),
+        ...(offline ? { syncedAt: now } : {}),
+      })
       .where(eq(occurrences.id, occ.id));
   if (series.approvalRequired && isAssignee && !canManage(actor.role)) {
-    const [submitted] = await db.update(occurrences).set({ status: "submitted", completedAt: now }).where(eq(occurrences.id, occ.id)).returning();
+    const [submitted] = await db.update(occurrences).set({ status: "submitted", completedAt: at }).where(eq(occurrences.id, occ.id)).returning();
     return submitted!;
   }
-  return finalizeCompletion(db, series, occ, now, isAssignee ? null : actor.userId);
+  return finalizeCompletion(db, series, occ, at, isAssignee ? null : actor.userId);
+}
+
+/** How long a completion made offline can wait to reach the server. */
+export const OFFLINE_HOURS = 24;
+
+/** Undoes an automatic miss (its penalty, consequence and the next turn it made) so the occurrence can be completed. */
+async function takeBackMiss(db: Tx, series: Series, occ: Occurrence): Promise<Occurrence> {
+  await withdrawMissConsequence(db, occ);
+  await db.delete(pointsLedger).where(and(eq(pointsLedger.occurrenceId, occ.id), eq(pointsLedger.kind, "miss")));
+  if (series.schedule.anchor === "completion")
+    await db.delete(occurrences).where(and(eq(occurrences.seriesId, series.id), eq(occurrences.status, "pending"), sql`${occurrences.originalDate} > ${occ.originalDate}`));
+  const [reopened] = await db.update(occurrences).set({ status: "pending" }).where(eq(occurrences.id, occ.id)).returning();
+  return reopened!;
 }
 
 /** A task with a window can't be started before the last windowMinutes before it's due. */
