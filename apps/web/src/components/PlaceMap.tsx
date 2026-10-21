@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type maplibregl from "maplibre-gl";
+import type * as maplibregl from "maplibre-gl";
 import type { Place, PlaceInput, PlaceSearchResult } from "../api/types";
 import { useDeletePlace, useSavePlace } from "../api/hooks";
 import { api, errorMessage } from "../api/client";
@@ -57,8 +57,14 @@ export function PlaceMap({
     let gone = false;
     let made: maplibregl.Map | null = null;
     // The map library is big, so it loads only when a map is first shown.
-    void Promise.all([import("maplibre-gl"), import("maplibre-gl/dist/maplibre-gl.css")]).then(([{ default: lib }]) => {
+    void Promise.all([
+      import("maplibre-gl"),
+      import("maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"),
+      import("maplibre-gl/dist/maplibre-gl.css"),
+    ]).then(([lib, { default: workerUrl }]) => {
       if (gone || !el.current) return;
+      // MapLibre 6 looks for its worker beside its own file, which bundling moves; point it at the bundled one.
+      lib.setWorkerUrl(workerUrl);
       made = make(lib, el.current);
     });
     return () => {
