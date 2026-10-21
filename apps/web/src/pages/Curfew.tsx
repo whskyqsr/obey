@@ -51,6 +51,7 @@ export function CurfewPage() {
         missPenalty: 0,
         consequenceId: null,
         timezone: browserTimeZone(),
+        reportHome: false,
       },
     );
   }, [curfew.data, places.data, form, subs]);
@@ -197,6 +198,17 @@ export function CurfewPage() {
                 ))}
               </Select>
             </div>
+
+            {who !== "You" && (
+              <div className="rounded-lg bg-surface-container-low px-4 py-2">
+                <Switch
+                  checked={form.reportHome}
+                  onChange={(reportHome) => set({ reportHome })}
+                  label={`${who} tells you they're home`}
+                  help={`Getting home puts "Tell ${me.user.displayName} I'm home" in front of ${who}, with room for a line. Their phone still checks curfew; this is them reporting in.`}
+                />
+              </div>
+            )}
 
             {(features.points || features.consequences) && (
               <div className="flex flex-col gap-4 rounded-lg bg-surface-container-low p-4">

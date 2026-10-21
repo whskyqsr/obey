@@ -10,7 +10,9 @@ import {
   useExcuseCurfew,
   useHomeForCurfew,
   useLibrary,
+  useTellHome,
 } from "../api/hooks";
+import { ReplyDialog } from "./Comments";
 import { errorMessage } from "../api/client";
 import type { CurfewClash, CurfewNight, CurfewRequest } from "../api/types";
 import { fmtDate, fmtTime, localDateOf } from "../lib/dates";
@@ -82,6 +84,8 @@ function Night({ night, request }: { night: CurfewNight; request?: CurfewRequest
   const consequences = useLibrary(rel.id, "consequences", isDom && features.consequences);
   const askWho = useAskWho();
   const [asking, setAsking] = useState(false);
+  const [telling, setTelling] = useState(false);
+  const [replying, setReplying] = useState(false);
   const mine = night.assigneeId === me.user.id;
   const who = memberName(night.assigneeId);
   const due = fmtTime(night.dueAt);
@@ -130,6 +134,59 @@ function Night({ night, request }: { night: CurfewNight; request?: CurfewRequest
       />
     );
   }
+  if (night.arrivedAt && night.reportHome) {
+    const told = night.toldAt;
+    if (mine)
+      return (
+        <>
+          <Strip
+            tone={told ? "home" : "soon"}
+            icon="home"
+            title={told ? "Home for curfew" : "You're home"}
+            body={told ? `Told ${askWho} at ${fmtTime(told)} · stay in until ${until}` : `Let ${askWho} know you're in · stay until ${until}`}
+            actions={
+              !told && (
+                <Button variant="tonal" icon="waving_hand" onClick={() => setTelling(true)}>
+                  Tell {askWho}
+                </Button>
+              )
+            }
+          />
+          {telling && <TellHomeSheet night={night} onClose={() => setTelling(false)} />}
+        </>
+      );
+    return (
+      <>
+        <Strip
+          tone="home"
+          icon="home"
+          title={`${who} is home`}
+          body={
+            told
+              ? night.toldNote
+                ? `“${night.toldNote}”`
+                : `Told you at ${fmtTime(told)} · in until ${until}`
+              : `Since ${fmtTime(night.arrivedAt)} · hasn't told you yet`
+          }
+          actions={
+            told && (
+              <Button variant="tonal" icon="chat" onClick={() => setReplying(true)}>
+                Reply
+              </Button>
+            )
+          }
+        />
+        {replying && (
+          <ReplyDialog
+            o={{ id: night.occurrenceId, commentCount: night.toldNote ? 1 : 0 }}
+            title={`${who} is home`}
+            intro={`Told you at ${fmtTime(told!)}. Your reply goes in tonight's curfew comments.`}
+            onClose={() => setReplying(false)}
+          />
+        )}
+      </>
+    );
+  }
   if (night.arrivedAt)
     return (
       <Strip
@@ -160,7 +217,9 @@ function Night({ night, request }: { night: CurfewNight; request?: CurfewRequest
                 variant="tonal"
                 icon="home"
                 busy={home.isPending}
-                onClick={() => home.mutate(night.occurrenceId, { onSuccess: () => snack("You're home for curfew"), onError: fail })}
+                onClick={() =>
+                  night.reportHome ? setTelling(true) : home.mutate({ occurrenceId: night.occurrenceId }, { onSuccess: () => snack("You're home for curfew"), onError: fail })
+                }
               >
                 I'm home
               </Button>
@@ -168,6 +227,7 @@ function Night({ night, request }: { night: CurfewNight; request?: CurfewRequest
           }
         />
         {sheet}
+        {telling && <TellHomeSheet night={night} onClose={() => setTelling(false)} />}
       </>
     );
   return (
@@ -181,6 +241,58 @@ function Night({ night, request }: { night: CurfewNight; request?: CurfewRequest
       />
       {sheet}
     </>
+  );
+}
+
+/** "Tell Sam I'm home": the sub reporting in, with an optional line that starts the night's comments. */
+function TellHomeSheet({ night, onClose }: { night: CurfewNight; onClose(): void }) {
+  const { rel } = useRel();
+  const snack = useSnackbar();
+  const tell = useTellHome(rel.id);
+  const tap = useHomeForCurfew(rel.id);
+  const who = useAskWho();
+  const [note, setNote] = useState("");
+  // Without a phone that checks, the same tap says they're home and tells the Dominant.
+  const send = night.arrivedAt ? tell : tap;
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      icon="home"
+      title={`Tell ${who} you're home`}
+      actions={
+        <>
+          <Button variant="text" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            busy={send.isPending}
+            icon="send"
+            onClick={() =>
+              send.mutate(
+                { occurrenceId: night.occurrenceId, note: note.trim() || null },
+                {
+                  onSuccess: () => {
+                    onClose();
+                    snack(`Told ${who}`);
+                  },
+                  onError: (e) => snack(errorMessage(e)),
+                },
+              )
+            }
+          >
+            Tell {who}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <TextField label="Add a line (optional)" value={note} onChange={(e) => setNote(e.target.value)} maxLength={280} autoFocus />
+        <p className="text-body-small">
+          {who} gets a notification that you're home. Your line goes with it when {who} has details turned on, and it starts tonight's comments.
+        </p>
+      </div>
+    </Dialog>
   );
 }
 

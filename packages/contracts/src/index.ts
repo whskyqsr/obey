@@ -68,6 +68,8 @@ export const user = z.object({
   quietHours: quietHours.nullable().default(null),
   /** Notification kinds this person turned off. */
   mutedNotifications: z.array(notifyCategory).default([]),
+  /** Notifications may carry a partner's own words (a reminder they wrote, a line sent with "I'm home"). Off by default. */
+  notifyDetails: z.boolean().default(false),
 });
 export type User = z.infer<typeof user>;
 
@@ -93,6 +95,8 @@ export const member = z.object({
   /** Location watching paused by them; until null means until they turn it back on. */
   locationPaused: z.boolean().default(false),
   locationPausedUntil: z.string().nullable().default(null),
+  /** Whether their notifications may carry a partner's own words, so a Dominant knows if a reminder in their words gets through. */
+  notifyDetails: z.boolean().default(false),
 });
 export const relationship = z.object({
   id,
@@ -130,6 +134,7 @@ export const updateMe = z.object({
   /** null turns quiet hours off. */
   quietHours: quietHours.nullable().optional(),
   mutedNotifications: z.array(notifyCategory).max(20).optional(),
+  notifyDetails: z.boolean().optional(),
 });
 /** Both boxes must be ticked; there is no way to upload a proof photo without them. */
 export const acceptProofTerms = z.object({ adult: z.literal(true), rules: z.literal(true) });
@@ -218,6 +223,9 @@ export const taskInput = z.object({
   placeId: id.nullable().default(null),
   /** With a place: how long to stay once there; leaving sooner counts as missed ("left early"). */
   stayMinutes: z.number().int().min(5).max(720).nullable().default(null),
+  /** The push before it's due: the app's words, the Dominant's own (reminderText, shown when the assignee allows details), or none. */
+  reminder: z.enum(["default", "custom", "none"]).default("default"),
+  reminderText: z.string().trim().max(140).nullable().default(null),
 });
 export type TaskInput = z.input<typeof taskInput>;
 
@@ -270,6 +278,8 @@ export const occurrence = z.object({
   journalNoteId: id.nullable().default(null),
   /** A Dominant saw this miss and left it missed, so it no longer needs them. */
   missConfirmed: z.boolean().default(false),
+  /** A low check-in (mood 1 or 2) a Dominant has replied to or marked seen. */
+  moodSeen: z.boolean().default(false),
   /** In occurrence lists, a miss's consequence still to be done (its title), which a Dominant can drop while keeping the miss. */
   missConsequence: z.string().nullable().default(null),
   /** A count task's bounds (both null for an ordinary task) and how many have been marked. */
@@ -286,6 +296,8 @@ export const occurrence = z.object({
   stayUntil: z.string().nullable().default(null),
   /** One night of a curfew; these never show as tasks. */
   curfew: z.boolean().default(false),
+  /** A consequence handed out, on its own or for a miss; a "let off" reward can get the sub out of it. */
+  consequence: z.boolean().default(false),
 });
 export type Occurrence = z.infer<typeof occurrence>;
 
@@ -340,6 +352,8 @@ export const curfewInput = z.object({
   missPenalty: z.number().int().min(0).max(10_000).default(0),
   consequenceId: id.nullable().default(null),
   timezone: z.string().min(1),
+  /** The sub tells the Dominant they're home: getting home puts "Tell … I'm home" in front of them, and location still checks. */
+  reportHome: z.boolean().default(false),
 });
 export type CurfewInput = z.input<typeof curfewInput>;
 export type CurfewSettings = z.infer<typeof curfewInput>;
@@ -359,6 +373,10 @@ export const curfewNight = z.object({
   canTap: z.boolean(),
   /** The latest note a Dominant left about this night (say, with a declined ask). */
   note: z.string().nullable().default(null),
+  /** The curfew asks the sub to tell the Dominant they're home; when they did, and the line they sent. */
+  reportHome: z.boolean().default(false),
+  toldAt: z.string().nullable().default(null),
+  toldNote: z.string().nullable().default(null),
 });
 export type CurfewNight = z.infer<typeof curfewNight>;
 
@@ -413,6 +431,8 @@ export const curfew = z.object({
 });
 export type Curfew = z.infer<typeof curfew>;
 export const excuseCurfewInput = z.object({ occurrenceId: id });
+/** "Tell Sam I'm home", with an optional line. */
+export const tellHomeInput = z.object({ note: z.string().trim().max(280).nullable().optional() });
 
 /** Adds to a count task's count (a tap is by: 1), or sets it outright to fix a mistake. */
 export const countOccurrence = z.union([z.object({ by: z.number().int().min(-1_000).max(1_000) }), z.object({ to: z.number().int().min(0).max(10_000) })]);
@@ -528,9 +548,10 @@ export const monthSummary = z.object({
   previous: tally,
   /** The focus tasks' counts this month, in the order they were picked. */
   focusTasks: z.array(tally.extend({ taskId: id, title: z.string() })),
-  /** Average mood (1 to 5) from the sub's check-ins and journal, this month and the one before; null without any. */
+  /** Average mood (1 to 5) from the sub's check-ins and journal this month; null without any. Kept for older apps. */
   mood: z.number().nullable(),
-  previousMood: z.number().nullable(),
+  /** Each mood the sub gave this month, oldest first: the month's mood line. Never compared with another month. */
+  moods: z.array(z.object({ at: z.string(), mood })).default([]),
 });
 export type MonthSummary = z.infer<typeof monthSummary>;
 export const pastMonth = z.object({ month: monthKey, goal: z.string().nullable(), myRating: z.number().int().nullable(), rate: z.number().nullable() });
@@ -632,6 +653,20 @@ export const rescheduleRequest = z.object({
 });
 export type RescheduleRequest = z.infer<typeof rescheduleRequest>;
 
+/** A sub's delay from the weekly allowance, which applied without asking; a Dominant's Today shows it until they close it. */
+export const delayUsed = z.object({
+  /** The request to mark seen; it closes the rest of its group too. */
+  id,
+  requestedBy: id,
+  items: z.array(z.object({ occurrenceId: id, title: z.string(), fromDueAt: z.string(), toDueAt: z.string() })),
+  reason: z.string().nullable(),
+  createdAt: z.string(),
+  /** Delays left in the allowance for the rest of the week, and the allowance itself. */
+  left: z.number().int(),
+  allowance: z.number().int(),
+});
+export type DelayUsed = z.infer<typeof delayUsed>;
+
 export const ledgerEntry = z.object({
   id,
   userId: id,
@@ -640,17 +675,32 @@ export const ledgerEntry = z.object({
   note: z.string(),
   createdBy: id.nullable(),
   createdAt: z.string(),
+  /** A redemption: the reward, and when a Dominant marked it redeemed (null while it waits on them) with their note. */
+  rewardId: id.nullable().default(null),
+  /** A "let off" redemption's consequence (its occurrence, and title). */
+  occurrenceId: id.nullable().default(null),
+  consequenceTitle: z.string().nullable().default(null),
+  redeemedAt: z.string().nullable().default(null),
+  redeemedBy: id.nullable().default(null),
+  redeemNote: z.string().nullable().default(null),
 });
 export type LedgerEntry = z.infer<typeof ledgerEntry>;
 
+/** A Dominant marking a redemption redeemed, with an optional note to the sub. */
+export const markRedeemedInput = z.object({ note: z.string().trim().max(500).nullable().optional() });
 export const adjustPoints = z.object({ userId: id, delta: z.number().int(), note: z.string().min(1).max(500) });
 
 export const rewardInput = z.object({
   title: z.string().min(1).max(200),
   bodyMd: z.string().max(5_000).default(""),
   cost: z.number().int().min(0),
+  /** Unused: redeeming never waits for approval; a Dominant marks it redeemed afterwards instead. */
   needsApproval: z.boolean().default(true),
+  /** Gets the sub out of a consequence: redeeming it names one of theirs, excused once the Dominant marks it redeemed. */
+  letsOff: z.boolean().default(false),
 });
+/** Redeeming a reward; one that lets them off a consequence names it (a consequence task's occurrence). */
+export const redeemInput = z.object({ consequenceOccurrenceId: id.nullable().optional() });
 export const reward = rewardInput.extend({ id, relationshipId: id, createdAt: z.string() });
 
 export const consequenceInput = z.object({

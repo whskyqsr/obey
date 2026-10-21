@@ -34,6 +34,8 @@ export const taskDto = (s: Series) => ({
   countPer: s.countPer,
   placeId: s.placeId,
   stayMinutes: s.stayMinutes,
+  reminder: s.reminder,
+  reminderText: s.reminderText,
   summary: describe(s.schedule),
   assignedConsequenceId: s.assignedConsequenceId,
   active: s.active,
@@ -68,6 +70,7 @@ export const occurrenceDto = (o: typeof occurrences.$inferSelect, s: Series, mis
   journalPrompt: s.asksJournal ? s.bodyMd : null,
   journalNoteId: o.journalNoteId,
   missConfirmed: o.missConfirmedAt !== null,
+  moodSeen: o.moodSeenAt !== null,
   missConsequence,
   countMin: s.countMin,
   countMax: s.countMax,
@@ -79,6 +82,7 @@ export const occurrenceDto = (o: typeof occurrences.$inferSelect, s: Series, mis
   leftAt: isoOrNull(o.leftAt),
   stayUntil: s.placeId ? isoOrNull(stayEnd(s, o)) : null,
   curfew: s.curfewUntil !== null,
+  consequence: s.assignedConsequenceId !== null || s.causedByOccurrenceId !== null,
 });
 
 /** `title` is the task's, so a request card can say which task it's about. */
@@ -97,7 +101,7 @@ export const rescheduleDto = (r: typeof reschedules.$inferSelect, title: string)
   createdAt: iso(r.createdAt),
 });
 
-export const ledgerDto = (l: typeof pointsLedger.$inferSelect) => ({
+export const ledgerDto = (l: typeof pointsLedger.$inferSelect, consequenceTitle: string | null = null) => ({
   id: l.id,
   userId: l.userId,
   delta: l.delta,
@@ -105,6 +109,12 @@ export const ledgerDto = (l: typeof pointsLedger.$inferSelect) => ({
   note: l.note,
   createdBy: l.createdBy,
   createdAt: iso(l.createdAt),
+  rewardId: l.rewardId,
+  occurrenceId: l.occurrenceId,
+  consequenceTitle: l.kind === "redemption" ? consequenceTitle : null,
+  redeemedAt: isoOrNull(l.redeemedAt),
+  redeemedBy: l.redeemedBy,
+  redeemNote: l.redeemNote,
 });
 
 type Library = typeof rewards.$inferSelect | typeof consequences.$inferSelect | typeof rules.$inferSelect | typeof protocols.$inferSelect;

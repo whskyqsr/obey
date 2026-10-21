@@ -44,7 +44,11 @@ interface Form {
   countPer: "task" | "count";
   placeId: string;
   stayMinutes: number | null;
+  reminder: Reminder;
+  reminderText: string;
 }
+
+type Reminder = "default" | "custom" | "none";
 
 type CountKind = "exactly" | "atLeast" | "atMost" | "range";
 
@@ -119,6 +123,8 @@ function formFrom(task: Task | undefined, defaultAssignee: string, start?: strin
     countPer: task?.countPer ?? "task",
     placeId: task?.placeId ?? "",
     stayMinutes: task?.stayMinutes ?? null,
+    reminder: task?.reminder ?? "default",
+    reminderText: task?.reminderText ?? "",
   };
 }
 
@@ -166,6 +172,8 @@ function toInput(f: Form): TaskInput {
     countPer: f.countPer,
     placeId: f.placeId || null,
     stayMinutes: f.placeId ? f.stayMinutes : null,
+    reminder: f.reminder === "custom" && !f.reminderText.trim() ? "default" : f.reminder,
+    reminderText: f.reminder === "custom" ? f.reminderText.trim() || null : null,
   };
 }
 
@@ -479,6 +487,8 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
             </Fold>
           )}
 
+          <ReminderFold form={form} set={set} readOnly={readOnly} />
+
           <Fold icon="timer" title={graceTitle} sub={graceSub} open={readOnly}>
             <div className="flex flex-wrap gap-2">
               {graceChips.map((c) => (
@@ -501,6 +511,58 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
         </div>
       </fieldset>
     </form>
+  );
+}
+
+const REMINDERS: { value: Reminder; label: string }[] = [
+  { value: "default", label: "Fealty's" },
+  { value: "custom", label: "In my words" },
+  { value: "none", label: "None" },
+];
+
+/** The push half an hour before it's due: the app's, the Dominant's own words, or none for a Dom who'd rather nudge. */
+function ReminderFold({ form, set, readOnly }: { form: Form; set(p: Partial<Form>): void; readOnly: boolean }) {
+  const { rel, memberName } = useRel();
+  const who = memberName(form.assigneeId);
+  const details = rel.members.find((m) => m.userId === form.assigneeId)?.notifyDetails ?? false;
+  const words = form.reminderText.trim();
+  const title =
+    form.reminder === "none" ? "No reminder" : form.reminder === "custom" && words ? `Reminder: “${words}”` : "Reminder 30 min before";
+  const sub =
+    form.reminder === "none"
+      ? "You'll nudge them yourself"
+      : form.reminder === "custom" && words && !details
+        ? `${who} sees "A task is due soon" until they turn on details`
+        : form.reminder === "custom"
+          ? "In your words"
+          : `"A task is due soon"`;
+  return (
+    <Fold icon="notifications" title={title} sub={sub} open={readOnly}>
+      <div className="flex flex-wrap gap-2">
+        {REMINDERS.map((r) => (
+          <Chip key={r.value} selected={form.reminder === r.value} onClick={readOnly ? undefined : () => set({ reminder: r.value })}>
+            {r.label}
+          </Chip>
+        ))}
+      </div>
+      {form.reminder === "custom" && (
+        <>
+          <TextField
+            label="What they'll read"
+            placeholder="Lines, pet. Neatly."
+            value={form.reminderText}
+            onChange={(e) => set({ reminderText: e.target.value })}
+            maxLength={140}
+          />
+          <p className="text-body-medium text-on-surface-variant">
+            {details
+              ? `${who} lets notifications show your words, so this is what their lock screen says.`
+              : `${who} keeps notifications discreet, so they'll see "A task is due soon" until they turn on "Show your partner's words" in Settings.`}
+          </p>
+        </>
+      )}
+      {form.reminder === "none" && <p className="text-body-medium text-on-surface-variant">No push before it's due. It still shows on Today.</p>}
+    </Fold>
   );
 }
 

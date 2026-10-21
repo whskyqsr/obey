@@ -88,6 +88,9 @@ export function fmtRelative(iso: string, now = Date.now()): string {
   return diff >= 0 ? `in ${label}` : `${label} ago`;
 }
 
+/** "just now", "5m ago", "2h ago": how long since something happened. */
+export const ago = (iso: string, now = Date.now()) => (now - new Date(iso).getTime() < 60_000 ? "just now" : fmtRelative(iso, now));
+
 /** Value for <input type="datetime-local"> from an ISO instant. */
 export function toLocalInput(iso: string): string {
   const d = new Date(iso);
