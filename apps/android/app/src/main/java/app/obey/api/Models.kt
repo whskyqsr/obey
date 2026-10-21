@@ -747,7 +747,6 @@ data class RescheduleDayResult(
     val occurrences: List<Occurrence>,
 )
 
-@Serializable
 /** A delay a sub took from their weekly allowance, which their Dominant hears about. */
 @Serializable
 data class DelayUsed(
