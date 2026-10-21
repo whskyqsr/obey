@@ -6,7 +6,7 @@ import type { CalendarEvent, Occurrence, RescheduleRequest } from "../api/types"
 import { EventDialog, eventOn, eventWhen } from "../components/EventDialog";
 import { DayRescheduleSheet } from "../components/DayRescheduleSheet";
 import { isOverdue } from "../components/OccurrenceCard";
-import { ExcuseAction, ReviewActions, RowGroup, RowLink, TaskRow } from "../components/TaskRow";
+import { MissActions, ReviewActions, RowGroup, RowLink, TaskRow } from "../components/TaskRow";
 import { KitPrompt } from "./Kits";
 import { Button, Dialog, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, Section, TextField, useSnackbar, cx } from "../components/ui";
 import { addDays, fmtDate, fmtDateTime, fmtRelative, fromLocalInput, localDateOf, toLocalInput, today } from "../lib/dates";
@@ -91,7 +91,7 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
                           <TaskRow key={o.id} o={o} showDate={dueDay(o) !== t} actions={<ReviewActions o={o} />} />
                         ))}
                         {needs.missed.map((o) => (
-                          <TaskRow key={o.id} o={o} showDate={dueDay(o) !== t} actions={<ExcuseAction o={o} />} />
+                          <TaskRow key={o.id} o={o} showDate={dueDay(o) !== t} actions={<MissActions o={o} />} />
                         ))}
                       </RowGroup>
                     )}

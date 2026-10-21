@@ -54,6 +54,8 @@ data class OccurrenceActions(
     val onReject: (() -> Unit)? = null,
     /** A Dominant excusing a miss: no penalty, and the streak holds. */
     val onExcuse: (() -> Unit)? = null,
+    /** A Dominant leaving a miss as missed: the penalty stays and it stops needing them. */
+    val onConfirmMiss: (() -> Unit)? = null,
     /** Opens the comments on this due date. */
     val onComments: (() -> Unit)? = null,
 )
@@ -134,8 +136,11 @@ fun OccurrenceRow(
             }
         },
         trailingContent = {
-            if (actions.onExcuse != null) {
-                androidx.compose.material3.TextButton(onClick = actions.onExcuse) { Text("Excuse") }
+            if (actions.onExcuse != null || actions.onConfirmMiss != null) {
+                Row {
+                    actions.onExcuse?.let { androidx.compose.material3.TextButton(onClick = it) { Text("Excuse") } }
+                    actions.onConfirmMiss?.let { androidx.compose.material3.TextButton(onClick = it) { Text("Mark missed") } }
+                }
             } else if (actions.onApprove != null || actions.onReject != null) {
                 Row {
                     actions.onComments?.let { IconButton(onClick = it) { Icon(Icons.Outlined.AddComment, "Comment") } }

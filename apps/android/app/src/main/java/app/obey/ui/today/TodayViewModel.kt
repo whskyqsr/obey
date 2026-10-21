@@ -92,7 +92,7 @@ class TodayViewModel @Inject constructor(
             overdue = live.filter { it.status == OccurrenceStatus.Pending && parseInstant(it.dueAt).isBefore(now) && dueDate(it) < today }.sortedWith(byDue),
             today = live.filter { dueDate(it) == today }.sortedWith(byDue),
             awaitingReview = live.filter { it.status == OccurrenceStatus.Submitted }.sortedWith(byDue),
-            recentMisses = live.filter { it.status == OccurrenceStatus.Missed && !dueDate(it).isBefore(today.minusDays(1)) }.sortedWith(byDue),
+            recentMisses = live.filter { it.status == OccurrenceStatus.Missed && !it.missConfirmed && !dueDate(it).isBefore(today.minusDays(1)) }.sortedWith(byDue),
             later = live.filter { it.status == OccurrenceStatus.Pending && dueDate(it) > today }
                 .sortedWith(byDue).groupBy { dueDate(it) }.toList().take(3),
             requests = reqs.await()
@@ -128,6 +128,12 @@ class TodayViewModel @Inject constructor(
     fun excuse(o: Occurrence) = action {
         api.editOccurrence(o.id, EditOccurrenceInput(status = OccurrenceStatus.Excused))
         say("Excused")
+        refresh()
+    }
+
+    fun confirmMiss(o: Occurrence) = action {
+        api.confirmMiss(o.id)
+        say("Left as missed")
         refresh()
     }
 

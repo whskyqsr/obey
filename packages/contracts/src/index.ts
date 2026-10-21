@@ -239,6 +239,8 @@ export const occurrence = z.object({
   asksJournal: z.boolean().default(false),
   journalPrompt: z.string().nullable().default(null),
   journalNoteId: id.nullable().default(null),
+  /** A Dominant saw this miss and left it missed, so it no longer needs them. */
+  missConfirmed: z.boolean().default(false),
 });
 export type Occurrence = z.infer<typeof occurrence>;
 

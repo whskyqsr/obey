@@ -2,7 +2,7 @@ import { MOODS, MOOD_LABELS } from "./Mood";
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import type { Occurrence } from "../api/types";
-import { useCompleteOccurrence, useEditOccurrence, useReviewOccurrence, useUndoComplete } from "../api/hooks";
+import { useCompleteOccurrence, useConfirmMiss, useEditOccurrence, useReviewOccurrence, useUndoComplete } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { fmtDate, fmtDateTime, fmtRelative, fmtTime, isAllDayDue, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
@@ -80,6 +80,8 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
       className={cx(
         "state-layer flex min-h-16 items-center gap-2 py-1 pr-2 pl-1 has-[a[data-card-link]:focus-visible]:outline-2 has-[a[data-card-link]:focus-visible]:-outline-offset-2 has-[a[data-card-link]:focus-visible]:outline-primary",
         current ? "bg-secondary-container" : "bg-surface-container-low",
+        // On a phone, decision buttons go on their own line so the title keeps the width.
+        actions && "max-sm:flex-wrap",
       )}
     >
       <div className="relative z-10">
@@ -139,7 +141,7 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
           )}
         </div>
       </Link>
-      <div className="relative z-10 flex items-center gap-1">
+      <div className={cx("relative z-10 flex items-center gap-1", actions && "max-sm:w-full max-sm:justify-end")}>
         {actions}
         {/* A Dominant moves anyone's deadline as easily as a sub asks for more time on their own. */}
         {!actions && o.status === "pending" && (mine || isDom) && (
@@ -183,18 +185,25 @@ export function ReviewActions({ o }: { o: Occurrence }) {
   );
 }
 
-/** Excuse a miss: no penalty, and it doesn't break the streak. */
-export function ExcuseAction({ o }: { o: Occurrence }) {
+/** Decide a miss: excuse it (no penalty, streak intact) or leave it missed, which keeps the penalty. Either clears it from Needs you. */
+export function MissActions({ o }: { o: Occurrence }) {
   const { rel } = useRel();
   const snack = useSnackbar();
   const edit = useEditOccurrence(rel.id);
+  const confirm = useConfirmMiss(rel.id);
+  const busy = edit.isPending || confirm.isPending;
   return (
-    <Button
-      variant="text"
-      busy={edit.isPending}
-      onClick={() => edit.mutate({ id: o.id, change: { status: "excused" } }, { onSuccess: () => snack("Excused"), onError: (e) => snack(errorMessage(e)) })}
-    >
-      Excuse
-    </Button>
+    <>
+      <Button
+        variant="text"
+        disabled={busy}
+        onClick={() => edit.mutate({ id: o.id, change: { status: "excused" } }, { onSuccess: () => snack("Excused"), onError: (e) => snack(errorMessage(e)) })}
+      >
+        Excuse
+      </Button>
+      <Button variant="tonal" busy={confirm.isPending} disabled={busy} onClick={() => confirm.mutate(o.id, { onSuccess: () => snack("Left as missed"), onError: (e) => snack(errorMessage(e)) })}>
+        Mark missed
+      </Button>
+    </>
   );
 }
