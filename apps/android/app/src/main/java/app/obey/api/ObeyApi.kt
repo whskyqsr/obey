@@ -106,6 +106,8 @@ interface ObeyApi {
         @Path("id") relationshipId: String,
         @Query("from") from: String,
         @Query("to") to: String,
+        /** "include" adds curfew nights, which lists leave out; the phone watches Home for them. */
+        @Query("curfew") curfew: String? = null,
     ): List<Occurrence>
 
     // Calendar plans
@@ -359,6 +361,19 @@ interface ObeyApi {
 
     @DELETE("relationships/{id}/location/pause")
     suspend fun resumeLocation(@Path("id") relationshipId: String)
+
+    // Curfew
+    @GET("relationships/{id}/curfew")
+    suspend fun curfew(@Path("id") relationshipId: String): Curfew
+
+    @PUT("relationships/{id}/curfew")
+    suspend fun saveCurfew(@Path("id") relationshipId: String, @Body body: CurfewInput): Curfew
+
+    @POST("occurrences/{id}/home")
+    suspend fun homeForCurfew(@Path("id") occurrenceId: String, @Body body: Map<String, String> = emptyMap()): Occurrence
+
+    @POST("relationships/{id}/curfew/excuse")
+    suspend fun excuseCurfew(@Path("id") relationshipId: String, @Body body: ExcuseCurfewInput): Occurrence
 
     // Push
     @POST("devices")

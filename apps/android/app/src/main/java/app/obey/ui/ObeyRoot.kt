@@ -439,7 +439,8 @@ private fun ObeyNavHost(nav: NavHostController) {
         composable<TaskEditorRoute> { TaskEditorScreen(onDone = { nav.popBackStack() }) }
         composable<NoteEditorRoute> { NoteEditorScreen(onDone = { nav.popBackStack() }) }
         composable<SettingsRoute> { SettingsScreen(onBack = { nav.popBackStack() }, onOpenDynamic = { nav.navigate(DynamicRoute) }) }
-        composable<DynamicRoute> { DynamicScreen(onBack = { nav.popBackStack() }, onPlaces = { nav.navigate(PlacesRoute) }, onLocation = { nav.navigate(LocationRoute) }) }
+        composable<DynamicRoute> { DynamicScreen(onBack = { nav.popBackStack() }, onPlaces = { nav.navigate(PlacesRoute) }, onLocation = { nav.navigate(LocationRoute) }, onCurfew = { nav.navigate(CurfewRoute) }) }
+        composable<CurfewRoute> { app.obey.ui.location.CurfewScreen(onBack = { nav.popBackStack() }, onPlaces = { nav.navigate(PlacesRoute) }) }
         composable<PlacesRoute> { app.obey.ui.location.PlacesScreen(onBack = { nav.popBackStack() }) }
         composable<LocationRoute> { app.obey.ui.location.LocationScreen(onBack = { nav.popBackStack() }) }
     }

@@ -167,6 +167,7 @@ fun LocationScreen(onBack: () -> Unit, vm: LocationViewModel = hiltViewModel()) 
     val context = LocalContext.current
     val setup by vm.setup.collectAsStateWithLifecycle()
     val watching by vm.watching.collectAsStateWithLifecycle()
+    val onCurfew by vm.onCurfew.collectAsStateWithLifecycle()
     val places by vm.places.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
@@ -270,7 +271,8 @@ fun LocationScreen(onBack: () -> Unit, vm: LocationViewModel = hiltViewModel()) 
                     }
                 } else {
                     Text(
-                        "Stops watching every place. Location tasks due while paused are excused, and $who is told you paused.",
+                        "Stops watching every place. Location tasks due while paused are excused, and $who is told you paused." +
+                            if (onCurfew) " Curfew still counts: tap I'm home on Today instead." else "",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

@@ -404,6 +404,10 @@ data class Occurrence(
     val stayMinutes: Int? = null,
     val arrivedAt: String? = null,
     val leftAt: String? = null,
+    /** When they may leave: the end of the stay once there, or a curfew's end. */
+    val stayUntil: String? = null,
+    /** One night of a curfew; never shown as a task. */
+    val curfew: Boolean = false,
     /** Done on this phone with no signal and not sent yet; never from the server. */
     @kotlinx.serialization.Transient val waitingToSync: Boolean = false,
 ) {
@@ -1070,3 +1074,55 @@ data class ReportLocationInput(val status: LocationStatus)
 /** [until] null pauses until it's turned back on. */
 @Serializable
 data class PauseLocationInput(val until: String?)
+
+/**
+ * A sub's curfew: home by [time] each night at the place, in until [until]. A time before noon is just after midnight.
+ * With [weekendTime], [time] is for Sun–Thu nights and [weekendTime] for Fri–Sat nights.
+ */
+@Serializable
+data class CurfewInput(
+    val enabled: Boolean,
+    val assigneeId: String,
+    val placeId: String,
+    val time: String,
+    val weekendTime: String? = null,
+    val until: String,
+    val points: Int = 0,
+    val missPenalty: Int = 0,
+    val consequenceId: String? = null,
+    val timezone: String,
+)
+
+/** The night Today shows: from an hour before curfew until it ends, or a broken one a Dominant hasn't settled. */
+@Serializable
+data class CurfewNight(
+    val occurrenceId: String,
+    val assigneeId: String,
+    val placeId: String,
+    val dueAt: String,
+    val endsAt: String,
+    val status: OccurrenceStatus,
+    val arrivedAt: String? = null,
+    val leftAt: String? = null,
+    val missConfirmed: Boolean = false,
+    /** Their phone can't check location, so they say "I'm home" themselves. */
+    val canTap: Boolean = false,
+)
+
+/** A plan in the coming week that runs into a curfew night. */
+@Serializable
+data class CurfewClash(
+    val occurrenceId: String,
+    val dueAt: String,
+    val endsAt: String,
+    val eventId: String,
+    val eventTitle: String,
+    val eventStartsAt: String,
+    val eventEndsAt: String,
+)
+
+@Serializable
+data class Curfew(val settings: CurfewInput? = null, val night: CurfewNight? = null, val clashes: List<CurfewClash> = emptyList())
+
+@Serializable
+data class ExcuseCurfewInput(val occurrenceId: String)

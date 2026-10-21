@@ -3,6 +3,7 @@ package app.obey.ui.settings
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.MyLocation
+import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Block
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -156,7 +157,7 @@ internal fun inviteDefault(role: Role?): Role? = when (role) {
 /** Everything about the relationship itself: who's in it, inviting, how it works, and which features are on. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun DynamicScreen(onBack: () -> Unit, onPlaces: () -> Unit = {}, onLocation: () -> Unit = {}, vm: SettingsViewModel = hiltViewModel()) {
+fun DynamicScreen(onBack: () -> Unit, onPlaces: () -> Unit = {}, onLocation: () -> Unit = {}, onCurfew: () -> Unit = {}, vm: SettingsViewModel = hiltViewModel()) {
     val sessionState by vm.session.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
@@ -165,6 +166,11 @@ fun DynamicScreen(onBack: () -> Unit, onPlaces: () -> Unit = {}, onLocation: () 
     var dialog by rememberSaveable { mutableStateOf<String?>(null) } // "relname" | "create" | "join" | "invite"
     val session = (sessionState as? SessionState.Ready)?.session
     var editingDate by remember { mutableStateOf<DynamicDate?>(null) }
+    val curfew by vm.curfew.collectAsStateWithLifecycle()
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        vm.loadCurfew()
+        onPauseOrDispose {}
+    }
 
     Scaffold(
         topBar = {
@@ -267,6 +273,15 @@ fun DynamicScreen(onBack: () -> Unit, onPlaces: () -> Unit = {}, onLocation: () 
                         supportingContent = { Text(if (s.canManage) "Where location tasks can send someone" else "The places location tasks use") },
                         trailingContent = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
                     )
+                    if (s.canManage || curfew?.enabled == true) {
+                        ListItem(
+                            modifier = Modifier.clickable(onClick = onCurfew),
+                            leadingContent = { Icon(Icons.Outlined.Bedtime, null) },
+                            headlineContent = { Text("Curfew") },
+                            supportingContent = { Text(curfew?.takeIf { it.enabled }?.let { app.obey.ui.location.describeCurfew(it) } ?: "Off") },
+                            trailingContent = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
+                        )
+                    }
                     if (me != null && me.role != Role.Dominant && !rel.ended) {
                         ListItem(
                             modifier = Modifier.clickable(onClick = onLocation),

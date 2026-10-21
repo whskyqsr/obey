@@ -80,9 +80,16 @@ class LocationViewModel @Inject constructor(
 
     fun markAsked() { watcher.asked = true }
 
+    private val _onCurfew = MutableStateFlow(false)
+    /** The person has a curfew, which a pause doesn't excuse. */
+    val onCurfew: StateFlow<Boolean> = _onCurfew.asStateFlow()
+
     fun loadWatching() {
         val s = sessions.session ?: return
         val id = relId ?: return
+        viewModelScope.launch {
+            _onCurfew.value = runCatching { api.curfew(id).settings }.getOrNull()?.let { it.enabled && it.assigneeId == s.userId } == true
+        }
         viewModelScope.launch {
             val today = LocalDate.now().toString()
             _watching.value = runCatching { api.occurrences(id, today, today) }.getOrDefault(emptyList())

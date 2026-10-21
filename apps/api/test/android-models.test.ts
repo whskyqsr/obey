@@ -52,7 +52,8 @@ describe("Android models", () => {
     let matched = 0;
     for (const [name, schema] of Object.entries(contracts)) {
       if (!(schema instanceof z.ZodObject)) continue;
-      for (const kt of [pascal(name), `${pascal(name)}Input`]) {
+      // curfew -> CurfewInput only when there's no curfewInput contract of its own.
+      for (const kt of [pascal(name), ...(`${name}Input` in contracts ? [] : [`${pascal(name)}Input`])]) {
         const fields = models.get(kt);
         if (!fields || NOT_THE_SAME.has(kt)) continue;
         matched++;

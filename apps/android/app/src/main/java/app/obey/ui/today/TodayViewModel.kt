@@ -6,6 +6,10 @@ import android.net.Network
 import androidx.lifecycle.viewModelScope
 import app.obey.api.CalendarEvent
 import app.obey.api.CompleteOccurrenceInput
+import app.obey.api.CurfewClash
+import app.obey.api.CurfewNight
+import app.obey.api.DismissClashesInput
+import app.obey.api.ExcuseCurfewInput
 import app.obey.api.DecideInput
 import app.obey.api.EditOccurrenceInput
 import app.obey.api.ObeyApi
@@ -42,6 +46,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
+
+/** Tonight's curfew night (if Today shows one), plans that run past curfew, and what a broken night costs. */
+data class TodayCurfew(val night: CurfewNight?, val clashes: List<CurfewClash>, val cost: String?)
 
 data class TodayData(
     /** Before today and still open (not yet marked missed). */
@@ -117,6 +124,7 @@ class TodayViewModel @Inject constructor(
             syncPending()
             _locationReady.value = watcher.status() == app.obey.api.LocationStatus.Ready
             if (sessions.session?.relationship?.features?.location == true) launch { runCatching { placeStore.refresh(relId) } }
+            launch { loadCurfew(relId) }
             try {
                 val snap = snapshot(relId)
                 offline.saveToday(relId, snap)
@@ -210,6 +218,50 @@ class TodayViewModel @Inject constructor(
     fun count(o: Occurrence, by: Int? = null, to: Int? = null) = action {
         val r = api.count(o.id, app.obey.api.CountChange(by = by, to = to))
         say("${o.title}: ${r.copy(title = o.title).countLine}")
+        refresh()
+    }
+
+    private val _curfew = MutableStateFlow<TodayCurfew?>(null)
+    /** Tonight's curfew strip and plans that run into one; null when there's no curfew or it couldn't load. */
+    val curfew: StateFlow<TodayCurfew?> = _curfew.asStateFlow()
+
+    private suspend fun loadCurfew(relId: String) {
+        val session = sessions.session ?: return
+        if (session.relationship?.features?.location != true) {
+            _curfew.value = null
+            return
+        }
+        val c = runCatching { api.curfew(relId) }.getOrNull() ?: return
+        val s = c.settings
+        val features = session.relationship.features
+        val consequence = if (session.canManage && features.consequences && s?.consequenceId != null) {
+            runCatching { api.consequences(relId).firstOrNull { it.id == s.consequenceId }?.title }.getOrNull()
+        } else null
+        val cost = listOfNotNull(s?.missPenalty?.takeIf { features.points && it > 0 }?.let { "−$it pts" }, consequence).joinToString(", ").ifEmpty { null }
+        _curfew.value = TodayCurfew(c.night, c.clashes, cost)
+    }
+
+    fun homeForCurfew(n: CurfewNight) = action {
+        api.homeForCurfew(n.occurrenceId)
+        say("You're home for curfew")
+        refresh()
+    }
+
+    fun excuseCurfew(occurrenceId: String, message: String) = action {
+        api.excuseCurfew(sessions.requireRelationshipId(), ExcuseCurfewInput(occurrenceId))
+        say(message)
+        refresh()
+    }
+
+    fun confirmCurfewMiss(n: CurfewNight) = action {
+        api.confirmMiss(n.occurrenceId)
+        say("Left as missed")
+        refresh()
+    }
+
+    fun leaveClash(c: CurfewClash) = action {
+        api.dismissClashes(c.eventId, DismissClashesInput(listOf(c.occurrenceId)))
+        say("Curfew stays that night")
         refresh()
     }
 
