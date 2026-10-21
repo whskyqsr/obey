@@ -179,6 +179,9 @@ interface ObeyApi {
     @DELETE("comments/{id}")
     suspend fun deleteComment(@Path("id") commentId: String)
 
+    @GET("notes/{id}/revisions")
+    suspend fun noteRevisions(@Path("id") noteId: String): List<NoteRevision>
+
     @GET("notes/{id}/comments")
     suspend fun noteComments(@Path("id") noteId: String): List<NoteComment>
 

@@ -16,6 +16,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import app.obey.ui.common.formatDateTime
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.EditNote
@@ -95,6 +100,8 @@ fun NoteEditorScreen(onDone: () -> Unit, vm: NoteEditorViewModel = hiltViewModel
     var preview by rememberSaveable { mutableStateOf(vm.opensForReading) }
     var menu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var history by remember { mutableStateOf(false) }
+    val revisionCount by vm.revisionCount.collectAsStateWithLifecycle()
     val showPreview = preview || !canEdit
 
     fun close() {
@@ -158,6 +165,12 @@ fun NoteEditorScreen(onDone: () -> Unit, vm: NoteEditorViewModel = hiltViewModel
                     val titleStyle = MaterialTheme.typography.headlineSmall.copy(color = MaterialTheme.colorScheme.onSurface)
                     if (showPreview) {
                         Text(draft.title.ifBlank { "Untitled" }, style = titleStyle)
+                        if (revisionCount > 0) {
+                            TextButton(onClick = { vm.loadRevisions(); history = true }, contentPadding = PaddingValues(horizontal = 0.dp)) {
+                                Icon(Icons.Outlined.History, null, Modifier.size(18.dp))
+                                Text(" Edited · see earlier versions")
+                            }
+                        }
                     } else {
                         BasicTextField(
                             value = title,
@@ -271,6 +284,33 @@ fun NoteEditorScreen(onDone: () -> Unit, vm: NoteEditorViewModel = hiltViewModel
                 }
             }
         }
+    }
+
+    if (history) {
+        val revisions by vm.revisions.collectAsStateWithLifecycle()
+        AlertDialog(
+            onDismissRequest = { history = false },
+            icon = { Icon(Icons.Outlined.History, null) },
+            title = { Text("Edit history") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Earlier versions, newest first. The current one is on the page.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    val list = revisions
+                    if (list == null) Text("Loading…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    list?.forEach { r ->
+                        Column(
+                            Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.medium).padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text("Replaced ${formatDateTime(r.createdAt)} by ${vm.editorName(r.editorId)}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (r.title.isNotBlank()) Text(r.title, style = MaterialTheme.typography.titleMedium)
+                            MarkdownPreview(markdown = r.bodyMd, onToggleCheck = null, modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { history = false }) { Text("Close") } },
+        )
     }
 
     if (confirmDelete) {

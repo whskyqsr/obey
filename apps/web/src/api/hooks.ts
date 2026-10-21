@@ -5,6 +5,7 @@ import type {
   AdminReport,
   OccurrenceComment,
   NoteComment,
+  NoteRevision,
   DeviceStatus,
   ProofPhoto,
   ReportReason,
@@ -357,6 +358,11 @@ export function useDeleteComment(rel: string) {
       invalidate();
     },
   });
+}
+
+/** Earlier versions of a note's title and text, newest first. Refetched when the note changes. */
+export function useNoteRevisions(noteId: string, revisionCount: number, enabled: boolean) {
+  return useQuery({ queryKey: ["noteRevisions", noteId, revisionCount], queryFn: () => api<NoteRevision[]>(`/notes/${noteId}/revisions`), enabled });
 }
 
 export function useNoteComments(noteId: string, enabled = true) {

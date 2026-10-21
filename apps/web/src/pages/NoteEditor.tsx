@@ -5,6 +5,7 @@ import { errorMessage } from "../api/client";
 import type { Note, NoteInput } from "../api/types";
 import { MarkdownEditor } from "../components/MarkdownEditor";
 import { NoteComments } from "../components/Comments";
+import { NoteHistory } from "../components/NoteHistory";
 import { Button, Chip, ErrorBox, Icon, IconButton, Loading, SegmentedButtons, Switch, useSnackbar } from "../components/ui";
 import { fmtDateTime } from "../lib/dates";
 import { MOODS } from "../components/Mood";
@@ -30,6 +31,7 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
   const save = useSaveLibraryItem(rel.id, "notes");
   const del = useDeleteLibraryItem(rel.id, "notes");
   const [confirm, confirmEl] = useConfirm();
+  const [historyOpen, setHistoryOpen] = useState(false);
   // The server decides who may change a note: its author (unless a sub's notes are switched off), or the sub on a note opened up to them.
   const canEdit = !note || note.canEdit;
   const isAuthor = !note || note.authorId === me.user.id;
@@ -138,6 +140,14 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
               {memberName(note.authorId)} · {fmtDateTime(kind === "journal" ? note.createdAt : note.updatedAt)}
             </span>
             {!isAuthor && canEdit && <span>· You can edit this</span>}
+            {note.revisionCount > 0 && (
+              <span>
+                ·{" "}
+                <button type="button" className="rounded-sm underline underline-offset-2 hover:text-on-surface" onClick={() => setHistoryOpen(true)}>
+                  Edited
+                </button>
+              </span>
+            )}
             {form.visibility === "private" && (
               <span className="flex items-center gap-1">
                 <Icon name="lock" size={16} /> Private
@@ -158,6 +168,7 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
             </div>
           )}
         </article>
+        <NoteHistory note={note} open={historyOpen} onClose={() => setHistoryOpen(false)} />
         {confirmEl}
       </div>
     );

@@ -512,10 +512,15 @@ export const note = noteInput.extend({
   /** Whether the person asking may change this note. */
   canEdit: z.boolean(),
   commentCount: z.number().int().default(0),
+  /** Earlier versions kept of the title and text; more than 0 means it was edited. */
+  revisionCount: z.number().int().default(0),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 export type Note = z.infer<typeof note>;
+/** A note's title and text before an edit; [createdAt] is when that edit replaced it. */
+export const noteRevision = z.object({ id, noteId: id, editorId: id, title: z.string(), bodyMd: z.string(), createdAt: z.string() });
+export type NoteRevision = z.infer<typeof noteRevision>;
 
 export const registerDevice = z.object({ token: z.string().min(10), platform: z.enum(["android", "web"]) });
 /** A device this account gets push on. Only the token's end is shown, enough for a client to spot its own. */
