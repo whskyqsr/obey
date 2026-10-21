@@ -16,6 +16,8 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.MoreTime
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.AlertDialog
@@ -23,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -42,6 +45,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
+import app.obey.api.CalendarEvent
+import app.obey.api.CurfewClash
 import app.obey.api.CurfewNight
 import app.obey.api.CurfewRequest
 import app.obey.ui.common.formatTime
@@ -221,5 +226,59 @@ fun ApproveOtherTimeSheet(request: CurfewRequest, name: String, busy: Boolean, o
     ) {
         TimeChoices(options, until, from, null) { until = it }
         until?.let { Summary(Icons.Filled.Home, "Home by ${formatTime(it.iso())}", "$name asked for ${formatTime(request.untilAt)}") }
+    }
+}
+
+private val planDay = DateTimeFormatter.ofPattern("EEE, MMM d")
+
+/** A Dominant moving when a plan ends, to curfew or earlier; its author is told. */
+@Composable
+fun PlanEndSheet(clash: CurfewClash, busy: Boolean, onDismiss: () -> Unit, onChange: (endsAt: String) -> Unit) {
+    val due = parseInstant(clash.dueAt)
+    val starts = parseInstant(clash.eventStartsAt)
+    val ends = parseInstant(clash.eventEndsAt)
+    val earlier = due.minus(Duration.ofMinutes(30))
+    val options = listOf("At curfew · ${formatTime(clash.dueAt)}" to due, formatTime(earlier.iso()) to earlier)
+    var endsAt by remember { mutableStateOf<Instant?>(due) }
+    Sheet(
+        Icons.Outlined.Event,
+        "When does ${clash.eventTitle} end?",
+        onDismiss,
+        actions = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+            Button(onClick = { endsAt?.let { onChange(it.iso()) } }, enabled = endsAt != null && !busy) { Text("Change end") }
+        },
+    ) {
+        TimeChoices(options, endsAt, starts, ends) { endsAt = it }
+        endsAt?.let {
+            Summary(Icons.Outlined.Event, "${starts.local().format(planDay)}, ${formatTime(clash.eventStartsAt)} – ${formatTime(it.iso())}", "Was until ${formatTime(clash.eventEndsAt)}")
+        }
+        Text(
+            "They're told the plan now ends at ${endsAt?.let { formatTime(it.iso()) } ?: "the new time"}.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** One of my plans someone else changed, until I close it. */
+@Composable
+fun PlanChangeCard(event: CalendarEvent, name: String, onSeen: () -> Unit) {
+    val c = MaterialTheme.colorScheme
+    Surface(color = c.surfaceContainerHigh, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+        Row(Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp)) {
+            Icon(Icons.Outlined.Event, null, tint = c.primary, modifier = Modifier.padding(top = 2.dp))
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text("$name changed ${event.title}", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "${parseInstant(event.startsAt).local().format(planDay)}, ${formatTime(event.startsAt)} – ${formatTime(event.endsAt)}" +
+                        (event.previousEndsAt?.let { " · was until ${formatTime(it)}" } ?: ""),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = c.onSurfaceVariant,
+                )
+            }
+            IconButton(onClick = onSeen) { Icon(Icons.Outlined.Close, "Got it") }
+        }
     }
 }

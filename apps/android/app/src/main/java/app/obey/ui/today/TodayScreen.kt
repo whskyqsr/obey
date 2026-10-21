@@ -84,6 +84,8 @@ fun TodayScreen(
     val curfew by vm.curfew.collectAsStateWithLifecycle()
     var askingMore by remember { mutableStateOf<app.obey.api.CurfewNight?>(null) }
     var approvingOther by remember { mutableStateOf<app.obey.api.CurfewRequest?>(null) }
+    var changingEnd by remember { mutableStateOf<app.obey.api.CurfewClash?>(null) }
+    val planChanges by vm.planChanges.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     MessageEffect(message, snackbar, vm::messageShown)
@@ -202,7 +204,10 @@ fun TodayScreen(
                         )
                     }
                     items(curfew?.clashes.orEmpty(), key = { "curfew-${it.occurrenceId}" }) { c ->
-                        CurfewClashCard(c, onExcuse = { vm.excuseCurfew(c.occurrenceId, "Curfew excused that night") }, onLeave = { vm.leaveClash(c) })
+                        CurfewClashCard(c, onExcuse = { vm.excuseCurfew(c.occurrenceId, "Curfew excused that night") }, onChangeEnd = { changingEnd = c }, onLeave = { vm.leaveClash(c) })
+                    }
+                    items(planChanges, key = { "changed-${it.id}" }) { e ->
+                        PlanChangeCard(e, e.changedBy?.let { session?.nameOf(it) } ?: "Someone") { vm.seenPlanChange(e) }
                     }
                     items(d.clashingPlans, key = { "plan-${it.id}" }) { e -> PlanHeadsUp(e, planTone(e, session?.relationship)) { plan = e } }
                     if (isDom && d.noTasks && session?.readOnly != true) item(key = "kits") { KitPrompt(onKits) }
@@ -340,5 +345,8 @@ fun TodayScreen(
     }
     approvingOther?.let { r ->
         ApproveOtherTimeSheet(r, session?.nameOf(r.requestedBy) ?: "They", busy, onDismiss = { approvingOther = null }) { until -> vm.approveCurfew(r, until) { approvingOther = null } }
+    }
+    changingEnd?.let { c ->
+        PlanEndSheet(c, busy, onDismiss = { changingEnd = null }) { endsAt -> vm.changePlanEnd(c, endsAt) { changingEnd = null } }
     }
 }

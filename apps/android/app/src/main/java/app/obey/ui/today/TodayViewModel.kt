@@ -125,6 +125,7 @@ class TodayViewModel @Inject constructor(
             _locationReady.value = watcher.status() == app.obey.api.LocationStatus.Ready
             if (sessions.session?.relationship?.features?.location == true) launch { runCatching { placeStore.refresh(relId) } }
             launch { loadCurfew(relId) }
+            launch { runCatching { api.planChanges(relId) }.onSuccess { _planChanges.value = it } }
             try {
                 val snap = snapshot(relId)
                 offline.saveToday(relId, snap)
@@ -277,6 +278,23 @@ class TodayViewModel @Inject constructor(
     fun declineCurfew(r: app.obey.api.CurfewRequest) = action {
         api.declineCurfew(r.id)
         say("Declined")
+        refresh()
+    }
+
+    private val _planChanges = MutableStateFlow<List<app.obey.api.CalendarEvent>>(emptyList())
+    /** My plans someone else changed (a Dominant moving the end), until I close the card. */
+    val planChanges: StateFlow<List<app.obey.api.CalendarEvent>> = _planChanges.asStateFlow()
+
+    fun seenPlanChange(e: app.obey.api.CalendarEvent) = action {
+        _planChanges.value = _planChanges.value.filter { it.id != e.id }
+        api.seenPlanChange(e.id)
+    }
+
+    /** A Dominant moving when a plan that runs past curfew ends; its author is told. */
+    fun changePlanEnd(c: CurfewClash, endsAt: String, onDone: () -> Unit = {}) = action {
+        api.changePlanEnd(c.eventId, app.obey.api.PlanEndInput(endsAt))
+        say("Plan changed")
+        onDone()
         refresh()
     }
 

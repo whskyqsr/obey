@@ -933,7 +933,14 @@ data class CalendarEvent(
     val noteMd: String? = null,
     /** Tasks still to do that fall due during the plan, for the people it involves. */
     val conflictIds: List<String> = emptyList(),
+    /** Someone else (a Dominant) moved its end; the author is shown it until they close the card. */
+    val changedBy: String? = null,
+    val previousEndsAt: String? = null,
 )
+
+/** A Dominant moving when someone else's plan ends; nothing else of theirs can be changed. */
+@Serializable
+data class PlanEndInput(val endsAt: String)
 
 /** A broken rule or protocol; [title] is what it was called when logged. */
 @Serializable

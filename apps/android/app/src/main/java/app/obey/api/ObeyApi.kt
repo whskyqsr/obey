@@ -124,6 +124,16 @@ interface ObeyApi {
     @PATCH("events/{id}")
     suspend fun updateEvent(@Path("id") id: String, @Body body: CalendarEventInput): CalendarEvent
 
+    @PATCH("events/{id}")
+    suspend fun changePlanEnd(@Path("id") id: String, @Body body: PlanEndInput): CalendarEvent
+
+    /** My plans someone else changed that I haven't closed yet. */
+    @GET("relationships/{id}/events/changes")
+    suspend fun planChanges(@Path("id") relationshipId: String): List<CalendarEvent>
+
+    @POST("events/{id}/seen")
+    suspend fun seenPlanChange(@Path("id") id: String, @Body body: Map<String, String> = emptyMap())
+
     @DELETE("events/{id}")
     suspend fun deleteEvent(@Path("id") id: String)
 

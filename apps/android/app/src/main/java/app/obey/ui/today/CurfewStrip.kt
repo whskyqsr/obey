@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,6 +29,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -151,9 +154,10 @@ fun CurfewStrip(
 
 private val clashDay = DateTimeFormatter.ofPattern("EEE, MMM d")
 
-/** A plan that runs past curfew, for a Dominant to excuse that night or leave it. */
+/** A plan that runs past curfew, for a Dominant to excuse that night, move the plan's end, or leave it. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun CurfewClashCard(clash: CurfewClash, onExcuse: () -> Unit, onLeave: () -> Unit) {
+fun CurfewClashCard(clash: CurfewClash, onExcuse: () -> Unit, onChangeEnd: () -> Unit, onLeave: () -> Unit) {
     Surface(
         color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
         shape = RoundedCornerShape(24.dp),
@@ -169,8 +173,9 @@ fun CurfewClashCard(clash: CurfewClash, onExcuse: () -> Unit, onLeave: () -> Uni
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Button(onClick = onExcuse) { Text("Excuse curfew that night") }
+                FlowRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Button(onClick = onExcuse) { Text("Excuse that night") }
+                    OutlinedButton(onClick = onChangeEnd) { Text("Change the end") }
                     TextButton(onClick = onLeave) { Text("Leave it") }
                 }
             }
