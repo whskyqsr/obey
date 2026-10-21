@@ -84,19 +84,19 @@ export async function pointsEnabled(db: Tx, relationshipId: string): Promise<boo
   return rel?.features.points !== false;
 }
 
-async function finalizeCompletion(db: Tx, series: Series, occ: Occurrence, completedAt: Date, reviewerId: string | null) {
+async function finalizeCompletion(db: Tx, series: Series, occ: Occurrence, completedAt: Date, reviewerId: string | null, points = series.points) {
   const [updated] = await db
     .update(occurrences)
     .set({ status: "completed", completedAt, reviewedBy: reviewerId, reviewedAt: reviewerId ? new Date() : null })
     .where(eq(occurrences.id, occ.id))
     .returning();
-  if (series.points !== 0 && (await pointsEnabled(db, series.relationshipId))) {
+  if (points !== 0 && (await pointsEnabled(db, series.relationshipId))) {
     await db
       .insert(pointsLedger)
       .values({
         relationshipId: series.relationshipId,
         userId: series.assigneeId,
-        delta: series.points,
+        delta: points,
         kind: "completion",
         note: series.title,
         occurrenceId: occ.id,
@@ -129,6 +129,7 @@ export async function completeOccurrence(
   // It may have been marked missed while the phone was offline; done in time, the miss is taken back.
   if (offline && occ.status === "missed" && !occ.missConfirmedAt && at.getTime() < occ.dueAt.getTime() + series.graceMinutes * 60_000) occ = await takeBackMiss(db, series, occ);
   if (occ.status !== "pending") throw new HttpError(409, `occurrence is ${occ.status}`);
+  if (isCountTask(series)) throw new HttpError(409, "this one is counted; mark each one instead");
   // The assignee can't work ahead into the next occurrence's turn (tomorrow's daily check-in today); a Dominant can.
   const opens = opensOn(series.schedule, occ.originalDate);
   if (isAssignee && !canManage(actor.role) && opens && localDate(at, series.timezone) < opens) throw new HttpError(409, `this one opens on ${opens}`);
@@ -185,6 +186,117 @@ async function takeBackMiss(db: Tx, series: Series, occ: Occurrence): Promise<Oc
     await db.delete(occurrences).where(and(eq(occurrences.seriesId, series.id), eq(occurrences.status, "pending"), sql`${occurrences.originalDate} > ${occ.originalDate}`));
   const [reopened] = await db.update(occurrences).set({ status: "pending" }).where(eq(occurrences.id, occ.id)).returning();
   return reopened!;
+}
+
+/** A count task is marked once each time it's done, instead of once. */
+export const isCountTask = (s: Pick<Series, "countMin" | "countMax">) => s.countMin !== null || s.countMax !== null;
+
+/** Where a count stands against the task's bounds. */
+export function countState(s: Pick<Series, "countMin" | "countMax">, n: number): "short" | "ok" | "over" {
+  if (s.countMax !== null && n > s.countMax) return "over";
+  if (s.countMin !== null && n < s.countMin) return "short";
+  return "ok";
+}
+
+/** Points for a count task done with n: the task's points, or that many for each one up to the maximum. */
+export const countedPoints = (s: Series, n: number) => (isCountTask(s) && s.countPer === "count" ? s.points * Math.min(n, s.countMax ?? n) : s.points);
+
+/** The penalty for a miss: the task's, or that much for each one short of the minimum or over the maximum. */
+export function countedPenalty(s: Series, n: number) {
+  if (!isCountTask(s) || s.countPer === "task") return s.missPenalty;
+  const off = s.countMax !== null && n > s.countMax ? n - s.countMax : Math.max(0, (s.countMin ?? 0) - n);
+  return s.missPenalty * Math.max(1, off);
+}
+
+/**
+ * Changes a count task's count, by a tap (by: 1) or a correction (to: n), and settles it: within bounds with a minimum
+ * reached it's done (points follow the count); over the maximum it's missed at once, with its penalty and consequence;
+ * a correction back takes either of those back. "No more than" with no minimum stays open until the deadline.
+ */
+export async function countOccurrence(
+  db: Tx,
+  series: Series,
+  occ: Occurrence,
+  actor: { userId: string; role: Role },
+  change: { by: number } | { to: number },
+  now: Date,
+): Promise<Occurrence> {
+  if (!isCountTask(series)) throw new HttpError(409, "this task isn't counted");
+  const isAssignee = actor.userId === series.assigneeId;
+  const manager = canManage(actor.role);
+  if (!isAssignee && !manager) throw forbidden("only the assignee can count this");
+  const settledAt = occ.dueAt.getTime() + series.graceMinutes * 60_000;
+  const late = now.getTime() >= settledAt;
+  const open = occ.status === "pending" || occ.status === "completed" || (occ.status === "missed" && !occ.missConfirmedAt);
+  if (!open) throw new HttpError(409, `occurrence is ${occ.status}`);
+  if (!manager) {
+    if (late) throw new HttpError(409, "the deadline has passed");
+    const opens = opensOn(series.schedule, occ.originalDate);
+    if (opens && localDate(now, series.timezone) < opens) throw new HttpError(409, `this one opens on ${opens}`);
+    assertWindowOpen(series, occ, now);
+  }
+  const n = Math.max(0, Math.min(10_000, "to" in change ? change.to : occ.count + change.by));
+  [occ] = (await db.update(occurrences).set({ count: n }).where(eq(occurrences.id, occ.id)).returning()) as [Occurrence];
+  const state = countState(series, n);
+  const pointsOn = await pointsEnabled(db, series.relationshipId);
+
+  if (state === "over") {
+    if (occ.status === "missed") {
+      if (pointsOn)
+        await db
+          .update(pointsLedger)
+          .set({ delta: -countedPenalty(series, n) })
+          .where(and(eq(pointsLedger.occurrenceId, occ.id), eq(pointsLedger.kind, "miss")));
+      return occ;
+    }
+    if (occ.status === "completed") await db.delete(pointsLedger).where(and(eq(pointsLedger.occurrenceId, occ.id), eq(pointsLedger.kind, "completion")));
+    const [missed] = await db.update(occurrences).set({ status: "missed", completedAt: null, missConfirmedAt: null }).where(eq(occurrences.id, occ.id)).returning();
+    const penalty = countedPenalty(series, n);
+    if (penalty > 0 && pointsOn)
+      await db
+        .insert(pointsLedger)
+        .values({ relationshipId: series.relationshipId, userId: series.assigneeId, delta: -penalty, kind: "miss", note: series.title, occurrenceId: occ.id })
+        .onConflictDoNothing();
+    if (occ.status === "pending") await advanceCompletionSeries(db, series, localDate(now, series.timezone));
+    // Going over again after a correction brings back the consequence that correction withdrew.
+    if (!(await issueMissConsequence(db, series, missed!, now))) {
+      const back = await db
+        .update(taskSeries)
+        .set({ active: true, updatedAt: now })
+        .where(and(eq(taskSeries.causedByOccurrenceId, occ.id), eq(taskSeries.active, false)))
+        .returning({ id: taskSeries.id });
+      if (back.length)
+        await db
+          .update(occurrences)
+          .set({ status: "pending" })
+          .where(and(eq(occurrences.seriesId, back[0]!.id), eq(occurrences.status, "cancelled")));
+    }
+    return missed!;
+  }
+
+  // Back within bounds or short of them: an over-the-limit miss is taken back first.
+  if (occ.status === "missed") occ = await takeBackMiss(db, series, occ);
+  const done = state === "ok" && (series.countMin !== null || late);
+  if (done) {
+    if (occ.status === "completed") {
+      if (pointsOn)
+        await db
+          .update(pointsLedger)
+          .set({ delta: countedPoints(series, n) })
+          .where(and(eq(pointsLedger.occurrenceId, occ.id), eq(pointsLedger.kind, "completion")));
+      return occ;
+    }
+    return finalizeCompletion(db, series, occ, late ? occ.dueAt : now, isAssignee ? null : actor.userId, countedPoints(series, n));
+  }
+  if (occ.status === "completed") {
+    await db.delete(pointsLedger).where(and(eq(pointsLedger.occurrenceId, occ.id), eq(pointsLedger.kind, "completion")));
+    if (series.schedule.anchor === "completion")
+      await db.delete(occurrences).where(and(eq(occurrences.seriesId, series.id), eq(occurrences.status, "pending"), sql`${occurrences.originalDate} > ${occ.originalDate}`));
+    [occ] = (await db.update(occurrences).set({ status: "pending", completedAt: null, reviewedBy: null, reviewedAt: null }).where(eq(occurrences.id, occ.id)).returning()) as [
+      Occurrence,
+    ];
+  }
+  return occ;
 }
 
 /** A task with a window can't be started before the last windowMinutes before it's due. */
@@ -403,6 +515,11 @@ export async function markMissed(db: Tx, now: Date) {
         ),
       )
       .limit(1);
+    // A count task kept within its bounds is done at the deadline ("no more than 3" has nothing to reach before then).
+    if (!red && isCountTask(series) && countState(series, occ.count) === "ok") {
+      await finalizeCompletion(db, series, occ, occ.dueAt, null, countedPoints(series, occ.count));
+      continue;
+    }
     const [updated] = await db
       .update(occurrences)
       .set({ status: red ? "excused" : "missed", missConfirmedAt: null })
@@ -413,13 +530,13 @@ export async function markMissed(db: Tx, now: Date) {
       await advanceCompletionSeries(db, series, localDate(occ.dueAt, series.timezone));
       continue;
     }
-    if (series.missPenalty > 0 && (await pointsEnabled(db, series.relationshipId))) {
+    if (countedPenalty(series, occ.count) > 0 && (await pointsEnabled(db, series.relationshipId))) {
       await db
         .insert(pointsLedger)
         .values({
           relationshipId: series.relationshipId,
           userId: series.assigneeId,
-          delta: -series.missPenalty,
+          delta: -countedPenalty(series, occ.count),
           kind: "miss",
           note: series.title,
           occurrenceId: occ.id,

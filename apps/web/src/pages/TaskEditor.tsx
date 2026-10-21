@@ -6,7 +6,7 @@ import type { Task, TaskInput, TaskStep } from "../api/types";
 import { RecurrencePicker } from "../components/RecurrencePicker";
 import { SortableList } from "../components/SortableList";
 import { MarkdownEditor } from "../components/MarkdownEditor";
-import { Button, Chip, ErrorBox, Icon, IconButton, Loading, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
+import { Button, Chip, ErrorBox, Icon, IconButton, Loading, SegmentedButtons, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
 import { type PickerState, defaultPicker, fromSchedule, preview, toSchedule } from "../recurrence/picker";
 import { browserTimeZone, fmtClock, fmtDate, today } from "../lib/dates";
 import { ROLE_LABEL, useRel } from "../lib/relationship";
@@ -35,6 +35,19 @@ interface Form {
   windowMinutes: number | null;
   askMood: boolean;
   asksJournal: boolean;
+  counted: boolean;
+  countKind: CountKind;
+  countN: number;
+  countTo: number;
+  countPer: "task" | "count";
+}
+
+type CountKind = "exactly" | "atLeast" | "atMost" | "range";
+
+function countKindOf(t: Task | undefined): CountKind {
+  if (t?.countMin != null && t.countMax != null) return t.countMin === t.countMax ? "exactly" : "range";
+  if (t?.countMax != null) return "atMost";
+  return t?.countMin != null ? "atLeast" : "exactly";
 }
 
 /** Grace chips. "midnight" follows the due time, so moving the time keeps it meaning "until midnight". */
@@ -95,7 +108,30 @@ function formFrom(task: Task | undefined, defaultAssignee: string, start?: strin
     windowMinutes: task?.windowMinutes ?? null,
     askMood: task?.askMood ?? false,
     asksJournal: task?.asksJournal ?? false,
+    counted: task ? task.countMin != null || task.countMax != null : false,
+    countKind: countKindOf(task),
+    countN: task?.countMin ?? task?.countMax ?? 3,
+    countTo: task?.countMax ?? 5,
+    countPer: task?.countPer ?? "task",
   };
+}
+
+const whole = (n: number, min = 1) => (Number.isFinite(n) ? Math.min(1000, Math.max(min, Math.trunc(n))) : min);
+
+/** The count bounds the form describes; both null for an ordinary task. */
+function countBoundsOf(f: Form): { countMin: number | null; countMax: number | null } {
+  if (!f.counted) return { countMin: null, countMax: null };
+  const n = whole(f.countN);
+  switch (f.countKind) {
+    case "exactly":
+      return { countMin: n, countMax: n };
+    case "atLeast":
+      return { countMin: n, countMax: null };
+    case "atMost":
+      return { countMin: null, countMax: n };
+    case "range":
+      return { countMin: n, countMax: whole(f.countTo, n) };
+  }
 }
 
 function toInput(f: Form): TaskInput {
@@ -120,6 +156,8 @@ function toInput(f: Form): TaskInput {
     windowMinutes: f.allDay ? null : f.windowMinutes,
     askMood: f.askMood,
     asksJournal: f.asksJournal,
+    ...countBoundsOf(f),
+    countPer: f.countPer,
   };
 }
 
@@ -274,34 +312,38 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
                 </option>
               ))}
             </Select>
-            <div>
-              <Switch
-                checked={form.approvalRequired}
-                onChange={(approvalRequired) => set({ approvalRequired })}
-                label="Needs approval"
-                help={features.points ? "Points post only after you approve the completion." : "It counts as done only after you approve it."}
-              />
-              <Switch
-                checked={form.proofRequired}
-                onChange={(proofRequired) => set({ proofRequired })}
-                label="Proof required"
-                help="A note or photo must accompany the completion."
-              />
-              <Switch
-                checked={form.askMood}
-                onChange={(askMood) => set({ askMood })}
-                label="Mood check-in"
-                help="Marking it done asks how they feel. Their answers build the mood graph in Your dynamic."
-              />
-              {(features.journal || form.asksJournal) && (
+            {form.counted ? (
+              <p className="text-body-medium text-on-surface-variant">A counted task is marked by counting, so it doesn't take approval, proof, a mood or a journal entry.</p>
+            ) : (
+              <div>
                 <Switch
-                  checked={form.asksJournal}
-                  onChange={(asksJournal) => set({ asksJournal })}
-                  label="Journal task"
-                  help="Marking it done means writing a journal entry, shared with you. Use the details as the prompt."
+                  checked={form.approvalRequired}
+                  onChange={(approvalRequired) => set({ approvalRequired })}
+                  label="Needs approval"
+                  help={features.points ? "Points post only after you approve the completion." : "It counts as done only after you approve it."}
                 />
-              )}
-            </div>
+                <Switch
+                  checked={form.proofRequired}
+                  onChange={(proofRequired) => set({ proofRequired })}
+                  label="Proof required"
+                  help="A note or photo must accompany the completion."
+                />
+                <Switch
+                  checked={form.askMood}
+                  onChange={(askMood) => set({ askMood })}
+                  label="Mood check-in"
+                  help="Marking it done asks how they feel. Their answers build the mood graph in Your dynamic."
+                />
+                {(features.journal || form.asksJournal) && (
+                  <Switch
+                    checked={form.asksJournal}
+                    onChange={(asksJournal) => set({ asksJournal })}
+                    label="Journal task"
+                    help="Marking it done means writing a journal entry, shared with you. Use the details as the prompt."
+                  />
+                )}
+              </div>
+            )}
           </Fold>
 
           <Fold icon="event_repeat" title={scheduleTitle} sub={scheduleSub} error={!!sched.errors.length} open={readOnly || !task}>
@@ -352,7 +394,8 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
             )}
           </Fold>
 
-          <StepsFold steps={form.steps} onChange={(steps) => set({ steps })} readOnly={readOnly} />
+          {!form.counted && <StepsFold steps={form.steps} onChange={(steps) => set({ steps })} readOnly={readOnly} />}
+          <CountFold form={form} set={set} readOnly={readOnly} points={features.points} />
 
           {(features.points || features.consequences) && (
             <Fold icon="balance" title={stakesTitle} sub={stakesSub} open={readOnly}>
@@ -442,6 +485,102 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
         </div>
       </fieldset>
     </form>
+  );
+}
+
+const COUNT_HELP: Record<CountKind, (n: number, to: number) => string> = {
+  exactly: (n) => `Done at exactly ${n}. Fewer by the deadline is missed; more counts as failed.`,
+  atLeast: (n) => `Done once it reaches ${n}, and it can keep going. Fewer by the deadline is missed.`,
+  atMost: (n) => `Done at the deadline if it's ${n} or fewer. More counts as failed.`,
+  range: (n, to) => `Done once it reaches ${n}. Fewer by the deadline is missed; more than ${to} counts as failed.`,
+};
+
+/** A count task is marked once each time (cups of water, edges) and is done when the count is in bounds. */
+function CountFold({ form, set, readOnly, points }: { form: Form; set(p: Partial<Form>): void; readOnly: boolean; points: boolean }) {
+  const { countMin, countMax } = countBoundsOf(form);
+  const n = whole(form.countN);
+  const to = whole(form.countTo, n);
+  const bounds =
+    countMin != null && countMax != null
+      ? countMin === countMax
+        ? `exactly ${countMin}`
+        : `${countMin} to ${countMax}`
+      : countMin != null
+        ? `at least ${countMin}`
+        : `no more than ${countMax}`;
+  return (
+    <Fold
+      icon="exposure_plus_1"
+      title={form.counted ? `Count: ${bounds}` : "Count it"}
+      sub={form.counted ? "Marked once each time, until it's due" : "Mark it more than once, like cups of water"}
+      open={readOnly && form.counted}
+    >
+      <Switch
+        checked={form.counted}
+        onChange={(counted) => set(counted ? { counted, steps: [], approvalRequired: false, proofRequired: false, askMood: false, asksJournal: false } : { counted })}
+        label="Count it"
+        help="A tap marks one more; hold to change the count."
+      />
+      {form.counted && (
+        <>
+          <SegmentedButtons
+            value={form.countKind}
+            onChange={(countKind) => set({ countKind })}
+            options={[
+              { value: "exactly", label: "Exactly" },
+              { value: "atLeast", label: "At least" },
+              { value: "atMost", label: "At most" },
+              { value: "range", label: "Range" },
+            ]}
+            className="w-full"
+          />
+          <div>
+            <div className="flex gap-4">
+              <TextField
+                label={form.countKind === "range" ? "At least" : "How many"}
+                type="number"
+                min={1}
+                max={1000}
+                value={Number.isFinite(form.countN) ? form.countN : ""}
+                onChange={(e) => set({ countN: num(e.target.value) })}
+                className="w-36"
+              />
+              {form.countKind === "range" && (
+                <TextField
+                  label="At most"
+                  type="number"
+                  min={n}
+                  max={1000}
+                  value={Number.isFinite(form.countTo) ? form.countTo : ""}
+                  onChange={(e) => set({ countTo: num(e.target.value) })}
+                  className="w-36"
+                />
+              )}
+            </div>
+            <p className="mt-1 px-1 text-body-small text-on-surface-variant">{COUNT_HELP[form.countKind](n, to)}</p>
+          </div>
+          {points && (
+            <div>
+              <div className="text-body-large text-on-surface">Points and penalties</div>
+              <SegmentedButtons
+                value={form.countPer}
+                onChange={(countPer) => set({ countPer })}
+                options={[
+                  { value: "task", label: "Per task" },
+                  { value: "count", label: "Per count" },
+                ]}
+                className="mt-2 w-full"
+              />
+              <p className="mt-1 px-1 text-body-small text-on-surface-variant">
+                {form.countPer === "task"
+                  ? "Booked once: points when it's done, the penalty if it isn't."
+                  : "Points for each one counted, and the penalty for each one short or over. A consequence is still handed out once."}
+              </p>
+            </div>
+          )}
+        </>
+      )}
+    </Fold>
   );
 }
 

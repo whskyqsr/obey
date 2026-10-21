@@ -10,6 +10,7 @@ import { ProofPhotos } from "./Proof";
 import { MOODS, MOOD_LABELS, MoodPicker } from "./Mood";
 import { RitualDialog, StepList, isRitual, stepProgress } from "./Ritual";
 import { RescheduleSheet } from "./RescheduleSheet";
+import { CountRing, CountSheet, canCount, countLine, isCounted, useCountTap } from "./Count";
 import { StreakStrip } from "./StreakStrip";
 import { Badge, Button, Dialog, Icon, Spinner, TextArea, cx, useSnackbar } from "./ui";
 import { importPage } from "../lib/staleBuild";
@@ -56,8 +57,12 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
   const [sendingBack, setSendingBack] = useState(false);
   const [commenting, setCommenting] = useState(false);
   const [running, setRunning] = useState(false);
+  const [counting, setCounting] = useState(false);
+  const countTap = useCountTap();
 
   const mine = o.assigneeId === me.user.id;
+  const counted = isCounted(o);
+  const countable = counted && canCount(o, mine, isDom);
   const overdue = isOverdue(o);
   const done = o.status === "completed" || o.status === "excused" || o.status === "cancelled";
   const isToday = localDateOf(new Date(o.dueAt)) === today();
@@ -90,10 +95,35 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
           <StreakStrip taskId={o.seriesId} className="mt-2" />
         </TitleWrap>
         <div className="flex flex-col items-end gap-1">
-          {features.points && o.points !== 0 && <Badge tone="primary">{o.points > 0 ? `+${o.points}` : o.points} pts</Badge>}
+          {features.points && o.points !== 0 && (
+            <Badge tone="primary">
+              {o.points > 0 ? `+${o.points}` : o.points} pts{counted && o.countPer === "count" ? " each" : ""}
+            </Badge>
+          )}
           {(o.status !== "pending" || overdue) && <Badge tone={overdue ? "error" : status.tone}>{overdue ? "Overdue" : status.label}</Badge>}
         </div>
       </div>
+      {counted && (
+        <div className="relative z-10 flex flex-col gap-2 rounded-sm bg-surface-container px-3 py-2">
+          <div className="flex items-center gap-3">
+            <CountRing o={o} onTap={countable && mine ? () => countTap(o) : undefined} onHold={countable ? () => setCounting(true) : undefined} disabled={!countable} />
+            <span className="min-w-0 flex-1 text-body-medium text-on-surface">{countLine(o)}</span>
+          </div>
+          {countable && (
+            <div className="flex flex-wrap gap-2">
+              {mine && (
+                <Button variant="tonal" icon="add" onClick={() => countTap(o)}>
+                  One more
+                </Button>
+              )}
+              <Button variant="text" onClick={() => setCounting(true)}>
+                Change the count
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+      {counting && <CountSheet o={o} open onClose={() => setCounting(false)} />}
       {isRitual(o) && (
         <div className="flex flex-col gap-2 rounded-sm bg-surface-container px-3 py-2">
           <div className="text-label-large text-on-surface-variant">{stepProgress(o)}</div>
@@ -123,7 +153,7 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
 
       {(o.status === "pending" || (isDom && o.status === "submitted")) && (
         <div className="relative z-10 flex flex-wrap items-center gap-2">
-          {o.status === "pending" && mine && isOpen(o) && !isRitual(o) && (
+          {o.status === "pending" && mine && isOpen(o) && !isRitual(o) && !counted && (
             <Button variant="filled" icon="check" onClick={() => setCompleting(true)}>
               Done
             </Button>
