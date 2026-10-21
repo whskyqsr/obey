@@ -1,0 +1,87 @@
+/* The fealty.me site: the app's oxblood M3 scheme (seed #8C3A2B), no web fonts, no scripts. */
+:root {
+  color-scheme: light dark;
+  --primary: #904b3e;
+  --on-primary: #ffffff;
+  --brand: #7d2c1d;
+  --on-brand: #ffdad3;
+  --primary-container: #ffdad3;
+  --surface: #fff8f6;
+  --surface-low: #fff0ee;
+  --surface-high: #f7e4e1;
+  --on-surface: #231918;
+  --on-surface-variant: #534340;
+  --outline-variant: #d8c2bd;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: #ffb4a6;
+    --on-primary: #561f15;
+    --primary-container: #733428;
+    --surface: #1a1110;
+    --surface-low: #231918;
+    --surface-high: #322826;
+    --on-surface: #f1dfdb;
+    --on-surface-variant: #d8c2bd;
+    --outline-variant: #534340;
+  }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--on-surface);
+  font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+a { color: var(--primary); text-underline-offset: 0.15em; }
+.wrap { max-width: 44rem; margin: 0 auto; padding: 0 16px; }
+
+header.top { border-bottom: 1px solid var(--outline-variant); }
+header.top .wrap { display: flex; align-items: center; gap: 12px; height: 64px; }
+.brand { display: flex; align-items: center; gap: 10px; color: var(--on-surface); text-decoration: none; }
+.brand svg { height: 32px; width: auto; color: var(--primary); }
+.wordmark { font-size: 15px; font-weight: 600; letter-spacing: 0.28em; text-transform: uppercase; }
+header.top nav { margin-left: auto; }
+
+.button {
+  display: inline-block;
+  padding: 10px 24px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-weight: 600;
+  font-size: 15px;
+  text-decoration: none;
+}
+.button.small { padding: 6px 16px; font-size: 14px; }
+
+.hero { padding: 72px 0 48px; text-align: center; }
+.hero svg { height: 120px; width: auto; color: var(--primary); }
+.hero h1 { margin: 24px 0 12px; font-size: clamp(32px, 7vw, 48px); line-height: 1.15; font-weight: 600; letter-spacing: -0.01em; }
+.hero p { margin: 0 auto 32px; max-width: 32rem; color: var(--on-surface-variant); font-size: 19px; }
+.hero .note { margin: 16px auto 0; font-size: 14px; }
+
+.features { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; padding-bottom: 48px; }
+.feature { padding: 20px; border-radius: 16px; background: var(--surface-low); }
+.feature h2 { margin: 0 0 6px; font-size: 17px; font-weight: 600; }
+.feature p { margin: 0; color: var(--on-surface-variant); font-size: 15px; }
+
+.adult { margin: 0 0 56px; padding: 16px 20px; border-radius: 16px; background: var(--primary-container); font-size: 15px; }
+
+.legal { padding-top: 48px; padding-bottom: 64px; }
+.legal h1 { margin: 0 0 4px; font-size: 34px; line-height: 1.2; font-weight: 600; }
+.legal .updated { margin: 0 0 32px; color: var(--on-surface-variant); font-size: 15px; }
+.legal h2 { margin: 40px 0 8px; font-size: 21px; font-weight: 600; }
+.legal h3 { margin: 24px 0 4px; font-size: 17px; font-weight: 600; }
+.legal ul { padding-left: 1.25em; }
+.legal li { margin: 4px 0; }
+.legal .summary { padding: 16px 20px; border-radius: 16px; background: var(--surface-low); }
+.legal .summary p { margin: 0; }
+.legal .caps { font-size: 15px; }
+
+footer { border-top: 1px solid var(--outline-variant); color: var(--on-surface-variant); font-size: 14px; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 20px; padding-top: 24px; padding-bottom: 32px; }
+footer a { color: inherit; }
+footer .owner { flex-basis: 100%; }
