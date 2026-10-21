@@ -18,12 +18,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.WrongLocation
+import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.EventBusy
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MoreTime
+import androidx.compose.material.icons.outlined.WavingHand
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -102,6 +104,11 @@ fun CurfewStrip(
     note: String = "",
     /** Set when the sub may still ask for more time tonight. */
     onMoreTime: (() -> Unit)? = null,
+    /** Who the sub tells they're home, when the curfew asks them to. */
+    askWho: String = "your Dominant",
+    /** The sub telling the Dominant they're home, and the Dominant replying to it. */
+    onTell: () -> Unit = {},
+    onReply: () -> Unit = {},
 ) {
     val due = formatTime(night.dueAt)
     val until = formatTime(night.endsAt)
@@ -117,6 +124,44 @@ fun CurfewStrip(
             if (canDecide && !mine) {
                 IconButton(onClick = onExcuse) { Icon(Icons.Outlined.EventAvailable, "Excuse this night") }
                 IconButton(onClick = onConfirm) { Icon(Icons.Outlined.Check, "Leave it missed") }
+            }
+        }
+        night.arrivedAt != null && night.reportHome && mine -> {
+            val told = night.toldAt
+            Strip(
+                if (told != null) Tone.Home else Tone.Soon,
+                Icons.Filled.Home,
+                if (told != null) "Home for curfew" else "You're home",
+                if (told != null) "Told $askWho at ${formatTime(told)} · stay in until $until" else "Let $askWho know you're in · stay until $until",
+            ) {
+                if (told == null) {
+                    FilledTonalButton(onClick = onTell) {
+                        Icon(Icons.Outlined.WavingHand, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Tell $askWho")
+                    }
+                }
+            }
+        }
+        night.arrivedAt != null && night.reportHome -> {
+            val told = night.toldAt
+            Strip(
+                Tone.Home,
+                Icons.Filled.Home,
+                "$name is home",
+                when {
+                    told == null -> "Since ${formatTime(night.arrivedAt)} · hasn't told you yet"
+                    night.toldNote != null -> "“${night.toldNote}”"
+                    else -> "Told you at ${formatTime(told)} · in until $until"
+                },
+            ) {
+                if (told != null) {
+                    FilledTonalButton(onClick = onReply) {
+                        Icon(Icons.AutoMirrored.Outlined.Chat, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Reply")
+                    }
+                }
             }
         }
         night.arrivedAt != null -> Strip(

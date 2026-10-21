@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -30,7 +31,13 @@ private val TYPES = listOf(
 
 /** Which kinds of notification this account gets, on every device; the dynamic's own news always comes through. */
 @Composable
-fun NotificationTypes(muted: List<String>, enabled: Boolean, onChange: (key: String, on: Boolean) -> Unit) {
+fun NotificationTypes(
+    muted: List<String>,
+    enabled: Boolean,
+    onChange: (key: String, on: Boolean) -> Unit,
+    details: Boolean = false,
+    onDetails: (Boolean) -> Unit = {},
+) {
     val colors = MaterialTheme.colorScheme
     val points = LocalFeatures.current.points
     Surface(color = colors.surfaceContainerLow, shape = MaterialTheme.shapes.large, modifier = Modifier.padding(horizontal = 16.dp).padding(top = 8.dp).fillMaxWidth()) {
@@ -43,6 +50,18 @@ fun NotificationTypes(muted: List<String>, enabled: Boolean, onChange: (key: Str
                     }
                     Switch(checked = t.key !in muted, enabled = enabled, onCheckedChange = { onChange(t.key, it) })
                 }
+            }
+            HorizontalDivider(Modifier.padding(vertical = 8.dp), color = colors.outlineVariant)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Show your partner's words", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "A reminder written for you, or the line sent with \"I'm home\", shows in the notification. Off, notifications only say who did what, so nothing personal is on your lock screen.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = details, enabled = enabled, onCheckedChange = onDetails)
             }
             Text("Someone joining or leaving your dynamic always comes through.", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
         }

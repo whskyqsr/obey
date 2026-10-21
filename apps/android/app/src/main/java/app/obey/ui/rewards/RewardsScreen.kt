@@ -13,9 +13,13 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Exposure
+import androidx.compose.material.icons.outlined.HourglassTop
+import androidx.compose.material.icons.outlined.Redeem
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -29,6 +33,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -83,6 +88,10 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
     var assigning by remember { mutableStateOf<Consequence?>(null) }
     var adjusting by remember { mutableStateOf(false) }
     var confirmRedeem by remember { mutableStateOf<Reward?>(null) }
+    var marking by remember { mutableStateOf<app.obey.api.LedgerEntry?>(null) }
+    val busy by vm.busy.collectAsStateWithLifecycle()
+    // Who marks a reward redeemed: the Dominant's name, or "your Dominant" when there's more than one.
+    val domName = session?.partners.orEmpty().filter { it.role != app.obey.api.Role.Submissive }.let { if (it.size == 1) it[0].displayName else "your Dominant" }
 
     Scaffold(
         topBar = {
@@ -149,13 +158,28 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
                         modifier = if (canManage) Modifier.clickable { editReward = Editing(r) } else Modifier,
                         headlineContent = { Text(r.title) },
                         supportingContent = {
-                            Text(listOfNotNull(r.bodyMd.takeIf { it.isNotBlank() }, if (r.needsApproval) "needs approval" else null).joinToString(" · "))
+                            Text(listOfNotNull(r.bodyMd.takeIf { it.isNotBlank() }, if (r.letsOff) "Gets ${if (canManage) "them" else "you"} out of a consequence" else null).joinToString(" · "))
                         },
                         trailingContent = {
-                            FilledTonalButton(onClick = { confirmRedeem = r }, enabled = myBalance >= r.cost) {
+                            if (canManage) Text("${r.cost} pts", style = MaterialTheme.typography.labelLarge)
+                            else FilledTonalButton(onClick = { confirmRedeem = r }, enabled = myBalance >= r.cost) {
                                 Text("${r.cost} pts")
                             }
                         },
+                    )
+                }
+
+                // Rewards spent but not yet given: a Dominant marks them redeemed; a sub sees what they're waiting on.
+                val waiting = if (features.points) d.ledger.filter {
+                    it.kind == app.obey.api.LedgerKind.Redemption && it.redeemedAt == null && (if (canManage) it.userId != session?.userId else it.userId == session?.userId)
+                } else emptyList()
+                if (waiting.isNotEmpty()) item(key = "h-waiting") { SectionHeader(if (canManage) "To redeem" else "Waiting on $domName") }
+                items(waiting, key = { "w-" + it.id }) { e ->
+                    if (canManage) app.obey.ui.today.RedemptionRow(e, session?.nameOf(e.userId) ?: "Your partner") { marking = e }
+                    else ListItem(
+                        leadingContent = { Icon(Icons.Outlined.HourglassTop, null, tint = MaterialTheme.colorScheme.tertiary) },
+                        headlineContent = { Text(e.note) },
+                        supportingContent = { Text("${-e.delta} pts spent ${app.obey.ui.common.ago(e.createdAt)}" + (e.consequenceTitle?.let { " · gets you out of $it" } ?: "")) },
                     )
                 }
 
@@ -187,7 +211,17 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
                 items(if (features.points) d.ledger else emptyList(), key = { "l-" + it.id }) { e ->
                     ListItem(
                         headlineContent = { Text(e.note.ifBlank { e.kind.name }) },
-                        supportingContent = { Text("${session?.nameOf(e.userId) ?: ""} · ${formatDateTime(e.createdAt)}") },
+                        supportingContent = {
+                            Column {
+                                Text(
+                                    "${session?.nameOf(e.userId) ?: ""} · ${formatDateTime(e.createdAt)}" +
+                                        if (e.kind == app.obey.api.LedgerKind.Redemption) {
+                                            if (e.redeemedAt != null) " · redeemed${e.consequenceTitle?.let { ", $it excused" } ?: ""}" else " · waiting on $domName"
+                                        } else "",
+                                )
+                                e.redeemNote?.let { Text("“$it”", fontStyle = androidx.compose.ui.text.font.FontStyle.Italic) }
+                            }
+                        },
                         trailingContent = {
                             Text(
                                 signed(e.delta),
@@ -228,13 +262,26 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
         )
     }
     confirmRedeem?.let { r ->
-        AlertDialog(
-            onDismissRequest = { confirmRedeem = null },
-            title = { Text("Redeem “${r.title}”?") },
-            text = { Text("This spends ${r.cost} points." + if (r.needsApproval) " Your partner will need to approve it." else "") },
-            confirmButton = { Button(onClick = { vm.redeem(r); confirmRedeem = null }) { Text("Redeem") } },
-            dismissButton = { TextButton(onClick = { confirmRedeem = null }) { Text("Cancel") } },
-        )
+        if (r.letsOff) {
+            LetOffDialog(
+                r,
+                (state as? Load.Ready)?.value?.myConsequences.orEmpty(),
+                domName,
+                busy,
+                onDismiss = { confirmRedeem = null },
+            ) { occurrenceId -> vm.redeem(r, domName, occurrenceId); confirmRedeem = null }
+        } else {
+            AlertDialog(
+                onDismissRequest = { confirmRedeem = null },
+                title = { Text("Redeem “${r.title}”?") },
+                text = { Text("Spend ${r.cost} points on “${r.title}”? $domName marks it redeemed once it's given.") },
+                confirmButton = { Button(onClick = { vm.redeem(r, domName); confirmRedeem = null }) { Text("Spend ${r.cost} pts") } },
+                dismissButton = { TextButton(onClick = { confirmRedeem = null }) { Text("Cancel") } },
+            )
+        }
+    }
+    marking?.let { e ->
+        app.obey.ui.today.RedeemedDialog(e, session?.nameOf(e.userId) ?: "them", busy, onDismiss = { marking = null }) { note -> vm.markRedeemed(e, note) { marking = null } }
     }
     if (adjusting) {
         AdjustDialog(
@@ -250,7 +297,7 @@ private fun RewardDialog(existing: Reward?, onDismiss: () -> Unit, onSave: (Rewa
     var title by remember { mutableStateOf(existing?.title.orEmpty()) }
     var body by remember { mutableStateOf(existing?.bodyMd.orEmpty()) }
     var cost by remember { mutableStateOf(existing?.cost?.toString() ?: "50") }
-    var approval by remember { mutableStateOf(existing?.needsApproval ?: true) }
+    var letsOff by remember { mutableStateOf(existing?.letsOff ?: false) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (existing == null) "New reward" else "Edit reward") },
@@ -259,12 +306,16 @@ private fun RewardDialog(existing: Reward?, onDismiss: () -> Unit, onSave: (Rewa
                 OutlinedTextField(title, { title = it.take(200) }, label = { Text("Title") }, singleLine = true)
                 OutlinedTextField(body, { body = it.take(5000) }, label = { Text("Description") }, minLines = 2)
                 NumberField("Cost (points)", cost, Modifier.fillMaxWidth()) { cost = it }
-                LabeledSwitch("Needs approval", null, approval) { approval = it }
+                LabeledSwitch(
+                    "Gets them out of a consequence",
+                    "Redeeming it means picking a consequence of theirs; it's excused when you mark the reward redeemed.",
+                    letsOff,
+                ) { letsOff = it }
             }
         },
         confirmButton = {
             Button(
-                onClick = { onSave(RewardInput(title.trim(), body, cost.toInt().coerceAtLeast(0), approval)) },
+                onClick = { onSave(RewardInput(title.trim(), body, cost.toInt().coerceAtLeast(0), letsOff)) },
                 enabled = title.isNotBlank() && cost.toIntOrNull() != null,
             ) { Text("Save") }
         },
@@ -274,6 +325,52 @@ private fun RewardDialog(existing: Reward?, onDismiss: () -> Unit, onSave: (Rewa
                 TextButton(onClick = onDismiss) { Text("Cancel") }
             }
         },
+    )
+}
+
+/** Spending a "lets off" reward: which of their consequences it's for. */
+@Composable
+private fun LetOffDialog(
+    reward: Reward,
+    mine: List<app.obey.api.Occurrence>,
+    who: String,
+    busy: Boolean,
+    onDismiss: () -> Unit,
+    onSpend: (String) -> Unit,
+) {
+    var picked by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.Redeem, null) },
+        title = { Text(reward.title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (mine.isEmpty()) {
+                    Text("You don't have a consequence to get out of right now.")
+                } else {
+                    Text("Which consequence is it for?")
+                    mine.forEach { o ->
+                        Row(
+                            Modifier.fillMaxWidth().selectable(selected = picked == o.id, role = Role.RadioButton) { picked = o.id }.padding(vertical = 4.dp),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = picked == o.id, onClick = null)
+                            Column(Modifier.padding(start = 12.dp)) {
+                                Text(o.title, style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    if (o.status == app.obey.api.OccurrenceStatus.Missed) "Missed" else "Due ${formatDateTime(o.dueAt)}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                    Text("It's excused once $who marks the reward redeemed. Until then it stays on your list.", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        confirmButton = { Button(onClick = { picked?.let(onSpend) }, enabled = picked != null && !busy) { Text("Spend ${reward.cost} pts") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
 

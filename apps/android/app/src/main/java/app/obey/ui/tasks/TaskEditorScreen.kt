@@ -26,6 +26,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FormatListNumbered
@@ -343,6 +344,8 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                         }
                     }
 
+                    ReminderFold(form, d.value.members) { change -> vm.update(change) }
+
                     val grace = form.effectiveGrace
                     val dueMinutes = if (form.allDay) 24 * 60 else form.dueTime.hour * 60 + form.dueTime.minute
                     Fold(
@@ -636,6 +639,56 @@ private fun clockAfter(minutes: Int, fmt: DateTimeFormatter): String {
     if (minutes == 24 * 60) return "midnight"
     val t = LocalTime.of((minutes / 60) % 24, minutes % 60).format(fmt)
     return if (minutes > 24 * 60) "$t the next day" else t
+}
+
+private val REMINDERS = listOf("default" to "Fealty's", "custom" to "In my words", "none" to "None")
+
+/** The push before it's due: Fealty's discreet one, the Dominant's own words, or none at all. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ReminderFold(form: TaskForm, members: List<app.obey.api.Member>, update: ((TaskForm) -> TaskForm) -> Unit) {
+    val member = members.firstOrNull { it.userId == form.assigneeId }
+    val who = member?.displayName ?: "They"
+    val details = member?.notifyDetails == true
+    val words = form.reminderText.trim()
+    Fold(
+        Icons.Outlined.Notifications,
+        when {
+            form.reminder == "none" -> "No reminder"
+            form.reminder == "custom" && words.isNotEmpty() -> "Reminder: “$words”"
+            else -> "Reminder 30 min before"
+        },
+        when {
+            form.reminder == "none" -> "You'll nudge them yourself"
+            form.reminder == "custom" && words.isNotEmpty() && !details -> "$who sees \"A task is due soon\" until they turn on details"
+            form.reminder == "custom" -> "In your words"
+            else -> "\"A task is due soon\""
+        },
+    ) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            REMINDERS.forEach { (value, label) ->
+                FilterChip(selected = form.reminder == value, onClick = { update { it.copy(reminder = value) } }, label = { Text(label) })
+            }
+        }
+        if (form.reminder == "custom") {
+            OutlinedTextField(
+                form.reminderText,
+                { v -> update { it.copy(reminderText = v.take(140)) } },
+                label = { Text("What they'll read") },
+                placeholder = { Text("Lines, pet. Neatly.") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                if (details) "$who lets notifications show your words, so this is what their lock screen says."
+                else "$who keeps notifications discreet, so they'll see \"A task is due soon\" until they turn on \"Show your partner's words\" in Settings.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (form.reminder == "none") {
+            Text("No push before it's due. It still shows on Today.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
 }
 
 /** A section that collapses to a one-line summary of what's in it. */

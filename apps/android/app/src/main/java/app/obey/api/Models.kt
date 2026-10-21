@@ -88,7 +88,12 @@ data class User(
     val quietHours: QuietHours? = null,
     /** Notification kinds turned off, e.g. "comments". */
     val mutedNotifications: List<String> = emptyList(),
+    /** Pushes carry a partner's own words (a reminder, a note); off keeps them discreet. */
+    val notifyDetails: Boolean = false,
 )
+
+@Serializable
+data class NotifyDetailsInput(val notifyDetails: Boolean)
 
 @Serializable
 data class MutedNotificationsInput(val mutedNotifications: List<String>)
@@ -151,6 +156,8 @@ data class Member(
     /** Location watching paused by them; [locationPausedUntil] null means until they turn it back on. */
     val locationPaused: Boolean = false,
     val locationPausedUntil: String? = null,
+    /** Their pushes carry a partner's own words; see [User.notifyDetails]. */
+    val notifyDetails: Boolean = false,
 )
 
 /** Whether this phone can notice arriving at and leaving places while Fealty is closed. */
@@ -302,6 +309,9 @@ data class TaskInput(
     val placeId: String? = null,
     /** With a place: how long to stay once there; leaving sooner is a miss. */
     val stayMinutes: Int? = null,
+    /** "default" (Fealty's reminder), "custom" ([reminderText], in the Dominant's words) or "none". */
+    val reminder: String = "default",
+    val reminderText: String? = null,
 )
 
 @Serializable
@@ -333,6 +343,8 @@ data class Task(
     val countPer: String = "task",
     val placeId: String? = null,
     val stayMinutes: Int? = null,
+    val reminder: String = "default",
+    val reminderText: String? = null,
     /** Set when this one-off task is a consequence handed out on its own. */
     val assignedConsequenceId: String? = null,
     val active: Boolean,
@@ -346,6 +358,7 @@ data class Task(
         approvalRequired = approvalRequired, schedule = schedule, dueTime = dueTime, timezone = timezone,
         graceMinutes = graceMinutes, steps = steps, windowMinutes = windowMinutes, askMood = askMood, asksJournal = asksJournal,
         countMin = countMin, countMax = countMax, countPer = countPer, placeId = placeId, stayMinutes = stayMinutes,
+        reminder = reminder, reminderText = reminderText,
     )
 }
 
@@ -388,6 +401,10 @@ data class Occurrence(
     /** A check-in asks for a mood when it's marked done; mood is the answer, 1 (awful) to 5 (great). */
     val askMood: Boolean = false,
     val mood: Int? = null,
+    /** A Dominant has seen this check-in's mood (said "seen" or replied). */
+    val moodSeen: Boolean = false,
+    /** A consequence (handed out on its own or for a miss), which a "lets off" reward can excuse. */
+    val consequence: Boolean = false,
     /** A journal task: its prompt, and the entry written for it once done. */
     val asksJournal: Boolean = false,
     val journalPrompt: String? = null,
@@ -590,9 +607,14 @@ data class MonthSummary(
     val totals: Tally,
     val previous: Tally,
     val focusTasks: List<FocusTaskTally> = emptyList(),
+    /** The month's average mood, kept for older apps; [moods] is what the review shows. */
     val mood: Double? = null,
-    val previousMood: Double? = null,
+    /** The sub's check-in moods this month, oldest first. */
+    val moods: List<MoodPoint> = emptyList(),
 )
+
+@Serializable
+data class MoodPoint(val at: String, val mood: Int)
 
 @Serializable
 data class PastMonth(val month: String, val goal: String? = null, val myRating: Int? = null, val rate: Double? = null)
@@ -726,6 +748,23 @@ data class RescheduleDayResult(
 )
 
 @Serializable
+/** A delay a sub took from their weekly allowance, which their Dominant hears about. */
+@Serializable
+data class DelayUsed(
+    val id: String,
+    val requestedBy: String,
+    val items: List<DelayItem>,
+    val reason: String? = null,
+    val createdAt: String,
+    /** Delays left this week, of [allowance]. */
+    val left: Int,
+    val allowance: Int,
+)
+
+@Serializable
+data class DelayItem(val occurrenceId: String, val title: String, val fromDueAt: String, val toDueAt: String)
+
+@Serializable
 data class DecideInput(
     val approve: Boolean,
     /** "Reschedule instead": this one task moves here, whatever was asked. */
@@ -752,7 +791,21 @@ data class LedgerEntry(
     val note: String,
     val createdBy: String? = null,
     val createdAt: String,
+    /** A redemption: the reward, and the consequence it lets them off, if it's that kind. */
+    val rewardId: String? = null,
+    val occurrenceId: String? = null,
+    val consequenceTitle: String? = null,
+    /** When a Dominant marked it redeemed (gave it), who did, and what they said. Null is waiting on them. */
+    val redeemedAt: String? = null,
+    val redeemedBy: String? = null,
+    val redeemNote: String? = null,
 )
+
+@Serializable
+data class RedeemInput(@EncodeDefault(EncodeDefault.Mode.NEVER) val consequenceOccurrenceId: String? = null)
+
+@Serializable
+data class MarkRedeemedInput(@EncodeDefault(EncodeDefault.Mode.NEVER) val note: String? = null)
 
 @Serializable
 data class Balance(val userId: String, val balance: Int)
@@ -765,7 +818,8 @@ data class RewardInput(
     val title: String,
     val bodyMd: String = "",
     val cost: Int,
-    val needsApproval: Boolean = true,
+    /** Lets the sub off one of their consequences, excused once a Dominant marks it redeemed. */
+    val letsOff: Boolean = false,
 )
 
 @Serializable
@@ -775,7 +829,7 @@ data class Reward(
     val title: String,
     val bodyMd: String = "",
     val cost: Int,
-    val needsApproval: Boolean = true,
+    val letsOff: Boolean = false,
     val createdAt: String,
 )
 
@@ -1101,6 +1155,8 @@ data class CurfewInput(
     val missPenalty: Int = 0,
     val consequenceId: String? = null,
     val timezone: String,
+    /** Getting home asks the sub to tell the Dominant they're home. */
+    val reportHome: Boolean = false,
 )
 
 /** The night Today shows: from an hour before curfew until it ends, or a broken one a Dominant hasn't settled. */
@@ -1119,7 +1175,14 @@ data class CurfewNight(
     val canTap: Boolean = false,
     /** The latest note a Dominant left about this night (say, with a declined ask). */
     val note: String? = null,
+    /** The curfew asks them to tell the Dominant they're home; when they did, and the line they sent. */
+    val reportHome: Boolean = false,
+    val toldAt: String? = null,
+    val toldNote: String? = null,
 )
+
+@Serializable
+data class TellHomeInput(@EncodeDefault(EncodeDefault.Mode.NEVER) val note: String? = null)
 
 /** A plan in the coming week that runs into a curfew night. */
 @Serializable

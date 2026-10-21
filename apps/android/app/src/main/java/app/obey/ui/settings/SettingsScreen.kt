@@ -175,7 +175,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, vm: SettingsVi
                 SectionHeader("Notifications")
                 PushHealthSection()
                 session?.let { s -> QuietHoursSetting(s.me.user.quietHours, enabled = !busy, onChange = vm::setQuietHours) }
-                session?.let { s -> NotificationTypes(s.me.user.mutedNotifications, enabled = !busy) { key, on -> vm.setNotificationType(key, on, s.me.user.mutedNotifications) } }
+                session?.let { s -> NotificationTypes(s.me.user.mutedNotifications, enabled = !busy, onChange = { key, on -> vm.setNotificationType(key, on, s.me.user.mutedNotifications) }, details = s.me.user.notifyDetails, onDetails = vm::setNotifyDetails) }
 
                 SectionHeader("Privacy")
                 app.obey.lock.AppLockSetting()

@@ -240,6 +240,19 @@ fun CurfewScreen(onBack: () -> Unit, onPlaces: () -> Unit, vm: CurfewViewModel =
                             form = f.copy(placeId = it)
                         }
                         Hint(if (mine) "Your phone checks this. Without location, you tap \"I'm home\"." else "$who's phone checks this. Without location, $who taps \"I'm home\".")
+                        if (!mine) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("$who tells you they're home", style = MaterialTheme.typography.bodyLarge)
+                                    Text(
+                                        "Getting home puts \"Tell ${session?.me?.user?.displayName ?: "you"} I'm home\" in front of $who, with room for a line. Their phone still checks curfew; this is them reporting in.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Switch(checked = f.reportHome, onCheckedChange = { form = f.copy(reportHome = it) })
+                            }
+                        }
                     }
 
                     val features = session?.relationship?.features

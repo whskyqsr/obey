@@ -291,15 +291,16 @@ fun PlanChangeCard(event: CalendarEvent, name: String, onSeen: () -> Unit) {
 
 /** "Note to …" after a one-tap decision: a comment on that task or curfew night, with a notification. */
 @Composable
-fun NoteDialog(target: NoteTarget, busy: Boolean, onDismiss: () -> Unit, onSend: (String) -> Unit) {
+fun NoteDialog(target: NoteTarget, busy: Boolean, title: String = "Note to ${target.to}", onDismiss: () -> Unit, onSend: (String) -> Unit) {
     var body by remember { mutableStateOf("") }
+    val reply = title != "Note to ${target.to}"
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Note to ${target.to}") },
+        title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text("About ${target.about}. ${target.to} is sent a notification.", style = MaterialTheme.typography.bodyMedium)
-                OutlinedTextField(body, { body = it.take(1000) }, label = { Text("Note") }, minLines = 3, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(body, { body = it.take(1000) }, label = { Text(if (reply) "Reply" else "Note") }, minLines = 3, modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = { Button(onClick = { onSend(body.trim()) }, enabled = body.isNotBlank() && !busy) { Text("Send") } },
