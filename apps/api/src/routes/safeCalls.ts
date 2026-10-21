@@ -3,7 +3,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { Deps } from "../app.js";
 import { memberships, safeCalls } from "../db/schema.js";
-import { notFound } from "../errors.js";
+import { forbidden, notFound } from "../errors.js";
 import { requireMember } from "../services/access.js";
 
 const callDto = (c: typeof safeCalls.$inferSelect): SafeCall => ({
@@ -19,7 +19,8 @@ const callDto = (c: typeof safeCalls.$inferSelect): SafeCall => ({
 
 /**
  * Safe words. Anyone in a dynamic can call yellow or red; everyone else is told at once, through quiet hours.
- * A dynamic has at most one open call: calling again changes its level. Anyone in the dynamic can clear it.
+ * A dynamic has at most one open call: calling again changes its level. Only whoever made the call can clear it
+ * (anyone can, once they've left the dynamic).
  */
 export const safeCallRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   const { db, notifier } = deps;
@@ -64,6 +65,13 @@ export const safeCallRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     if (!call) throw notFound();
     await requireMember(db, call.relationshipId, req.user.id);
     if (call.clearedAt) return callDto(call);
+    if (call.callerId !== req.user.id) {
+      const [caller] = await db
+        .select({ userId: memberships.userId })
+        .from(memberships)
+        .where(and(eq(memberships.relationshipId, call.relationshipId), eq(memberships.userId, call.callerId)));
+      if (caller) throw forbidden("only the person who made the call can clear it");
+    }
     const [cleared] = await db.update(safeCalls).set({ clearedAt: deps.now(), clearedBy: req.user.id }).where(eq(safeCalls.id, call.id)).returning();
     await notifier.send(await others(call.relationshipId, req.user.id), {
       title: "Fealty",

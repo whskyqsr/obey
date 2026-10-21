@@ -104,7 +104,7 @@ fun SafeWordSheet(vm: SafeCallViewModel, onDismiss: () -> Unit) {
             Text("$who is told straight away, even during quiet hours.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(4.dp))
             LevelButton(Icons.Filled.PanTool, "Yellow", "Slow down and check in with me", Yellow, OnYellow) { vm.call(SafeLevel.Yellow, note, onDismiss) }
-            LevelButton(Icons.Filled.FrontHand, "Red", "Stop. Tasks that slip are excused until it's cleared", MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.onError) {
+            LevelButton(Icons.Filled.FrontHand, "Red", "Stop. Tasks that slip are excused until you clear it", MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.onError) {
                 vm.call(SafeLevel.Red, note, onDismiss)
             }
             OutlinedTextField(note, { note = it.take(500) }, Modifier.fillMaxWidth(), label = { Text("Add a note (optional)") }, minLines = 2)
@@ -127,7 +127,7 @@ private fun LevelButton(icon: ImageVector, label: String, line: String, containe
     }
 }
 
-/** Shown to everyone in the dynamic while a safe call is open; anyone can clear it. */
+/** Shown to everyone in the dynamic while a safe call is open; only whoever called it can clear it. */
 @Composable
 fun SafeCallBanner(vm: SafeCallViewModel, call: SafeCall, modifier: Modifier = Modifier) {
     val session = vm.session ?: return
@@ -151,20 +151,27 @@ fun SafeCallBanner(vm: SafeCallViewModel, call: SafeCall, modifier: Modifier = M
                 Text("$caller called $level at ${formatTime(call.createdAt)}", style = MaterialTheme.typography.titleMedium, color = content)
                 if (call.note.isNotBlank()) Text("“${call.note}”", style = MaterialTheme.typography.bodyMedium, color = content)
                 Text(
-                    (if (mine) "${partnersOf(vm)} has been told. " else "") + if (red) "Tasks that slip are excused until one of you clears it." else "Slow down and check in.",
+                    (if (mine) "${partnersOf(vm)} has been told. " else "") +
+                        when {
+                            red -> "Tasks that slip are excused until ${if (mine) "you clear" else "$caller clears"} it."
+                            mine -> "Slow down and check in."
+                            else -> "Slow down and check in. Only $caller can clear it."
+                        },
                     style = MaterialTheme.typography.bodyMedium,
                     color = content.copy(alpha = 0.9f),
                 )
             }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-            if (mine) {
+        if (mine) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
                 TextButton(onClick = { vm.call(if (red) SafeLevel.Yellow else SafeLevel.Red, "") }) { Text("Change to ${if (red) "yellow" else "red"}", color = content) }
+                Button(
+                    onClick = { vm.clear(call.id) },
+                    colors = ButtonDefaults.buttonColors(containerColor = if (red) scheme.error else OnYellow, contentColor = if (red) scheme.onError else Yellow),
+                ) { Text("I'm okay now") }
             }
-            Button(
-                onClick = { vm.clear(call.id) },
-                colors = ButtonDefaults.buttonColors(containerColor = if (red && !mine) content else if (red) scheme.error else OnYellow, contentColor = if (red && !mine) container else if (red) scheme.onError else Yellow),
-            ) { Text(if (mine) "I'm okay now" else "Clear it") }
+        } else {
+            Spacer(Modifier.height(8.dp))
         }
     }
 }

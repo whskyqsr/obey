@@ -7,7 +7,7 @@ import { Dialog, Icon, TextArea, cx, useSnackbar } from "./ui";
 
 const LEVELS = [
   { level: "yellow", label: "Yellow", line: "Slow down and check in with me", tone: "bg-[#F6D57A] text-[#3A2E00]", icon: "pan_tool" },
-  { level: "red", label: "Red", line: "Stop. Tasks that slip are excused until it's cleared", tone: "bg-error text-on-error", icon: "front_hand" },
+  { level: "red", label: "Red", line: "Stop. Tasks that slip are excused until you clear it", tone: "bg-error text-on-error", icon: "front_hand" },
 ] as const;
 
 /** Calling yellow or red, with an optional note. Calling again while one is open changes its level. */
@@ -55,7 +55,7 @@ export function SafeWordSheet({ open, onClose }: { open: boolean; onClose(): voi
   );
 }
 
-/** Shown to everyone in the dynamic while a safe call is open; anyone can clear it. */
+/** Shown to everyone in the dynamic while a safe call is open; only whoever called it can clear it. */
 export function SafeCallBanner() {
   const { rel, me, memberName, partners } = useRel();
   const calls = useSafeCalls(rel.id);
@@ -83,12 +83,13 @@ export function SafeCallBanner() {
           {c.note && <div className="text-body-medium">“{c.note}”</div>}
           <div className="text-body-medium opacity-90">
             {mine && `${partners.map((p) => p.displayName).join(" and ") || "Your partner"} has been told. `}
-            {red ? "Tasks that slip are excused until one of you clears it." : "Slow down and check in."}
+            {red ? `Tasks that slip are excused until ${mine ? "you clear" : `${memberName(c.callerId)} clears`} it.` : "Slow down and check in."}
+            {!mine && !red && ` Only ${memberName(c.callerId)} can clear it.`}
           </div>
         </div>
       </div>
-      <div className="flex flex-wrap justify-end gap-2">
-        {mine && (
+      {mine && (
+        <div className="flex flex-wrap justify-end gap-2">
           <button
             type="button"
             disabled={change.isPending}
@@ -97,16 +98,16 @@ export function SafeCallBanner() {
           >
             Change to {other}
           </button>
-        )}
-        <button
-          type="button"
-          disabled={clear.isPending}
-          onClick={() => clear.mutate(c.id)}
-          className={cx("state-layer h-10 rounded-full px-5 text-label-large", red ? (mine ? "bg-error text-on-error" : "bg-on-error text-error") : "bg-[#3A2E00] text-[#F6D57A]")}
-        >
-          {mine ? "I'm okay now" : "Clear it"}
-        </button>
-      </div>
+          <button
+            type="button"
+            disabled={clear.isPending}
+            onClick={() => clear.mutate(c.id)}
+            className={cx("state-layer h-10 rounded-full px-5 text-label-large", red ? "bg-error text-on-error" : "bg-[#3A2E00] text-[#F6D57A]")}
+          >
+            I'm okay now
+          </button>
+        </div>
+      )}
     </div>
   );
 }

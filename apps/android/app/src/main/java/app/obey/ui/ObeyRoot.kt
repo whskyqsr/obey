@@ -300,7 +300,7 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
     }
 }
 
-/** An open safe call sits under every screen, just above the bar, until someone clears it; the top bar never moves. */
+/** An open safe call sits under every screen, just above the bar, until whoever called it clears it; the top bar never moves. */
 @Composable
 private fun SafeCallFrame(vm: SafeCallViewModel, call: SafeCall?, content: @Composable () -> Unit) {
     Column(Modifier.fillMaxSize()) {
