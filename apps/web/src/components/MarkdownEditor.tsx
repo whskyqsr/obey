@@ -23,7 +23,7 @@ export function MarkdownEditor({
   /** Render without the editing frame, for reading. */
   bare?: boolean;
   label?: string;
-  /** A shorter writing area, for a field inside a form. */
+  /** A shorter writing area, for a field inside a form. Its toolbar stays put instead of pinning to the top. */
   compact?: boolean;
 }) {
   const onChangeRef = useRef(onChange);
@@ -57,13 +57,14 @@ export function MarkdownEditor({
 
   return (
     <div className={cx(!bare && "group rounded-lg border border-outline-variant bg-surface-container-lowest focus-within:border-primary", bare && "-mx-4")}>
-      {editable && editor && <Toolbar editor={editor} />}
+      {editable && editor && <Toolbar editor={editor} pinned={!compact} />}
       <EditorContent editor={editor} />
     </div>
   );
 }
 
-function Toolbar({ editor }: { editor: Editor }) {
+/** `pinned` keeps the toolbar under a full-page editor's h-14 header while the text scrolls; a compact field in a form leaves it in place. */
+function Toolbar({ editor, pinned }: { editor: Editor; pinned: boolean }) {
   const [linkOpen, setLinkOpen] = useState(false);
   const [href, setHref] = useState("");
   const s = useEditorState({
@@ -138,7 +139,7 @@ function Toolbar({ editor }: { editor: Editor }) {
 
   return (
     // The opaque page-colored wrapper hides the editor's frame and text as they scroll under the pinned toolbar.
-    <div className="sticky top-14 z-10 -mx-px -mt-px bg-surface">
+    <div className={cx("-mx-px -mt-px bg-surface", pinned && "sticky top-14 z-10")}>
       <div
         role="toolbar"
         aria-label="Formatting"
