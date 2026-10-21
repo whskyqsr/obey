@@ -142,10 +142,8 @@ export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     if (found.authorId !== req.user.id) {
       // A Dominant may move when someone else's plan ends (say, to curfew); the author is told.
       if (!canManage(m.role)) throw forbidden("only the person who added an event can change it");
-      const { endsAt } = z
-        .object({ endsAt: z.string().datetime({ offset: true }) })
-        .strict()
-        .parse(req.body);
+      if (Object.keys((req.body as object) ?? {}).some((k) => k !== "endsAt")) throw forbidden("a Dominant can only change when someone else's plan ends");
+      const { endsAt } = z.object({ endsAt: z.string().datetime({ offset: true }) }).parse(req.body);
       const end = new Date(endsAt);
       if (end <= found.startsAt) throw new HttpError(400, "a plan has to end after it starts");
       if (found.allDay) throw new HttpError(400, "an all-day plan can't be given an end time");

@@ -698,7 +698,7 @@ describe("tasks and occurrences", () => {
       expect((await dom.get(`/relationships/${relId}/curfew`)).body.clashes).toMatchObject([{ eventId: plan.id }]);
 
       // The Dominant moves the plan's end to curfew; only the end, and the author is told.
-      expect((await dom.patch(`/events/${plan.id}`, { title: "Nope" })).status).toBe(400);
+      expect((await dom.patch(`/events/${plan.id}`, { title: "Nope" })).status).toBe(403);
       expect((await dom.patch(`/events/${plan.id}`, { endsAt: "2026-10-21T02:00:00Z" })).body).toMatchObject({
         endsAt: "2026-10-21T02:00:00.000Z",
         previousEndsAt: "2026-10-21T05:00:00.000Z",
@@ -1521,7 +1521,7 @@ describe("calendar events", () => {
     expect((await dom.get(`/relationships/${relId}/events?from=2026-10-20&to=2026-10-22`)).body).toEqual([]);
     expect((await ctx.as(crypto.randomUUID()).get(`/relationships/${relId}/events?from=2026-10-16&to=2026-10-16`)).status).toBe(404);
 
-    // Only the author changes it; moving it off the task clears the clash.
+    // Only the author changes it (a Dominant only its end); moving it off the task clears the clash.
     expect((await dom.patch(`/events/${made.body.id}`, { title: "Mine now" })).status).toBe(403);
     const moved = await sub.patch(`/events/${made.body.id}`, { startsAt: "2026-10-16T17:00:00-04:00", endsAt: "2026-10-16T20:00:00-04:00" });
     expect(moved.body.conflictIds).toEqual([]);
