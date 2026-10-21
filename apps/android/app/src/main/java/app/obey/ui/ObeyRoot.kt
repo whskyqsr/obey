@@ -2,6 +2,7 @@ package app.obey.ui
 
 import android.Manifest
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -21,8 +22,6 @@ import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.OutlinedButton
@@ -50,21 +49,50 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.FactCheck
-import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
+import kotlinx.coroutines.launch
+import app.obey.R
+import app.obey.api.Relationship
+import app.obey.api.title
+import app.obey.ui.common.LocalOpenMenu
 import app.obey.api.Features
 import app.obey.ui.common.LocalFeatures
 import app.obey.auth.AuthState
@@ -115,7 +143,7 @@ fun ObeyRoot(vm: RootViewModel = hiltViewModel()) {
                         // A new NavHost (and fresh ViewModels) per relationship.
                         key(s.session.relationship.id) {
                             CompositionLocalProvider(LocalFeatures provides s.session.relationship.features) {
-                                if (welcome == s.session.relationship.id) WelcomeScreen() else MainScaffold()
+                                if (welcome == s.session.relationship.id) WelcomeScreen() else MainScaffold(menuSubtitle(s.session.relationship, s.session.userId))
                             }
                         }
                     }
@@ -162,18 +190,22 @@ private fun topLevels(f: Features) = listOfNotNull(
     TopLevel(TaskListRoute, "All tasks", Icons.Outlined.Checklist) { it.hasRoute<TaskListRoute>() },
 )
 
-/** A phone's bar fits five; past that it keeps Today, Calendar, Rewards and the first writing space, and the rest go under More. */
+/** The phone's bar holds Today, Calendar, the next section that's on, and the first writing space; the rest go in the menu. Stats is always in the menu. */
 private fun splitBar(all: List<TopLevel>): Pair<List<TopLevel>, List<TopLevel>> {
-    // Stats always sits under More, however many sections are switched off.
-    if (all.size <= 5 && all.none { it.route == StatsRoute }) return all to emptyList()
     val writing = all.firstOrNull { it.route in writingRoutes }
-    val bar = (all.filter { it.route !in writingRoutes && it.route != StatsRoute }.take(3) + listOfNotNull(writing)).take(4)
+    val bar = all.filter { it.route !in writingRoutes && it.route != StatsRoute }.take(3) + listOfNotNull(writing)
     return bar to all.filter { it !in bar }
+}
+
+/** Under "Fealty" in the menu: the dynamic's name, or "with" the partners' names. */
+private fun menuSubtitle(rel: Relationship, myId: String): String {
+    val title = rel.title(myId)
+    return if (rel.name != null || rel.members.none { it.userId != myId }) title else "with $title"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MainScaffold() {
+private fun MainScaffold(menuSubtitle: String) {
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val destination = entry?.destination
@@ -182,7 +214,6 @@ private fun MainScaffold() {
     val (bar, overflow) = remember(all) { splitBar(all) }
     val isTopLevel = destination != null && all.any { t -> destination.hierarchy.any(t.matches) }
     val wide = LocalConfiguration.current.screenWidthDp >= 600
-    var moreOpen by remember { mutableStateOf(false) }
     // A tab the dynamic just switched off (say, from Settings) shouldn't stay reachable underneath.
     val switchedOff = destination != null && !isTopLevel && destination.hierarchy.any {
         it.hasRoute<RewardsRoute>() || it.hasRoute<ConsequencesRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<ProtocolsRoute>() || it.hasRoute<JournalRoute>() || it.hasRoute<StatsRoute>()
@@ -217,44 +248,86 @@ private fun MainScaffold() {
             Box(Modifier.weight(1f)) { ObeyNavHost(nav) }
         }
     } else {
-        Scaffold(
-            bottomBar = {
-                if (isTopLevel) {
-                    NavigationBar {
-                        bar.forEach { t ->
-                            NavigationBarItem(
-                                selected = selected(t),
-                                onClick = { go(t.route) },
-                                icon = { Icon(t.icon, null) },
-                                label = { Text(t.label) },
+        val drawer = rememberDrawerState(DrawerValue.Closed)
+        val scope = rememberCoroutineScope()
+        val openMenu = remember { { scope.launch { drawer.open() }; Unit } }
+        LaunchedEffect(destination) { drawer.close() }
+        BackHandler(drawer.isOpen) { scope.launch { drawer.close() } }
+        ModalNavigationDrawer(
+            drawerState = drawer,
+            // Swiping open would fight horizontal gestures like the calendar's; the header button opens it.
+            gesturesEnabled = drawer.isOpen,
+            drawerContent = {
+                ModalDrawerSheet(Modifier.width(300.dp), drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)) {
+                    Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 12.dp)) {
+                        Row(Modifier.padding(horizontal = 28.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Image(
+                                painterResource(R.drawable.ic_launcher_foreground),
+                                contentDescription = null,
+                                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(colorResource(R.color.launcher_background)),
                             )
+                            Column(Modifier.weight(1f)) {
+                                Text("Fealty", style = MaterialTheme.typography.titleLarge)
+                                Text(menuSubtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
                         }
-                        if (overflow.isNotEmpty()) {
-                            NavigationBarItem(
-                                selected = overflow.any(::selected),
-                                onClick = { moreOpen = true },
-                                icon = { Icon(Icons.Outlined.Menu, null) },
-                                label = { Text("More") },
-                            )
-                        }
+                        overflow.forEach { t -> MenuItem(t.label, t.icon, selected(t)) { go(t.route) } }
+                        HorizontalDivider(Modifier.padding(horizontal = 28.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        MenuItem("Your dynamic", Icons.Outlined.FavoriteBorder, destination?.hasRoute<DynamicRoute>() == true) { nav.navigate(DynamicRoute) }
+                        MenuItem("Settings", Icons.Outlined.Settings, destination?.hasRoute<SettingsRoute>() == true) { nav.navigate(SettingsRoute) }
                     }
                 }
             },
-        ) { padding ->
-            // Only the bottom bar's space is reserved here; each screen's own Scaffold handles the top insets.
-            val bottomOnly = androidx.compose.foundation.layout.PaddingValues(bottom = padding.calculateBottomPadding())
-            Box(Modifier.padding(bottomOnly).consumeWindowInsets(bottomOnly)) { ObeyNavHost(nav) }
-        }
-        if (moreOpen) {
-            ModalBottomSheet(onDismissRequest = { moreOpen = false }) {
-                overflow.forEach { t ->
-                    ListItem(
-                        headlineContent = { Text(t.label) },
-                        leadingContent = { Icon(t.icon, null) },
-                        modifier = Modifier.clickable { moreOpen = false; go(t.route) },
-                    )
+        ) {
+            CompositionLocalProvider(LocalOpenMenu provides openMenu) {
+                Scaffold(bottomBar = { if (isTopLevel) FloatingBar(bar, ::selected) { go(it.route) } }) { padding ->
+                    // Only the bottom bar's space is reserved here; each screen's own Scaffold handles the top insets.
+                    val bottomOnly = androidx.compose.foundation.layout.PaddingValues(bottom = padding.calculateBottomPadding())
+                    Box(Modifier.padding(bottomOnly).consumeWindowInsets(bottomOnly)) { ObeyNavHost(nav) }
                 }
-                Spacer(Modifier.height(24.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun MenuItem(label: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
+    NavigationDrawerItem(
+        label = { Text(label) },
+        icon = { Icon(icon, null) },
+        selected = selected,
+        onClick = onClick,
+        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+    )
+}
+
+/** The phone's floating row of tiles: the current page fills its tile. */
+@Composable
+private fun FloatingBar(items: List<TopLevel>, selected: (TopLevel) -> Boolean, onClick: (TopLevel) -> Unit) {
+    Surface(
+        Modifier.windowInsetsPadding(WindowInsets.navigationBars).padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 16.dp).fillMaxWidth().height(76.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
+        shadowElevation = 3.dp,
+    ) {
+        Row(Modifier.selectableGroup().padding(6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            items.forEach { t ->
+                val on = selected(t)
+                val color = if (on) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(if (on) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+                        .selectable(selected = on, role = Role.Tab, onClick = { onClick(t) }),
+                    verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Icon(t.icon, null, tint = color)
+                    Text(t.label, style = MaterialTheme.typography.labelMedium, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
     }

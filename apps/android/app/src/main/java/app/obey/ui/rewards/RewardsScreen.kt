@@ -54,6 +54,7 @@ import app.obey.ui.common.Load
 import app.obey.ui.common.LoadingBox
 import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.SectionHeader
+import app.obey.ui.common.MenuButton
 import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.formatDateTime
 import app.obey.ui.common.signed
@@ -85,6 +86,7 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
     Scaffold(
         topBar = {
             TopAppBar(
+                navigationIcon = { MenuButton() },
                 title = { Text(if (consequences) "Consequences" else "Rewards & points") },
                 actions = {
                     if (canManage && features.points) IconButton(onClick = { adjusting = true }) { Icon(Icons.Outlined.Exposure, "Adjust points") }

@@ -44,6 +44,7 @@ import app.obey.ui.common.ErrorBox
 import app.obey.ui.common.Load
 import app.obey.ui.common.LoadingBox
 import app.obey.ui.common.MessageEffect
+import app.obey.ui.common.MenuButton
 import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.formatDate
 import app.obey.ui.today.OccurrenceActions
@@ -120,6 +121,7 @@ fun UpcomingScreen(
     Scaffold(
         topBar = {
             TopAppBar(
+                navigationIcon = { MenuButton() },
                 title = { Text("Calendar") },
                 actions = {
                     if (session?.readOnly != true) IconButton(onClick = {

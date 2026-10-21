@@ -62,6 +62,7 @@ import app.obey.ui.common.ErrorBox
 import app.obey.ui.common.Load
 import app.obey.ui.common.LoadingBox
 import app.obey.ui.common.MoodCard
+import app.obey.ui.common.MenuButton
 import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.loadCatching
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -114,7 +115,7 @@ fun StatsScreen(onOpenSettings: () -> Unit, onOpenTask: (String) -> Unit, vm: St
     val members = session.relationship?.members.orEmpty()
     val sub = members.firstOrNull { it.role == Role.Submissive }?.userId
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Stats") }, actions = { SettingsAction(onOpenSettings) }) }) { padding ->
+    Scaffold(topBar = { TopAppBar(title = { Text("Stats") }, navigationIcon = { MenuButton() }, actions = { SettingsAction(onOpenSettings) }) }) { padding ->
         Column(
             Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
