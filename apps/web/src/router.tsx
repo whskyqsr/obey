@@ -17,6 +17,7 @@ import { RewardsPage } from "./pages/Rewards";
 import { ProtocolsPage } from "./pages/Protocols";
 import { RuleLogPage } from "./pages/RuleLog";
 import { StatsPage } from "./pages/Stats";
+import { MonthReviewPage } from "./pages/MonthReview";
 import { KitsPage } from "./pages/Kits";
 import { RulesPage } from "./pages/Rules";
 import { SettingsPage } from "./pages/Settings";
@@ -206,6 +207,7 @@ const routeTree = rootRoute.addChildren([
   ),
   journalEntryRoute,
   page("/stats", gated("stats", StatsPage)),
+  page("/review", gated("review", MonthReviewPage)),
   page("/settings", SettingsPage),
   page("/dynamic", DynamicPage),
   page("/admin/reports", AdminReportsPage),

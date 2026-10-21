@@ -514,3 +514,56 @@ export const safeCalls = pgTable(
   },
   (t) => [index("safe_calls_relationship_idx").on(t.relationshipId, t.createdAt)],
 );
+
+/** The focus a Dominant sets for a calendar month ("2026-10"), and the tasks that count towards it. */
+export const monthFocuses = pgTable(
+  "month_focuses",
+  {
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    month: text("month").notNull(),
+    goal: text("goal").notNull(),
+    taskIds: jsonb("task_ids").$type<string[]>().notNull().default([]),
+    setBy: uuid("set_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.relationshipId, t.month] })],
+);
+
+/** One person's look back on a month: how well the focus was kept, what went well, what to work on. */
+export const monthReviews = pgTable(
+  "month_reviews",
+  {
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    month: text("month").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    rating: integer("rating").notNull(),
+    wentWell: text("went_well").notNull().default(""),
+    workOn: text("work_on").notNull().default(""),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.relationshipId, t.month, t.userId] })],
+);
+
+/** Who has been told a month's review is open, so each person hears it once. */
+export const monthPrompts = pgTable(
+  "month_prompts",
+  {
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    month: text("month").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    sentAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.relationshipId, t.month, t.userId] })],
+);

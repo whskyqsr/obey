@@ -28,6 +28,7 @@ export const FEATURE_ROWS: { key: keyof Features; label: string; help: string }[
   { key: "protocols", label: "Protocols", help: "Exactly what's expected, and when and how it's done." },
   { key: "journal", label: "Journal", help: "Dated entries with a mood." },
   { key: "stats", label: "Stats", help: "How tasks are going: done and missed over time, by weekday and by task." },
+  { key: "review", label: "Monthly review", help: "A focus for each month, and a look back on it together at the end." },
 ];
 
 const DATE_PRESETS = ["Anniversary", "Collaring", "First met"];

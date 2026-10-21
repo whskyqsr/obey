@@ -52,6 +52,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.Insights
+import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.FactCheck
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -108,6 +109,7 @@ import app.obey.ui.protocols.ProtocolEditorScreen
 import app.obey.ui.protocols.ProtocolsScreen
 import app.obey.ui.rulelog.RuleLogScreen
 import app.obey.ui.stats.StatsScreen
+import app.obey.ui.stats.MonthReviewScreen
 import app.obey.ui.kits.KitsScreen
 import app.obey.ui.kits.describe
 import app.obey.ui.rules.RulesScreen
@@ -185,14 +187,15 @@ private fun topLevels(f: Features) = listOfNotNull(
     TopLevel(NotesRoute, "Notes", Icons.AutoMirrored.Outlined.Notes) { it.hasRoute<NotesRoute>() },
     if (f.journal) TopLevel(JournalRoute, "Journal", Icons.Outlined.AutoStories) { it.hasRoute<JournalRoute>() } else null,
     if (f.stats) TopLevel(StatsRoute, "Stats", Icons.Outlined.Insights) { it.hasRoute<StatsRoute>() } else null,
+    if (f.review) TopLevel(MonthReviewRoute, "Monthly review", Icons.Outlined.Flag) { it.hasRoute<MonthReviewRoute>() } else null,
     // Tasks open from Today and Calendar; the full list is for managing them, so it sits under More.
     TopLevel(TaskListRoute, "All tasks", Icons.Outlined.Checklist) { it.hasRoute<TaskListRoute>() },
 )
 
-/** The phone's bar holds Today, Calendar, the next section that's on, and the first writing space; the rest go in the menu. Stats is always in the menu. */
+/** The phone's bar holds Today, Calendar, the next section that's on, and the first writing space; the rest go in the menu. Stats and the monthly review are always in the menu. */
 private fun splitBar(all: List<TopLevel>): Pair<List<TopLevel>, List<TopLevel>> {
     val writing = all.firstOrNull { it.route in writingRoutes }
-    val bar = all.filter { it.route !in writingRoutes && it.route != StatsRoute }.take(3) + listOfNotNull(writing)
+    val bar = all.filter { it.route !in writingRoutes && it.route != StatsRoute && it.route != MonthReviewRoute }.take(3) + listOfNotNull(writing)
     return bar to all.filter { it !in bar }
 }
 
@@ -209,7 +212,7 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
     val wide = LocalConfiguration.current.screenWidthDp >= 600
     // A tab the dynamic just switched off (say, from Settings) shouldn't stay reachable underneath.
     val switchedOff = destination != null && !isTopLevel && destination.hierarchy.any {
-        it.hasRoute<RewardsRoute>() || it.hasRoute<ConsequencesRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<ProtocolsRoute>() || it.hasRoute<JournalRoute>() || it.hasRoute<StatsRoute>()
+        it.hasRoute<RewardsRoute>() || it.hasRoute<ConsequencesRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<ProtocolsRoute>() || it.hasRoute<JournalRoute>() || it.hasRoute<StatsRoute>() || it.hasRoute<MonthReviewRoute>()
     }
     LaunchedEffect(switchedOff) { if (switchedOff) nav.navigate(TodayRoute) { popUpTo(nav.graph.findStartDestination().id) } }
 
@@ -395,6 +398,7 @@ private fun ObeyNavHost(nav: NavHostController) {
             )
         }
         composable<StatsRoute> { StatsScreen(onOpenSettings = settings, onOpenTask = openTask) }
+        composable<MonthReviewRoute> { MonthReviewScreen(onOpenSettings = settings) }
         composable<TaskListRoute> {
             TaskListScreen(
                 onOpen = openTask,

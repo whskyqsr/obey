@@ -13,6 +13,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object NotesRoute
 @Serializable data object JournalRoute
 @Serializable data object StatsRoute
+@Serializable data object MonthReviewRoute
 @Serializable data object SettingsRoute
 @Serializable data object DynamicRoute
 @Serializable data object TaskListRoute

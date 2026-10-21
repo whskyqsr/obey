@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { api, apiObjectUrl } from "./client";
-import type { DynamicStats, MoodEntry } from "@obey/contracts";
+import type { DynamicStats, MonthFocus, MonthReview, MonthSummary, MoodEntry, PastMonth } from "@obey/contracts";
 import type {
   AdminReport,
   OccurrenceComment,
@@ -605,5 +605,40 @@ export function useTickStep(rel: string) {
   return useMutation({
     mutationFn: ({ id, stepId, done }: { id: string; stepId: string; done: boolean }) => api<Occurrence>(`/occurrences/${id}/steps`, { method: "POST", body: { stepId, done } }),
     onSuccess: () => invalidate(),
+  });
+}
+
+// ---- monthly review
+
+const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+export function useMonth(rel: string, month: string) {
+  return useQuery({
+    queryKey: ["rel", rel, "month", month],
+    queryFn: () => api<MonthSummary>(`/relationships/${rel}/months/${month}?zone=${encodeURIComponent(zone())}`),
+  });
+}
+
+export function usePastMonths(rel: string) {
+  return useQuery({ queryKey: ["rel", rel, "months"], queryFn: () => api<PastMonth[]>(`/relationships/${rel}/months?zone=${encodeURIComponent(zone())}`) });
+}
+
+export function useSetFocus(rel: string, month: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { goal: string; taskIds: string[] }) => api<MonthFocus>(`/relationships/${rel}/months/${month}/focus`, { method: "PUT", body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["rel", rel, "month"] }),
+  });
+}
+
+export function useSaveMonthReview(rel: string, month: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { rating: number; wentWell: string; workOn: string }) =>
+      api<MonthReview>(`/relationships/${rel}/months/${month}/review?zone=${encodeURIComponent(zone())}`, { method: "PUT", body }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["rel", rel, "month"] });
+      void qc.invalidateQueries({ queryKey: ["rel", rel, "months"] });
+    },
   });
 }

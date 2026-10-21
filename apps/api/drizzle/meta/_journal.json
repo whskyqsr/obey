@@ -239,6 +239,13 @@
       "when": 1792600182247,
       "tag": "0033_offline_sync",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792601180093,
+      "tag": "0034_monthly_review",
+      "breakpoints": true
     }
   ]
 }

@@ -176,6 +176,7 @@ data class Features(
     val protocols: Boolean = true,
     val journal: Boolean = true,
     val stats: Boolean = true,
+    val review: Boolean = true,
 )
 
 /** The relationship's name, or the partners' names when it has none. */
@@ -458,6 +459,46 @@ data class DynamicStats(
     val weekdays: List<Tally>,
     val tasks: List<TaskTally>,
 )
+
+@Serializable
+data class MonthFocusInput(val goal: String, val taskIds: List<String> = emptyList())
+
+@Serializable
+data class MonthReviewInput(val rating: Int, val wentWell: String = "", val workOn: String = "")
+
+/** The month's one goal, and the tasks that count towards it. [setBy] is null once that person has left. */
+@Serializable
+data class MonthFocus(val goal: String, val taskIds: List<String>, val setBy: String? = null, val updatedAt: String)
+
+/** One person's look back on a month: how well the focus was kept (1 to 5), and two answers. */
+@Serializable
+data class MonthReview(val userId: String, val rating: Int, val wentWell: String = "", val workOn: String = "", val updatedAt: String)
+
+@Serializable
+data class FocusTaskTally(val taskId: String, val title: String, val done: Int, val missed: Int, val excused: Int, val rate: Double? = null)
+
+/**
+ * A month in the dynamic: its focus, how the sub's ([subjectId]) tasks went against the month before, and the reviews.
+ * [reviews] holds your own answers, and everyone else's once you've given yours.
+ */
+@Serializable
+data class MonthSummary(
+    val month: String,
+    val subjectId: String? = null,
+    val focus: MonthFocus? = null,
+    val reviewOpensOn: String,
+    val reviewOpen: Boolean,
+    val reviews: List<MonthReview> = emptyList(),
+    val waitingOn: List<String> = emptyList(),
+    val totals: Tally,
+    val previous: Tally,
+    val focusTasks: List<FocusTaskTally> = emptyList(),
+    val mood: Double? = null,
+    val previousMood: Double? = null,
+)
+
+@Serializable
+data class PastMonth(val month: String, val goal: String? = null, val myRating: Int? = null, val rate: Double? = null)
 
 /** One point on the mood graph: a check-in answer, or a journal entry with a mood. */
 @Serializable

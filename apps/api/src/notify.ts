@@ -38,6 +38,8 @@ const CATEGORY: Record<string, NotifyCategory> = {
   rule_log: "assigned",
   event_changed: "plans",
   reward_redeemed: "rewards",
+  month_review_open: "reminders",
+  month_review: "comments",
 };
 export const categoryOf = (type: string | undefined): NotifyCategory | null => (type ? (CATEGORY[type] ?? null) : null);
 
