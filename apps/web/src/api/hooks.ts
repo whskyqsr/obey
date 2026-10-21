@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { api, apiObjectUrl } from "./client";
-import type { MoodEntry } from "@obey/contracts";
+import type { DynamicStats, MoodEntry } from "@obey/contracts";
 import type {
   AdminReport,
   OccurrenceComment,
@@ -84,6 +84,16 @@ export function useStreaks(rel: string) {
 
 export function useMoods(rel: string, days: number) {
   return useQuery({ queryKey: ["rel", rel, "moods", days], queryFn: () => api<MoodEntry[]>(`/relationships/${rel}/moods?days=${days}`), staleTime: 60_000 });
+}
+
+export function useStats(rel: string, days: number, userId: string | null) {
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const who = userId ? `&userId=${userId}` : "";
+  return useQuery({
+    queryKey: ["rel", rel, "stats", days, userId],
+    queryFn: () => api<DynamicStats>(`/relationships/${rel}/stats?days=${days}&zone=${encodeURIComponent(zone)}${who}`),
+    staleTime: 60_000,
+  });
 }
 
 export function useEditOccurrence(rel: string) {

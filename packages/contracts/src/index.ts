@@ -38,7 +38,7 @@ export const reschedulePolicy = z.enum(["dominant_only", "request", "allowance"]
 /** Changes whenever the picture does; null when there is none. Fetch it from /users/:id/avatar. */
 const avatarVersion = z.string().nullable();
 /** Parts of the app a dynamic can switch off. Points covers rewards too; tasks and notes are always on. */
-export const FEATURES = ["points", "consequences", "rules", "protocols", "journal"] as const;
+export const FEATURES = ["points", "consequences", "rules", "protocols", "journal", "stats"] as const;
 export const features = z.object(Object.fromEntries(FEATURES.map((f) => [f, z.boolean()])) as Record<(typeof FEATURES)[number], z.ZodBoolean>);
 export type Features = z.infer<typeof features>;
 export const allFeatures = (stored: Partial<Features> = {}): Features => Object.fromEntries(FEATURES.map((f) => [f, stored[f] ?? true])) as Features;
@@ -298,6 +298,31 @@ export const completeOccurrence = z.object({
   /** A journal task's entry; it's saved to the journal, shared with the dynamic. */
   journal: z.object({ title: z.string().max(200).default(""), bodyMd: z.string().trim().min(1).max(100_000) }).optional(),
 });
+
+/** Done, missed and excused counts; `rate` is done / (done + missed), null when nothing was due. */
+export const tally = z.object({ done: z.number().int(), missed: z.number().int(), excused: z.number().int(), rate: z.number().nullable() });
+export type Tally = z.infer<typeof tally>;
+
+/** How one person's tasks went over a stretch of days, for the Stats page. */
+export const dynamicStats = z.object({
+  days: z.number().int(),
+  totals: tally.extend({
+    /** Done by the deadline it had when it was done. */
+    onTime: z.number().int(),
+    /** Occurrences whose deadline was moved. */
+    moved: z.number().int(),
+  }),
+  /** The same counts for the stretch just before, for the trend. */
+  previous: tally,
+  /** Oldest first: days for a week or month, weeks for 3 months, months for a year. `start` is a local date. */
+  buckets: z.array(tally.extend({ start: plainDate })),
+  bucket: z.enum(["day", "week", "month"]),
+  /** Index 0 is Sunday. */
+  weekdays: z.array(tally).length(7),
+  tasks: z.array(tally.extend({ taskId: id, title: z.string(), streak: z.number().int(), active: z.boolean() })),
+});
+export type DynamicStats = z.infer<typeof dynamicStats>;
+export const STATS_RANGES = [7, 30, 90, 365] as const;
 
 /** One point on the mood graph: a check-in, or a journal entry with a mood. */
 export const moodEntry = z.object({

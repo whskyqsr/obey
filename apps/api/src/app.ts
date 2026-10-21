@@ -18,6 +18,7 @@ import { libraryRoutes } from "./routes/library.js";
 import { pointsRoutes } from "./routes/points.js";
 import { proofRoutes } from "./routes/proofs.js";
 import { relationshipRoutes } from "./routes/relationships.js";
+import { statsRoutes } from "./routes/stats.js";
 import { taskRoutes } from "./routes/tasks.js";
 
 export interface Deps {
@@ -89,6 +90,7 @@ export function buildApp(deps: Deps) {
   app.get("/health", async () => ({ ok: true }));
   app.register(relationshipRoutes(deps));
   app.register(taskRoutes(deps));
+  app.register(statsRoutes(deps));
   app.register(pointsRoutes(deps));
   app.register(libraryRoutes(deps));
   app.register(proofRoutes(deps));

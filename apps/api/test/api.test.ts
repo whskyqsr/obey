@@ -888,6 +888,46 @@ describe("protocols", () => {
   });
 });
 
+describe("stats", () => {
+  it("counts a person's done, missed and excused tasks by local day, with the stretch before for the trend", async () => {
+    const { dom, sub, relId, subId, domId } = await ctx.pair();
+    const t = (await dom.post(`/relationships/${relId}/tasks`, task(subId, { schedule: { start: "2026-10-16", rule: { freq: "daily" } } }))).body;
+    try {
+      const occs = (await dom.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-22`)).body as { id: string; originalDate: string }[];
+      ctx.clock.now = new Date("2026-10-23T12:00:00Z");
+      await runJobs(ctx.db, ctx.notifier, ctx.clock.now, { materializeDays: 14, reminderLeadMinutes: 30 });
+      const on = (d: string) => occs.find((o) => o.originalDate === d)!.id;
+      await dom.patch(`/occurrences/${on("2026-10-20")}`, { status: "completed" });
+      await dom.patch(`/occurrences/${on("2026-10-21")}`, { status: "completed" });
+      await dom.patch(`/occurrences/${on("2026-10-19")}`, { status: "excused" });
+
+      const stats = (await dom.get(`/relationships/${relId}/stats?days=7&zone=${encodeURIComponent(NY)}`)).body;
+      expect(stats.totals).toMatchObject({ done: 2, missed: 3, excused: 1, rate: 2 / 5 });
+      expect(stats.previous).toEqual({ done: 0, missed: 1, excused: 0, rate: 0 });
+      expect(stats.bucket).toBe("day");
+      expect(stats.buckets.map((b: { start: string; done: number; missed: number }) => [b.start, b.done, b.missed])).toEqual([
+        ["2026-10-17", 0, 1],
+        ["2026-10-18", 0, 1],
+        ["2026-10-19", 0, 0],
+        ["2026-10-20", 1, 0],
+        ["2026-10-21", 1, 0],
+        ["2026-10-22", 0, 1],
+        ["2026-10-23", 0, 0],
+      ]);
+      expect(stats.weekdays[2]).toMatchObject({ done: 1, missed: 0 }); // the 20th is a Tuesday
+      expect(stats.tasks).toEqual([{ taskId: t.id, title: t.title, active: true, streak: 0, done: 2, missed: 3, excused: 1, rate: 2 / 5 }]);
+
+      expect((await sub.get(`/relationships/${relId}/stats?days=90&zone=${encodeURIComponent(NY)}`)).body).toMatchObject({ bucket: "week", totals: { done: 2, missed: 4 } });
+      expect((await sub.get(`/relationships/${relId}/stats?userId=${domId}`)).body.totals).toMatchObject({ done: 0, missed: 0, rate: null });
+      expect((await sub.get(`/relationships/${relId}/stats?days=12`)).status).toBe(400);
+      await dom.patch(`/relationships/${relId}`, { features: { stats: false } });
+      expect((await sub.get(`/relationships/${relId}/stats`)).status).toBe(403);
+    } finally {
+      ctx.clock.now = new Date("2026-10-16T12:00:00Z");
+    }
+  });
+});
+
 describe("feature switches", () => {
   it("merges switches and stops booking points when points are off", async () => {
     const { dom, sub, relId, subId } = await ctx.pair();
@@ -897,6 +937,7 @@ describe("feature switches", () => {
       rules: true,
       protocols: true,
       journal: true,
+      stats: true,
     });
     // Notes can't be switched off; the key is ignored.
     expect((await dom.patch(`/relationships/${relId}`, { features: { notes: false } })).body.features).not.toHaveProperty("notes");
