@@ -637,6 +637,37 @@ describe("background jobs", () => {
     ctx.clock.now = new Date("2026-10-16T12:00:00Z");
   });
 
+  it("lets anyone call a safe word, tells the others through quiet hours, and excuses misses while red is on", async () => {
+    const { dom, sub, relId, domId, subId } = await ctx.pair();
+    await dom.post(`/relationships/${relId}/tasks`, task(subId, { missPenalty: 5 }));
+    expect((await sub.get(`/relationships/${relId}/safe-calls`)).body).toEqual({ active: null, recent: [] });
+
+    const yellow = await sub.post(`/relationships/${relId}/safe-calls`, { level: "yellow", note: "Need to talk" });
+    expect(yellow.status).toBe(201);
+    expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [domId], push: { body: "Sub called yellow", urgent: true, data: { type: "safe_call", level: "yellow" } } });
+    // Calling again changes the open call rather than opening a second one, and keeps the note.
+    const red = await sub.post(`/relationships/${relId}/safe-calls`, { level: "red" });
+    expect(red).toMatchObject({ status: 200, body: { id: yellow.body.id, level: "red", note: "Need to talk" } });
+    expect((await dom.get(`/relationships/${relId}/safe-calls`)).body.active).toMatchObject({ id: yellow.body.id, level: "red", callerId: subId });
+    expect((await (await ctx.pair()).dom.get(`/relationships/${relId}/safe-calls`)).status).toBe(404);
+
+    ctx.clock.now = new Date("2026-10-17T02:01:00Z");
+    await runJobs(ctx.db, ctx.notifier, ctx.clock.now, { materializeDays: 14, reminderLeadMinutes: 30 });
+    expect((await dom.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body[0].status).toBe("excused");
+    expect((await dom.get(`/relationships/${relId}/balances`)).body[0]?.balance ?? 0).toBe(0);
+
+    const cleared = await dom.post(`/safe-calls/${yellow.body.id}/clear`);
+    expect(cleared.body).toMatchObject({ clearedBy: domId, clearedAt: ctx.clock.now.toISOString() });
+    expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [subId], push: { data: { type: "safe_call_cleared" } } });
+    expect((await sub.get(`/relationships/${relId}/safe-calls`)).body).toMatchObject({ active: null, recent: [{ id: yellow.body.id }] });
+
+    // Once it's cleared, the next miss counts.
+    ctx.clock.now = new Date("2026-10-20T02:01:00Z");
+    await runJobs(ctx.db, ctx.notifier, ctx.clock.now, { materializeDays: 14, reminderLeadMinutes: 30 });
+    expect((await dom.get(`/relationships/${relId}/occurrences?from=2026-10-19&to=2026-10-19`)).body[0].status).toBe("missed");
+    ctx.clock.now = new Date("2026-10-16T12:00:00Z");
+  });
+
   it("sends one reminder per occurrence", async () => {
     const { dom, relId, subId } = await ctx.pair();
     await dom.post(`/relationships/${relId}/tasks`, task(subId));

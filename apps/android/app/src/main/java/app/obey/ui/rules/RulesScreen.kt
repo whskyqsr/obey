@@ -57,6 +57,7 @@ import app.obey.ui.common.LoadingBox
 import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.ReorderableList
 import app.obey.ui.common.MenuButton
+import app.obey.ui.common.SafeWordAction
 import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.loadCatching
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -139,6 +140,7 @@ fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, on
                 title = { Text("Rules") },
                 actions = {
                     IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.History, "Broken-rule log") }
+                    SafeWordAction()
                     SettingsAction(onOpenSettings)
                 },
             )

@@ -55,6 +55,7 @@ import app.obey.ui.common.LoadingBox
 import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.SectionHeader
 import app.obey.ui.common.MenuButton
+import app.obey.ui.common.SafeWordAction
 import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.local
 import app.obey.ui.proof.ProofPhotos
@@ -102,7 +103,7 @@ fun TodayScreen(
                 title = {
                     Text(LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE d MMMM")))
                 },
-                actions = { SettingsAction(onOpenSettings) },
+                actions = { SafeWordAction(); SettingsAction(onOpenSettings) },
             )
         },
         floatingActionButton = {

@@ -11,6 +11,8 @@ export interface Push {
   title: string;
   body: string;
   data?: Record<string, string>;
+  /** Comes through quiet hours with sound; only for safe calls. */
+  urgent?: boolean;
 }
 
 export interface Notifier {
@@ -113,7 +115,7 @@ export function fcmNotifier(db: Db, app: FirebaseApp, log: (msg: string) => void
       const targets = rows.map((r) => ({
         token: r.token,
         platform: r.platform,
-        quiet: r.quietStart && r.quietEnd && r.timezone ? isQuiet({ start: r.quietStart, end: r.quietEnd, timezone: r.timezone }, now) : false,
+        quiet: !push.urgent && r.quietStart && r.quietEnd && r.timezone ? isQuiet({ start: r.quietStart, end: r.quietEnd, timezone: r.timezone }, now) : false,
       }));
       for (const message of fcmMessages(targets, push)) {
         const res = await messaging.sendEachForMulticast(message);

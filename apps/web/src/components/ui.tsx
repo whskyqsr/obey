@@ -529,7 +529,18 @@ export function PageHeader({ title, subtitle, actions }: { title: ReactNode; sub
               <Icon name="menu" />
             </button>
           )}
-          <h1 className="min-w-0 text-headline-medium text-on-surface md:text-headline-large">{title}</h1>
+          <h1 className="min-w-0 flex-1 text-headline-medium text-on-surface md:text-headline-large">{title}</h1>
+          {menu?.safeWord && (
+            <button
+              type="button"
+              aria-label="Safe word"
+              title="Safe word"
+              onClick={menu.safeWord}
+              className="state-layer -my-1 -mr-3 flex size-12 shrink-0 items-center justify-center rounded-full text-error"
+            >
+              <Icon name="front_hand" filled />
+            </button>
+          )}
         </div>
         {subtitle && <p className={cx("mt-1 text-body-medium text-on-surface-variant", menu && "pl-10 md:pl-0")}>{subtitle}</p>}
       </div>

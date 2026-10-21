@@ -8,6 +8,8 @@ export interface Menu {
   open(): void;
   /** Called with the header's button (or null when it unmounts) so the shell knows when it's out of view. */
   track(el: HTMLElement | null): void;
+  /** Opens the safe-word sheet; set for subs and switches, who get its button on every page header. */
+  safeWord?(): void;
 }
 
 export const MenuContext = createContext<Menu | null>(null);

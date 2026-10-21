@@ -1,4 +1,4 @@
-import { and, count, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import {
   type PlainDate,
@@ -14,7 +14,7 @@ import {
   splitSeries,
 } from "@obey/recurrence";
 import type { Tx } from "../db/index.js";
-import { consequences, notes, occurrences, pointsLedger, relationships, reschedules, taskSeries } from "../db/schema.js";
+import { consequences, notes, occurrences, pointsLedger, relationships, reschedules, safeCalls, taskSeries } from "../db/schema.js";
 import { HttpError, forbidden } from "../errors.js";
 import { type Role, canManage } from "./access.js";
 
@@ -365,12 +365,29 @@ export async function markMissed(db: Tx, now: Date) {
     .where(and(eq(occurrences.status, "pending"), sql`${occurrences.dueAt} + make_interval(mins => ${taskSeries.graceMinutes}) <= ${now.toISOString()}::timestamptz`));
   const missed: { occ: Occurrence; series: Series; consequence: Series | null }[] = [];
   for (const { occ, series } of overdue) {
+    // A red safe call that was on when it came due (or is on now) excuses it: no penalty, no consequence.
+    const [red] = await db
+      .select({ id: safeCalls.id })
+      .from(safeCalls)
+      .where(
+        and(
+          eq(safeCalls.relationshipId, series.relationshipId),
+          eq(safeCalls.level, "red"),
+          lte(safeCalls.createdAt, now),
+          or(isNull(safeCalls.clearedAt), gte(safeCalls.clearedAt, occ.dueAt)),
+        ),
+      )
+      .limit(1);
     const [updated] = await db
       .update(occurrences)
-      .set({ status: "missed", missConfirmedAt: null })
+      .set({ status: red ? "excused" : "missed", missConfirmedAt: null })
       .where(and(eq(occurrences.id, occ.id), eq(occurrences.status, "pending")))
       .returning();
     if (!updated) continue;
+    if (red) {
+      await advanceCompletionSeries(db, series, localDate(occ.dueAt, series.timezone));
+      continue;
+    }
     if (series.missPenalty > 0 && (await pointsEnabled(db, series.relationshipId))) {
       await db
         .insert(pointsLedger)

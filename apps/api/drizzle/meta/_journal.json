@@ -225,6 +225,13 @@
       "when": 1792588084891,
       "tag": "0031_miss_confirmed",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792597690698,
+      "tag": "0032_safe_calls",
+      "breakpoints": true
     }
   ]
 }
