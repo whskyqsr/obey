@@ -2,6 +2,7 @@ import type { Db } from "./db/index.js";
 import { managers } from "./services/access.js";
 import { claimReminders, markMissed, materializeAll } from "./services/scheduling.js";
 import type { Notifier } from "./notify.js";
+import { promptMonthReviews } from "./routes/months.js";
 
 /** One pass of the background work. Every step is idempotent, so overlapping or repeated runs are safe. */
 export async function runJobs(db: Db, notifier: Notifier, now: Date, opts: { materializeDays: number; reminderLeadMinutes: number }) {
@@ -25,5 +26,6 @@ export async function runJobs(db: Db, notifier: Notifier, now: Date, opts: { mat
   for (const { occ, series } of reminders) {
     await notifier.send([series.assigneeId], { title: "Fealty", body: "A task is due soon", data: { type: "reminder", occurrenceId: occ.id } });
   }
-  return { missed: missed.length, reminders: reminders.length };
+  const reviews = await promptMonthReviews(db, notifier, now);
+  return { missed: missed.length, reminders: reminders.length, reviews };
 }

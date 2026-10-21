@@ -67,3 +67,7 @@ export interface LibraryTypes {
   notes: { item: Note; input: NoteInput };
 }
 export type LibraryKind = keyof LibraryTypes;
+export type MonthSummary = c.MonthSummary;
+export type MonthFocus = c.MonthFocus;
+export type MonthReview = c.MonthReview;
+export type PastMonth = c.PastMonth;

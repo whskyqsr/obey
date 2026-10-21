@@ -703,6 +703,49 @@ describe("background jobs", () => {
   });
 });
 
+describe("monthly review", () => {
+  it("lets a Dominant set the month's focus and each person look back on it once the review opens", async () => {
+    const { dom, sub, relId, domId, subId } = await ctx.pair();
+    const t = (await dom.post(`/relationships/${relId}/tasks`, task(subId))).body;
+    const q = "?zone=America/New_York";
+    expect((await sub.put(`/relationships/${relId}/months/2026-10/focus`, { goal: "Be on time" })).status).toBe(403);
+    const focus = await dom.put(`/relationships/${relId}/months/2026-10/focus`, { goal: " Be on time ", taskIds: [t.id] });
+    expect(focus.body).toMatchObject({ goal: "Be on time", taskIds: [t.id], setBy: domId });
+    expect((await sub.get(`/relationships/${relId}/months/2026-10${q}`)).body).toMatchObject({
+      subjectId: subId,
+      reviewOpensOn: "2026-10-29",
+      reviewOpen: false,
+      waitingOn: expect.arrayContaining([domId, subId]),
+    });
+    expect((await sub.put(`/relationships/${relId}/months/2026-10/review${q}`, { rating: 4 })).status).toBe(409);
+
+    ctx.clock.now = new Date("2026-10-29T16:00:00Z");
+    const opts = { materializeDays: 14, reminderLeadMinutes: 30 };
+    await runJobs(ctx.db, ctx.notifier, ctx.clock.now, opts);
+    await runJobs(ctx.db, ctx.notifier, ctx.clock.now, opts);
+    const prompts = ctx.notifier.sent.filter((s) => s.push.data?.type === "month_review_open" && (s.userIds.includes(subId) || s.userIds.includes(domId)));
+    expect(prompts).toHaveLength(2);
+
+    const mine = await sub.put(`/relationships/${relId}/months/2026-10/review${q}`, { rating: 4, wentWell: "Mornings", workOn: "Gym" });
+    expect(mine.body).toMatchObject({ userId: subId, rating: 4, wentWell: "Mornings", workOn: "Gym" });
+    expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [domId], push: { body: "Sub looked back on October" } });
+    // The Dominant can't read it until they've answered too.
+    expect((await dom.get(`/relationships/${relId}/months/2026-10${q}`)).body).toMatchObject({ reviewOpen: true, reviews: [], waitingOn: [domId] });
+    await dom.put(`/relationships/${relId}/months/2026-10/review${q}`, { rating: 5 });
+    const summary = (await dom.get(`/relationships/${relId}/months/2026-10${q}`)).body;
+    expect(summary.reviews).toHaveLength(2);
+    // Every third day from Oct 16, all missed: the 16th, 19th, 22nd, 25th and 28th.
+    expect(summary.totals).toMatchObject({ done: 0, missed: 5, rate: 0 });
+    expect(summary.focusTasks).toEqual([expect.objectContaining({ taskId: t.id, missed: 5 })]);
+
+    ctx.clock.now = new Date("2026-11-02T16:00:00Z");
+    expect((await sub.get(`/relationships/${relId}/months${q}`)).body).toEqual([{ month: "2026-10", goal: "Be on time", myRating: 4, rate: 0 }]);
+    await dom.patch(`/relationships/${relId}`, { features: { review: false } });
+    expect((await sub.get(`/relationships/${relId}/months${q}`)).status).toBe(403);
+    ctx.clock.now = new Date("2026-10-16T12:00:00Z");
+  });
+});
+
 describe("points, rewards and notes", () => {
   it("redeems rewards only with enough points", async () => {
     const { dom, sub, relId, subId } = await ctx.pair();
@@ -991,6 +1034,7 @@ describe("feature switches", () => {
       protocols: true,
       journal: true,
       stats: true,
+      review: true,
     });
     // Notes can't be switched off; the key is ignored.
     expect((await dom.patch(`/relationships/${relId}`, { features: { notes: false } })).body.features).not.toHaveProperty("notes");

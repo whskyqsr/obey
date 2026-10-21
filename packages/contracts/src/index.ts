@@ -38,7 +38,7 @@ export const reschedulePolicy = z.enum(["dominant_only", "request", "allowance"]
 /** Changes whenever the picture does; null when there is none. Fetch it from /users/:id/avatar. */
 const avatarVersion = z.string().nullable();
 /** Parts of the app a dynamic can switch off. Points covers rewards too; tasks and notes are always on. */
-export const FEATURES = ["points", "consequences", "rules", "protocols", "journal", "stats"] as const;
+export const FEATURES = ["points", "consequences", "rules", "protocols", "journal", "stats", "review"] as const;
 export const features = z.object(Object.fromEntries(FEATURES.map((f) => [f, z.boolean()])) as Record<(typeof FEATURES)[number], z.ZodBoolean>);
 export type Features = z.infer<typeof features>;
 export const allFeatures = (stored: Partial<Features> = {}): Features => Object.fromEntries(FEATURES.map((f) => [f, stored[f] ?? true])) as Features;
@@ -327,6 +327,43 @@ export const dynamicStats = z.object({
 });
 export type DynamicStats = z.infer<typeof dynamicStats>;
 export const STATS_RANGES = [7, 30, 90, 365] as const;
+
+/** A calendar month, "2026-10". */
+export const monthKey = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "expected YYYY-MM");
+export const monthFocusInput = z.object({ goal: z.string().trim().min(1).max(200), taskIds: z.array(id).max(10).default([]) });
+export const monthReviewInput = z.object({
+  rating: z.number().int().min(1).max(5),
+  wentWell: z.string().trim().max(2_000).default(""),
+  workOn: z.string().trim().max(2_000).default(""),
+});
+export const monthFocus = z.object({ goal: z.string(), taskIds: z.array(id), setBy: id.nullable(), updatedAt: z.string() });
+export type MonthFocus = z.infer<typeof monthFocus>;
+export const monthReview = z.object({ userId: id, rating: z.number().int(), wentWell: z.string(), workOn: z.string(), updatedAt: z.string() });
+export type MonthReview = z.infer<typeof monthReview>;
+/** A month in the dynamic: its focus, how the sub's tasks went against the month before, and the reviews. */
+export const monthSummary = z.object({
+  month: monthKey,
+  /** Whose tasks the numbers are about: the dynamic's first sub, or null when there isn't one. */
+  subjectId: id.nullable(),
+  focus: monthFocus.nullable(),
+  /** The review opens for the month's last three days and stays open after. */
+  reviewOpensOn: plainDate,
+  reviewOpen: z.boolean(),
+  /** Your own answers, and everyone else's once you've given yours. */
+  reviews: z.array(monthReview),
+  /** People who haven't answered yet. */
+  waitingOn: z.array(id),
+  totals: tally,
+  previous: tally,
+  /** The focus tasks' counts this month, in the order they were picked. */
+  focusTasks: z.array(tally.extend({ taskId: id, title: z.string() })),
+  /** Average mood (1 to 5) from the sub's check-ins and journal, this month and the one before; null without any. */
+  mood: z.number().nullable(),
+  previousMood: z.number().nullable(),
+});
+export type MonthSummary = z.infer<typeof monthSummary>;
+export const pastMonth = z.object({ month: monthKey, goal: z.string().nullable(), myRating: z.number().int().nullable(), rate: z.number().nullable() });
+export type PastMonth = z.infer<typeof pastMonth>;
 
 /** One point on the mood graph: a check-in, or a journal entry with a mood. */
 export const moodEntry = z.object({
