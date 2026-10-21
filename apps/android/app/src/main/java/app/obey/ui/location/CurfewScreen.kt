@@ -227,7 +227,7 @@ fun CurfewScreen(onBack: () -> Unit, onPlaces: () -> Unit, vm: CurfewViewModel =
                                 selected = f.weekendTime != null,
                                 onClick = { form = f.copy(weekendTime = f.weekendTime ?: saved?.weekendTime ?: "00:00") },
                                 shape = SegmentedButtonDefaults.itemShape(1, 2),
-                            ) { Text("Weeknights and weekends", maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                            ) { Text("Weekends differ", maxLines = 1, overflow = TextOverflow.Ellipsis) }
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             TimeButton(if (f.weekendTime != null) "Sun–Thu, home by" else "Home by", f.time, Modifier.weight(1f)) { picking = "time" }

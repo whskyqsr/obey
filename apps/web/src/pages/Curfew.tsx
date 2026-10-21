@@ -156,7 +156,7 @@ export function CurfewPage() {
                 onChange={(v) => set({ weekendTime: v === "split" ? (saved?.weekendTime ?? "00:00") : null })}
                 options={[
                   { value: "every", label: "Every night" },
-                  { value: "split", label: "Weeknights and weekends" },
+                  { value: "split", label: "Weekends differ" },
                 ]}
                 className="w-full whitespace-nowrap"
               />
