@@ -1,5 +1,5 @@
 // Copies Firebase's sign-in helper pages into dist/__/auth, so Google sign-in can run on our own domain
-// (VITE_FIREBASE_AUTH_DOMAIN=app.obey.chzsda.com) instead of showing <project>.firebaseapp.com.
+// (VITE_FIREBASE_AUTH_DOMAIN=app.fealty.me) instead of showing <project>.firebaseapp.com.
 // See "Option 4" in https://firebase.google.com/docs/auth/web/redirect-best-practices.
 import { mkdir, writeFile } from "node:fs/promises";
 
