@@ -451,6 +451,8 @@ export const calendarEvents = pgTable(
     changedBy: uuid("changed_by").references(() => users.id, { onDelete: "set null" }),
     previousEndsAt: ts("previous_ends_at"),
     changeSeenAt: ts("change_seen_at"),
+    /** The Dominant's optional note with that change. */
+    changeNote: text("change_note"),
     createdAt: createdAt(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },

@@ -1,11 +1,23 @@
 import { useState, type ReactNode } from "react";
-import { useAskCurfew, useChangePlanEnd, useConfirmMiss, useCurfew, useDecideCurfew, useDismissClashes, useExcuseCurfew, useHomeForCurfew, useLibrary } from "../api/hooks";
+import {
+  useAddComment,
+  useAskCurfew,
+  useChangePlanEnd,
+  useConfirmMiss,
+  useCurfew,
+  useDecideCurfew,
+  useDismissClashes,
+  useExcuseCurfew,
+  useHomeForCurfew,
+  useLibrary,
+} from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { CurfewClash, CurfewNight, CurfewRequest } from "../api/types";
 import { fmtDate, fmtTime, localDateOf } from "../lib/dates";
 import { plusLabel, plusMinutes, timeAfter, toHHMM } from "../lib/curfewTimes";
 import { useRel } from "../lib/relationship";
-import { Button, Chip, Dialog, Icon, IconButton, TextField, cx, useSnackbar } from "./ui";
+import { useNoteAfter } from "./DecisionNote";
+import { Button, Chip, Dialog, Icon, IconButton, TextArea, TextField, cx, useSnackbar } from "./ui";
 
 type Tone = "neutral" | "soon" | "home" | "broken";
 
@@ -80,6 +92,10 @@ function Night({ night, request }: { night: CurfewNight; request?: CurfewRequest
   const canAsk = mine && !started && !night.arrivedAt && night.status === "pending" && !request;
   const sheet = asking && <MoreTimeSheet night={night} onClose={() => setAsking(false)} />;
   const waiting = request && !started ? ` · asked ${mine ? askWho : "you"} for ${fmtTime(request.untilAt)}` : "";
+  // A Dominant's note about tonight (with a decision, say), for the sub.
+  const note = mine && night.note ? ` · ${askWho}: “${night.note}”` : "";
+  const noteAfter = useNoteAfter();
+  const target = (about: string) => ({ relId: rel.id, occurrenceId: night.occurrenceId, to: who, about });
 
   if (night.status === "missed") {
     const why = night.leftAt ? `Left home at ${fmtTime(night.leftAt)}` : `Not home by ${due}`;
@@ -93,7 +109,7 @@ function Night({ night, request }: { night: CurfewNight; request?: CurfewRequest
         tone="broken"
         icon="wrong_location"
         title={mine ? "You broke curfew" : `${who} broke curfew`}
-        body={[why, cost.join(", ")].filter(Boolean).join(" · ")}
+        body={[why, cost.join(", ")].filter(Boolean).join(" · ") + note}
         actions={
           isDom &&
           !mine && (
@@ -101,9 +117,13 @@ function Night({ night, request }: { night: CurfewNight; request?: CurfewRequest
               <IconButton
                 icon="event_available"
                 label="Excuse this night"
-                onClick={() => excuse.mutate(night.occurrenceId, { onSuccess: () => snack("Excused"), onError: fail })}
+                onClick={() => excuse.mutate(night.occurrenceId, { onSuccess: () => noteAfter("Excused", target("excusing curfew")), onError: fail })}
               />
-              <IconButton icon="check" label="Leave it missed" onClick={() => confirm.mutate(night.occurrenceId, { onSuccess: () => snack("Left as missed"), onError: fail })} />
+              <IconButton
+                icon="check"
+                label="Leave it missed"
+                onClick={() => confirm.mutate(night.occurrenceId, { onSuccess: () => noteAfter("Left as missed", target("leaving curfew missed")), onError: fail })}
+              />
             </div>
           )
         }
@@ -116,7 +136,7 @@ function Night({ night, request }: { night: CurfewNight; request?: CurfewRequest
         tone="home"
         icon="home"
         title={mine ? "Home for curfew" : `${who} is home for curfew`}
-        body={`Since ${fmtTime(night.arrivedAt)} · ${mine ? "stay" : "in"} until ${until}`}
+        body={`Since ${fmtTime(night.arrivedAt)} · ${mine ? "stay" : "in"} until ${until}${note}`}
       />
     );
   if (!mine) return <Strip tone="neutral" icon="bedtime" title={started ? `Curfew started at ${due}` : `Curfew at ${due}`} body={`${who} isn't home yet · in until ${until}`} />;
@@ -132,7 +152,7 @@ function Night({ night, request }: { night: CurfewNight; request?: CurfewRequest
           tone="neutral"
           icon="bedtime"
           title={`Curfew at ${due}`}
-          body={`Stay in until ${until}${waiting}`}
+          body={`Stay in until ${until}${waiting}${note}`}
           actions={
             <div className="flex shrink-0 items-center gap-1">
               {canAsk && <IconButton icon="more_time" label="More time" onClick={() => setAsking(true)} />}
@@ -156,7 +176,7 @@ function Night({ night, request }: { night: CurfewNight; request?: CurfewRequest
         tone="soon"
         icon="directions_walk"
         title={started ? `Curfew started at ${due}` : `Curfew in ${Math.max(1, Math.round((Date.parse(night.dueAt) - Date.now()) / 60_000))} min`}
-        body={waiting ? `Be home by ${due}${waiting}` : `Be home by ${due}, stay in until ${until}`}
+        body={(waiting ? `Be home by ${due}${waiting}` : `Be home by ${due}, stay in until ${until}`) + note}
         actions={more}
       />
       {sheet}
@@ -303,7 +323,11 @@ function Ask({ request }: { request: CurfewRequest }) {
   const decide = useDecideCurfew(rel.id);
   const [changing, setChanging] = useState(false);
   const who = memberName(request.requestedBy);
-  const done = (msg: string) => ({ onSuccess: () => snack(msg), onError: (e: unknown) => snack(errorMessage(e)) });
+  const noteAfter = useNoteAfter();
+  const done = (msg: string, about: string) => ({
+    onSuccess: () => noteAfter(msg, { relId: rel.id, occurrenceId: request.occurrenceId, to: who, about }),
+    onError: (e: unknown) => snack(errorMessage(e)),
+  });
   return (
     <div className="flex flex-col gap-1.5 rounded-xl bg-secondary-container px-4 py-4 text-on-secondary-container">
       <div className="text-title-medium">
@@ -315,13 +339,13 @@ function Ask({ request }: { request: CurfewRequest }) {
       </div>
       {request.reason && <div className="text-body-medium italic opacity-85">"{request.reason}"</div>}
       <div className="mt-2 flex flex-wrap gap-2">
-        <Button icon="check" busy={decide.isPending} onClick={() => decide.mutate({ id: request.id, approve: true }, done("Curfew moved"))}>
+        <Button icon="check" busy={decide.isPending} onClick={() => decide.mutate({ id: request.id, approve: true }, done("Curfew moved", "moving curfew"))}>
           Approve
         </Button>
         <Button variant="outlined" onClick={() => setChanging(true)}>
           Change
         </Button>
-        <Button variant="text" onClick={() => decide.mutate({ id: request.id, approve: false }, done("Declined"))}>
+        <Button variant="text" onClick={() => decide.mutate({ id: request.id, approve: false }, done("Declined", "saying no to more time"))}>
           Decline
         </Button>
       </div>
@@ -335,6 +359,8 @@ function ChangeSheet({ request, onClose }: { request: CurfewRequest; onClose(): 
   const { rel, memberName } = useRel();
   const snack = useSnackbar();
   const decide = useDecideCurfew(rel.id);
+  const addNote = useAddComment(rel.id);
+  const [note, setNote] = useState("");
   const steps: { label: string; at: string }[] = [];
   for (let m = 30; Date.parse(plusMinutes(request.fromDueAt, m)) < Date.parse(request.untilAt) && steps.length < 3; m += 30) {
     const at = plusMinutes(request.fromDueAt, m);
@@ -364,6 +390,7 @@ function ChangeSheet({ request, onClose }: { request: CurfewRequest; onClose(): 
                   onSuccess: () => {
                     onClose();
                     snack("Curfew moved");
+                    if (note.trim()) addNote.mutate({ occurrenceId: request.occurrenceId, body: note.trim() }, { onError: (e) => snack(errorMessage(e)) });
                   },
                   onError: (e) => snack(errorMessage(e)),
                 },
@@ -378,13 +405,15 @@ function ChangeSheet({ request, onClose }: { request: CurfewRequest; onClose(): 
       <div className="flex flex-col gap-4">
         <TimeChoices options={options} value={until} onChange={setUntil} after={request.fromDueAt} />
         {until && <Summary icon="home" title={`Home by ${fmtTime(until)}`} body={`${memberName(request.requestedBy)} asked for ${fmtTime(request.untilAt)}`} />}
+        <TextArea label={`Note to ${memberName(request.requestedBy)} (optional)`} value={note} maxLength={1000} onChange={(e) => setNote(e.target.value)} />
       </div>
     </Dialog>
   );
 }
 
 function Clash({ clash }: { clash: CurfewClash }) {
-  const { rel } = useRel();
+  const { rel, partners } = useRel();
+  const noteAfter = useNoteAfter();
   const snack = useSnackbar();
   const excuse = useExcuseCurfew(rel.id);
   const dismiss = useDismissClashes(rel.id);
@@ -400,7 +429,21 @@ function Clash({ clash }: { clash: CurfewClash }) {
           {when} · runs past curfew ({fmtTime(clash.dueAt)})
         </div>
         <div className="mt-3 flex flex-wrap gap-x-1 gap-y-2">
-          <Button busy={excuse.isPending} onClick={() => excuse.mutate(clash.occurrenceId, { onSuccess: () => snack("Curfew excused that night"), onError: fail })}>
+          <Button
+            busy={excuse.isPending}
+            onClick={() =>
+              excuse.mutate(clash.occurrenceId, {
+                onSuccess: () =>
+                  noteAfter("Curfew excused that night", {
+                    relId: rel.id,
+                    occurrenceId: clash.occurrenceId,
+                    to: partners.map((p) => p.displayName).join(" and ") || "them",
+                    about: "excusing curfew that night",
+                  }),
+                onError: fail,
+              })
+            }
+          >
             Excuse that night
           </Button>
           <Button variant="outlined" onClick={() => setMoving(true)}>
@@ -421,7 +464,7 @@ function Clash({ clash }: { clash: CurfewClash }) {
 
 /** A Dominant moving when a plan ends, to curfew or earlier; its author is told. */
 function PlanEndSheet({ clash, onClose }: { clash: CurfewClash; onClose(): void }) {
-  const { rel } = useRel();
+  const { rel, partners } = useRel();
   const snack = useSnackbar();
   const change = useChangePlanEnd(rel.id);
   const options = [
@@ -429,6 +472,7 @@ function PlanEndSheet({ clash, onClose }: { clash: CurfewClash; onClose(): void 
     { label: fmtTime(plusMinutes(clash.dueAt, -30)), at: plusMinutes(clash.dueAt, -30) },
   ];
   const [endsAt, setEndsAt] = useState<string | null>(clash.dueAt);
+  const [note, setNote] = useState("");
   const day = fmtDate(localDateOf(new Date(clash.eventStartsAt)));
   return (
     <Dialog
@@ -447,7 +491,7 @@ function PlanEndSheet({ clash, onClose }: { clash: CurfewClash; onClose(): void 
             onClick={() =>
               endsAt &&
               change.mutate(
-                { id: clash.eventId, endsAt },
+                { id: clash.eventId, endsAt, note: note.trim() || null },
                 {
                   onSuccess: () => {
                     onClose();
@@ -466,6 +510,12 @@ function PlanEndSheet({ clash, onClose }: { clash: CurfewClash; onClose(): void 
       <div className="flex flex-col gap-4">
         <TimeChoices options={options} value={endsAt} onChange={setEndsAt} after={clash.eventStartsAt} before={clash.eventEndsAt} />
         {endsAt && <Summary icon="event" title={`${day}, ${fmtTime(clash.eventStartsAt)} – ${fmtTime(endsAt)}`} body={`Was until ${fmtTime(clash.eventEndsAt)}`} />}
+        <TextArea
+          label={`Note to ${partners.map((p) => p.displayName).join(" and ") || "them"} (optional)`}
+          value={note}
+          maxLength={280}
+          onChange={(e) => setNote(e.target.value)}
+        />
         <p className="text-body-small">
           They're told the plan now ends at {endsAt ? fmtTime(endsAt) : "the new time"}.{" "}
           {endsAt && new Date(endsAt) > new Date(clash.dueAt) ? `Curfew moves to ${fmtTime(endsAt)} that night.` : `Curfew stays at ${fmtTime(clash.dueAt)}.`}

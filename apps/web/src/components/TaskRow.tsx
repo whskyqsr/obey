@@ -11,6 +11,7 @@ import { RitualDialog, isRitual, stepProgress } from "./Ritual";
 import { SendBackDialog } from "./Comments";
 import { RescheduleSheet } from "./RescheduleSheet";
 import { StreakStrip } from "./StreakStrip";
+import { useNoteAfter } from "./DecisionNote";
 import { CountRing, CountSheet, canCount, countLine, isCounted, useCountTap } from "./Count";
 import { CheckInButton, PlaceRing, canCheckIn, isPlaced, placeLine, useCheckIn, usePlaceLookup } from "./Location";
 import { Button, Icon, IconButton, cx, useSnackbar } from "./ui";
@@ -208,11 +209,13 @@ export function ReviewActions({ o }: { o: Occurrence }) {
  * the consequence it handed out. Each clears it from Needs you.
  */
 export function MissActions({ o }: { o: Occurrence }) {
-  const { rel } = useRel();
+  const { rel, memberName } = useRel();
   const snack = useSnackbar();
   const edit = useEditOccurrence(rel.id);
   const confirm = useConfirmMiss(rel.id);
   const drop = useDropConsequence(rel.id);
+  const noteAfter = useNoteAfter();
+  const target = (about: string) => ({ relId: rel.id, occurrenceId: o.id, to: memberName(o.assigneeId), about: `${about} “${o.title}”` });
   const busy = edit.isPending || confirm.isPending || drop.isPending;
   return (
     <>
@@ -220,14 +223,21 @@ export function MissActions({ o }: { o: Occurrence }) {
         icon="remove_circle_outline"
         label="Excuse: no penalty"
         disabled={busy}
-        onClick={() => edit.mutate({ id: o.id, change: { status: "excused" } }, { onSuccess: () => snack("Excused"), onError: (e) => snack(errorMessage(e)) })}
+        onClick={() =>
+          edit.mutate({ id: o.id, change: { status: "excused" } }, { onSuccess: () => noteAfter("Excused", target("excusing")), onError: (e) => snack(errorMessage(e)) })
+        }
       />
       {o.missConsequence && (
         <IconButton
           icon="remove_done"
           label={`Drop “${o.missConsequence}”: it stays missed`}
           disabled={busy}
-          onClick={() => drop.mutate(o.id, { onSuccess: () => snack(`Dropped “${o.missConsequence}”`), onError: (e) => snack(errorMessage(e)) })}
+          onClick={() =>
+            drop.mutate(o.id, {
+              onSuccess: () => noteAfter(`Dropped “${o.missConsequence}”`, target(`dropping “${o.missConsequence}” for`)),
+              onError: (e) => snack(errorMessage(e)),
+            })
+          }
         />
       )}
       <IconButton
@@ -235,7 +245,7 @@ export function MissActions({ o }: { o: Occurrence }) {
         label="Accept: it stays missed"
         variant="tonal"
         disabled={busy}
-        onClick={() => confirm.mutate(o.id, { onSuccess: () => snack("Kept as missed"), onError: (e) => snack(errorMessage(e)) })}
+        onClick={() => confirm.mutate(o.id, { onSuccess: () => noteAfter("Kept as missed", target("keeping as missed")), onError: (e) => snack(errorMessage(e)) })}
       />
     </>
   );

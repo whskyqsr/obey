@@ -357,6 +357,8 @@ export const curfewNight = z.object({
   missConfirmed: z.boolean(),
   /** The assignee's phone can't check location, so they say "I'm home" themselves. */
   canTap: z.boolean(),
+  /** The latest note a Dominant left about this night (say, with a declined ask). */
+  note: z.string().nullable().default(null),
 });
 export type CurfewNight = z.infer<typeof curfewNight>;
 
@@ -820,6 +822,7 @@ export const calendarEvent = z.object({
   /** Set when someone other than the author changed it (a Dominant moving its end). */
   changedBy: id.nullable().default(null),
   previousEndsAt: z.string().nullable().default(null),
+  changeNote: z.string().nullable().default(null),
 });
 export type CalendarEvent = z.infer<typeof calendarEvent>;
 

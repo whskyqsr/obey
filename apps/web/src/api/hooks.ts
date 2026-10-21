@@ -782,7 +782,7 @@ export function useDecideCurfew(rel: string) {
 export function useChangePlanEnd(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({
-    mutationFn: ({ id, endsAt }: { id: string; endsAt: string }) => api<CalendarEvent>(`/events/${id}`, { method: "PATCH", body: { endsAt } }),
+    mutationFn: ({ id, endsAt, note }: { id: string; endsAt: string; note?: string | null }) => api<CalendarEvent>(`/events/${id}`, { method: "PATCH", body: { endsAt, note } }),
     onSuccess: () => invalidate(),
   });
 }

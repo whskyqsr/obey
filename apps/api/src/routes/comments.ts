@@ -62,7 +62,7 @@ export const commentRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     // Discreet like every push: who, not what.
     await deps.notifier.send(others, {
       title: "Fealty",
-      body: `${req.user.displayName} commented on a task`,
+      body: series.curfewUntil ? `${req.user.displayName} left you a note about curfew` : `${req.user.displayName} commented on a task`,
       data: { type: "occurrence_comment", occurrenceId: occ.id },
     });
     return reply.status(201).send(c);

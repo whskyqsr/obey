@@ -25,6 +25,7 @@ export function PlanChanges() {
               {eventWhen(e)}
               {e.previousEndsAt && ` · was until ${fmtTime(e.previousEndsAt)}`}
             </div>
+            {e.changeNote && <div className="mt-1 text-body-medium italic">“{e.changeNote}”</div>}
           </div>
           <IconButton icon="close" label="Got it" onClick={() => seen.mutate(e.id, { onError: (x) => snack(errorMessage(x)) })} />
         </div>

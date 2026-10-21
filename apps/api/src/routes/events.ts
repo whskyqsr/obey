@@ -52,6 +52,7 @@ const eventDto = (e: Event, due: Due[]) => ({
   conflictIds: clashes(e, due).map((o) => o.id),
   changedBy: e.changedBy,
   previousEndsAt: e.previousEndsAt?.toISOString() ?? null,
+  changeNote: e.changeNote,
 });
 
 /** "12:00 AM" in the person's own zone, as best we know it. */
@@ -143,8 +144,8 @@ export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     if (found.authorId !== req.user.id) {
       // A Dominant may move when someone else's plan ends (say, to curfew); the author is told.
       if (!canManage(m.role)) throw forbidden("only the person who added an event can change it");
-      if (Object.keys((req.body as object) ?? {}).some((k) => k !== "endsAt")) throw forbidden("a Dominant can only change when someone else's plan ends");
-      const { endsAt } = z.object({ endsAt: z.string().datetime({ offset: true }) }).parse(req.body);
+      if (Object.keys((req.body as object) ?? {}).some((k) => k !== "endsAt" && k !== "note")) throw forbidden("a Dominant can only change when someone else's plan ends");
+      const { endsAt, note } = z.object({ endsAt: z.string().datetime({ offset: true }), note: z.string().trim().max(280).nullable().optional() }).parse(req.body);
       const end = new Date(endsAt);
       if (end <= found.startsAt) throw new HttpError(400, "a plan has to end after it starts");
       if (found.allDay) throw new HttpError(400, "an all-day plan can't be given an end time");
@@ -155,7 +156,7 @@ export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       const e = await db.transaction(async (tx) => {
         const [e] = await tx
           .update(calendarEvents)
-          .set({ endsAt: end, changedBy: req.user.id, previousEndsAt: found.endsAt, changeSeenAt: null, updatedAt: now })
+          .set({ endsAt: end, changedBy: req.user.id, previousEndsAt: found.endsAt, changeSeenAt: null, changeNote: note || null, updatedAt: now })
           .where(eq(calendarEvents.id, found.id))
           .returning();
         if (movesCurfew) {
@@ -203,6 +204,7 @@ export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         changedBy: null,
         previousEndsAt: null,
         changeSeenAt: null,
+        changeNote: null,
         updatedAt: deps.now(),
       })
       .where(eq(calendarEvents.id, current.id))

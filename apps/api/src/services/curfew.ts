@@ -1,8 +1,8 @@
-import { and, desc, eq, gt, gte, inArray, isNotNull, lt } from "drizzle-orm";
+import { and, desc, eq, gt, gte, inArray, isNotNull, lt, ne } from "drizzle-orm";
 import type { CurfewClash, CurfewNight, CurfewRequest, CurfewSettings } from "@obey/contracts";
 import { addDays, dueInstant, localDate, type Weekday } from "@obey/recurrence";
 import type { Tx } from "../db/index.js";
-import { calendarEvents, curfewRequests, memberships, occurrences, places, relationships, taskSeries, users } from "../db/schema.js";
+import { calendarEvents, curfewRequests, memberships, occurrenceComments, occurrences, places, relationships, taskSeries, users } from "../db/schema.js";
 import { HttpError } from "../errors.js";
 import { curfewEnd } from "./location.js";
 import { type Occurrence, type Series, materializeSeries } from "./scheduling.js";
@@ -133,7 +133,7 @@ export async function canTapHome(db: Tx, relationshipId: string, userId: string,
   return u?.status !== "ready" || paused;
 }
 
-const nightDto = (occ: Occurrence, series: Series, canTap: boolean): CurfewNight => ({
+const nightDto = (occ: Occurrence, series: Series, canTap: boolean, note: string | null = null): CurfewNight => ({
   occurrenceId: occ.id,
   assigneeId: series.assigneeId,
   placeId: series.placeId!,
@@ -144,6 +144,7 @@ const nightDto = (occ: Occurrence, series: Series, canTap: boolean): CurfewNight
   leftAt: occ.leftAt?.toISOString() ?? null,
   missConfirmed: occ.missConfirmedAt !== null,
   canTap,
+  note,
 });
 
 /** Curfew nights of this dynamic, newest first, due between the two instants. */
@@ -163,7 +164,13 @@ export async function curfewNightNow(db: Tx, relationshipId: string, now: Date):
   const broken = rows.find(({ occ }) => occ.status === "missed" && !occ.missConfirmedAt);
   const pick = live ?? broken;
   if (!pick) return null;
-  return nightDto(pick.occ, pick.series, await canTapHome(db, relationshipId, pick.series.assigneeId, now));
+  const [note] = await db
+    .select({ body: occurrenceComments.body })
+    .from(occurrenceComments)
+    .where(and(eq(occurrenceComments.occurrenceId, pick.occ.id), ne(occurrenceComments.authorId, pick.series.assigneeId)))
+    .orderBy(desc(occurrenceComments.createdAt))
+    .limit(1);
+  return nightDto(pick.occ, pick.series, await canTapHome(db, relationshipId, pick.series.assigneeId, now), note?.body ?? null);
 }
 
 /** Plans in the coming week that overlap a curfew night still to come and involve the sub, unless left as they are. */
