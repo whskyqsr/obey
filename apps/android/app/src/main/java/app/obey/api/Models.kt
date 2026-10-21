@@ -237,6 +237,12 @@ data class UpdateRelationshipInput(
 @Serializable
 data class TaskStep(val id: String, val title: String)
 
+enum class CountState { Short, Ok, Over }
+
+/** A tap adds one ([by] = 1); a correction sets the count outright ([to]). */
+@Serializable
+data class CountChange(val by: Int? = null, val to: Int? = null)
+
 @Serializable
 data class TickStepInput(val stepId: String, val done: Boolean)
 
@@ -267,6 +273,11 @@ data class TaskInput(
     val askMood: Boolean = false,
     /** A journal task: marking it done means writing a journal entry; bodyMd is the prompt. */
     val asksJournal: Boolean = false,
+    /** A count task is marked once each time and done when the count is between these; both null is an ordinary task. */
+    val countMin: Int? = null,
+    val countMax: Int? = null,
+    /** "task" books points and penalties once; "count" for each one counted, short or over. */
+    val countPer: String = "task",
 )
 
 @Serializable
@@ -293,6 +304,9 @@ data class Task(
     val askMood: Boolean = false,
     val asksJournal: Boolean = false,
     val summary: String,
+    val countMin: Int? = null,
+    val countMax: Int? = null,
+    val countPer: String = "task",
     /** Set when this one-off task is a consequence handed out on its own. */
     val assignedConsequenceId: String? = null,
     val active: Boolean,
@@ -305,6 +319,7 @@ data class Task(
         consequenceDueTime = consequenceDueTime, proofRequired = proofRequired,
         approvalRequired = approvalRequired, schedule = schedule, dueTime = dueTime, timezone = timezone,
         graceMinutes = graceMinutes, steps = steps, windowMinutes = windowMinutes, askMood = askMood, asksJournal = asksJournal,
+        countMin = countMin, countMax = countMax, countPer = countPer,
     )
 }
 
@@ -353,9 +368,48 @@ data class Occurrence(
     val journalNoteId: String? = null,
     /** A Dominant saw this miss and left it missed, so it no longer needs them. */
     val missConfirmed: Boolean = false,
+    /** A count task's bounds (both null for an ordinary task) and how many have been marked. */
+    val countMin: Int? = null,
+    val countMax: Int? = null,
+    val countPer: String = "task",
+    val count: Int = 0,
     /** Done on this phone with no signal and not sent yet; never from the server. */
     @kotlinx.serialization.Transient val waitingToSync: Boolean = false,
 ) {
+    /** Marked once each time it's done (cups of water, edges) instead of once. */
+    val isCounted: Boolean get() = countMin != null || countMax != null
+
+    /** "exactly 3", "at least 8", "no more than 2", "3–5". */
+    val countBounds: String get() = when {
+        countMin != null && countMax != null -> if (countMin == countMax) "exactly $countMin" else "$countMin–$countMax"
+        countMin != null -> "at least $countMin"
+        else -> "no more than $countMax"
+    }
+
+    fun countState(n: Int = count): CountState = when {
+        countMax != null && n > countMax -> CountState.Over
+        countMin != null && n < countMin -> CountState.Short
+        else -> CountState.Ok
+    }
+
+    /** "5 of at least 8", "3 of 3–5 · done, up to 2 more", "4 of exactly 3 · over by 1". */
+    val countLine: String get() {
+        val base = "$count of $countBounds"
+        return when {
+            countState() == CountState.Over -> "$base · over by ${count - countMax!!}"
+            status != OccurrenceStatus.Completed -> base
+            countMax != null && countMin != countMax && count == countMax -> "$base · at the limit"
+            countMax != null && countMin != countMax -> "$base · done, up to ${countMax - count} more"
+            else -> "$base · done"
+        }
+    }
+
+    /** Whether the count can still change: the assignee's while it's open and not past due; a Dominant's any time. */
+    fun canCount(mine: Boolean, manager: Boolean): Boolean {
+        val live = status == OccurrenceStatus.Pending || status == OccurrenceStatus.Completed || (status == OccurrenceStatus.Missed && !missConfirmed)
+        return live && (manager || (mine && isOpen() && java.time.Instant.parse(dueAt).isAfter(java.time.Instant.now())))
+    }
+
     /**
      * Tomorrow's daily task waits for its day, and a task with a window waits for it to open; the API refuses
      * either before then.

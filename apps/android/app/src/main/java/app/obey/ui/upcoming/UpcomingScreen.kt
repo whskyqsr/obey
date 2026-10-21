@@ -91,6 +91,7 @@ fun UpcomingScreen(
     }
     var rescheduling by remember { mutableStateOf<Occurrence?>(null) }
     var running by remember { mutableStateOf<Occurrence?>(null) }
+    var counting by remember { mutableStateOf<Occurrence?>(null) }
     var noting by remember { mutableStateOf<Occurrence?>(null) }
     // A plan to show, or a day to add one on.
     var plan by remember { mutableStateOf<Pair<CalendarEvent?, LocalDate>?>(null) }
@@ -107,6 +108,8 @@ fun UpcomingScreen(
                 onComplete = if (mine) ({ if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) }) else null,
                 onReschedule = { rescheduling = o },
                 onEditTask = if (canManage) ({ onEditTask(o.seriesId) }) else null,
+                onCount = if (mine && o.canCount(true, canManage)) ({ vm.count(o, by = 1) }) else null,
+                onCountHold = if (o.canCount(mine, canManage)) ({ counting = o }) else null,
             ),
             onOpen = { onOpenTask(o.seriesId) },
         )
@@ -243,6 +246,7 @@ fun UpcomingScreen(
     }
 
     running?.let { o -> app.obey.ui.today.RitualSheet(o, onDismiss = { running = null; vm.refresh() }, onNeedsProof = { running = null; noting = it }) }
+    counting?.let { o -> app.obey.ui.today.CountDialog(o, onDismiss = { counting = null }, onSave = { n -> vm.count(o, to = n); counting = null }) }
     noting?.let { o -> app.obey.ui.today.DoneDialog(o, onDismiss = { noting = null }, onDone = { note, mood, entry -> vm.complete(o, note, mood, entry); noting = null }) }
     rescheduling?.let { o ->
         RescheduleSheet(o, onDismiss = { rescheduling = null }, onSubmit = { vm.reschedule(o, it) })

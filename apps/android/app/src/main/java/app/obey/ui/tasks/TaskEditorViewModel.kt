@@ -31,6 +31,9 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** How a count task's bounds are set: one number for the first three, two for a range. */
+enum class CountKind(val label: String) { Exactly("Exactly"), AtLeast("At least"), AtMost("At most"), Range("Range") }
+
 /** Grace chips. [Midnight] follows the due time, so moving the time keeps it meaning "until midnight". */
 enum class Grace(val label: String) { None("None"), Quarter("15 min"), Hour("1 hour"), Midnight("Until midnight"), Custom("Custom") }
 
@@ -60,7 +63,26 @@ data class TaskForm(
     val windowMinutes: Int? = null,
     val askMood: Boolean = false,
     val asksJournal: Boolean = false,
+    /** A count task: marked once each time, done when the count is in bounds. */
+    val counted: Boolean = false,
+    val countKind: CountKind = CountKind.Exactly,
+    val countN: String = "3",
+    val countTo: String = "5",
+    /** "task" or "count": points and penalties once, or for each one. */
+    val countPer: String = "task",
 ) {
+    /** The bounds this form describes; both null for an ordinary task. */
+    val countBounds: Pair<Int?, Int?> get() {
+        if (!counted) return null to null
+        val n = (countN.toIntOrNull() ?: 1).coerceIn(1, 1000)
+        return when (countKind) {
+            CountKind.Exactly -> n to n
+            CountKind.AtLeast -> n to null
+            CountKind.AtMost -> null to n
+            CountKind.Range -> n to (countTo.toIntOrNull() ?: n).coerceIn(n, 1000)
+        }
+    }
+
     val titleError: String? get() = if (title.isBlank()) "Give it a title" else null
     val valid: Boolean get() = titleError == null && assigneeId.isNotEmpty() &&
         points.toIntOrNull() != null && missPenalty.toIntOrNull() != null && (grace != Grace.Custom || graceMinutes.toIntOrNull() != null)
@@ -162,6 +184,15 @@ class TaskEditorViewModel @Inject constructor(
         windowMinutes = t.windowMinutes,
         askMood = t.askMood,
         asksJournal = t.asksJournal,
+        counted = t.countMin != null || t.countMax != null,
+        countKind = when {
+            t.countMin != null && t.countMax != null -> if (t.countMin == t.countMax) CountKind.Exactly else CountKind.Range
+            t.countMax != null -> CountKind.AtMost
+            else -> CountKind.AtLeast.takeIf { t.countMin != null } ?: CountKind.Exactly
+        },
+        countN = (t.countMin ?: t.countMax ?: 3).toString(),
+        countTo = (t.countMax ?: 5).toString(),
+        countPer = t.countPer,
     )
 
     fun update(change: (TaskForm) -> TaskForm) = _form.update(change)
@@ -194,6 +225,9 @@ class TaskEditorViewModel @Inject constructor(
             windowMinutes = if (f.allDay) null else f.windowMinutes,
             askMood = f.askMood,
             asksJournal = f.asksJournal,
+            countMin = f.countBounds.first,
+            countMax = f.countBounds.second,
+            countPer = f.countPer,
         )
         action {
             if (original == null) api.createTask(sessions.requireRelationshipId(), input)

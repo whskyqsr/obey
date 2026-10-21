@@ -90,6 +90,7 @@ fun TodayScreen(
     var rescheduling by remember { mutableStateOf<Occurrence?>(null) }
     var noting by remember { mutableStateOf<Occurrence?>(null) }
     var running by remember { mutableStateOf<Occurrence?>(null) }
+    var counting by remember { mutableStateOf<Occurrence?>(null) }
     var commenting by remember { mutableStateOf<Occurrence?>(null) }
     var sendingBack by remember { mutableStateOf<Occurrence?>(null) }
     var plan by remember { mutableStateOf<CalendarEvent?>(null) }
@@ -136,6 +137,8 @@ fun TodayScreen(
                     onReschedule = { rescheduling = o },
                     onEditTask = if (session?.canManage == true) ({ onEditTask(o.seriesId) }) else null,
                     onComments = { commenting = o },
+                    onCount = if (o.assigneeId == me && o.canCount(true, session?.canManage == true)) ({ vm.count(o, by = 1) }) else null,
+                    onCountHold = if (o.canCount(o.assigneeId == me, session?.canManage == true)) ({ counting = o }) else null,
                 )
 
                 val isDom = session?.canManage == true
@@ -146,7 +149,9 @@ fun TodayScreen(
                 fun row(o: Occurrence, actions: OccurrenceActions = actionsFor(o)): @Composable () -> Unit = {
                     SwipeableRow(
                         o,
-                        onDone = if (o.assigneeId == me && o.status == OccurrenceStatus.Pending && o.isOpen()) ({ if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) }) else null,
+                        onDone = if (o.isCounted) {
+                            if (o.assigneeId == me && o.canCount(true, isDom)) ({ vm.count(o, by = 1) }) else null
+                        } else if (o.assigneeId == me && o.status == OccurrenceStatus.Pending && o.isOpen()) ({ if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) }) else null,
                         // A Dominant moves anyone's deadline the same way a sub asks for more time on their own.
                         onMoreTime = if ((o.assigneeId == me || isDom) && o.status == OccurrenceStatus.Pending) ({ rescheduling = o }) else null,
                         moreTimeLabel = if (o.assigneeId == me) "More time" else "Reschedule",
@@ -272,5 +277,6 @@ fun TodayScreen(
     }
 
     running?.let { o -> RitualSheet(o, onDismiss = { running = null; vm.refresh() }, onNeedsProof = { running = null; noting = it }) }
+    counting?.let { o -> CountDialog(o, onDismiss = { counting = null }, onSave = { n -> vm.count(o, to = n); counting = null }) }
     noting?.let { o -> DoneDialog(o, onDismiss = { noting = null }, onDone = { note, mood, entry -> vm.complete(o, note, mood, entry); noting = null }) }
 }

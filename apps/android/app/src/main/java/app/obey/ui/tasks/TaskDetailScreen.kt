@@ -135,6 +135,13 @@ class TaskDetailViewModel @Inject constructor(
         TaskDetail(task, stats.await(), currentByTask(occ.await().filter { it.seriesId == taskId })[taskId].orEmpty())
     }
 
+    /** A count task: [by] 1 for a tap, or [to] to set the count outright. */
+    fun count(o: Occurrence, by: Int? = null, to: Int? = null) = action {
+        val r = api.count(o.id, app.obey.api.CountChange(by = by, to = to))
+        say("${o.title}: ${r.copy(title = o.title).countLine}")
+        refresh()
+    }
+
     fun complete(o: Occurrence, note: String? = null, mood: Int? = null, entry: String? = null) = action {
         val r = api.complete(o.id, CompleteOccurrenceInput(noteMd = note?.takeIf { it.isNotBlank() }, mood = mood, journal = entry?.let { app.obey.api.JournalEntryInput(o.title, it) }))
         say(if (r.status == OccurrenceStatus.Submitted) "Sent for approval" else if (mood != null) "Checked in" else "Marked done")
@@ -187,6 +194,7 @@ fun TaskDetailScreen(
     var rescheduling by remember { mutableStateOf<Occurrence?>(null) }
     var noting by remember { mutableStateOf<Occurrence?>(null) }
     var running by remember { mutableStateOf<Occurrence?>(null) }
+    var counting by remember { mutableStateOf<Occurrence?>(null) }
     var commenting by remember { mutableStateOf<Occurrence?>(null) }
     var sendingBack by remember { mutableStateOf<Occurrence?>(null) }
     val title = (state as? Load.Ready)?.value?.task?.title.orEmpty()
@@ -289,6 +297,8 @@ fun TaskDetailScreen(
                                     onCompleteWithNote = if (mine) ({ noting = o }) else null,
                                     onReschedule = { rescheduling = o },
                                     onComments = { commenting = o },
+                                    onCount = if (mine && o.canCount(true, canManage)) ({ vm.count(o, by = 1) }) else null,
+                                    onCountHold = if (o.canCount(mine, canManage)) ({ counting = o }) else null,
                                 )
                             },
                         )
@@ -326,6 +336,7 @@ fun TaskDetailScreen(
     }
     rescheduling?.let { o -> RescheduleSheet(o, onDismiss = { rescheduling = null }, onSubmit = { vm.reschedule(o, it) }) }
     running?.let { o -> app.obey.ui.today.RitualSheet(o, onDismiss = { running = null; vm.refresh() }, onNeedsProof = { running = null; noting = it }) }
+    counting?.let { o -> app.obey.ui.today.CountDialog(o, onDismiss = { counting = null }, onSave = { n -> vm.count(o, to = n); counting = null }) }
     noting?.let { o -> app.obey.ui.today.DoneDialog(o, onDismiss = { noting = null }, onDone = { note, mood, entry -> vm.complete(o, note, mood, entry); noting = null }) }
 }
 
