@@ -124,6 +124,16 @@ interface ObeyApi {
     @PATCH("events/{id}")
     suspend fun updateEvent(@Path("id") id: String, @Body body: CalendarEventInput): CalendarEvent
 
+    @PATCH("events/{id}")
+    suspend fun changePlanEnd(@Path("id") id: String, @Body body: PlanEndInput): CalendarEvent
+
+    /** My plans someone else changed that I haven't closed yet. */
+    @GET("relationships/{id}/events/changes")
+    suspend fun planChanges(@Path("id") relationshipId: String): List<CalendarEvent>
+
+    @POST("events/{id}/seen")
+    suspend fun seenPlanChange(@Path("id") id: String, @Body body: Map<String, String> = emptyMap())
+
     @DELETE("events/{id}")
     suspend fun deleteEvent(@Path("id") id: String)
 
@@ -374,6 +384,18 @@ interface ObeyApi {
 
     @POST("relationships/{id}/curfew/excuse")
     suspend fun excuseCurfew(@Path("id") relationshipId: String, @Body body: ExcuseCurfewInput): Occurrence
+
+    @POST("relationships/{id}/curfew/check")
+    suspend fun curfewCheck(@Path("id") relationshipId: String, @Body body: CurfewCheckInput): CurfewCheck
+
+    @POST("relationships/{id}/curfew/requests")
+    suspend fun askCurfew(@Path("id") relationshipId: String, @Body body: CurfewRequestInput): CurfewRequest
+
+    @POST("curfew-requests/{id}/approve")
+    suspend fun approveCurfew(@Path("id") requestId: String, @Body body: ApproveCurfewRequestInput): CurfewRequest
+
+    @POST("curfew-requests/{id}/decline")
+    suspend fun declineCurfew(@Path("id") requestId: String, @Body body: Map<String, String> = emptyMap()): CurfewRequest
 
     // Push
     @POST("devices")

@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,11 +23,13 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.EventBusy
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.MoreTime
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -92,6 +96,10 @@ fun CurfewStrip(
     onHome: () -> Unit,
     onExcuse: () -> Unit,
     onConfirm: () -> Unit,
+    /** " · asked Sam for 11:00 PM" while an ask is waiting. */
+    waiting: String = "",
+    /** Set when the sub may still ask for more time tonight. */
+    onMoreTime: (() -> Unit)? = null,
 ) {
     val due = formatTime(night.dueAt)
     val until = formatTime(night.endsAt)
@@ -116,7 +124,8 @@ fun CurfewStrip(
             "Since ${formatTime(night.arrivedAt)} · ${if (mine) "stay" else "in"} until $until",
         )
         !mine -> Strip(Tone.Neutral, Icons.Outlined.Bedtime, if (started) "Curfew started at $due" else "Curfew at $due", "$name isn't home yet · in until $until")
-        night.canTap && !started -> Strip(Tone.Neutral, Icons.Outlined.Bedtime, "Curfew at $due", "Stay in until $until") {
+        night.canTap && !started -> Strip(Tone.Neutral, Icons.Outlined.Bedtime, "Curfew at $due", "Stay in until $until$waiting") {
+            onMoreTime?.let { IconButton(onClick = it) { Icon(Icons.Outlined.MoreTime, "More time") } }
             FilledTonalButton(onClick = onHome) {
                 Icon(Icons.Outlined.Home, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
@@ -129,17 +138,26 @@ fun CurfewStrip(
                 Tone.Soon,
                 Icons.AutoMirrored.Filled.DirectionsWalk,
                 if (started) "Curfew started at $due" else "Curfew in $mins min",
-                "Be home by $due, stay in until $until",
-            )
+                if (waiting.isNotEmpty()) "Be home by $due$waiting" else "Be home by $due, stay in until $until",
+            ) {
+                onMoreTime?.let {
+                    FilledTonalButton(onClick = it) {
+                        Icon(Icons.Outlined.MoreTime, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("More time")
+                    }
+                }
+            }
         }
     }
 }
 
 private val clashDay = DateTimeFormatter.ofPattern("EEE, MMM d")
 
-/** A plan that runs past curfew, for a Dominant to excuse that night or leave it. */
+/** A plan that runs past curfew, for a Dominant to excuse that night, move the plan's end, or leave it. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun CurfewClashCard(clash: CurfewClash, onExcuse: () -> Unit, onLeave: () -> Unit) {
+fun CurfewClashCard(clash: CurfewClash, onExcuse: () -> Unit, onChangeEnd: () -> Unit, onLeave: () -> Unit) {
     Surface(
         color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
         shape = RoundedCornerShape(24.dp),
@@ -155,8 +173,9 @@ fun CurfewClashCard(clash: CurfewClash, onExcuse: () -> Unit, onLeave: () -> Uni
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Button(onClick = onExcuse) { Text("Excuse curfew that night") }
+                FlowRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Button(onClick = onExcuse) { Text("Excuse that night") }
+                    OutlinedButton(onClick = onChangeEnd) { Text("Change the end") }
                     TextButton(onClick = onLeave) { Text("Leave it") }
                 }
             }

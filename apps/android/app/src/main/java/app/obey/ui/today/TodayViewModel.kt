@@ -48,7 +48,7 @@ import kotlinx.coroutines.launch
 import retrofit2.HttpException
 
 /** Tonight's curfew night (if Today shows one), plans that run past curfew, and what a broken night costs. */
-data class TodayCurfew(val night: CurfewNight?, val clashes: List<CurfewClash>, val cost: String?)
+data class TodayCurfew(val night: CurfewNight?, val clashes: List<CurfewClash>, val cost: String?, val requests: List<app.obey.api.CurfewRequest> = emptyList())
 
 data class TodayData(
     /** Before today and still open (not yet marked missed). */
@@ -125,6 +125,7 @@ class TodayViewModel @Inject constructor(
             _locationReady.value = watcher.status() == app.obey.api.LocationStatus.Ready
             if (sessions.session?.relationship?.features?.location == true) launch { runCatching { placeStore.refresh(relId) } }
             launch { loadCurfew(relId) }
+            launch { runCatching { api.planChanges(relId) }.onSuccess { _planChanges.value = it } }
             try {
                 val snap = snapshot(relId)
                 offline.saveToday(relId, snap)
@@ -238,7 +239,7 @@ class TodayViewModel @Inject constructor(
             runCatching { api.consequences(relId).firstOrNull { it.id == s.consequenceId }?.title }.getOrNull()
         } else null
         val cost = listOfNotNull(s?.missPenalty?.takeIf { features.points && it > 0 }?.let { "−$it pts" }, consequence).joinToString(", ").ifEmpty { null }
-        _curfew.value = TodayCurfew(c.night, c.clashes, cost)
+        _curfew.value = TodayCurfew(c.night, c.clashes, cost, c.requests)
     }
 
     fun homeForCurfew(n: CurfewNight) = action {
@@ -256,6 +257,44 @@ class TodayViewModel @Inject constructor(
     fun confirmCurfewMiss(n: CurfewNight) = action {
         api.confirmMiss(n.occurrenceId)
         say("Left as missed")
+        refresh()
+    }
+
+    fun askCurfew(n: CurfewNight, until: String, reason: String?, who: String, onDone: () -> Unit) = action {
+        api.askCurfew(sessions.requireRelationshipId(), app.obey.api.CurfewRequestInput(n.occurrenceId, until, reason))
+        say("Asked $who")
+        onDone()
+        refresh()
+    }
+
+    /** [until] null approves the time asked for. */
+    fun approveCurfew(r: app.obey.api.CurfewRequest, until: String?, onDone: () -> Unit = {}) = action {
+        api.approveCurfew(r.id, app.obey.api.ApproveCurfewRequestInput(until))
+        say("Curfew moved")
+        onDone()
+        refresh()
+    }
+
+    fun declineCurfew(r: app.obey.api.CurfewRequest) = action {
+        api.declineCurfew(r.id)
+        say("Declined")
+        refresh()
+    }
+
+    private val _planChanges = MutableStateFlow<List<app.obey.api.CalendarEvent>>(emptyList())
+    /** My plans someone else changed (a Dominant moving the end), until I close the card. */
+    val planChanges: StateFlow<List<app.obey.api.CalendarEvent>> = _planChanges.asStateFlow()
+
+    fun seenPlanChange(e: app.obey.api.CalendarEvent) = action {
+        _planChanges.value = _planChanges.value.filter { it.id != e.id }
+        api.seenPlanChange(e.id)
+    }
+
+    /** A Dominant moving when a plan that runs past curfew ends; its author is told. */
+    fun changePlanEnd(c: CurfewClash, endsAt: String, onDone: () -> Unit = {}) = action {
+        api.changePlanEnd(c.eventId, app.obey.api.PlanEndInput(endsAt))
+        say("Plan changed")
+        onDone()
         refresh()
     }
 

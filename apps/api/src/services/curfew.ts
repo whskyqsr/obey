@@ -1,8 +1,8 @@
 import { and, desc, eq, gt, gte, inArray, isNotNull, lt } from "drizzle-orm";
-import type { CurfewClash, CurfewNight, CurfewSettings } from "@obey/contracts";
+import type { CurfewClash, CurfewNight, CurfewRequest, CurfewSettings } from "@obey/contracts";
 import { addDays, dueInstant, localDate, type Weekday } from "@obey/recurrence";
 import type { Tx } from "../db/index.js";
-import { calendarEvents, memberships, occurrences, places, relationships, taskSeries, users } from "../db/schema.js";
+import { calendarEvents, curfewRequests, memberships, occurrences, places, relationships, taskSeries, users } from "../db/schema.js";
 import { HttpError } from "../errors.js";
 import { curfewEnd } from "./location.js";
 import { type Occurrence, type Series, materializeSeries } from "./scheduling.js";
@@ -182,8 +182,11 @@ export async function curfewClashes(db: Tx, relationshipId: string, now: Date): 
         gt(calendarEvents.endsAt, nights[0]!.occ.dueAt),
       ),
     );
+  // A night someone has asked more time for is sorted out by that request instead.
+  const asked = new Set((await pendingRequests(db, relationshipId, now)).map(({ r }) => r.occurrenceId));
   const clashes: CurfewClash[] = [];
   for (const { occ, series } of nights) {
+    if (asked.has(occ.id)) continue;
     const ends = curfewEnd(occ.dueAt, series.curfewUntil!, series.timezone);
     const e = events.find((e) => (e.withPartner || e.authorId === series.assigneeId) && e.startsAt < ends && e.endsAt > occ.dueAt && !e.dismissedIds.includes(occ.id));
     if (e)
@@ -227,4 +230,70 @@ export async function checkHome(db: Tx, relationshipId: string, placeId: string)
     .from(places)
     .where(and(eq(places.id, placeId), eq(places.relationshipId, relationshipId)));
   if (!p) throw new HttpError(400, "that place isn't in this dynamic");
+}
+
+type RequestRow = typeof curfewRequests.$inferSelect;
+
+export const requestDto = (r: RequestRow, eventTitle: string | null = null): CurfewRequest => ({
+  id: r.id,
+  occurrenceId: r.occurrenceId,
+  eventId: r.eventId,
+  eventTitle,
+  requestedBy: r.requestedBy,
+  fromDueAt: r.fromDueAt.toISOString(),
+  untilAt: r.untilAt.toISOString(),
+  reason: r.reason,
+  status: r.status,
+});
+
+/** Asks for more time still waiting on a Dominant; one lapses once its night's curfew arrives unanswered. */
+export async function pendingRequests(db: Tx, relationshipId: string, now: Date, requestedBy?: string) {
+  return db
+    .select({ r: curfewRequests, eventTitle: calendarEvents.title })
+    .from(curfewRequests)
+    .innerJoin(occurrences, eq(curfewRequests.occurrenceId, occurrences.id))
+    .leftJoin(calendarEvents, eq(curfewRequests.eventId, calendarEvents.id))
+    .where(
+      and(
+        eq(curfewRequests.relationshipId, relationshipId),
+        eq(curfewRequests.status, "pending"),
+        eq(occurrences.status, "pending"),
+        gt(occurrences.dueAt, now),
+        ...(requestedBy ? [eq(curfewRequests.requestedBy, requestedBy)] : []),
+      ),
+    )
+    .orderBy(occurrences.dueAt);
+}
+
+/**
+ * The person's curfew night a plan from [startsAt, endsAt) runs into, if any. Nights further out than usual are
+ * scheduled on the spot, so a plan weeks away can still ask.
+ */
+export async function nightForPlan(db: Tx, relationshipId: string, userId: string, startsAt: Date, endsAt: Date, now: Date) {
+  const series = await db
+    .select()
+    .from(taskSeries)
+    .where(and(eq(taskSeries.relationshipId, relationshipId), eq(taskSeries.assigneeId, userId), eq(taskSeries.active, true), isNotNull(taskSeries.curfewUntil)));
+  if (!series.length) return null;
+  for (const s of series) await materializeSeries(db, s, addDays(localDate(endsAt, s.timezone), 1), now);
+  const rows = await db
+    .select({ occ: occurrences, series: taskSeries })
+    .from(occurrences)
+    .innerJoin(taskSeries, eq(occurrences.seriesId, taskSeries.id))
+    .where(
+      and(
+        inArray(
+          taskSeries.id,
+          series.map((s) => s.id),
+        ),
+        eq(occurrences.status, "pending"),
+        gt(occurrences.dueAt, now),
+        lt(occurrences.dueAt, endsAt),
+        gte(occurrences.dueAt, new Date(startsAt.getTime() - MAX_NIGHT_HOURS * 3_600_000)),
+      ),
+    )
+    .orderBy(occurrences.dueAt);
+  const hit = rows.find(({ occ, series }) => curfewEnd(occ.dueAt, series.curfewUntil!, series.timezone) > startsAt);
+  if (!hit) return null;
+  return { occ: hit.occ, series: hit.series, endsAt: curfewEnd(hit.occ.dueAt, hit.series.curfewUntil!, hit.series.timezone) };
 }

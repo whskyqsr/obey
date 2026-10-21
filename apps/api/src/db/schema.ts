@@ -447,6 +447,10 @@ export const calendarEvents = pgTable(
     noteMd: text("note_md"),
     /** Tasks someone said are fine alongside this plan; they no longer count as clashes. */
     dismissedIds: jsonb("dismissed_ids").$type<string[]>().notNull().default([]),
+    /** Someone other than the author changed the plan (a Dominant moving its end); the author is told until they've seen it. */
+    changedBy: uuid("changed_by").references(() => users.id, { onDelete: "set null" }),
+    previousEndsAt: ts("previous_ends_at"),
+    changeSeenAt: ts("change_seen_at"),
     createdAt: createdAt(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
@@ -643,4 +647,36 @@ export const usageDaily = pgTable(
     count: integer("count").notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.day, t.kind] })],
+);
+
+/** A sub asking for a later curfew one night, from Today or from a plan that runs past it; a Dominant decides. */
+export const curfewRequests = pgTable(
+  "curfew_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    occurrenceId: uuid("occurrence_id")
+      .notNull()
+      .references(() => occurrences.id, { onDelete: "cascade" }),
+    /** The plan it was asked from, if any. */
+    eventId: uuid("event_id").references(() => calendarEvents.id, { onDelete: "set null" }),
+    requestedBy: uuid("requested_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Curfew as it was, and the home-by asked for. */
+    fromDueAt: ts("from_due_at").notNull(),
+    untilAt: ts("until_at").notNull(),
+    reason: text("reason"),
+    status: text("status", { enum: ["pending", "approved", "declined"] })
+      .notNull()
+      .default("pending"),
+    /** What the Dominant approved; may be earlier than asked. */
+    grantedAt: ts("granted_at"),
+    decidedBy: uuid("decided_by").references(() => users.id, { onDelete: "set null" }),
+    decidedAt: ts("decided_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("curfew_requests_relationship_idx").on(t.relationshipId, t.status)],
 );

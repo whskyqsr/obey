@@ -1,10 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { CalendarEvent, Occurrence } from "../api/types";
-import { useDeleteEvent, useDismissClashes, useOccurrences, usePlanReschedule, useSaveEvent } from "../api/hooks";
+import { useAskCurfew, useCurfew, useCurfewCheck, useDeleteEvent, useDismissClashes, useOccurrences, usePlanReschedule, useSaveEvent } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { addDays, fmtDate, fmtTime, fromLocalInput, localDateOf, toLocalInput, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 import { afterEvent } from "./RescheduleSheet";
+import { useAskWho } from "./CurfewStrip";
 import { Button, Chip, Dialog, Icon, SegmentedButtons, Switch, TextArea, TextField, useSnackbar } from "./ui";
 
 /** "Sat, Oct 18, 7:00 – 11:00 PM", or the dates for an all-day plan (its end is the next midnight, so show the day before). */
@@ -72,6 +73,7 @@ export function EventDialog({ event, day, open, onClose }: { event: CalendarEven
 
   const current = saved;
   const mine = !current || current.authorId === me.user.id;
+  const curfew = useCurfewWarning(open && editing, draft, current);
   const clashes = useClashes(open && !editing ? current : null);
   const set = (p: Partial<Draft>) => setDraft((d) => ({ ...d, ...p }));
 
@@ -96,14 +98,22 @@ export function EventDialog({ event, day, open, onClose }: { event: CalendarEven
     save.mutate(
       { id: current?.id, input },
       {
-        onSuccess: (res) => {
+        onSuccess: async (res) => {
+          if (curfew.ask) {
+            try {
+              await curfew.ask(res.id, input.endsAt);
+              snack(`${current ? "Plan updated" : "Plan added"}. Asked ${curfew.who}.`);
+            } catch (e) {
+              snack(errorMessage(e));
+            }
+          }
           if (res.conflictIds.length) {
             // Stay open on the clashes, so they can be moved right away.
             setSaved(res);
             setEditing(false);
           } else {
             onClose();
-            snack(current ? "Plan updated" : "Plan added");
+            if (!curfew.ask) snack(current ? "Plan updated" : "Plan added");
           }
         },
         onError: (e) => snack(errorMessage(e)),
@@ -161,6 +171,7 @@ export function EventDialog({ event, day, open, onClose }: { event: CalendarEven
             {current.authorId === me.user.id ? "you" : memberName(current.authorId)}
           </div>
           {current.noteMd && <p className="rounded-sm bg-surface-container px-3 py-2 whitespace-pre-wrap">{current.noteMd}</p>}
+          {curfew.waiting}
           {clashes.body}
         </div>
       </Dialog>
@@ -178,7 +189,7 @@ export function EventDialog({ event, day, open, onClose }: { event: CalendarEven
             Cancel
           </Button>
           <Button onClick={submit} busy={save.isPending} disabled={!valid}>
-            Save
+            {curfew.ask ? `Save and ask ${curfew.who}` : "Save"}
           </Button>
         </>
       }
@@ -223,10 +234,109 @@ export function EventDialog({ event, day, open, onClose }: { event: CalendarEven
             <TextField label="Ends" type="datetime-local" value={draft.end} min={draft.start} onChange={(e) => e.target.value && set({ end: e.target.value })} />
           </div>
         )}
+        {curfew.form(set)}
         <TextArea label="Note (optional)" value={draft.note} onChange={(e) => set({ note: e.target.value })} maxLength={2000} rows={2} />
       </div>
     </Dialog>
   );
+}
+
+/**
+ * A plan of mine that runs past one of my curfew nights: end it at curfew, or ask for that night's curfew to move to the
+ * plan's end (sent once the plan is saved). Once a night is asked about, the plan shows it's waiting.
+ */
+function useCurfewWarning(active: boolean, draft: Draft, current: CalendarEvent | null) {
+  const { rel, me, features } = useRel();
+  const who = useAskWho();
+  const curfewQ = useCurfew(rel.id, features.location);
+  const settings = curfewQ.data?.settings;
+  const onCurfew = !!settings?.enabled && settings.assigneeId === me.user.id;
+  const startsAt = draft.allDay || !draft.start ? null : fromLocalInput(draft.start);
+  const endsAt = draft.allDay || !draft.end ? null : fromLocalInput(draft.end);
+  const check = useCurfewCheck(rel.id, startsAt, endsAt, active && onCurfew);
+  const askCurfew = useAskCurfew(rel.id);
+  const [choice, setChoice] = useState<"end" | "ask" | null>(null);
+  const [reason, setReason] = useState("");
+  // Remembered so "Ends at curfew" still shows once the plan no longer runs past it.
+  const [endedAt, setEndedAt] = useState<string | null>(null);
+  useEffect(() => {
+    if (!active) {
+      setChoice(null);
+      setReason("");
+      setEndedAt(null);
+    }
+  }, [active]);
+  const pending = (curfewQ.data?.requests ?? []).find((r) => r.eventId && r.eventId === current?.id);
+  const night = check.data?.night ?? null;
+  const canAsk = !!night && !!endsAt && Date.parse(endsAt) < Date.parse(night.endsAt) && !pending;
+  const asking = choice === "ask" && canAsk;
+
+  const waiting = pending && (
+    <div className="flex items-center gap-3 rounded-lg bg-surface-container px-4 py-3">
+      <Icon name="hourglass_top" className="text-on-surface-variant" />
+      <div>
+        <div className="text-title-medium text-on-surface">Waiting on {who}</div>
+        <div className="text-body-medium">
+          You asked to move {fmtDate(localDateOf(new Date(Date.parse(pending.fromDueAt) - 12 * 3_600_000)), { weekday: "long" })}'s curfew from {fmtTime(pending.fromDueAt)} to{" "}
+          {fmtTime(pending.untilAt)}
+        </div>
+      </div>
+    </div>
+  );
+
+  function form(set: (p: Partial<Draft>) => void) {
+    if (!onCurfew || draft.allDay) return null;
+    if (pending) return waiting;
+    if (!night) {
+      if (!endedAt || draft.end !== toLocalInput(endedAt)) return null;
+      return (
+        <div className="flex items-start gap-3 rounded-lg bg-surface-container px-4 py-3">
+          <Icon name="bedtime" className="text-on-surface-variant" />
+          <div>
+            <div className="text-title-small text-on-surface">Ends at curfew</div>
+            <div className="text-body-medium">Curfew that night is {fmtTime(endedAt)}.</div>
+          </div>
+        </div>
+      );
+    }
+    const past = Math.round((Date.parse(endsAt!) - Date.parse(night.dueAt)) / 60_000);
+    const howLong = past < 60 ? `${past} min` : past % 60 ? `${(past / 60).toFixed(1)} hours` : past === 60 ? "an hour" : `${past / 60} hours`;
+    const nightName = fmtDate(localDateOf(new Date(Date.parse(night.dueAt) - 12 * 3_600_000)), { weekday: "long" });
+    return (
+      <div className="flex flex-col gap-3 rounded-lg bg-error-container px-4 py-3 text-on-error-container">
+        <div className="flex items-start gap-3">
+          <Icon name="bedtime" />
+          <div>
+            <div className="text-title-small">Runs {howLong} past curfew</div>
+            <div className="text-body-medium opacity-85">
+              Curfew {nightName} is {fmtTime(night.dueAt)}.{!canAsk && ` It runs past the stay-in time (${fmtTime(night.endsAt)}), so end it earlier.`}
+            </div>
+          </div>
+        </div>
+        <SegmentedButtons<"end" | "ask" | "">
+          value={asking ? "ask" : ""}
+          onChange={(v) => {
+            if (v === "end") {
+              setEndedAt(night.dueAt);
+              setChoice(null);
+              set({ end: toLocalInput(night.dueAt) });
+            } else if (v === "ask") setChoice("ask");
+          }}
+          className="w-full whitespace-nowrap"
+          options={[{ value: "end", label: `End at ${fmtTime(night.dueAt)}` }, ...(canAsk ? [{ value: "ask" as const, label: `Ask until ${fmtTime(endsAt!)}` }] : [])]}
+        />
+        {asking && <TextField label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={280} />}
+        {asking && (
+          <p className="text-body-small">
+            {who} is asked to move {nightName}'s curfew to {fmtTime(endsAt!)}. The plan is saved either way; if {who} says no, curfew stays at {fmtTime(night.dueAt)}.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  const ask = asking ? (eventId: string, until: string) => askCurfew.mutateAsync({ occurrenceId: night!.occurrenceId, until, reason: reason.trim() || null, eventId }) : null;
+  return { form, ask, who, waiting: !active && waiting };
 }
 
 type ClashChoice = "keep" | "move" | "cancel";
