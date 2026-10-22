@@ -91,8 +91,10 @@ export function PlaceMap({
       center: [lng, lat],
       zoom: zoomFor(radiusM, lat),
       interactive,
-      attributionControl: { compact: true },
+      attributionControl: false,
     });
+    // Top right, so the credit doesn't cover the dialog's hint and locate button along the bottom.
+    m.addControl(new lib.AttributionControl({ compact: true }), "top-right");
     map.current = m;
     const draw = () => {
       const c = m.getCenter();
