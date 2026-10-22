@@ -25,7 +25,7 @@ import app.obey.api.Role
 val Role.label: String
     get() = when (this) {
         Role.Dominant -> "Dominant"
-        Role.Submissive -> "Submissive"
+        Role.Submissive -> "submissive"
         Role.Switch -> "Switch"
     }
 

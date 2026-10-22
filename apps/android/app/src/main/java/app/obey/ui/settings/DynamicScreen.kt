@@ -316,7 +316,7 @@ fun DynamicScreen(onBack: () -> Unit, onPlaces: () -> Unit = {}, onLocation: () 
                         supportingContent = {
                             Text(
                                 when {
-                                    swap == null -> "Trade Dominant and Submissive with ${swapWith?.displayName}, for a while or for good"
+                                    swap == null -> "Trade Dominant and submissive with ${swapWith?.displayName}, for a while or for good"
                                     swap.active -> swap.endsAt?.let { "Until ${app.obey.ui.roles.formatSwapEnd(it)}" } ?: "Until one of you swaps back"
                                     swap.requestedBy == s.userId -> "Waiting for ${s.nameOf(swap.partnerId)} to accept"
                                     else -> "${s.nameOf(swap.requestedBy)} asked; answer on Today"

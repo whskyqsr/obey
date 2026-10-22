@@ -77,7 +77,7 @@ export function relTitle(rel: Relationship, myId: string): string {
   return names.length === 1 ? names[0]! : `${names.slice(0, -1).join(", ")} & ${names.at(-1)}`;
 }
 
-export const ROLE_LABEL = { dominant: "Dominant", submissive: "Submissive", switch: "Switch" } as const;
+export const ROLE_LABEL = { dominant: "Dominant", submissive: "submissive", switch: "Switch" } as const;
 
 /** A submissive in a dynamic that has marked a Collaring date that has come. */
 export function isCollared(rel: Relationship, userId: string, on = today()): boolean {
