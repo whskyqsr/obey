@@ -71,6 +71,7 @@ export async function relationshipDto(db: Tx, ids: string[]) {
     weeklyDelayAllowance: r.weeklyDelayAllowance,
     features: allFeatures(r.features),
     subNotes: r.subNotes,
+    proofDays: r.proofDays,
     dates: r.dates,
     createdAt: r.createdAt.toISOString(),
     endedAt: r.endedAt?.toISOString() ?? null,
@@ -192,8 +193,11 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
   });
 
   app.patch<{ Params: { id: string } }>("/relationships/:id", async (req) => {
-    await requireManager(db, req.params.id, req.user.id);
     const { features, ...body } = updateRelationship.parse(req.body);
+    // How long proof photos are kept is a privacy choice either partner may make; everything else is a Dominant's.
+    const onlyProofDays = !features && Object.keys(body).every((k) => k === "proofDays");
+    if (onlyProofDays) await requireMember(db, req.params.id, req.user.id);
+    else await requireManager(db, req.params.id, req.user.id);
     // Feature switches merge into what's stored, so one toggle doesn't reset the others.
     const merged = features ? sql`${relationships.features} || ${JSON.stringify(features)}::jsonb` : undefined;
     if (Object.keys(body).length || merged) {

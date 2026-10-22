@@ -41,6 +41,13 @@ export const FEATURE_ROWS: { key: keyof Features; label: string; help: string }[
   { key: "location", label: "Location tasks", help: "Tasks done by getting somewhere, like the gym by 6, checked by the sub's phone." },
 ];
 
+/** How long proof photos are kept once their task is done. */
+const PROOF_DAYS = [
+  { value: 1, label: "A day after the task is done" },
+  { value: 7, label: "A week after the task is done" },
+  { value: 30, label: "30 days after the task is done" },
+];
+
 const DATE_PRESETS = ["Anniversary", "Collaring", "First met"];
 const DATE_ICON: Record<string, string> = { Anniversary: "favorite", "First met": "waving_hand" };
 
@@ -339,6 +346,25 @@ export function DynamicPage() {
               label={`${sub ? sub.displayName : "A submissive"} can write notes`}
               help="Their own notes. Yours stay read-only to them unless you let them edit one."
             />
+          </div>
+          <div className="px-4 pt-3 pb-4">
+            <Select
+              label="Keep proof photos"
+              value={rel.proofDays === null ? "" : String(rel.proofDays)}
+              disabled={!!rel.endedAt}
+              onChange={(e) => {
+                const days = e.target.value ? Number(e.target.value) : null;
+                patch({ proofDays: days }, days ? `Proof photos are deleted ${PROOF_DAYS.find((d) => d.value === days)?.label.toLowerCase()}` : "Proof photos are kept");
+              }}
+              help="Either of you can change this. A photo that's been reported stays until it's reviewed."
+            >
+              <option value="">Until you delete them</option>
+              {PROOF_DAYS.map((d) => (
+                <option key={d.value} value={d.value}>
+                  {d.label}
+                </option>
+              ))}
+            </Select>
           </div>
         </Group>
 

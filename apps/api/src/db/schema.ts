@@ -48,6 +48,8 @@ export const relationships = pgTable("relationships", {
   features: jsonb("features").$type<Partial<Features>>().notNull().default({}),
   /** Whether a submissive may write notes of their own. */
   subNotes: boolean("sub_notes").notNull().default(true),
+  /** Proof photos are deleted this many days after their task is settled; null keeps them. */
+  proofDays: integer("proof_days"),
   /** Anniversaries and other dates the dynamic marks. */
   dates: jsonb("dates").$type<DynamicDate[]>().notNull().default([]),
   /** The sub's curfew as a Dominant set it; its nights are hidden task series (see task_series.curfew_until). */

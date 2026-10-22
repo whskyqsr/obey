@@ -126,6 +126,8 @@ export const relationship = z.object({
   features,
   /** Whether a submissive may write notes of their own. Dominants always can. */
   subNotes: z.boolean(),
+  /** Proof photos are deleted this many days after their task is settled; null keeps them. */
+  proofDays: z.number().int().nullable().default(null),
   dates: z.array(dynamicDate),
   createdAt: z.string(),
   /** When a partner left or blocked; an ended dynamic is kept read-only for both. */
@@ -186,6 +188,8 @@ export const updateRelationship = z.object({
   weeklyDelayAllowance: z.number().int().min(0).max(50).optional(),
   features: features.partial().optional(),
   subNotes: z.boolean().optional(),
+  /** Either partner may change it: the photos are of them, or for them. */
+  proofDays: z.number().int().min(1).max(365).nullable().optional(),
   /** The whole list, replacing what's stored. */
   dates: z.array(dynamicDate).max(20).optional(),
 });
