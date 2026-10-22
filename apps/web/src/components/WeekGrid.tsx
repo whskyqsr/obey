@@ -85,6 +85,7 @@ export function WeekGrid({
   clashing,
   onOpenTask,
   onOpenEvent,
+  fab,
 }: {
   days: string[];
   occurrences: Occurrence[];
@@ -92,6 +93,8 @@ export function WeekGrid({
   clashing: Set<string>;
   onOpenTask(o: Occurrence): void;
   onOpenEvent(e: CalendarEvent): void;
+  /** A floating button sits in the bottom corner: the grid stops above it, so its scrollbar doesn't run under the button. */
+  fab?: boolean;
 }) {
   const t = today();
   const { rel } = useRel();
@@ -194,7 +197,7 @@ export function WeekGrid({
       )}
 
       {/* Hours */}
-      <div ref={scroller} className="max-h-[calc(100dvh-290px)] min-h-96 overflow-y-auto [scrollbar-gutter:stable]">
+      <div ref={scroller} className={cx("max-h-[calc(100dvh-290px)] min-h-96 overflow-y-auto [scrollbar-gutter:stable]", fab && "md:max-h-[calc(100dvh-370px)]")}>
         <div className="relative grid grid-cols-[64px_repeat(7,1fr)]" style={{ height: 24 * HOUR }}>
           <div className="relative">
             {Array.from({ length: 23 }, (_, h) => (

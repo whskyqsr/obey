@@ -231,6 +231,7 @@ export function CalendarPage() {
           clashing={clashing}
           onOpenTask={(o) => setDetailId(o.id)}
           onOpenEvent={setPlan}
+          fab={isDom}
         />
       ) : (
         <div className="grid gap-3 px-4 md:grid-cols-7 md:gap-2 md:px-6">
