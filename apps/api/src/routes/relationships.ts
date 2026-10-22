@@ -5,7 +5,7 @@ import type { FastifyInstance } from "fastify";
 import { allFeatures, createInvite, createRelationship, id, joinRelationship, leaveRelationship, registerDevice, updateMe, updateRelationship } from "@obey/contracts";
 import type { Deps } from "../app.js";
 import type { Tx } from "../db/index.js";
-import { blocks, devices, invites, memberships, relationships, users } from "../db/schema.js";
+import { blocks, consequences, devices, invites, memberships, relationships, rewards, rules, taskSeries, users } from "../db/schema.js";
 import { HttpError, notFound } from "../errors.js";
 import { managers, membership, requireManager, requireMember } from "../services/access.js";
 import { deleteAccount, endRelationship } from "../services/account.js";
@@ -59,11 +59,13 @@ export async function relationshipDto(db: Tx, ids: string[]) {
       notifyDetails: users.notifyDetails,
       locationPausedAt: memberships.locationPausedAt,
       locationPausedUntil: memberships.locationPausedUntil,
+      joinedAt: memberships.createdAt,
     })
     .from(memberships)
     .innerJoin(users, eq(users.id, memberships.userId))
     .where(inArray(memberships.relationshipId, ids));
   const swaps = await openSwaps(db, ids);
+  const setups = await soloSetups(db, rels, members, now);
   return rels.map((r) => ({
     id: r.id,
     name: r.name,
@@ -77,6 +79,7 @@ export async function relationshipDto(db: Tx, ids: string[]) {
     endedAt: r.endedAt?.toISOString() ?? null,
     endedBy: r.endedBy,
     roleSwap: !r.endedAt && swaps.has(r.id) ? swapDto(swaps.get(r.id)!) : null,
+    soloSetup: setups.get(r.id) ?? null,
     members: members
       .filter((m) => m.relationshipId === r.id)
       .map(({ userId, displayName, role, avatarUpdatedAt, locationStatus, notifyDetails, locationPausedAt, locationPausedUntil }) => {
@@ -93,6 +96,44 @@ export async function relationshipDto(db: Tx, ids: string[]) {
         };
       }),
   }));
+}
+
+const SOLO_SETUP_DAYS = 14;
+
+/**
+ * What someone set up on their own before their partner joined, for the one-time cards both of them see. Only for a
+ * dynamic of two whose second member joined in the last two weeks, and only when there was something to hand over.
+ */
+async function soloSetups(db: Tx, rels: (typeof relationships.$inferSelect)[], members: { relationshipId: string; userId: string; joinedAt: Date }[], now: Date) {
+  const out = new Map<string, { setById: string; joinerId: string; joinedAt: string; tasks: number; rules: number; rewards: number; consequences: number }>();
+  const since = now.getTime() - SOLO_SETUP_DAYS * 86_400_000;
+  for (const r of rels) {
+    const two = members.filter((m) => m.relationshipId === r.id).sort((a, b) => a.joinedAt.getTime() - b.joinedAt.getTime());
+    if (r.endedAt || two.length !== 2 || two[1]!.joinedAt.getTime() < since) continue;
+    const before = two[1]!.joinedAt;
+    const count = async (t: typeof rules | typeof rewards | typeof consequences) => {
+      const [row] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(t)
+        .where(and(eq(t.relationshipId, r.id), sql`${t.createdAt} < ${before.toISOString()}::timestamptz`));
+      return row!.n;
+    };
+    const [tasks] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(taskSeries)
+      .where(and(eq(taskSeries.relationshipId, r.id), isNull(taskSeries.assignedConsequenceId), sql`${taskSeries.createdAt} < ${before.toISOString()}::timestamptz`));
+    const setup = {
+      setById: two[0]!.userId,
+      joinerId: two[1]!.userId,
+      joinedAt: before.toISOString(),
+      tasks: tasks!.n,
+      rules: await count(rules),
+      rewards: await count(rewards),
+      consequences: await count(consequences),
+    };
+    if (setup.tasks + setup.rules + setup.rewards + setup.consequences > 0) out.set(r.id, setup);
+  }
+  return out;
 }
 
 export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) => {
@@ -210,7 +251,9 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
   });
 
   app.post<{ Params: { id: string } }>("/relationships/:id/invites", async (req, reply) => {
-    const me = await requireMember(db, req.params.id, req.user.id);
+    await requireMember(db, req.params.id, req.user.id);
+    // The stored role, not the switch someone on their own acts as.
+    const me = (await membership(db, req.params.id, req.user.id))!;
     const body = createInvite.parse(req.body ?? {});
     // Unless told otherwise, a Dominant invites a submissive and a submissive invites a Dominant; a Switch leaves it open.
     const role = body.role !== undefined ? body.role : me.role === "dominant" ? "submissive" : me.role === "submissive" ? "dominant" : null;

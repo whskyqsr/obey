@@ -97,7 +97,11 @@ export function RuleLogPage() {
         })}
       </ul>
       {!readOnly && <Fab icon="add" label={isDom ? "Log a broken rule" : "Own up to one"} onClick={() => setAdding(true)} />}
-      <LogDialog open={adding} onClose={() => setAdding(false)} defaultSubject={isDom ? (partners.find((p) => p.role === "submissive") ?? partners[0])?.userId : me.user.id} />
+      <LogDialog
+        open={adding}
+        onClose={() => setAdding(false)}
+        defaultSubject={isDom ? ((partners.find((p) => p.role === "submissive") ?? partners[0])?.userId ?? me.user.id) : me.user.id}
+      />
       {confirmEl}
     </>
   );

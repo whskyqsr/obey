@@ -85,6 +85,8 @@ fun TodayScreen(
     onOpenTask: (String) -> Unit,
     onOpenSettings: () -> Unit,
     onKits: () -> Unit,
+    onInvite: () -> Unit = {},
+    onOpenTasks: () -> Unit = {},
     onOpenLocation: () -> Unit = {},
     onOpenAgreement: (edit: Boolean) -> Unit = {},
     onOpenRules: () -> Unit = {},
@@ -413,7 +415,8 @@ fun TodayScreen(
                     offlineSince?.let { at -> item(key = "offline") { OfflineBanner(at) } }
                     if (session?.readOnly == true) item(key = "ended") { EndedBanner(onOpenSettings) }
                     if (session?.relationship?.roleSwap != null) item(key = "role-swap") { app.obey.ui.roles.RoleSwapCard(session) }
-                    if (session != null && session.relationship?.features?.chastity == true && !session.readOnly) item(key = "chastity") { app.obey.ui.chastity.ChastityTodayCard(session) }
+                    if (session != null && !session.readOnly) item(key = "solo") { SoloCards(session, onInvite, onOpenTasks) }
+                    if (session != null && session.relationship?.features?.chastity == true && !session.readOnly && !session.solo) item(key = "chastity") { app.obey.ui.chastity.ChastityTodayCard(session) }
                     curfew?.night?.let { n ->
                         item(key = "curfew") {
                             val mine = n.assigneeId == me
@@ -458,7 +461,7 @@ fun TodayScreen(
                     if (!locationReady && !paused && (d.overdue + d.today + d.later.flatMap { it.second }).any { it.assigneeId == me && it.isPlaced && it.status == OccurrenceStatus.Pending }) {
                         item(key = "location") { app.obey.ui.location.LocationSetupPrompt(onOpenLocation) }
                     }
-                    if (!isDom) {
+                    if (!isDom || session?.solo == true) {
                         val counted = d.today.filter { it.status != OccurrenceStatus.Excused }
                         if (counted.isNotEmpty()) item(key = "progress") { ProgressCard(counted) }
                     }

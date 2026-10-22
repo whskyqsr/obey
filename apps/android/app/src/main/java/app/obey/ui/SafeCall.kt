@@ -176,9 +176,9 @@ fun SafeCallBanner(vm: SafeCallViewModel, call: SafeCall, modifier: Modifier = M
     }
 }
 
-/** Whether the person may call the safe word here: subs and switches, in a dynamic that hasn't ended. */
+/** Whether the person may call the safe word here: subs and switches, in a dynamic that hasn't ended and has someone else to tell. */
 fun SafeCallViewModel.canCall(): Boolean {
     val s = session ?: return false
     val rel = s.relationship ?: return false
-    return s.myRole != null && s.myRole != app.obey.api.Role.Dominant && !rel.ended
+    return s.myRole != null && s.myRole != app.obey.api.Role.Dominant && !rel.ended && !s.solo
 }

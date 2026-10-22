@@ -30,8 +30,11 @@ data class Session(
     /** An ended dynamic stays readable, but nothing in it can change. */
     val readOnly: Boolean get() = relationship?.ended == true
 
-    /** Dominants and switches may create and approve things, unless the dynamic has ended; the server enforces the real rules. */
-    val canManage: Boolean get() = (myRole == Role.Dominant || myRole == Role.Switch) && !readOnly
+    /** On their own in a live dynamic (solo mode): they set and do their own tasks until a partner joins. */
+    val solo: Boolean get() = myMember != null && relationship?.members?.size == 1 && !readOnly
+
+    /** Dominants and switches, and anyone on their own, may create and approve things unless the dynamic has ended; the server enforces the real rules. */
+    val canManage: Boolean get() = (myRole == Role.Dominant || myRole == Role.Switch || solo) && !readOnly
 
     fun nameOf(userId: String): String =
         relationship?.members?.firstOrNull { it.userId == userId }?.displayName

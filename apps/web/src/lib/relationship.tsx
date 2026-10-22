@@ -11,8 +11,10 @@ interface RelState {
   rel: Relationship;
   /** The signed-in user's membership in `rel`. */
   self: Member | undefined;
-  /** Dominants (and switches) manage tasks, libraries and approvals. */
+  /** Dominants (and switches) manage tasks, libraries and approvals. So does someone on their own (solo mode). */
   isDom: boolean;
+  /** On their own in a live dynamic: they set and do their own tasks until a partner joins. */
+  solo: boolean;
   partners: Member[];
   /** The relationship's name, or the partners' names when it has none. */
   title: string;
@@ -31,11 +33,13 @@ export function RelationshipProvider({ me, children }: { me: Me; children: React
     const rel = me.relationships.find((r) => r.id === selected) ?? me.relationships.find((r) => !r.endedAt) ?? me.relationships[0];
     if (!rel) return null;
     const self = rel.members.find((m) => m.userId === me.user.id);
+    const solo = !!self && rel.members.length === 1 && !rel.endedAt;
     return {
       me,
       rel,
       self,
-      isDom: self ? self.role !== "submissive" : false,
+      isDom: self ? solo || self.role !== "submissive" : false,
+      solo,
       partners: rel.members.filter((m) => m.userId !== me.user.id),
       title: relTitle(rel, me.user.id),
       features: allFeatures(rel.features),
@@ -73,7 +77,7 @@ export function useOptionalRel(): RelState | null {
 export function relTitle(rel: Relationship, myId: string): string {
   if (rel.name) return rel.name;
   const names = rel.members.filter((m) => m.userId !== myId).map((m) => m.displayName);
-  if (names.length === 0) return "Waiting for your partner";
+  if (names.length === 0) return "Just you";
   return names.length === 1 ? names[0]! : `${names.slice(0, -1).join(", ")} & ${names.at(-1)}`;
 }
 

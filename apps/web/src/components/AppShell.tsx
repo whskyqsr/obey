@@ -5,6 +5,7 @@ import { MenuContext, type Menu } from "../lib/menu";
 import { useRel } from "../lib/relationship";
 import { useNeedsYou } from "../lib/today";
 import { DynamicSwitcher } from "./DynamicSwitcher";
+import { InviteSheet } from "../pages/Dynamic";
 import { SafeCallBanner, SafeWordSheet } from "./SafeCall";
 import { Icon, cx } from "./ui";
 
@@ -35,13 +36,16 @@ const ALL: Dest[] = [
   { to: "/settings", label: "Settings", icon: "settings" },
 ];
 
+/** What needs a second person, so it stays out of the way while someone is on their own. */
+const NOT_SOLO = ["/agreement", "/chastity"];
+
 /** Destinations the desktop drawer pins to the bottom instead of the main list. */
 const DRAWER_BOTTOM = ["/settings"];
 
 /** Destinations for the current dynamic: everything, plus the phone's bar and what goes in its menu. */
 export function useDestinations() {
-  const { features } = useRel();
-  const all = ALL.filter((d) => !d.feature || features[d.feature]);
+  const { features, solo } = useRel();
+  const all = ALL.filter((d) => (!d.feature || features[d.feature]) && !(solo && NOT_SOLO.includes(d.to)));
   // The bar holds Today, Calendar, the next section that's on, and the first writing space; the rest go in the menu.
   const isWriting = (d: Dest) => d.to === "/notes" || d.to === "/journal";
   const writing = all.find(isWriting);
@@ -77,7 +81,7 @@ function BarItem({ d, active, badge }: { d: Dest; active: boolean; badge?: numbe
 }
 
 /** The phone's menu: everything that isn't in the bar, sliding in from the left. */
-function MenuDrawer({ open, onClose, items }: { open: boolean; onClose(): void; items: Dest[] }) {
+function MenuDrawer({ open, onClose, items, onInvite }: { open: boolean; onClose(): void; items: Dest[]; onInvite?(): void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   useEffect(() => {
     if (!open) return;
@@ -118,6 +122,15 @@ function MenuDrawer({ open, onClose, items }: { open: boolean; onClose(): void; 
         <hr className="mx-4 my-2 border-outline-variant" />
         {row({ to: "/dynamic", label: "Your dynamic", icon: "favorite" })}
         {bottom.map(row)}
+        {onInvite && (
+          <InviteButton
+            onClick={() => {
+              onClose();
+              onInvite();
+            }}
+            className="h-13"
+          />
+        )}
       </nav>
     </div>
   );
@@ -160,9 +173,18 @@ function DrawerItem({ d, active, badge }: { d: Dest; active: boolean; badge?: nu
   );
 }
 
+function InviteButton({ onClick, className }: { onClick(): void; className?: string }) {
+  return (
+    <button type="button" onClick={onClick} className={cx("state-layer flex items-center gap-3 rounded-full px-4 text-left text-label-large text-primary", className)}>
+      <Icon name="person_add" />
+      Invite a partner
+    </button>
+  );
+}
+
 export function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { rel, self } = useRel();
+  const { rel, self, solo } = useRel();
   const todayBadge = useNeedsYou().count;
   const { all, bar, more } = useDestinations();
   // The editor's Save is the only action that matters while editing, so the phone bar steps aside.
@@ -170,7 +192,9 @@ export function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [safeOpen, setSafeOpen] = useState(false);
   // Subs and switches get the safe word on every page; an ended dynamic has no one to tell.
-  const canCall = !!self && self.role !== "dominant" && !rel.endedAt;
+  const canCall = !!self && self.role !== "dominant" && !rel.endedAt && !solo;
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const invite = solo ? () => setInviteOpen(true) : undefined;
   // The header's menu button, and whether it has scrolled out of view (then a floating copy takes its place).
   const [headerButton, setHeaderButton] = useState<HTMLElement | null>(null);
   const [buttonHidden, setButtonHidden] = useState(false);
@@ -182,8 +206,9 @@ export function AppShell() {
   }, [headerButton]);
   useEffect(() => setMenuOpen(false), [pathname]);
   const menu = useMemo<Menu>(
-    () => ({ open: () => setMenuOpen(true), track: setHeaderButton, safeWord: canCall ? () => setSafeOpen(true) : undefined, banner: <SafeCallBanner /> }),
-    [canCall],
+    () => ({ open: () => setMenuOpen(true), track: setHeaderButton, safeWord: canCall ? () => setSafeOpen(true) : undefined, invite, banner: <SafeCallBanner /> }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [canCall, solo],
   );
 
   return (
@@ -199,6 +224,7 @@ export function AppShell() {
             .map((d) => (
               <DrawerItem key={d.to} d={d} active={isActive(pathname, d.to)} badge={d.to === "/" ? todayBadge : 0} />
             ))}
+          {invite && <InviteButton onClick={invite} className="h-12" />}
           <div className="flex-1" />
           {all
             .filter((d) => DRAWER_BOTTOM.includes(d.to))
@@ -257,7 +283,8 @@ export function AppShell() {
             <Icon name="menu" />
           </button>
         )}
-        <MenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} items={more} />
+        <MenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} items={more} onInvite={invite} />
+        {solo && <InviteSheet open={inviteOpen} onClose={() => setInviteOpen(false)} />}
         {canCall && <SafeWordSheet open={safeOpen} onClose={() => setSafeOpen(false)} />}
       </div>
     </MenuContext.Provider>

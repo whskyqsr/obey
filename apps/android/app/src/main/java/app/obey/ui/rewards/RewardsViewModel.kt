@@ -88,9 +88,10 @@ class RewardsViewModel @Inject constructor(
     fun deleteReward(r: Reward) = action { api.deleteReward(r.id); refresh() }
 
     /** Points are spent straight away; [who] marks it redeemed once it's given. */
-    fun redeem(r: Reward, who: String, consequenceOccurrenceId: String? = null) = action {
+    /** [who] is told; null when there's nobody to tell (solo mode). */
+    fun redeem(r: Reward, who: String?, consequenceOccurrenceId: String? = null) = action {
         api.redeemReward(r.id, app.obey.api.RedeemInput(consequenceOccurrenceId))
-        say("Spent ${r.cost} points. $who has been told.")
+        say(if (who == null) "Spent ${r.cost} points." else "Spent ${r.cost} points. $who has been told.")
         refresh()
     }
 

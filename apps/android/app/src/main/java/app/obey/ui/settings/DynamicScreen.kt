@@ -165,13 +165,13 @@ internal fun inviteDefault(role: Role?): Role? = when (role) {
 /** Everything about the relationship itself: who's in it, inviting, how it works, and which features are on. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun DynamicScreen(onBack: () -> Unit, onPlaces: () -> Unit = {}, onLocation: () -> Unit = {}, onCurfew: () -> Unit = {}, vm: SettingsViewModel = hiltViewModel()) {
+fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, onPlaces: () -> Unit = {}, onLocation: () -> Unit = {}, onCurfew: () -> Unit = {}, vm: SettingsViewModel = hiltViewModel()) {
     val sessionState by vm.session.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     MessageEffect(message, snackbar, vm::messageShown)
-    var dialog by rememberSaveable { mutableStateOf<String?>(null) } // "relname" | "create" | "join" | "invite"
+    var dialog by rememberSaveable { mutableStateOf(if (startInvite) "invite" else null) } // "relname" | "create" | "join" | "invite"
     val session = (sessionState as? SessionState.Ready)?.session
     var editingDate by remember { mutableStateOf<DynamicDate?>(null) }
     val curfew by vm.curfew.collectAsStateWithLifecycle()

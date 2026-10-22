@@ -189,6 +189,8 @@ data class Relationship(
     val endedBy: String? = null,
     /** The open role swap, asked for or under way. */
     val roleSwap: RoleSwap? = null,
+    /** What someone set up on their own before their partner joined, for a couple of weeks after they do. */
+    val soloSetup: SoloSetup? = null,
 ) {
     val ended: Boolean get() = endedAt != null
 }
@@ -209,6 +211,18 @@ data class RoleSwap(
 ) {
     val active: Boolean get() = status == "active"
 }
+
+/** Counts of what was set up before the second member joined. */
+@Serializable
+data class SoloSetup(
+    val setById: String,
+    val joinerId: String,
+    val joinedAt: String,
+    val tasks: Int,
+    val rules: Int,
+    val rewards: Int,
+    val consequences: Int,
+)
 
 @Serializable
 data class RoleSwapInput(val endsAt: String?, val pauseTasks: Boolean)
@@ -239,7 +253,7 @@ fun Relationship.title(myId: String): String {
     name?.let { return it }
     val names = members.filter { it.userId != myId }.map { it.displayName }
     return when (names.size) {
-        0 -> "Waiting for your partner"
+        0 -> "Just you"
         1 -> names[0]
         else -> names.dropLast(1).joinToString(", ") + " & " + names.last()
     }
