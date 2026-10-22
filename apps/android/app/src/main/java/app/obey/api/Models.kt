@@ -1312,3 +1312,20 @@ data class Agreement(val current: AgreementVersion? = null, val proposal: Agreem
 
 @Serializable
 data class AgreementTemplate(val sections: List<AgreementSectionInput>)
+
+/** A rule or protocol someone else added, changed or removed, until this person marks it seen. */
+@Serializable
+data class LibraryChange(
+    val id: String,
+    /** "rules" or "protocols". */
+    val kind: String,
+    /** "added", "changed" or "removed". */
+    val verb: String,
+    val itemId: String,
+    val title: String,
+    val changedBy: String? = null,
+    val createdAt: String,
+)
+
+@Serializable
+data class SeenLibraryChangesInput(val ids: List<String>)

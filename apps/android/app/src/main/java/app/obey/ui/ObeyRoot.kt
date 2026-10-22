@@ -221,11 +221,13 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
         it.hasRoute<RewardsRoute>() || it.hasRoute<ConsequencesRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<ProtocolsRoute>() || it.hasRoute<JournalRoute>() || it.hasRoute<StatsRoute>() || it.hasRoute<MonthReviewRoute>() || it.hasRoute<AgreementRoute>()
     }
     LaunchedEffect(switchedOff) { if (switchedOff) nav.navigate(TodayRoute) { popUpTo(nav.graph.findStartDestination().id) } }
-    // A push asking to set up location opens its screen.
+    // A push naming a screen (location setup, the agreement, rules or protocols) opens it.
     LaunchedEffect(Unit) {
         app.obey.push.PendingNav.target.collect { target ->
             if (target == app.obey.push.PendingNav.LOCATION && features.location) nav.navigate(LocationRoute)
             if (target == app.obey.push.PendingNav.AGREEMENT && features.agreement) nav.navigate(AgreementRoute())
+            if (target == app.obey.push.PendingNav.RULES && features.rules) nav.navigate(RulesRoute)
+            if (target == app.obey.push.PendingNav.PROTOCOLS && features.protocols) nav.navigate(ProtocolsRoute)
             if (target != null) app.obey.push.PendingNav.target.value = null
         }
     }
@@ -372,6 +374,8 @@ private fun ObeyNavHost(nav: NavHostController) {
                 onKits = { nav.navigate(KitsRoute) },
                 onOpenLocation = { nav.navigate(LocationRoute) },
                 onOpenAgreement = { edit -> nav.navigate(if (edit) AgreementRoute(edit = true) else AgreementRoute(review = true)) },
+                onOpenRules = { nav.navigate(RulesRoute) },
+                onOpenProtocol = { nav.navigate(ProtocolEditorRoute(protocolId = it)) },
             )
         }
         composable<UpcomingRoute> {

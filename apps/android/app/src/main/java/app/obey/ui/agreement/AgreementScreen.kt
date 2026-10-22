@@ -1052,28 +1052,6 @@ private fun AskChangesSheet(name: String, inForce: Int?, busy: Boolean, onDismis
     }
 }
 
-/** Today's card when the agreement needs you: a partner's proposal to read, or changes asked of yours. */
-@Composable
-fun AgreementTodayCard(v: AgreementVersion, session: Session, onOpen: (edit: Boolean) -> Unit) {
-    val mine = v.proposedBy == session.userId
-    val c = MaterialTheme.colorScheme
-    val title = if (mine) {
-        "${v.feedback?.userId?.let { session.nameOf(it) } ?: "Your partner"} asked for changes to the agreement"
-    } else {
-        "${proposer(v, session)} proposed version ${v.number} of your agreement"
-    }
-    val note = (if (mine) v.feedback?.note else v.note)?.takeIf { it.isNotBlank() }
-    Surface(color = c.secondaryContainer, contentColor = c.onSecondaryContainer, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            note?.let { Text("“$it”", style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic) }
-            Row(Modifier.padding(top = 8.dp)) {
-                Button(onClick = { onOpen(mine) }) { Text(if (mine) "Edit" else "Read it") }
-            }
-        }
-    }
-}
-
 /** Whether [v] is waiting on [session]'s person: a partner's proposal they haven't agreed to, or changes asked of their own. */
 fun agreementNeedsMe(v: AgreementVersion?, session: Session): Boolean {
     if (v == null || v.status !in OPEN) return false

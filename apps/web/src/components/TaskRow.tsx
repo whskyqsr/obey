@@ -193,9 +193,7 @@ export function ReviewActions({ o }: { o: Occurrence }) {
   const act = (approve: boolean) => review.mutate({ id: o.id, approve }, { onSuccess: () => snack(approve ? "Approved" : "Sent back"), onError: (e) => snack(errorMessage(e)) });
   return (
     <>
-      <Button variant="text" disabled={review.isPending} onClick={() => setSendingBack(true)}>
-        Send back
-      </Button>
+      <IconButton icon="undo" label="Send back" disabled={review.isPending} onClick={() => setSendingBack(true)} />
       <SendBackDialog o={o} open={sendingBack} onClose={() => setSendingBack(false)} />
       <Button variant="tonal" busy={review.isPending} onClick={() => act(true)}>
         Approve

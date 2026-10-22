@@ -270,7 +270,7 @@ fun PlanEndSheet(clash: CurfewClash, to: String, busy: Boolean, onDismiss: () ->
 @Composable
 fun PlanChangeCard(event: CalendarEvent, name: String, onSeen: () -> Unit) {
     val c = MaterialTheme.colorScheme
-    Surface(color = c.surfaceContainerHigh, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+    Surface(color = c.surfaceContainerHigh, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp)) {
             Icon(Icons.Outlined.Event, null, tint = c.primary, modifier = Modifier.padding(top = 2.dp))
             Spacer(Modifier.width(16.dp))

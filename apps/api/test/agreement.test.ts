@@ -117,5 +117,16 @@ describe("rule and protocol changes", () => {
     const p = (await dom.post(`/relationships/${relId}/protocols`, { title: "Morning greeting" })).body;
     await dom.del(`/protocols/${p.id}`);
     expect(lastTo(subId)!.body).toBe("Dom removed the protocol “Morning greeting”");
+
+    // Today keeps what Sub hasn't seen, one entry per item: an unseen protocol added then removed leaves nothing.
+    let changes = (await sub.get(`/relationships/${relId}/library-changes`)).body;
+    expect(changes).toEqual([expect.objectContaining({ kind: "rules", verb: "added", itemId: rule.id, title: "Lights out by 10:30", changedBy: domId })]);
+    expect((await dom.get(`/relationships/${relId}/library-changes`)).body).toEqual([]);
+    expect((await sub.post(`/relationships/${relId}/library-changes/seen`, { ids: [changes[0].id] })).status).toBe(204);
+    await dom.patch(`/rules/${rule.id}`, { bodyMd: "Phone down too." });
+    changes = (await sub.get(`/relationships/${relId}/library-changes`)).body;
+    expect(changes).toEqual([expect.objectContaining({ verb: "changed", title: "Lights out by 10:30" })]);
+    await dom.del(`/rules/${rule.id}`);
+    expect((await sub.get(`/relationships/${relId}/library-changes`)).body).toEqual([expect.objectContaining({ verb: "removed", itemId: rule.id })]);
   });
 });

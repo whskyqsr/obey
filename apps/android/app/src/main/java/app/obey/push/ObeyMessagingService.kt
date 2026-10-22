@@ -54,10 +54,20 @@ class ObeyMessagingService : FirebaseMessagingService() {
 
         val setup = message.data["type"] == "location_setup"
         val agreement = message.data["type"] in setOf("agreement_proposed", "agreement_agreed", "agreement_changes")
+        // A rule or protocol someone changed opens that page; the change waits on Today too.
+        val library = if (message.data["type"] == "library_changed") (if (message.data["kind"] == "protocols") PendingNav.PROTOCOLS else PendingNav.RULES) else null
         val intent = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
         if (setup) intent.putExtra(PendingNav.EXTRA, PendingNav.LOCATION)
         if (agreement) intent.putExtra(PendingNav.EXTRA, PendingNav.AGREEMENT)
-        val pending = PendingIntent.getActivity(this, if (setup) 1 else if (agreement) 2 else 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        library?.let { intent.putExtra(PendingNav.EXTRA, it) }
+        val code = when {
+            setup -> 1
+            agreement -> 2
+            library == PendingNav.RULES -> 3
+            library == PendingNav.PROTOCOLS -> 4
+            else -> 0
+        }
+        val pending = PendingIntent.getActivity(this, code, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val quiet = message.data["quiet"] == "1"
         val channel = getString(if (quiet) R.string.notification_channel_quiet else R.string.notification_channel_default)
         val notification = NotificationCompat.Builder(this, channel)

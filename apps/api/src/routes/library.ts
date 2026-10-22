@@ -1,9 +1,9 @@
 import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { consequenceInput, noteInput, protocolInput, reorderInput, rewardInput, ruleInput } from "@obey/contracts";
+import { consequenceInput, noteInput, protocolInput, reorderInput, rewardInput, ruleInput, seenLibraryChangesInput } from "@obey/contracts";
 import type { ZodObject, ZodRawShape } from "zod";
 import type { Deps } from "../app.js";
-import { consequences, memberships, noteRevisions, notes, protocols, relationships, rewards, rules } from "../db/schema.js";
+import { consequences, libraryChanges, memberships, noteRevisions, notes, protocols, relationships, rewards, rules } from "../db/schema.js";
 import { HttpError, forbidden, notFound, parsePatch } from "../errors.js";
 import { libraryDto, noteDto } from "../serialize.js";
 import { sendWithWords } from "../notify.js";
@@ -23,14 +23,60 @@ const SITTING_MS = 10 * 60_000;
 export const libraryRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   const { db, notifier } = deps;
 
-  /** Tells everyone else in the dynamic that a rule or protocol was added, changed or removed; its title only with details on. */
-  const tellChanged = async (relationshipId: string, by: { id: string; displayName: string }, kind: "rule" | "protocol", verb: "added" | "changed" | "removed", title: string) => {
+  /**
+   * Tells everyone else in the dynamic that a rule or protocol was added, changed or removed (its title only with details
+   * on), and keeps it for their Today until they've seen it. Unseen changes to one item fold into one: edits to something
+   * they haven't seen yet stay "added", and removing it then leaves nothing to see.
+   */
+  const tellChanged = async (
+    relationshipId: string,
+    by: { id: string; displayName: string },
+    kind: "rule" | "protocol",
+    verb: "added" | "changed" | "removed",
+    item: { id: string; title: string },
+  ) => {
     const others = (await db.select({ userId: memberships.userId }).from(memberships).where(eq(memberships.relationshipId, relationshipId)))
       .map((m) => m.userId)
       .filter((id) => id !== by.id);
-    const push = { title: "Fealty", body: `${by.displayName} ${verb} a ${kind}`, data: { type: "library_changed", kind: `${kind}s` } };
-    await sendWithWords(db, notifier, others, push, { ...push, body: `${by.displayName} ${verb} the ${kind} “${title}”` });
+    const kinds = `${kind}s` as const;
+    for (const userId of others) {
+      const [before] = await db
+        .delete(libraryChanges)
+        .where(and(eq(libraryChanges.userId, userId), eq(libraryChanges.itemId, item.id)))
+        .returning({ verb: libraryChanges.verb });
+      if (verb === "removed" && before?.verb === "added") continue;
+      await db.insert(libraryChanges).values({
+        relationshipId,
+        userId,
+        changedBy: by.id,
+        kind: kinds,
+        verb: verb === "changed" && before?.verb === "added" ? "added" : verb,
+        itemId: item.id,
+        title: item.title,
+      });
+    }
+    const push = { title: "Fealty", body: `${by.displayName} ${verb} a ${kind}`, data: { type: "library_changed", kind: kinds } };
+    await sendWithWords(db, notifier, others, push, { ...push, body: `${by.displayName} ${verb} the ${kind} “${item.title}”` });
   };
+
+  app.get<{ Params: { id: string } }>("/relationships/:id/library-changes", async (req) => {
+    await requireMember(db, req.params.id, req.user.id);
+    const rows = await db
+      .select()
+      .from(libraryChanges)
+      .where(and(eq(libraryChanges.relationshipId, req.params.id), eq(libraryChanges.userId, req.user.id)))
+      .orderBy(desc(libraryChanges.createdAt))
+      .limit(200);
+    return rows.map((r) => ({ id: r.id, kind: r.kind, verb: r.verb, itemId: r.itemId, title: r.title, changedBy: r.changedBy, createdAt: r.createdAt.toISOString() }));
+  });
+
+  app.post<{ Params: { id: string } }>("/relationships/:id/library-changes/seen", async (req, reply) => {
+    await requireMember(db, req.params.id, req.user.id);
+    const { ids } = seenLibraryChangesInput.parse(req.body);
+    if (ids.length)
+      await db.delete(libraryChanges).where(and(eq(libraryChanges.relationshipId, req.params.id), eq(libraryChanges.userId, req.user.id), inArray(libraryChanges.id, ids)));
+    reply.status(204);
+  });
 
   for (const { path, table, input, order } of LIBRARIES) {
     // A protocol may only point at a rule in its own relationship.
@@ -66,7 +112,8 @@ export const libraryRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         .insert(t)
         .values({ ...(body as object), relationshipId: req.params.id } as typeof rewards.$inferInsert)
         .returning();
-      if (path === "rules" || path === "protocols") await tellChanged(req.params.id, req.user, path === "rules" ? "rule" : "protocol", "added", (row as { title: string }).title);
+      if (path === "rules" || path === "protocols")
+        await tellChanged(req.params.id, req.user, path === "rules" ? "rule" : "protocol", "added", row as { id: string; title: string });
       reply.status(201);
       return libraryDto(row!);
     });
@@ -100,7 +147,7 @@ export const libraryRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       const [row] = await db.update(t).set(body).where(eq(t.id, existing.id)).returning();
       // Moving one in the list isn't a change worth a notification.
       if ((path === "rules" || path === "protocols") && Object.keys(body).some((k) => k !== "position"))
-        await tellChanged(existing.relationshipId, req.user, path === "rules" ? "rule" : "protocol", "changed", (row as { title: string }).title);
+        await tellChanged(existing.relationshipId, req.user, path === "rules" ? "rule" : "protocol", "changed", row as { id: string; title: string });
       return libraryDto(row!);
     });
 
@@ -110,7 +157,7 @@ export const libraryRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       await requireManager(db, existing.relationshipId, req.user.id);
       await db.delete(t).where(eq(t.id, existing.id));
       if (path === "rules" || path === "protocols")
-        await tellChanged(existing.relationshipId, req.user, path === "rules" ? "rule" : "protocol", "removed", (existing as { title: string }).title);
+        await tellChanged(existing.relationshipId, req.user, path === "rules" ? "rule" : "protocol", "removed", existing as { id: string; title: string });
       reply.status(204);
     });
   }

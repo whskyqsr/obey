@@ -19,6 +19,7 @@ export type AgreementVersion = c.AgreementVersion;
 export type AgreementSection = c.AgreementSection;
 export type AgreementSectionInput = c.AgreementSectionInput;
 export type AgreementInput = c.AgreementInput;
+export type LibraryChange = c.LibraryChange;
 export type Relationship = c.Relationship;
 export type DynamicDate = c.DynamicDate;
 export type Features = c.Features;

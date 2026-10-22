@@ -136,6 +136,7 @@ class TodayViewModel @Inject constructor(
             launch { runCatching { api.planChanges(relId) }.onSuccess { _planChanges.value = it } }
             launch { loadForDom(relId) }
             launch { loadAgreement(relId) }
+            launch { loadLibraryChanges(relId) }
             try {
                 val snap = snapshot(relId)
                 offline.saveToday(relId, snap)
@@ -296,6 +297,30 @@ class TodayViewModel @Inject constructor(
         }
     }
 
+    private val _libraryChanges = MutableStateFlow<List<app.obey.api.LibraryChange>>(emptyList())
+    /** Rules and protocols someone else added, changed or removed that this person hasn't marked seen, newest first. */
+    val libraryChanges: StateFlow<List<app.obey.api.LibraryChange>> = _libraryChanges.asStateFlow()
+
+    private suspend fun loadLibraryChanges(relId: String) {
+        val features = sessions.session?.relationship?.features
+        if (features == null || (!features.rules && !features.protocols)) {
+            _libraryChanges.value = emptyList()
+            return
+        }
+        runCatching { api.libraryChanges(relId) }.onSuccess { list ->
+            _libraryChanges.value = list.filter { if (it.kind == "rules") features.rules else features.protocols }
+        }
+    }
+
+    /** Clears these changes from Today; [message] confirms it when there's one to show. */
+    fun seenLibraryChanges(ids: List<String>, message: String? = null) = action {
+        val relId = sessions.requireRelationshipId()
+        _libraryChanges.value = _libraryChanges.value.filter { it.id !in ids }
+        api.seenLibraryChanges(relId, app.obey.api.SeenLibraryChangesInput(ids))
+        message?.let { say(it) }
+        loadLibraryChanges(relId)
+    }
+
     private suspend fun loadForDom(relId: String) {
         val session = sessions.session ?: return
         val rel = session.relationship
@@ -315,6 +340,14 @@ class TodayViewModel @Inject constructor(
     fun seenDelay(d: app.obey.api.DelayUsed) = action {
         _delays.value = _delays.value.filter { it.id != d.id }
         api.seenDelay(d.id)
+    }
+
+    /** "Mark all seen" on Today's delays, one after another. */
+    fun seenDelays(list: List<app.obey.api.DelayUsed>) = action {
+        val ids = list.map { it.id }.toSet()
+        _delays.value = _delays.value.filter { it.id !in ids }
+        list.forEach { api.seenDelay(it.id) }
+        say("Marked seen")
     }
 
     fun moodSeen(o: Occurrence) = action {
@@ -393,6 +426,14 @@ class TodayViewModel @Inject constructor(
     fun seenPlanChange(e: app.obey.api.CalendarEvent) = action {
         _planChanges.value = _planChanges.value.filter { it.id != e.id }
         api.seenPlanChange(e.id)
+    }
+
+    /** "Mark all seen" on Today's changed plans, one after another. */
+    fun seenPlanChanges(list: List<app.obey.api.CalendarEvent>) = action {
+        val ids = list.map { it.id }.toSet()
+        _planChanges.value = _planChanges.value.filter { it.id !in ids }
+        list.forEach { api.seenPlanChange(it.id) }
+        say("Marked seen")
     }
 
     /** A Dominant moving when a plan that runs past curfew ends; its author is told. */
@@ -484,6 +525,16 @@ class TodayViewModel @Inject constructor(
         api.review(o.id, ReviewOccurrenceInput(approve = approve, comment = comment))
         say(if (approve) "Approved" else "Sent back")
         refresh()
+    }
+
+    /** "Approve all" on Today: each one in turn, then one snackbar. */
+    fun approveAll(list: List<Occurrence>) = action {
+        try {
+            list.forEach { api.review(it.id, ReviewOccurrenceInput(approve = true)) }
+            say("Approved ${list.size}")
+        } finally {
+            refresh()
+        }
     }
 
     fun reschedule(o: Occurrence, input: RescheduleInput) = action {

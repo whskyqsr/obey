@@ -741,3 +741,25 @@ export const agreementSignatures = pgTable(
   },
   (t) => [primaryKey({ columns: [t.versionId, t.userId] })],
 );
+
+/** A rule or protocol someone else added, changed or removed, until this person has seen it on Today. */
+export const libraryChanges = pgTable(
+  "library_changes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    changedBy: uuid("changed_by").references(() => users.id, { onDelete: "set null" }),
+    kind: text("kind", { enum: ["rules", "protocols"] }).notNull(),
+    verb: text("verb", { enum: ["added", "changed", "removed"] }).notNull(),
+    /** Not a reference: a removed item is gone. */
+    itemId: uuid("item_id").notNull(),
+    title: text("title").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("library_changes_user_idx").on(t.userId, t.relationshipId)],
+);

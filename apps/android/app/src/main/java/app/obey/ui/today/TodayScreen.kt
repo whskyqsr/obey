@@ -2,6 +2,8 @@ package app.obey.ui.today
 
 import app.obey.ui.comments.CommentsSheet
 import app.obey.ui.comments.SendBackDialog
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,7 +16,16 @@ import app.obey.ui.plans.firstDay
 import app.obey.ui.plans.iso
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.EventBusy
+import androidx.compose.material.icons.outlined.Gavel
+import androidx.compose.material.icons.outlined.Handshake
 import androidx.compose.material.icons.outlined.MoreTime
+import androidx.compose.material.icons.outlined.Redeem
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.SentimentDissatisfied
+import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -76,6 +87,8 @@ fun TodayScreen(
     onKits: () -> Unit,
     onOpenLocation: () -> Unit = {},
     onOpenAgreement: (edit: Boolean) -> Unit = {},
+    onOpenRules: () -> Unit = {},
+    onOpenProtocol: (String) -> Unit = {},
     vm: TodayViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -90,6 +103,8 @@ fun TodayScreen(
     val delays by vm.delays.collectAsStateWithLifecycle()
     val redemptions by vm.redemptions.collectAsStateWithLifecycle()
     val agreement by vm.agreement.collectAsStateWithLifecycle()
+    val libraryChanges by vm.libraryChanges.collectAsStateWithLifecycle()
+    val busy by vm.busy.collectAsStateWithLifecycle()
     var telling by remember { mutableStateOf<app.obey.api.CurfewNight?>(null) }
     var redeeming by remember { mutableStateOf<app.obey.api.LedgerEntry?>(null) }
     var replying by remember { mutableStateOf<NoteTarget?>(null) }
@@ -162,7 +177,6 @@ fun TodayScreen(
                 val isDom = session?.canManage == true
                 val reviewIds = d.awaitingReview.map { it.id }.toSet()
                 val missIds = d.recentMisses.map { it.id }.toSet()
-                val needs = if (isDom) d.requests.size + d.awaitingReview.size + d.recentMisses.size + d.lowMoods.size + redemptions.size else 0
                 val restOfToday = if (isDom) d.today.filter { it.id !in reviewIds && it.id !in missIds } else d.today
                 fun row(o: Occurrence, actions: OccurrenceActions = actionsFor(o)): @Composable () -> Unit = {
                     SwipeableRow(
@@ -179,6 +193,220 @@ fun TodayScreen(
                         OccurrenceRow(o, nameFor(o), actions, onOpen = { onOpenTask(o.seriesId) }, streak = d.streaks[o.seriesId])
                     }
                 }
+
+                fun nameOr(userId: String?) = userId?.let { session?.nameOf(it) } ?: "Someone"
+                // Everything waiting on this person, one row per kind, in the same order as the web.
+                val inbox = buildList {
+                    if (d.requests.isNotEmpty()) add(
+                        InboxGroup(
+                            key = "requests",
+                            icon = Icons.Outlined.MoreTime,
+                            tone = InboxTone.Tertiary,
+                            title = if (isDom) "${plural(d.requests.size, "request")} for more time" else "Waiting for approval",
+                            subtitle = d.requests.joinToString(", ") { rows -> if (rows.size == 1) rows.first().title else plural(rows.size, "task") },
+                            count = d.requests.size,
+                            body = {
+                                d.requests.forEach { rows ->
+                                    ExtensionRequestCard(
+                                        rows = rows,
+                                        requester = if (rows.first().requestedBy == me) null else session?.nameOf(rows.first().requestedBy),
+                                        canDecide = isDom && rows.first().requestedBy != me,
+                                        onDecide = { vm.decide(rows, it) },
+                                        onInstead = { instead = it },
+                                    )
+                                }
+                            },
+                        ),
+                    )
+                    if (isDom && d.awaitingReview.isNotEmpty()) add(
+                        InboxGroup(
+                            key = "review",
+                            icon = Icons.Outlined.TaskAlt,
+                            tone = InboxTone.Primary,
+                            title = "Approve ${plural(d.awaitingReview.size, "task")}",
+                            subtitle = d.awaitingReview.joinToString(", ") { it.title },
+                            count = d.awaitingReview.size,
+                            action = if (d.awaitingReview.size > 1) "Approve all" to { vm.approveAll(d.awaitingReview) } else null,
+                            body = {
+                                InboxRows {
+                                    d.awaitingReview.forEach { o ->
+                                        Column(Modifier.background(MaterialTheme.colorScheme.surface)) {
+                                            row(o, OccurrenceActions(onApprove = { vm.review(o, true) }, onReject = { sendingBack = o }, onComments = { commenting = o }))()
+                                            if (o.photoCount > 0) ProofPhotos(o.id, canAdd = false, modifier = Modifier.padding(start = 64.dp, end = 16.dp, bottom = 8.dp))
+                                        }
+                                    }
+                                }
+                            },
+                        ),
+                    )
+                    if (isDom && d.recentMisses.isNotEmpty()) add(
+                        InboxGroup(
+                            key = "missed",
+                            icon = Icons.Outlined.Close,
+                            tone = InboxTone.Error,
+                            title = plural(d.recentMisses.size, "missed task"),
+                            subtitle = d.recentMisses.joinToString(", ") { o ->
+                                o.title + if (parseInstant(o.dueAt).local().toLocalDate() != LocalDate.now()) ", yesterday" else ""
+                            },
+                            count = d.recentMisses.size,
+                            body = {
+                                InboxRows {
+                                    d.recentMisses.forEach { o ->
+                                        OccurrenceRow(o, nameFor(o), OccurrenceActions(onExcuse = { vm.excuse(o) }, onConfirmMiss = { vm.confirmMiss(o) }, onDropConsequence = if (o.missConsequence != null) ({ vm.dropConsequence(o) }) else null, onComments = { commenting = o }), onOpen = { onOpenTask(o.seriesId) }, streak = d.streaks[o.seriesId])
+                                    }
+                                }
+                            },
+                        ),
+                    )
+                    val curfewClashes = if (isDom) curfew?.clashes.orEmpty() else emptyList()
+                    if (curfewClashes.isNotEmpty()) add(
+                        InboxGroup(
+                            key = "curfew",
+                            icon = Icons.Outlined.EventBusy,
+                            tone = InboxTone.Secondary,
+                            title = if (curfewClashes.size == 1) "1 plan runs past curfew" else "${curfewClashes.size} plans run past curfew",
+                            subtitle = curfewClashes.joinToString(", ") { it.eventTitle },
+                            count = curfewClashes.size,
+                            body = {
+                                curfewClashes.forEach { c ->
+                                    CurfewClashCard(c, onExcuse = { vm.excuseCurfew(c.occurrenceId, "Curfew excused that night") }, onChangeEnd = { changingEnd = c }, onLeave = { vm.leaveClash(c) })
+                                }
+                            },
+                        ),
+                    )
+                    if (d.clashingPlans.isNotEmpty()) add(
+                        InboxGroup(
+                            key = "clashes",
+                            icon = Icons.Outlined.EventBusy,
+                            tone = InboxTone.Secondary,
+                            title = if (d.clashingPlans.size == 1) "1 plan overlaps tasks" else "${d.clashingPlans.size} plans overlap tasks",
+                            subtitle = d.clashingPlans.joinToString(", ") { it.title },
+                            count = d.clashingPlans.size,
+                            body = {
+                                d.clashingPlans.forEach { e -> PlanHeadsUp(e, planTone(e, session?.relationship)) { plan = e } }
+                            },
+                        ),
+                    )
+                    agreement?.let { v ->
+                        val mine = v.proposedBy == me
+                        val quote = (if (mine) v.feedback?.note else v.note)?.takeIf { it.isNotBlank() }?.let { " · “$it”" } ?: ""
+                        add(
+                            InboxGroup(
+                                key = "agreement",
+                                icon = Icons.Outlined.Handshake,
+                                tone = InboxTone.Secondary,
+                                title = "Agreement version ${v.number}",
+                                subtitle = (if (mine) "${nameOr(v.feedback?.userId)} asked for changes" else "Proposed by ${v.proposedBy?.let { session?.nameOf(it) } ?: "someone"}") + quote,
+                                count = 1,
+                                onOpen = { onOpenAgreement(mine) },
+                            ),
+                        )
+                    }
+                    if (isDom && d.lowMoods.isNotEmpty()) add(
+                        InboxGroup(
+                            key = "moods",
+                            icon = Icons.Outlined.SentimentDissatisfied,
+                            tone = InboxTone.Error,
+                            title = plural(d.lowMoods.size, "low check-in"),
+                            subtitle = d.lowMoods.joinToString(", ") { o ->
+                                "${session?.nameOf(o.assigneeId) ?: "Your partner"} felt ${app.obey.ui.common.moodLabel(o.mood ?: 1).lowercase()} after ${o.title}"
+                            },
+                            count = d.lowMoods.size,
+                            body = {
+                                InboxRows {
+                                    d.lowMoods.forEach { o ->
+                                        val who = session?.nameOf(o.assigneeId) ?: "Your partner"
+                                        MoodRow(
+                                            o,
+                                            who,
+                                            onSeen = { vm.moodSeen(o) },
+                                            onReply = { replying = NoteTarget("", o.id, who, "$who feeling ${app.obey.ui.common.moodLabel(o.mood ?: 1).lowercase()} (${o.title})") },
+                                        )
+                                    }
+                                }
+                            },
+                        ),
+                    )
+                    if (isDom && redemptions.isNotEmpty()) add(
+                        InboxGroup(
+                            key = "rewards",
+                            icon = Icons.Outlined.Redeem,
+                            tone = InboxTone.Primary,
+                            title = "${plural(redemptions.size, "reward")} to give",
+                            subtitle = redemptions.joinToString(", ") { it.note },
+                            count = redemptions.size,
+                            body = {
+                                InboxRows {
+                                    redemptions.forEach { e -> RedemptionRow(e, session?.nameOf(e.userId) ?: "Your partner") { redeeming = e } }
+                                }
+                            },
+                        ),
+                    )
+                    // Updates: nothing to decide, so each kind clears in one tap.
+                    if (isDom && delays.isNotEmpty()) add(
+                        InboxGroup(
+                            key = "delays",
+                            icon = Icons.Outlined.Schedule,
+                            tone = InboxTone.Neutral,
+                            title = if (delays.map { it.requestedBy }.toSet().size == 1) {
+                                "${session?.nameOf(delays.first().requestedBy) ?: "Your partner"} used ${plural(delays.size, "delay")}"
+                            } else {
+                                plural(delays.size, "delay used", "delays used")
+                            },
+                            subtitle = delays.flatMap { it.items }.joinToString(", ") { it.title },
+                            count = delays.size,
+                            action = "Mark all seen" to { vm.seenDelays(delays) },
+                            body = {
+                                delays.forEach { x -> DelayCard(x, session?.nameOf(x.requestedBy) ?: "Your partner") { vm.seenDelay(x) } }
+                            },
+                        ),
+                    )
+                    if (planChanges.isNotEmpty()) add(
+                        InboxGroup(
+                            key = "plans",
+                            icon = Icons.Outlined.Event,
+                            tone = InboxTone.Neutral,
+                            title = if (planChanges.size == 1) "1 plan changed" else "${planChanges.size} plans changed",
+                            subtitle = planChanges.joinToString(", ") { e -> if (e.previousEndsAt != null) "${e.title} now ends ${app.obey.ui.common.formatTime(e.endsAt)}" else e.title },
+                            count = planChanges.size,
+                            action = "Mark all seen" to { vm.seenPlanChanges(planChanges) },
+                            body = {
+                                planChanges.forEach { e -> PlanChangeCard(e, nameOr(e.changedBy)) { vm.seenPlanChange(e) } }
+                            },
+                        ),
+                    )
+                    if (libraryChanges.isNotEmpty()) {
+                        val kinds = libraryChanges.map { it.kind }.toSet()
+                        add(
+                            InboxGroup(
+                                key = "library",
+                                icon = Icons.Outlined.Gavel,
+                                tone = InboxTone.Neutral,
+                                title = if (kinds.size == 2) "Rules and protocols changed" else if ("rules" in kinds) "Rules changed" else "Protocols changed",
+                                subtitle = librarySummary(libraryChanges) { nameOr(it) },
+                                count = libraryChanges.size,
+                                action = "Mark all seen" to { vm.seenLibraryChanges(libraryChanges.map { it.id }, "Marked seen") },
+                                body = {
+                                    InboxRows {
+                                        libraryChanges.forEach { c ->
+                                            LibraryChangeRow(
+                                                c,
+                                                nameOr(c.changedBy),
+                                                onOpen = when {
+                                                    c.verb == "removed" -> null
+                                                    c.kind == "protocols" -> ({ onOpenProtocol(c.itemId) })
+                                                    else -> onOpenRules
+                                                },
+                                                onSeen = { vm.seenLibraryChanges(listOf(c.id)) },
+                                            )
+                                        }
+                                    }
+                                },
+                            ),
+                        )
+                    }
+                }
+                val waiting = inbox.sumOf { it.count }
 
                 LazyColumn(Modifier.fillMaxSize()) {
                     offlineSince?.let { at -> item(key = "offline") { OfflineBanner(at) } }
@@ -218,19 +446,6 @@ fun TodayScreen(
                             onDecline = { vm.declineCurfew(r) },
                         )
                     }
-                    agreement?.let { v ->
-                        if (session != null) item(key = "agreement") { app.obey.ui.agreement.AgreementTodayCard(v, session, onOpenAgreement) }
-                    }
-                    items(curfew?.clashes.orEmpty(), key = { "curfew-${it.occurrenceId}" }) { c ->
-                        CurfewClashCard(c, onExcuse = { vm.excuseCurfew(c.occurrenceId, "Curfew excused that night") }, onChangeEnd = { changingEnd = c }, onLeave = { vm.leaveClash(c) })
-                    }
-                    items(planChanges, key = { "changed-${it.id}" }) { e ->
-                        PlanChangeCard(e, e.changedBy?.let { session?.nameOf(it) } ?: "Someone") { vm.seenPlanChange(e) }
-                    }
-                    if (isDom) items(delays, key = { "delay-${it.id}" }) { x ->
-                        DelayCard(x, session?.nameOf(x.requestedBy) ?: "Your partner") { vm.seenDelay(x) }
-                    }
-                    items(d.clashingPlans, key = { "plan-${it.id}" }) { e -> PlanHeadsUp(e, planTone(e, session?.relationship)) { plan = e } }
                     if (isDom && d.noTasks && session?.readOnly != true) item(key = "kits") { KitPrompt(onKits) }
                     // Someone with location tasks whose phone can't notice them arriving.
                     val paused = session?.myMember?.locationPaused == true
@@ -241,49 +456,12 @@ fun TodayScreen(
                         val counted = d.today.filter { it.status != OccurrenceStatus.Excused }
                         if (counted.isNotEmpty()) item(key = "progress") { ProgressCard(counted) }
                     }
-                    if (isDom && needs > 0) {
-                        item(key = "h-needs") { SectionHeader("Needs you · $needs") }
-                    }
-                    if (isDom) items(d.lowMoods, key = { "mood-" + it.id }) { o ->
-                        val who = session?.nameOf(o.assigneeId) ?: "Your partner"
-                        MoodRow(
-                            o,
-                            who,
-                            onSeen = { vm.moodSeen(o) },
-                            onReply = { replying = NoteTarget("", o.id, who, "$who feeling ${app.obey.ui.common.moodLabel(o.mood ?: 1).lowercase()} (${o.title})") },
-                        )
-                    }
-                    if (d.requests.isNotEmpty()) {
-                        if (!isDom) item(key = "h-req") { SectionHeader("Waiting for approval") }
-                        items(d.requests, key = { "r-" + (it.first().groupId ?: it.first().id) }) { rows ->
-                            ExtensionRequestCard(
-                                rows = rows,
-                                requester = if (rows.first().requestedBy == me) null else session?.nameOf(rows.first().requestedBy),
-                                canDecide = isDom && rows.first().requestedBy != me,
-                                onDecide = { vm.decide(rows, it) },
-                                onInstead = { instead = it },
-                            )
-                        }
-                    }
-                    if (isDom) {
-                        items(d.awaitingReview, key = { "v-" + it.id }) { o ->
-                            androidx.compose.foundation.layout.Column {
-                                row(o, OccurrenceActions(onApprove = { vm.review(o, true) }, onReject = { sendingBack = o }, onComments = { commenting = o }))()
-                                if (o.photoCount > 0) ProofPhotos(o.id, canAdd = false, modifier = Modifier.padding(start = 64.dp, end = 16.dp, bottom = 8.dp))
-                            }
-                        }
-                        items(d.recentMisses, key = { "m-" + it.id }) { o ->
-                            OccurrenceRow(o, nameFor(o), OccurrenceActions(onExcuse = { vm.excuse(o) }, onConfirmMiss = { vm.confirmMiss(o) }, onDropConsequence = if (o.missConsequence != null) ({ vm.dropConsequence(o) }) else null, onComments = { commenting = o }), onOpen = { onOpenTask(o.seriesId) }, streak = d.streaks[o.seriesId])
-                        }
-                        items(redemptions, key = { "redeem-" + it.id }) { e ->
-                            RedemptionRow(e, session?.nameOf(e.userId) ?: "Your partner") { redeeming = e }
-                        }
-                    }
+                    if (inbox.isNotEmpty()) item(key = "inbox") { TodayInbox(if (isDom) "Needs you" else "For you", inbox, busy) }
                     if (d.overdue.isNotEmpty()) {
                         item(key = "h-over") { SectionHeader("Overdue") }
                         items(d.overdue, key = { "o-" + it.id }) { o -> row(o)() }
                     }
-                    item(key = "h-today") { SectionHeader(if (isDom && needs > 0) "Rest of today" else "Today") }
+                    item(key = "h-today") { SectionHeader(if (isDom && waiting > 0) "Rest of today" else "Today") }
                     // Whole-day extension: the user's own open tasks for today, plus today's that already slipped.
                     // Tasks that already have a request waiting aren't offered again.
                     val asked = d.requests.flatten().map { it.occurrenceId }.toSet()
@@ -372,7 +550,6 @@ fun TodayScreen(
     }
 
     noting?.let { o -> DoneDialog(o, onDismiss = { noting = null }, onDone = { note, mood, entry -> vm.complete(o, note, mood, entry); noting = null }) }
-    val busy by vm.busy.collectAsStateWithLifecycle()
     askingMore?.let { n ->
         MoreTimeSheet(n, askWho, busy, onDismiss = { askingMore = null }) { until, reason -> vm.askCurfew(n, until, reason, askWho) { askingMore = null } }
     }
