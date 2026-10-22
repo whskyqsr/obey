@@ -198,7 +198,9 @@ fun PlaceDialog(
     onDelete: (() -> Unit)?,
 ) {
     var draft by remember { mutableStateOf(place?.toInput() ?: PlaceInput(name = "", lat = 40.7128, lng = -74.006, radiusM = 150)) }
-    var q by remember { mutableStateOf("") }
+    var q by remember { mutableStateOf(place?.address.orEmpty()) }
+    // The address picked from the list stays in the field without searching for it again.
+    var chosen by remember { mutableStateOf(place?.address) }
     var found by remember { mutableStateOf<List<PlaceSearchResult>>(emptyList()) }
     var hint by remember { mutableStateOf<String?>(null) }
     var searching by remember { mutableStateOf(false) }
@@ -219,7 +221,7 @@ fun PlaceDialog(
     LaunchedEffect(q) {
         found = emptyList()
         outcome = null
-        searching = q.trim().length >= 3
+        searching = q.trim().length >= 3 && q != chosen
         if (!searching) return@LaunchedEffect
         delay(350)
         val r = runCatching { search(q.trim(), draft.lat, draft.lng) }
@@ -234,7 +236,8 @@ fun PlaceDialog(
             address = listOf(f.name, f.address).filter { it.isNotBlank() }.joinToString(", ").take(200),
             name = draft.name.ifBlank { f.name.take(40) },
         )
-        q = ""
+        chosen = draft.address
+        q = draft.address.orEmpty()
     }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
@@ -259,7 +262,7 @@ fun PlaceDialog(
                     supportingText = when (outcome) {
                         "failed" -> ({ Text("Search isn't working right now. Drag the map to the spot instead.") })
                         "none" -> ({ Text("No matches. Try just the street and city.") })
-                        else -> null
+                        else -> if (place == null && chosen != null && q == chosen) ({ Text("Search can be a few houses off. Drag the map until the pin is on the building.") }) else null
                     },
                     isError = outcome == "failed",
                     // The keyboard's search key takes the top match.

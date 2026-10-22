@@ -151,13 +151,13 @@ export function PlaceMap({
   );
 }
 
-/** Looks up addresses and businesses, nearest to [near] first, through our server. */
-function useAddressSearch(q: string, near: { lat: number; lng: number }) {
+/** Looks up addresses and businesses, nearest to [near] first, through our server. The [chosen] address isn't searched again. */
+function useAddressSearch(q: string, near: { lat: number; lng: number }, chosen: string | null) {
   const [found, setFound] = useState<PlaceSearchResult[]>([]);
   const [state, setState] = useState<"idle" | "searching" | "done" | "failed">("idle");
   useEffect(() => {
     setFound([]);
-    if (q.trim().length < 3) return setState("idle");
+    if (q.trim().length < 3 || q === chosen) return setState("idle");
     setState("searching");
     let gone = false;
     const t = setTimeout(() => {
@@ -185,12 +185,15 @@ export function PlaceDialog({ place, open, onClose, onSaved }: { place: Place | 
   const remove = useDeletePlace(rel.id);
   const [draft, setDraft] = useState<PlaceInput>({ name: "", address: null, lat: 40.7128, lng: -74.006, radiusM: 150 });
   const [q, setQ] = useState("");
+  // The address picked from the list stays in the field without searching for it again.
+  const [chosen, setChosen] = useState<string | null>(null);
   const [located, setLocated] = useState(false);
-  const { found, state: searching } = useAddressSearch(q, draft);
+  const { found, state: searching } = useAddressSearch(q, draft, chosen);
 
   useEffect(() => {
     if (!open) return;
-    setQ("");
+    setQ(place?.address ?? "");
+    setChosen(place?.address ?? null);
     if (place) return setDraft({ name: place.name, address: place.address, lat: place.lat, lng: place.lng, radiusM: place.radiusM });
     setDraft({ name: "", address: null, lat: 40.7128, lng: -74.006, radiusM: 150 });
     setLocated(false);
@@ -207,8 +210,10 @@ export function PlaceDialog({ place, open, onClose, onSaved }: { place: Place | 
 
   const set = (p: Partial<PlaceInput>) => setDraft((d) => ({ ...d, ...p }));
   const pick = (f: PlaceSearchResult) => {
-    set({ lat: f.lat, lng: f.lng, address: [f.name, f.address].filter(Boolean).join(", ").slice(0, 200), name: draft.name || f.name.slice(0, 40) });
-    setQ("");
+    const address = [f.name, f.address].filter(Boolean).join(", ").slice(0, 200);
+    set({ lat: f.lat, lng: f.lng, address, name: draft.name || f.name.slice(0, 40) });
+    setChosen(address);
+    setQ(address);
   };
   const valid = draft.name.trim().length > 0;
   const submit = () =>
@@ -264,7 +269,15 @@ export function PlaceDialog({ place, open, onClose, onSaved }: { place: Place | 
             onChange={(e) => setQ(e.target.value)}
             // Enter takes the top match, so it doesn't submit the dialog or look like nothing happened.
             onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), found[0] && pick(found[0]))}
-            help={searching === "searching" ? "Searching…" : searching === "done" && !found.length ? "No matches. Try just the street and city." : undefined}
+            help={
+              searching === "searching"
+                ? "Searching…"
+                : searching === "done" && !found.length
+                  ? "No matches. Try just the street and city."
+                  : !place && chosen && q === chosen
+                    ? "Search can be a few houses off. Drag the map until the pin is on the building."
+                    : undefined
+            }
             error={searching === "failed" ? "Search isn't working right now. Drag the map to the spot instead." : undefined}
           />
           {searching === "searching" && (
