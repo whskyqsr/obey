@@ -229,6 +229,12 @@ class SettingsViewModel @Inject constructor(
         say(if (date == null) "Date removed" else "Date saved")
     }
 
+    fun setProofDays(days: Int?) = action {
+        val rel = sessions.requireRelationshipId()
+        sessions.onRelationshipChanged(api.setProofDays(rel, app.obey.api.ProofDaysInput(days)))
+        say(if (days == null) "Proof photos are kept" else "Proof photos are deleted ${proofDaysLabel(days).lowercase()}")
+    }
+
     fun setSubNotes(on: Boolean) = action {
         val rel = sessions.requireRelationshipId()
         sessions.onRelationshipChanged(api.updateRelationship(rel, UpdateRelationshipInput(subNotes = on)))

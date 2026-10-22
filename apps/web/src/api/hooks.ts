@@ -1,6 +1,20 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { api, apiObjectUrl } from "./client";
-import type { ApplyKitResult, ChastityEvent, ChastityLock, ChastityView, Kit, RoleSwap, SharedKit, DynamicStats, MonthFocus, MonthReview, MonthSummary, MoodEntry, PastMonth } from "@obey/contracts";
+import type {
+  ApplyKitResult,
+  ChastityEvent,
+  ChastityLock,
+  ChastityView,
+  Kit,
+  RoleSwap,
+  SharedKit,
+  DynamicStats,
+  MonthFocus,
+  MonthReview,
+  MonthSummary,
+  MoodEntry,
+  PastMonth,
+} from "@obey/contracts";
 import type {
   AdminReport,
   OccurrenceComment,
@@ -244,7 +258,7 @@ export function useJoinRelationship() {
 export function useUpdateRelationship(rel: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Partial<Pick<Relationship, "name" | "reschedulePolicy" | "weeklyDelayAllowance" | "subNotes" | "dates">> & { features?: Partial<Features> }) =>
+    mutationFn: (body: Partial<Pick<Relationship, "name" | "reschedulePolicy" | "weeklyDelayAllowance" | "subNotes" | "proofDays" | "dates">> & { features?: Partial<Features> }) =>
       api<Relationship>(`/relationships/${rel}`, { method: "PATCH", body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.me }),
   });

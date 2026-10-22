@@ -1,0 +1,1 @@
+ALTER TABLE "relationships" ADD COLUMN "proof_days" integer;

@@ -330,6 +330,13 @@
       "when": 1792702597730,
       "tag": "0046_chastity",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1792705406956,
+      "tag": "0047_proof_days",
+      "breakpoints": true
     }
   ]
 }

@@ -382,6 +382,15 @@ fun DynamicScreen(onBack: () -> Unit, onPlaces: () -> Unit = {}, onLocation: () 
                     supportingContent = { Text("Their own notes. Yours stay read-only to them unless you let them edit one.") },
                     trailingContent = { Switch(checked = rel.subNotes, onCheckedChange = vm::setSubNotes, enabled = s.canManage && !busy) },
                 )
+                var pickingProofDays by remember { mutableStateOf(false) }
+                ListItem(
+                    modifier = if (rel.ended) Modifier else Modifier.clickable { pickingProofDays = true },
+                    headlineContent = { Text("Keep proof photos") },
+                    supportingContent = { Text(rel.proofDays?.let(::proofDaysLabel) ?: "Until you delete them") },
+                )
+                if (pickingProofDays) {
+                    ProofDaysDialog(rel.proofDays, onDismiss = { pickingProofDays = false }) { vm.setProofDays(it); pickingProofDays = false }
+                }
 
                 SectionHeader("Features")
                 featureRows.forEach { (label, help, get, set) ->
@@ -629,5 +638,42 @@ private fun LeaveDialog(
             ) { Text(if (target != null) "Block" else "Leave") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+/** How long proof photos are kept once their task is done. */
+private val PROOF_DAYS = listOf(1, 7, 30)
+
+fun proofDaysLabel(days: Int) = when (days) {
+    1 -> "A day after the task is done"
+    7 -> "A week after the task is done"
+    else -> "$days days after the task is done"
+}
+
+@Composable
+private fun ProofDaysDialog(current: Int?, onDismiss: () -> Unit, onPick: (Int?) -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Keep proof photos") },
+        text = {
+            Column {
+                (listOf<Int?>(null) + PROOF_DAYS).forEach { d ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable { onPick(d) }.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = current == d, onClick = { onPick(d) })
+                        Text(d?.let(::proofDaysLabel) ?: "Until you delete them")
+                    }
+                }
+                Text(
+                    "Either of you can change this. A photo that's been reported stays until it's reviewed.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

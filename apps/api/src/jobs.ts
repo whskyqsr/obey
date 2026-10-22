@@ -10,6 +10,7 @@ import { type Notifier, sendWithWords } from "./notify.js";
 import { promptMonthReviews } from "./routes/months.js";
 import { sceneCheckIns } from "./routes/scenes.js";
 import { finishLocks } from "./routes/chastity.js";
+import { deleteOldProofs } from "./services/proofRetention.js";
 
 /** One pass of the background work. Every step is idempotent, so overlapping or repeated runs are safe. */
 export async function runJobs(db: Db, notifier: Notifier, now: Date, opts: { materializeDays: number; reminderLeadMinutes: number }) {
@@ -30,6 +31,7 @@ export async function runJobs(db: Db, notifier: Notifier, now: Date, opts: { mat
   }
 
   await finishLocks({ db, notifier }, now);
+  await deleteOldProofs(db, now);
 
   // Stays that are up complete before misses are marked, so a stay running past the deadline isn't counted late.
   const stayed = await db.transaction((tx) => finishStays(tx, now));

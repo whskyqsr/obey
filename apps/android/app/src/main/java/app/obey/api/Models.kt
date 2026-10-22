@@ -181,6 +181,8 @@ data class Relationship(
     val features: Features = Features(),
     /** Whether a submissive may write notes of their own. */
     val subNotes: Boolean = true,
+    /** Proof photos are deleted this many days after their task is settled; null keeps them. */
+    val proofDays: Int? = null,
     val dates: List<DynamicDate> = emptyList(),
     /** When a partner left or blocked; an ended dynamic is kept read-only for both. */
     val endedAt: String? = null,
@@ -285,6 +287,10 @@ data class UpdateRelationshipInput(
     /** The whole list, replacing what's stored. */
     @EncodeDefault(EncodeDefault.Mode.NEVER) val dates: List<DynamicDate>? = null,
 )
+
+/** How long proof photos are kept; null (sent as null) keeps them. Either partner may change it. */
+@Serializable
+data class ProofDaysInput(val proofDays: Int?)
 
 /** One step of a ritual; ids are made by the app and only need to be unique within the task. */
 @Serializable

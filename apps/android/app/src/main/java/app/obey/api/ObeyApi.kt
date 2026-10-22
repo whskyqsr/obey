@@ -87,6 +87,9 @@ interface ObeyApi {
     @PATCH("relationships/{id}")
     suspend fun updateRelationship(@Path("id") relationshipId: String, @Body body: UpdateRelationshipInput): Relationship
 
+    @PATCH("relationships/{id}")
+    suspend fun setProofDays(@Path("id") relationshipId: String, @Body body: ProofDaysInput): Relationship
+
     @POST("relationships/{id}/leave")
     suspend fun leaveRelationship(@Path("id") relationshipId: String, @Body body: LeaveInput): Relationship
 
