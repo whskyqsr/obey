@@ -112,12 +112,16 @@ export function CurfewPage() {
       <div className="flex flex-col pb-10">
         {header}
         <div className="mx-auto w-full max-w-2xl px-4 md:px-6">
-          <Empty icon="home" title="Add Home first" body="Curfew checks that they're at a place. Save their home in Places, then come back." />
-          <div className="flex justify-center">
-            <Button variant="tonal" icon="add_location_alt" onClick={() => navigate({ to: "/places" })}>
-              Go to Places
-            </Button>
-          </div>
+          <Empty
+            icon="home"
+            title="Add Home first"
+            body="Curfew checks that they're at a place. Save their home in Places, then come back."
+            action={
+              <Button variant="tonal" icon="add_location_alt" onClick={() => navigate({ to: "/places" })}>
+                Go to Places
+              </Button>
+            }
+          />
         </div>
       </div>
     );
