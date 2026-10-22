@@ -20,13 +20,22 @@ describe("fromGeoapify", () => {
 });
 
 describe("censusQuery", () => {
-  const street = { lat: 39.8, lon: -89.6, result_type: "street", street: "Main Street", city: "Springfield", state_code: "IL", postcode: "62701", country_code: "us" };
-  it("asks for the house when Geoapify only found the street", () => {
+  const street = {
+    lat: 39.8,
+    lon: -89.6,
+    rank: { confidence_building_level: 0.75 },
+    street: "Main Street",
+    city: "Springfield",
+    state_code: "IL",
+    postcode: "62701",
+    country_code: "us",
+  };
+  it("asks for the house when Geoapify is only guessing along the street", () => {
     expect(censusQuery(street, "100 Main St")).toBe("100 Main Street, Springfield, IL 62701");
     expect(censusQuery({ ...street, housenumber: "100" }, "Main")).toBe("100 Main Street, Springfield, IL 62701");
   });
   it("leaves houses it already found, other countries, and searches without a number", () => {
-    expect(censusQuery({ ...street, result_type: "building" }, "100 Main St")).toBeNull();
+    expect(censusQuery({ ...street, rank: { confidence_building_level: 1 } }, "100 Main St")).toBeNull();
     expect(censusQuery({ ...street, country_code: "ca" }, "100 Main St")).toBeNull();
     expect(censusQuery(street, "Main St")).toBeNull();
   });

@@ -55,8 +55,8 @@ type GeoapifyResult = {
   name?: string;
   address_line1?: string;
   address_line2?: string;
-  /** "building" when it found the house itself; "street" when it only knows the street. */
-  result_type?: string;
+  /** How sure it is of the house itself: 1 for a known point, lower when it's guessing along the street, 0 for a number it made up. */
+  rank?: { confidence_building_level?: number };
   housenumber?: string;
   street?: string;
   city?: string;
@@ -75,11 +75,11 @@ export const fromGeoapify = (results: GeoapifyResult[]): PlaceSearchResult[] =>
   }));
 
 /**
- * When Geoapify knows a US street but not the house on it, the full address to ask the Census Bureau for,
+ * When Geoapify isn't sure where a US house is on its street (it may still call it a "building"), the full address to ask the Census Bureau for,
  * which places a house number along its block. Null when there's nothing to improve.
  */
 export const censusQuery = (r: GeoapifyResult, q: string) => {
-  if (r.country_code !== "us" || r.result_type === "building" || !r.street || !r.state_code) return null;
+  if (r.country_code !== "us" || (r.rank?.confidence_building_level ?? 0) >= 1 || !r.street || !r.state_code) return null;
   const house = r.housenumber ?? q.match(/^\s*(\d+[a-z]?)\s/i)?.[1];
   if (!house) return null;
   return `${house} ${r.street}, ${[r.city, [r.state_code, r.postcode].filter(Boolean).join(" ")].filter(Boolean).join(", ")}`;
@@ -104,7 +104,10 @@ export const geoapifyGeocoder =
     if (near) params.set("bias", `proximity:${near.lng},${near.lat}`);
     const res = await fetch(`https://api.geoapify.com/v1/geocode/autocomplete?${params}`, { signal: AbortSignal.timeout(8_000) });
     if (!res.ok) throw new Error(`geoapify ${res.status}`);
-    const results = ((await res.json()) as { results?: GeoapifyResult[] }).results ?? [];
+    const all = ((await res.json()) as { results?: GeoapifyResult[] }).results ?? [];
+    // A house number it has no idea about (confidence 0) is the typed number pasted onto any street of that name.
+    const real = all.filter((r) => !r.housenumber || r.rank?.confidence_building_level !== 0);
+    const results = real.length ? real : all;
     const found = fromGeoapify(results);
     // A pin on the street, not the house, is too far off for a geofence; the top two get a second look.
     await Promise.all(
