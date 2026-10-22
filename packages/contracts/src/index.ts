@@ -98,6 +98,22 @@ export const member = z.object({
   /** Whether their notifications may carry a partner's own words, so a Dominant knows if a reminder in their words gets through. */
   notifyDetails: z.boolean().default(false),
 });
+/** A Dominant and a submissive trading roles, asked for or under way. Roles in `members` are already swapped while it's active. */
+export const roleSwap = z.object({
+  id,
+  requestedBy: id,
+  partnerId: id,
+  status: z.enum(["pending", "active"]),
+  /** Null: until someone swaps back. */
+  endsAt: z.string().nullable(),
+  pauseTasks: z.boolean(),
+  createdAt: z.string(),
+  startedAt: z.string().nullable(),
+});
+export type RoleSwap = z.infer<typeof roleSwap>;
+/** At most 30 days out; null means until someone swaps back. */
+export const roleSwapInput = z.object({ endsAt: z.string().datetime({ offset: true }).nullable().default(null), pauseTasks: z.boolean().default(true) });
+
 export const relationship = z.object({
   id,
   /** Optional; apps show the partners' names instead. */
@@ -113,6 +129,8 @@ export const relationship = z.object({
   /** When a partner left or blocked; an ended dynamic is kept read-only for both. */
   endedAt: z.string().nullable(),
   endedBy: id.nullable(),
+  /** The open swap, asked for or under way. */
+  roleSwap: roleSwap.nullable().default(null),
 });
 export type Relationship = z.infer<typeof relationship>;
 

@@ -24,6 +24,7 @@ import { HttpError, forbidden, notFound, parsePatch } from "../errors.js";
 import { occurrenceDto, rescheduleDto, taskDto } from "../serialize.js";
 import { addComment } from "./comments.js";
 import { canManage, managers, membership, requireManager, requireMember } from "../services/access.js";
+import { pausedTasks } from "../services/roleSwaps.js";
 import {
   completeOccurrence,
   countOccurrence,
@@ -97,7 +98,10 @@ function checkCount(t: {
 }
 
 /** A reminder in the Dominant's words needs the words; any other kind keeps none. */
-function reminderFields<T extends { reminder?: "default" | "custom" | "none"; reminderText?: string | null }>(body: T, current?: { reminder: string; reminderText: string | null }): T {
+function reminderFields<T extends { reminder?: "default" | "custom" | "none"; reminderText?: string | null }>(
+  body: T,
+  current?: { reminder: string; reminderText: string | null },
+): T {
   const kind = body.reminder ?? current?.reminder ?? "default";
   const text = body.reminderText !== undefined ? body.reminderText : (current?.reminderText ?? null);
   if (kind === "custom" && !text?.trim()) throw new HttpError(400, "write the reminder, or pick another kind");
@@ -286,9 +290,12 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         ),
       )
       .orderBy(asc(occurrences.dueAt));
+    const pause = await pausedTasks(db, req.params.id);
     const shown = rows.filter(({ occ, series }) => {
       const d = localDate(occ.dueAt, series.timezone);
-      return d >= q.from && d <= q.to && occ.status !== "cancelled" && (q.curfew === "include" || !series.curfewUntil);
+      // A role swap's paused tasks drop out of sight while they wait; whatever came due during it was excused.
+      const waiting = occ.status === "pending" && pause?.userId === series.assigneeId && (pause.until === null || occ.dueAt <= pause.until);
+      return d >= q.from && d <= q.to && occ.status !== "cancelled" && !waiting && (q.curfew === "include" || !series.curfewUntil);
     });
     const consequence = await missConsequences(
       db,
@@ -523,7 +530,11 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const { occ, series, member } = await loadOccurrence(db, req.params.id, req.user.id);
     if (!canManage(member.role) || req.user.id === series.assigneeId) throw forbidden("only a Dominant can do this");
     if (occ.mood === null) throw new HttpError(409, "this check-in has no mood");
-    const [updated] = await db.update(occurrences).set({ moodSeenAt: occ.moodSeenAt ?? deps.now() }).where(eq(occurrences.id, occ.id)).returning();
+    const [updated] = await db
+      .update(occurrences)
+      .set({ moodSeenAt: occ.moodSeenAt ?? deps.now() })
+      .where(eq(occurrences.id, occ.id))
+      .returning();
     return occurrenceDto(updated!, series);
   });
 

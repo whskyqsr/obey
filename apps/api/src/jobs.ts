@@ -3,6 +3,9 @@ import { managers } from "./services/access.js";
 import { claimCurfewNudges, clockTime } from "./services/curfew.js";
 import { finishStays } from "./services/location.js";
 import { claimReminders, markMissed, materializeAll } from "./services/scheduling.js";
+import { endSwap, expiredSwaps } from "./services/roleSwaps.js";
+import { roleSwaps } from "./db/schema.js";
+import { eq } from "drizzle-orm";
 import { type Notifier, sendWithWords } from "./notify.js";
 import { promptMonthReviews } from "./routes/months.js";
 import { sceneCheckIns } from "./routes/scenes.js";
@@ -10,6 +13,20 @@ import { sceneCheckIns } from "./routes/scenes.js";
 /** One pass of the background work. Every step is idempotent, so overlapping or repeated runs are safe. */
 export async function runJobs(db: Db, notifier: Notifier, now: Date, opts: { materializeDays: number; reminderLeadMinutes: number }) {
   await materializeAll(db, opts.materializeDays, now);
+
+  // Timed role swaps whose time is up end before misses are marked, so the paused tasks pick up on time.
+  for (const swap of await expiredSwaps(db, now)) {
+    if (swap.status === "pending") {
+      await db.update(roleSwaps).set({ status: "cancelled", endedAt: now }).where(eq(roleSwaps.id, swap.id));
+      continue;
+    }
+    await db.transaction((tx) => endSwap(tx, swap, null, now));
+    await notifier.send([swap.requestedBy, swap.partnerId], {
+      title: "Fealty",
+      body: "Your role swap is over. Your roles are back.",
+      data: { type: "role_swap", relationshipId: swap.relationshipId },
+    });
+  }
 
   // Stays that are up complete before misses are marked, so a stay running past the deadline isn't counted late.
   const stayed = await db.transaction((tx) => finishStays(tx, now));

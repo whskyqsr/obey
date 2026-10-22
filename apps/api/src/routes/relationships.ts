@@ -9,6 +9,7 @@ import { blocks, devices, invites, memberships, relationships, users } from "../
 import { HttpError, notFound } from "../errors.js";
 import { managers, membership, requireManager, requireMember } from "../services/access.js";
 import { deleteAccount, endRelationship } from "../services/account.js";
+import { openSwaps, swapDto } from "../services/roleSwaps.js";
 
 // No 0/O/1/I so codes read cleanly aloud.
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -62,6 +63,7 @@ export async function relationshipDto(db: Tx, ids: string[]) {
     .from(memberships)
     .innerJoin(users, eq(users.id, memberships.userId))
     .where(inArray(memberships.relationshipId, ids));
+  const swaps = await openSwaps(db, ids);
   return rels.map((r) => ({
     id: r.id,
     name: r.name,
@@ -73,6 +75,7 @@ export async function relationshipDto(db: Tx, ids: string[]) {
     createdAt: r.createdAt.toISOString(),
     endedAt: r.endedAt?.toISOString() ?? null,
     endedBy: r.endedBy,
+    roleSwap: !r.endedAt && swaps.has(r.id) ? swapDto(swaps.get(r.id)!) : null,
     members: members
       .filter((m) => m.relationshipId === r.id)
       .map(({ userId, displayName, role, avatarUpdatedAt, locationStatus, notifyDetails, locationPausedAt, locationPausedUntil }) => {

@@ -303,6 +303,34 @@ fun DynamicScreen(onBack: () -> Unit, onPlaces: () -> Unit = {}, onLocation: () 
                     }
                 }
 
+                val swapWith = app.obey.ui.roles.swapPartner(s)
+                val swap = rel.roleSwap
+                val inSwap = swap != null && (swap.requestedBy == s.userId || swap.partnerId == s.userId)
+                if (!rel.ended && (swapWith != null || inSwap)) {
+                    SectionHeader("Roles")
+                    val opens = swap == null || swap.active || swap.requestedBy == s.userId
+                    ListItem(
+                        modifier = if (opens) Modifier.clickable { dialog = if (swap == null) "swap" else "end-swap" } else Modifier,
+                        leadingContent = { Icon(Icons.Outlined.SwapHoriz, null) },
+                        headlineContent = { Text(if (swap?.active == true) "Roles swapped" else if (swap != null) "Swap asked for" else "Swap roles") },
+                        supportingContent = {
+                            Text(
+                                when {
+                                    swap == null -> "Trade Dominant and Submissive with ${swapWith?.displayName}, for a while or for good"
+                                    swap.active -> swap.endsAt?.let { "Until ${app.obey.ui.roles.formatSwapEnd(it)}" } ?: "Until one of you swaps back"
+                                    swap.requestedBy == s.userId -> "Waiting for ${s.nameOf(swap.partnerId)} to accept"
+                                    else -> "${s.nameOf(swap.requestedBy)} asked; answer on Today"
+                                },
+                            )
+                        },
+                        trailingContent = { if (opens) Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
+                    )
+                    when (dialog) {
+                        "swap" -> app.obey.ui.roles.SwapSheet(s, onDismiss = { dialog = null })
+                        "end-swap" -> swap?.let { app.obey.ui.roles.EndSwapDialog(s, it, onDismiss = { dialog = null }) }
+                    }
+                }
+
                 SectionHeader("How it works")
                 ListItem(
                     modifier = if (s.canManage) Modifier.clickable { dialog = "relname" } else Modifier,
