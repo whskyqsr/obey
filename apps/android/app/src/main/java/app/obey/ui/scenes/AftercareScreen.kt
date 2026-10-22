@@ -64,7 +64,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class AftercareViewModel @Inject constructor(private val api: ObeyApi, private val sessions: SessionRepository) : BaseViewModel() {
     val session get() = sessions.session
-    val avatars = AvatarLoader(api)
+    internal val avatars = AvatarLoader(api)
 
     private val _state = MutableStateFlow<Load<List<AftercarePlan>>>(Load.Loading)
     val state: StateFlow<Load<List<AftercarePlan>>> = _state.asStateFlow()

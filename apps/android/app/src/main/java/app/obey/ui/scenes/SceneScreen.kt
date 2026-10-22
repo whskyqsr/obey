@@ -77,7 +77,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class SceneViewModel @Inject constructor(private val api: ObeyApi, private val sessions: SessionRepository, savedState: SavedStateHandle) : BaseViewModel() {
     val session get() = sessions.session
-    val avatars = AvatarLoader(api)
+    internal val avatars = AvatarLoader(api)
     val sceneId = savedState.toRoute<SceneRoute>().sceneId
 
     private val _state = MutableStateFlow<Load<Scene>>(Load.Loading)
