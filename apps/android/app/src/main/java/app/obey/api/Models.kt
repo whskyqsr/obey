@@ -1037,20 +1037,26 @@ data class RuleLogInput(
 @Serializable
 data class StarterKit(val id: String, val title: String, val description: String, val icon: String, val items: List<KitItem>)
 
+/** One thing a kit adds. Never who a task is for, places, photos or history. */
 @Serializable
 data class KitItem(
     val key: String,
-    /** "task", "rule" or "protocol". */
+    /** "task", "rule", "protocol", "reward" or "consequence". */
     val kind: String,
     val title: String,
     val bodyMd: String? = null,
-    val repeat: KitRepeat? = null,
+    /** Tasks: absent for a one-off. */
+    val repeat: RecurrenceRule? = null,
+    val anchor: Anchor? = null,
     val dueTime: String? = null,
+    val points: Int? = null,
+    val proofRequired: Boolean? = null,
+    val steps: List<String>? = null,
+    val consequenceKey: String? = null,
+    val rewardKey: String? = null,
     val ruleKey: String? = null,
+    val cost: Int? = null,
 )
-
-@Serializable
-data class KitRepeat(val freq: String, val interval: Int? = null, val byWeekday: List<String>? = null)
 
 @Serializable
 data class ApplyKitInput(
@@ -1061,7 +1067,36 @@ data class ApplyKitInput(
 )
 
 @Serializable
-data class ApplyKitResult(val tasks: Int, val rules: Int, val protocols: Int)
+data class ApplyKitResult(val tasks: Int, val rules: Int, val protocols: Int, val rewards: Int = 0, val consequences: Int = 0)
+
+/** A kit someone saved from a dynamic: theirs alone, shareable by code. */
+@Serializable
+data class Kit(
+    val id: String,
+    val title: String,
+    val description: String,
+    val items: List<KitItem>,
+    val shareCode: String? = null,
+    val createdAt: String,
+)
+
+@Serializable
+data class KitInput(
+    val title: String,
+    val description: String,
+    val tasks: List<String>,
+    val rules: List<String>,
+    val protocols: List<String>,
+    val rewards: List<String>,
+    val consequences: List<String>,
+)
+
+@Serializable
+data class KitPatch(val title: String, val description: String, val keep: List<String>)
+
+/** A shared kit as anyone with its code sees it. */
+@Serializable
+data class SharedKit(val code: String, val title: String, val description: String, val items: List<KitItem>)
 
 /** "That's fine": keep these tasks as they are alongside a plan; they stop counting as clashes. */
 @Serializable

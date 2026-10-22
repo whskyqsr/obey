@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { boolean, customType, date, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
-import type { AgreementSectionInput, CurfewSettings, DynamicDate, Features } from "@obey/contracts";
+import type { AgreementSectionInput, CurfewSettings, DynamicDate, Features, KitItem } from "@obey/contracts";
 import type { Schedule } from "@obey/recurrence";
 
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
@@ -844,4 +844,23 @@ export const aftercarePlans = pgTable(
     updatedAt: ts("updated_at").notNull(),
   },
   (t) => [primaryKey({ columns: [t.relationshipId, t.userId] })],
+);
+
+/** A kit someone saved from a dynamic: a copy of the items, theirs alone, shareable by code. */
+export const kits = pgTable(
+  "kits",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    items: jsonb("items").$type<KitItem[]>().notNull().default([]),
+    /** Set while shared; cleared to stop sharing, and a new one is made if it's shared again. */
+    shareCode: text("share_code"),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [index("kits_owner_idx").on(t.ownerId), uniqueIndex("kits_share_code_uq").on(t.shareCode)],
 );

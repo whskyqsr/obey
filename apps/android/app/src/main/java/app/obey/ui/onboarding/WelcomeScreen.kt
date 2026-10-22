@@ -67,6 +67,7 @@ import app.obey.ui.common.Load
 import app.obey.ui.common.LoadingBox
 import app.obey.ui.common.MessageEffect
 import app.obey.ui.kits.KitSheet
+import app.obey.ui.kits.KitSource
 import app.obey.ui.kits.KitsViewModel
 import app.obey.ui.kits.describe
 import app.obey.ui.kits.kitIcon
@@ -267,7 +268,7 @@ private fun KitsStep(session: Session, onApplied: () -> Unit, vm: KitsViewModel 
             }
         }
     }
-    open?.let { k -> KitSheet(k, session, onDismiss = { open = null }, onAdd = { items, who -> vm.apply(k, items, who); open = null }) }
+    open?.let { k -> KitSheet(k.title, k.description, k.items, session, onDismiss = { open = null }, onAdd = { items, who -> vm.apply(KitSource.Saved(k.id), items, who); open = null }) }
 }
 
 @Composable

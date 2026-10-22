@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { api, apiObjectUrl } from "./client";
-import type { DynamicStats, MonthFocus, MonthReview, MonthSummary, MoodEntry, PastMonth } from "@obey/contracts";
+import type { ApplyKitResult, Kit, SharedKit, DynamicStats, MonthFocus, MonthReview, MonthSummary, MoodEntry, PastMonth } from "@obey/contracts";
 import type {
   AdminReport,
   OccurrenceComment,
@@ -658,13 +658,68 @@ export function useDeleteLibraryItem(rel: string, kind: LibraryKind) {
   });
 }
 
-export type ApplyKitInput = { kit: string; items: string[]; assigneeId?: string; timezone: string; start: string };
+/** `kit` is a starter kit's id or one of your own; `shared` is a share code instead. */
+export type ApplyKitInput = { kit?: string; shared?: string; items: string[]; assigneeId?: string; timezone: string; start: string };
 
 export function useApplyKit(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({
-    mutationFn: ({ kit, ...body }: ApplyKitInput) => api<{ tasks: number; rules: number; protocols: number }>(`/relationships/${rel}/kits/${kit}`, { method: "POST", body }),
+    mutationFn: ({ kit, shared, ...body }: ApplyKitInput) =>
+      api<ApplyKitResult>(shared ? `/relationships/${rel}/shared-kits/${shared}` : `/relationships/${rel}/kits/${kit}`, { method: "POST", body }),
     onSuccess: () => invalidate(),
+  });
+}
+
+const myKits = ["me", "kits"] as const;
+
+export function useMyKits(enabled = true) {
+  return useQuery({ queryKey: myKits, queryFn: () => api<Kit[]>("/me/kits"), enabled });
+}
+
+export type NewKit = { title: string; description: string; tasks: string[]; rules: string[]; protocols: string[]; rewards: string[]; consequences: string[] };
+
+export function useSaveKit(rel: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: NewKit) => api<Kit>(`/relationships/${rel}/kits`, { method: "POST", body }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: myKits }),
+  });
+}
+
+export function useUpdateKit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string; title?: string; description?: string; keep?: string[] }) => api<Kit>(`/kits/${id}`, { method: "PATCH", body }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: myKits }),
+  });
+}
+
+export function useDeleteKit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api(`/kits/${id}`, { method: "DELETE" }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: myKits }),
+  });
+}
+
+/** Turns a kit's share link on or off. */
+export function useShareKit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, on }: { id: string; on: boolean }) => api<Kit>(`/kits/${id}/share`, { method: on ? "POST" : "DELETE", ...(on && { body: {} }) }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: myKits }),
+  });
+}
+
+export function useSharedKit(code: string) {
+  return useQuery({ queryKey: ["sharedKit", code], queryFn: () => api<SharedKit>(`/shared-kits/${code}`), retry: false });
+}
+
+export function useCopySharedKit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => api<Kit>(`/shared-kits/${code}/save`, { method: "POST", body: {} }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: myKits }),
   });
 }
 
