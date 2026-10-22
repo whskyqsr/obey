@@ -412,6 +412,7 @@ fun TodayScreen(
                 LazyColumn(Modifier.fillMaxSize()) {
                     offlineSince?.let { at -> item(key = "offline") { OfflineBanner(at) } }
                     if (session?.readOnly == true) item(key = "ended") { EndedBanner(onOpenSettings) }
+                    if (session?.relationship?.roleSwap != null) item(key = "role-swap") { app.obey.ui.roles.RoleSwapCard(session) }
                     curfew?.night?.let { n ->
                         item(key = "curfew") {
                             val mine = n.assigneeId == me

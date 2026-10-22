@@ -316,6 +316,13 @@
       "when": 1792691606400,
       "tag": "0044_kits",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1792694336990,
+      "tag": "0045_role_swaps",
+      "breakpoints": true
     }
   ]
 }

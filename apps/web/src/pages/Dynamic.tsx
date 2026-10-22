@@ -9,6 +9,7 @@ import { MoodCard } from "../components/Mood";
 import { DynamicHero } from "../components/DynamicHero";
 import { Button, Checkbox, Chip, Dialog, Icon, IconButton, OverflowMenu, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
 import { ReportDialog } from "../components/Proof";
+import { EndSwapDialog, SwapDialog, fmtSwapEnd, swapPartner } from "../components/RoleSwap";
 import { fmtDate, fmtDateTime, localDateOf, today } from "../lib/dates";
 import { anniversary, describeDate } from "../lib/dynamicDates";
 import { inviteLink } from "../lib/invite";
@@ -146,7 +147,10 @@ export function DynamicPage() {
   const curfew = useCurfew(rel.id, features.location);
   const back = useBack(() => navigate({ to: "/settings" }));
   const title = useDynamicTitle();
-  const [sheet, setSheet] = useState<"invite" | "name" | "deadlines" | null>(null);
+  const [sheet, setSheet] = useState<"invite" | "name" | "deadlines" | "swap" | "end-swap" | null>(null);
+  const swapWith = swapPartner(rel, me.user.id);
+  const swap = rel.roleSwap;
+  const inSwap = swap && (swap.requestedBy === me.user.id || swap.partnerId === me.user.id);
   const [reporting, setReporting] = useState<string | null>(null);
   // Leaving (null target) or blocking one person.
   const [leaving, setLeaving] = useState<{ target: Member | null } | null>(null);
@@ -284,6 +288,31 @@ export function DynamicPage() {
           </>
         )}
 
+        {!rel.endedAt && (swapWith || inSwap) && (
+          <>
+            <Label>Roles</Label>
+            <Group>
+              <Row
+                leading={<Icon name="swap_horiz" className="text-on-surface-variant" />}
+                headline={swap?.status === "active" ? "Roles swapped" : swap ? "Swap asked for" : "Swap roles"}
+                supporting={
+                  swap?.status === "active"
+                    ? swap.endsAt
+                      ? `Until ${fmtSwapEnd(swap.endsAt)}`
+                      : "Until one of you swaps back"
+                    : swap
+                      ? swap.requestedBy === me.user.id
+                        ? `Waiting for ${memberName(swap.partnerId)} to accept`
+                        : `${memberName(swap.requestedBy)} asked; answer on Today`
+                      : `Trade Dominant and Submissive with ${swapWith!.displayName}, for a while or for good`
+                }
+                trailing={(!swap || swap.status === "active" || swap.requestedBy === me.user.id) && <Icon name="chevron_right" className="text-on-surface-variant" />}
+                onClick={!swap ? () => setSheet("swap") : swap.status === "active" || swap.requestedBy === me.user.id ? () => setSheet("end-swap") : undefined}
+              />
+            </Group>
+          </>
+        )}
+
         <Label>How it works</Label>
         <Group>
           <Row
@@ -366,6 +395,8 @@ export function DynamicPage() {
       {leaving && <LeaveDialog target={leaving.target} onClose={() => setLeaving(null)} />}
 
       <InviteSheet open={sheet === "invite"} onClose={() => setSheet(null)} />
+      <SwapDialog open={sheet === "swap"} onClose={() => setSheet(null)} />
+      {swap && <EndSwapDialog open={sheet === "end-swap"} onClose={() => setSheet(null)} swap={swap} />}
       <NameDialog open={sheet === "name"} onClose={() => setSheet(null)} onSave={(name) => patch({ name }, "Name saved")} />
       <DateDialog
         value={editingDate}

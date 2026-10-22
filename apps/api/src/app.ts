@@ -17,6 +17,7 @@ import { safeCallRoutes } from "./routes/safeCalls.js";
 import { agreementRoutes } from "./routes/agreement.js";
 import { sceneRoutes } from "./routes/scenes.js";
 import { kitRoutes } from "./routes/kits.js";
+import { roleSwapRoutes } from "./routes/roleSwaps.js";
 import { verificationRoutes } from "./routes/verification.js";
 import { eventRoutes } from "./routes/events.js";
 import { libraryRoutes } from "./routes/library.js";
@@ -120,6 +121,7 @@ export function buildApp(deps: Deps) {
   app.register(agreementRoutes(deps));
   app.register(sceneRoutes(deps));
   app.register(kitRoutes(deps));
+  app.register(roleSwapRoutes(deps));
   app.register(verificationRoutes(deps));
   app.register(imageryRoutes(deps));
   return app;

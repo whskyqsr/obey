@@ -864,3 +864,35 @@ export const kits = pgTable(
   },
   (t) => [index("kits_owner_idx").on(t.ownerId), uniqueIndex("kits_share_code_uq").on(t.shareCode)],
 );
+
+/**
+ * A Dominant and a submissive trading roles. Asked by one, it starts only when the other accepts; it ends when
+ * either ends it or at endsAt. While active the memberships carry the swapped roles.
+ */
+export const roleSwaps = pgTable(
+  "role_swaps",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    requestedBy: uuid("requested_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    partnerId: uuid("partner_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: text("status", { enum: ["pending", "active", "ended", "declined", "cancelled"] }).notNull(),
+    /** Null: until someone swaps back. */
+    endsAt: ts("ends_at"),
+    pauseTasks: boolean("pause_tasks").notNull().default(true),
+    /** Whose tasks are paused while it's active: the submissive from before the swap. */
+    pausedUserId: uuid("paused_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    startedAt: ts("started_at"),
+    endedAt: ts("ended_at"),
+    /** Null when the time ran out. */
+    endedBy: uuid("ended_by").references(() => users.id, { onDelete: "set null" }),
+  },
+  (t) => [index("role_swaps_relationship_idx").on(t.relationshipId, t.createdAt)],
+);

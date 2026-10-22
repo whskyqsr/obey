@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { api, apiObjectUrl } from "./client";
-import type { ApplyKitResult, Kit, SharedKit, DynamicStats, MonthFocus, MonthReview, MonthSummary, MoodEntry, PastMonth } from "@obey/contracts";
+import type { ApplyKitResult, Kit, RoleSwap, SharedKit, DynamicStats, MonthFocus, MonthReview, MonthSummary, MoodEntry, PastMonth } from "@obey/contracts";
 import type {
   AdminReport,
   OccurrenceComment,
@@ -1057,4 +1057,25 @@ export function useDeleteSceneComment(rel: string) {
     mutationFn: (c: SceneComment) => api(`/scene-comments/${c.id}`, { method: "DELETE" }),
     onSuccess: () => invalidate(),
   });
+}
+
+/** Asks the other person to swap roles; `endsAt` null means until someone swaps back. */
+export function useAskRoleSwap(rel: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { endsAt: string | null; pauseTasks: boolean }) => api<RoleSwap>(`/relationships/${rel}/role-swap`, { method: "POST", body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.me }),
+  });
+}
+
+/** Roles change, so everything that depends on them reloads. */
+export function useAcceptRoleSwap(rel: string) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: () => api<RoleSwap>(`/relationships/${rel}/role-swap/accept`, { method: "POST" }), onSuccess: () => qc.invalidateQueries() });
+}
+
+/** Declines or takes back a request, or ends a swap that's on. */
+export function useEndRoleSwap(rel: string) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: () => api<void>(`/relationships/${rel}/role-swap`, { method: "DELETE" }), onSuccess: () => qc.invalidateQueries() });
 }

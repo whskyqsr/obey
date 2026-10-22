@@ -14,6 +14,7 @@ export type NotifyCategory = c.NotifyCategory;
 export type RuleLogEntry = c.RuleLogEntry;
 export type SafeCall = c.SafeCall;
 export type SafeCalls = c.SafeCalls;
+export type RoleSwap = c.RoleSwap;
 export type Agreement = c.Agreement;
 export type AgreementVersion = c.AgreementVersion;
 export type AgreementSection = c.AgreementSection;

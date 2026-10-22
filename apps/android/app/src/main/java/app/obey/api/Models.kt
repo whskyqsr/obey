@@ -185,9 +185,31 @@ data class Relationship(
     /** When a partner left or blocked; an ended dynamic is kept read-only for both. */
     val endedAt: String? = null,
     val endedBy: String? = null,
+    /** The open role swap, asked for or under way. */
+    val roleSwap: RoleSwap? = null,
 ) {
     val ended: Boolean get() = endedAt != null
 }
+
+/** A Dominant and a submissive trading roles. While [active], the members' roles are already swapped. */
+@Serializable
+data class RoleSwap(
+    val id: String,
+    val requestedBy: String,
+    val partnerId: String,
+    /** "pending" or "active". */
+    val status: String,
+    /** Null: until someone swaps back. */
+    val endsAt: String? = null,
+    val pauseTasks: Boolean,
+    val createdAt: String,
+    val startedAt: String? = null,
+) {
+    val active: Boolean get() = status == "active"
+}
+
+@Serializable
+data class RoleSwapInput(val endsAt: String?, val pauseTasks: Boolean)
 
 /** Leaving ends the dynamic for both; the people in [block] can never pair with you again. */
 @Serializable

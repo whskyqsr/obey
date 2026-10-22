@@ -257,6 +257,16 @@ interface ObeyApi {
     @POST("relationships/{id}/safe-calls")
     suspend fun callSafeWord(@Path("id") relationshipId: String, @Body body: SafeCallInput): SafeCall
 
+    @POST("relationships/{id}/role-swap")
+    suspend fun askRoleSwap(@Path("id") relationshipId: String, @Body body: RoleSwapInput): RoleSwap
+
+    @POST("relationships/{id}/role-swap/accept")
+    suspend fun acceptRoleSwap(@Path("id") relationshipId: String, @Body body: Map<String, String> = emptyMap()): RoleSwap
+
+    /** Declines or takes back a request, or ends a swap that's on. */
+    @DELETE("relationships/{id}/role-swap")
+    suspend fun endRoleSwap(@Path("id") relationshipId: String)
+
     @POST("safe-calls/{id}/clear")
     suspend fun clearSafeCall(@Path("id") id: String): SafeCall
 
