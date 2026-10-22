@@ -5,7 +5,26 @@ export type Geocoder = (q: string, near: { lat: number; lng: number } | null) =>
 
 const PHOTON = "https://photon.komoot.io/api/";
 
+/**
+ * Photon often finds nothing for a full US address with a unit, ZIP or country on it,
+ * so a query that finds nothing is tried once more without them.
+ */
+export const plainAddress = (q: string) =>
+  q
+    .replace(/,?\s*(?:apt|apartment|unit|suite|ste)\.?\s*[\w-]+|,?\s*#\s*[\w-]+/gi, "")
+    .replace(/\s\d{5}(?:-\d{4})?(?=\s*(?:,|$|usa\b|united states))/gi, "")
+    .replace(/,?\s*(?:usa|united states(?: of america)?)\s*$/i, "")
+    .replace(/\s*,(?:\s*,)+/g, ",")
+    .replace(/[\s,]+$/, "")
+    .trim();
+
 export const photonGeocoder: Geocoder = async (q, near) => {
+  const found = await photon(q, near);
+  const plain = plainAddress(q);
+  return found.length || plain === q || plain.length < 3 ? found : photon(plain, near);
+};
+
+const photon: Geocoder = async (q, near) => {
   const params = new URLSearchParams({ q, limit: "5" });
   if (near) {
     params.set("lat", String(near.lat));

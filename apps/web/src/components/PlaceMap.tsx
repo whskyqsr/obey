@@ -4,7 +4,7 @@ import type { Place, PlaceInput, PlaceSearchResult } from "../api/types";
 import { useDeletePlace, useSavePlace } from "../api/hooks";
 import { api, errorMessage } from "../api/client";
 import { useRel } from "../lib/relationship";
-import { Button, Dialog, Icon, IconButton, TextField, cx, useSnackbar } from "./ui";
+import { Button, Dialog, Icon, IconButton, Spinner, TextField, cx, useSnackbar } from "./ui";
 
 /** Free OpenStreetMap tiles; no key or billing account needed. */
 const STYLE = "https://tiles.openfreemap.org/styles/liberty";
@@ -67,16 +67,14 @@ export function PlaceMap({
     let gone = false;
     let made: maplibregl.Map | null = null;
     // The map library is big, so it loads only when a map is first shown.
-    void Promise.all([
-      import("maplibre-gl"),
-      import("maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"),
-      import("maplibre-gl/dist/maplibre-gl.css"),
-    ]).then(([lib, { default: workerUrl }]) => {
-      if (gone || !el.current) return;
-      // MapLibre 6 looks for its worker beside its own file, which bundling moves; point it at the bundled one.
-      lib.setWorkerUrl(workerUrl);
-      made = make(lib, el.current);
-    });
+    void Promise.all([import("maplibre-gl"), import("maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"), import("maplibre-gl/dist/maplibre-gl.css")]).then(
+      ([lib, { default: workerUrl }]) => {
+        if (gone || !el.current) return;
+        // MapLibre 6 looks for its worker beside its own file, which bundling moves; point it at the bundled one.
+        lib.setWorkerUrl(workerUrl);
+        made = make(lib, el.current);
+      },
+    );
     return () => {
       gone = true;
       try {
@@ -156,13 +154,16 @@ export function PlaceMap({
 /** Looks up addresses and businesses, nearest to [near] first, through our server. */
 function useAddressSearch(q: string, near: { lat: number; lng: number }) {
   const [found, setFound] = useState<PlaceSearchResult[]>([]);
+  const [state, setState] = useState<"idle" | "searching" | "done" | "failed">("idle");
   useEffect(() => {
-    if (q.trim().length < 3) return setFound([]);
+    setFound([]);
+    if (q.trim().length < 3) return setState("idle");
+    setState("searching");
     let gone = false;
     const t = setTimeout(() => {
       api<PlaceSearchResult[]>(`/places/search?${new URLSearchParams({ q, lat: String(near.lat), lng: String(near.lng) })}`)
-        .then((r) => !gone && setFound(r))
-        .catch(() => undefined);
+        .then((r) => !gone && (setFound(r), setState("done")))
+        .catch(() => !gone && setState("failed"));
     }, 350);
     return () => {
       gone = true;
@@ -171,7 +172,7 @@ function useAddressSearch(q: string, near: { lat: number; lng: number }) {
     // Only a new query searches again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
-  return found;
+  return { found, state };
 }
 
 const fmtRadius = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(m % 1000 ? 1 : 0)} km` : `${m} m`);
@@ -185,7 +186,7 @@ export function PlaceDialog({ place, open, onClose, onSaved }: { place: Place | 
   const [draft, setDraft] = useState<PlaceInput>({ name: "", address: null, lat: 40.7128, lng: -74.006, radiusM: 150 });
   const [q, setQ] = useState("");
   const [located, setLocated] = useState(false);
-  const found = useAddressSearch(q, draft);
+  const { found, state: searching } = useAddressSearch(q, draft);
 
   useEffect(() => {
     if (!open) return;
@@ -205,6 +206,10 @@ export function PlaceDialog({ place, open, onClose, onSaved }: { place: Place | 
   }, [open, place]);
 
   const set = (p: Partial<PlaceInput>) => setDraft((d) => ({ ...d, ...p }));
+  const pick = (f: PlaceSearchResult) => {
+    set({ lat: f.lat, lng: f.lng, address: [f.name, f.address].filter(Boolean).join(", ").slice(0, 200), name: draft.name || f.name.slice(0, 40) });
+    setQ("");
+  };
   const valid = draft.name.trim().length > 0;
   const submit = () =>
     save.mutate(
@@ -247,19 +252,25 @@ export function PlaceDialog({ place, open, onClose, onSaved }: { place: Place | 
     >
       <div className="flex flex-col gap-4">
         <div className="relative">
-          <TextField label="Search an address or business" value={q} onChange={(e) => setQ(e.target.value)} />
+          <TextField
+            label="Search an address or business"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            // Enter takes the top match, so it doesn't submit the dialog or look like nothing happened.
+            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), found[0] && pick(found[0]))}
+            help={searching === "searching" ? "Searching…" : searching === "done" && !found.length ? "No matches. Try just the street and city." : undefined}
+            error={searching === "failed" ? "Search isn't working right now. Drag the map to the spot instead." : undefined}
+          />
+          {searching === "searching" && (
+            <span className="pointer-events-none absolute top-4 right-3 text-on-surface-variant">
+              <Spinner size={24} />
+            </span>
+          )}
           {found.length > 0 && (
             <ul className="absolute inset-x-0 top-full z-20 mt-1 overflow-hidden rounded-sm bg-surface-container shadow-elev-2">
               {found.map((f, i) => (
                 <li key={i}>
-                  <button
-                    type="button"
-                    className="state-layer flex w-full items-start gap-3 px-4 py-2 text-left"
-                    onClick={() => {
-                      set({ lat: f.lat, lng: f.lng, address: [f.name, f.address].filter(Boolean).join(", ").slice(0, 200), name: draft.name || f.name.slice(0, 40) });
-                      setQ("");
-                    }}
-                  >
+                  <button type="button" className="state-layer flex w-full items-start gap-3 px-4 py-2 text-left" onClick={() => pick(f)}>
                     <Icon name="location_on" className="mt-0.5 text-on-surface-variant" />
                     <span className="min-w-0">
                       <span className="block truncate text-body-large text-on-surface">{f.name}</span>

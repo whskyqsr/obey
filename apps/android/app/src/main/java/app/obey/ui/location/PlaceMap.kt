@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
@@ -23,6 +25,7 @@ import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.MyLocation
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -49,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
@@ -197,6 +201,9 @@ fun PlaceDialog(
     var q by remember { mutableStateOf("") }
     var found by remember { mutableStateOf<List<PlaceSearchResult>>(emptyList()) }
     var hint by remember { mutableStateOf<String?>(null) }
+    var searching by remember { mutableStateOf(false) }
+    // What the last search came to, shown under the field: "none" or "failed".
+    var outcome by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     fun goToMe() = scope.launch {
@@ -210,12 +217,24 @@ fun PlaceDialog(
     // A new place starts where the Dominant is, when the phone already allows it.
     LaunchedEffect(Unit) { if (place == null && canLocate()) goToMe() }
     LaunchedEffect(q) {
-        if (q.trim().length < 3) {
-            found = emptyList()
-            return@LaunchedEffect
-        }
+        found = emptyList()
+        outcome = null
+        searching = q.trim().length >= 3
+        if (!searching) return@LaunchedEffect
         delay(350)
-        found = runCatching { search(q.trim(), draft.lat, draft.lng) }.getOrElse { hint = "Search isn't working right now; drag the map to the spot."; emptyList() }
+        val r = runCatching { search(q.trim(), draft.lat, draft.lng) }
+        found = r.getOrDefault(emptyList())
+        outcome = if (r.isFailure) "failed" else if (found.isEmpty()) "none" else null
+        searching = false
+    }
+    fun pick(f: PlaceSearchResult) {
+        draft = draft.copy(
+            lat = f.lat,
+            lng = f.lng,
+            address = listOf(f.name, f.address).filter { it.isNotBlank() }.joinToString(", ").take(200),
+            name = draft.name.ifBlank { f.name.take(40) },
+        )
+        q = ""
     }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
@@ -236,6 +255,16 @@ fun PlaceDialog(
                     onValueChange = { q = it.take(200); hint = null },
                     leadingIcon = { Icon(Icons.Outlined.Search, null) },
                     placeholder = { Text("Search an address or business") },
+                    trailingIcon = if (searching) ({ CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) }) else null,
+                    supportingText = when (outcome) {
+                        "failed" -> ({ Text("Search isn't working right now. Drag the map to the spot instead.") })
+                        "none" -> ({ Text("No matches. Try just the street and city.") })
+                        else -> null
+                    },
+                    isError = outcome == "failed",
+                    // The keyboard's search key takes the top match.
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { found.firstOrNull()?.let(::pick) }),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 )
@@ -266,15 +295,7 @@ fun PlaceDialog(
                             Column {
                                 found.forEach { f ->
                                     ListItem(
-                                        modifier = Modifier.clickable {
-                                            draft = draft.copy(
-                                                lat = f.lat,
-                                                lng = f.lng,
-                                                address = listOf(f.name, f.address).filter { it.isNotBlank() }.joinToString(", ").take(200),
-                                                name = draft.name.ifBlank { f.name.take(40) },
-                                            )
-                                            q = ""
-                                        },
+                                        modifier = Modifier.clickable { pick(f) },
                                         leadingContent = { Icon(Icons.Outlined.LocationOn, null) },
                                         headlineContent = { Text(f.name) },
                                         supportingContent = if (f.address.isNotBlank()) ({ Text(f.address) }) else null,
