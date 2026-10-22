@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fromGeoapify, plainAddress } from "../src/services/geocode.js";
+import { censusQuery, fromGeoapify, plainAddress } from "../src/services/geocode.js";
 
 describe("plainAddress", () => {
   it("drops the unit, ZIP and country that Photon trips on", () => {
@@ -16,5 +16,27 @@ describe("fromGeoapify", () => {
     expect(fromGeoapify([{ lat: 42.2, lon: -84.4, address_line1: "100 Main Street", address_line2: "Springfield, IL 62701, United States of America" }])).toEqual([
       { name: "100 Main Street", address: "Springfield, IL 62701", lat: 42.2, lng: -84.4 },
     ]);
+  });
+});
+
+describe("censusQuery", () => {
+  const street = {
+    lat: 39.8,
+    lon: -89.6,
+    rank: { confidence_building_level: 0.75 },
+    street: "Main Street",
+    city: "Springfield",
+    state_code: "IL",
+    postcode: "62701",
+    country_code: "us",
+  };
+  it("asks for the house when Geoapify is only guessing along the street", () => {
+    expect(censusQuery(street, "100 Main St")).toBe("100 Main Street, Springfield, IL 62701");
+    expect(censusQuery({ ...street, housenumber: "100" }, "Main")).toBe("100 Main Street, Springfield, IL 62701");
+  });
+  it("leaves houses it already found, other countries, and searches without a number", () => {
+    expect(censusQuery({ ...street, rank: { confidence_building_level: 1 } }, "100 Main St")).toBeNull();
+    expect(censusQuery({ ...street, country_code: "ca" }, "100 Main St")).toBeNull();
+    expect(censusQuery(street, "Main St")).toBeNull();
   });
 });

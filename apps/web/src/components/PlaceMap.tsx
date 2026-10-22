@@ -254,6 +254,12 @@ export function PlaceDialog({ place, open, onClose, onSaved }: { place: Place | 
         <div className="relative">
           <TextField
             label="Search an address or business"
+            // Our own suggestions only: the browser's saved addresses would cover them.
+            name="fealty-place-search"
+            autoComplete="off"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={found.length > 0}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             // Enter takes the top match, so it doesn't submit the dialog or look like nothing happened.
