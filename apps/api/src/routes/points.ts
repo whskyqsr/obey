@@ -109,8 +109,8 @@ export const pointsRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const body = markRedeemedInput.parse(req.body ?? {});
     const [entry] = await db.select().from(pointsLedger).where(eq(pointsLedger.id, req.params.id));
     if (!entry || entry.kind !== "redemption") throw notFound();
-    await requireManager(db, entry.relationshipId, req.user.id);
-    if (entry.userId === req.user.id) throw new HttpError(403, "someone else marks your redemptions");
+    const me = await requireManager(db, entry.relationshipId, req.user.id);
+    if (entry.userId === req.user.id && !me.solo) throw new HttpError(403, "someone else marks your redemptions");
     const note = body.note?.trim() || null;
     const updated = await db.transaction(async (tx) => {
       const [u] = await tx

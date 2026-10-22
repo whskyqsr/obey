@@ -10,6 +10,8 @@ export interface Menu {
   track(el: HTMLElement | null): void;
   /** Opens the safe-word sheet; set for subs and switches, who get its button on every page header. */
   safeWord?(): void;
+  /** Opens the invite sheet; set when someone is on their own (solo mode). */
+  invite?(): void;
   /** Shown under every page header, such as an open safe call, so the title and menu never move. */
   banner?: ReactNode;
 }

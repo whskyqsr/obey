@@ -114,6 +114,17 @@ export const roleSwap = z.object({
 });
 export type RoleSwap = z.infer<typeof roleSwap>;
 /** At most 30 days out; null means until someone swaps back. */
+export const soloSetup = z.object({
+  setById: id,
+  joinerId: id,
+  joinedAt: z.string(),
+  tasks: z.number().int(),
+  rules: z.number().int(),
+  rewards: z.number().int(),
+  consequences: z.number().int(),
+});
+export type SoloSetup = z.infer<typeof soloSetup>;
+
 export const roleSwapInput = z.object({ endsAt: z.string().datetime({ offset: true }).nullable().default(null), pauseTasks: z.boolean().default(true) });
 
 export const relationship = z.object({
@@ -135,6 +146,8 @@ export const relationship = z.object({
   endedBy: id.nullable(),
   /** The open swap, asked for or under way. */
   roleSwap: roleSwap.nullable().default(null),
+  /** What someone set up on their own before their partner joined, for a couple of weeks after they do. */
+  soloSetup: soloSetup.nullable().default(null),
 });
 export type Relationship = z.infer<typeof relationship>;
 

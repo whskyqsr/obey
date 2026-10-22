@@ -79,6 +79,8 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
     MessageEffect(message, snackbar, vm::messageShown)
     val session = vm.session
     val canManage = session?.canManage == true
+    // On their own, they both set rewards and spend points on them.
+    val solo = session?.solo == true
     // Rewards and Consequences are separate pages that share this screen and its data, as on the web.
     val features = LocalFeatures.current.let { if (consequences) it.copy(points = false) else it.copy(consequences = false) }
 
@@ -161,7 +163,7 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
                             Text(listOfNotNull(r.bodyMd.takeIf { it.isNotBlank() }, if (r.letsOff) "Gets ${if (canManage) "them" else "you"} out of a consequence" else null, r.lockMinutes?.takeIf { features.chastity }?.let { "Takes ${app.obey.ui.chastity.fmtMinutes(it)} off the lock" }).joinToString(" · "))
                         },
                         trailingContent = {
-                            if (canManage) Text("${r.cost} pts", style = MaterialTheme.typography.labelLarge)
+                            if (canManage && !solo) Text("${r.cost} pts", style = MaterialTheme.typography.labelLarge)
                             else FilledTonalButton(onClick = { confirmRedeem = r }, enabled = myBalance >= r.cost) {
                                 Text("${r.cost} pts")
                             }
@@ -171,7 +173,7 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
 
                 // Rewards spent but not yet given: a Dominant marks them redeemed; a sub sees what they're waiting on.
                 val waiting = if (features.points) d.ledger.filter {
-                    it.kind == app.obey.api.LedgerKind.Redemption && it.redeemedAt == null && (if (canManage) it.userId != session?.userId else it.userId == session?.userId)
+                    it.kind == app.obey.api.LedgerKind.Redemption && it.redeemedAt == null && (solo || if (canManage) it.userId != session?.userId else it.userId == session?.userId)
                 } else emptyList()
                 if (waiting.isNotEmpty()) item(key = "h-waiting") { SectionHeader(if (canManage) "To redeem" else "Waiting on $domName") }
                 items(waiting, key = { "w-" + it.id }) { e ->
@@ -277,8 +279,8 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
             AlertDialog(
                 onDismissRequest = { confirmRedeem = null },
                 title = { Text("Redeem “${r.title}”?") },
-                text = { Text("Spend ${r.cost} points on “${r.title}”? $domName marks it redeemed once it's given.") },
-                confirmButton = { Button(onClick = { vm.redeem(r, domName); confirmRedeem = null }) { Text("Spend ${r.cost} pts") } },
+                text = { Text(if (solo) "Spend ${r.cost} points on “${r.title}”? Mark it redeemed once you've had it." else "Spend ${r.cost} points on “${r.title}”? $domName marks it redeemed once it's given.") },
+                confirmButton = { Button(onClick = { vm.redeem(r, if (solo) null else domName); confirmRedeem = null }) { Text("Spend ${r.cost} pts") } },
                 dismissButton = { TextButton(onClick = { confirmRedeem = null }) { Text("Cancel") } },
             )
         }

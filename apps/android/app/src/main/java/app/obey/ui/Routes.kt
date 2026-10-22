@@ -16,7 +16,8 @@ import kotlinx.serialization.Serializable
 @Serializable data class StatsRoute(val month: String? = null, val who: String? = null)
 @Serializable data object MonthReviewRoute
 @Serializable data object SettingsRoute
-@Serializable data object DynamicRoute
+/** Your dynamic; [invite] opens it on the invite sheet (from solo mode's "Invite a partner"). */
+@Serializable data class DynamicRoute(val invite: Boolean = false)
 @Serializable data object TaskListRoute
 @Serializable data object KitsRoute
 @Serializable data class KitRoute(val kitId: String)

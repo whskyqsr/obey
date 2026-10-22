@@ -73,6 +73,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
@@ -158,7 +159,9 @@ fun ObeyRoot(vm: RootViewModel = hiltViewModel()) {
                         // A new NavHost (and fresh ViewModels) per relationship.
                         key(s.session.relationship.id) {
                             val byId = remember(places, s.session.relationship.id) { places[s.session.relationship.id].orEmpty().associateBy { it.id } }
-                            CompositionLocalProvider(LocalFeatures provides s.session.relationship.features, app.obey.ui.location.LocalPlaces provides byId) {
+                            // Someone on their own has nobody to sign an agreement with or hold a key, so those stay out of the way.
+                            val features = s.session.relationship.features.let { f -> if (s.session.solo) f.copy(agreement = false, chastity = false) else f }
+                            CompositionLocalProvider(LocalFeatures provides features, app.obey.ui.location.LocalPlaces provides byId) {
                                 if (welcome == s.session.relationship.id) WelcomeScreen() else MainScaffold(s.session)
                             }
                         }
@@ -273,7 +276,7 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
     LaunchedEffect(safeError) {
         safeError?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show(); safeVm.messageShown() }
     }
-    val switcher = SwitcherActions(session, settingsVm::loadAvatar, { settingsVm.selectRelationship(it) }, { nav.navigate(DynamicRoute) }, { nav.navigate(DynamicRoute) })
+    val switcher = SwitcherActions(session, settingsVm::loadAvatar, { settingsVm.selectRelationship(it) }, { nav.navigate(DynamicRoute()) }, { nav.navigate(DynamicRoute()) })
 
     if (wide) {
         Row(Modifier.fillMaxSize()) {
@@ -309,8 +312,11 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
                         overflow.filter { it.route !is AgreementRoute }.forEach { t -> MenuItem(t.label, t.icon, selected(t)) { go(t.route) } }
                         HorizontalDivider(Modifier.padding(horizontal = 28.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         overflow.firstOrNull { it.route is AgreementRoute }?.let { t -> MenuItem(t.label, t.icon, selected(t)) { go(t.route) } }
-                        MenuItem("Your dynamic", Icons.Outlined.FavoriteBorder, destination?.hasRoute<DynamicRoute>() == true) { nav.navigate(DynamicRoute) }
+                        MenuItem("Your dynamic", Icons.Outlined.FavoriteBorder, destination?.hasRoute<DynamicRoute>() == true) { nav.navigate(DynamicRoute()) }
                         MenuItem("Settings", Icons.Outlined.Settings, destination?.hasRoute<SettingsRoute>() == true) { nav.navigate(SettingsRoute) }
+                        if (session.solo) {
+                            MenuItem("Invite a partner", Icons.Outlined.PersonAdd, false, tint = MaterialTheme.colorScheme.primary) { nav.navigate(DynamicRoute(invite = true)) }
+                        }
                     }
                 }
             },
@@ -336,13 +342,14 @@ private fun SafeCallFrame(vm: SafeCallViewModel, call: SafeCall?, content: @Comp
 }
 
 @Composable
-private fun MenuItem(label: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
+private fun MenuItem(label: String, icon: ImageVector, selected: Boolean, tint: androidx.compose.ui.graphics.Color? = null, onClick: () -> Unit) {
     NavigationDrawerItem(
         label = { Text(label) },
         icon = { Icon(icon, null) },
         selected = selected,
         onClick = onClick,
         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+        colors = if (tint != null) NavigationDrawerItemDefaults.colors(unselectedIconColor = tint, unselectedTextColor = tint) else NavigationDrawerItemDefaults.colors(),
     )
 }
 
@@ -390,6 +397,8 @@ private fun ObeyNavHost(nav: NavHostController) {
                 onOpenTask = openTask,
                 onOpenSettings = settings,
                 onKits = { nav.navigate(KitsRoute) },
+                onInvite = { nav.navigate(DynamicRoute(invite = true)) },
+                onOpenTasks = { nav.navigate(TaskListRoute) },
                 onOpenLocation = { nav.navigate(LocationRoute) },
                 onOpenAgreement = { edit -> nav.navigate(if (edit) AgreementRoute(edit = true) else AgreementRoute(review = true)) },
                 onOpenRules = { nav.navigate(RulesRoute) },
@@ -497,8 +506,8 @@ private fun ObeyNavHost(nav: NavHostController) {
         composable<TaskHistoryRoute> { TaskHistoryScreen(onBack = { nav.popBackStack() }) }
         composable<TaskEditorRoute> { TaskEditorScreen(onDone = { nav.popBackStack() }) }
         composable<NoteEditorRoute> { NoteEditorScreen(onDone = { nav.popBackStack() }) }
-        composable<SettingsRoute> { SettingsScreen(onBack = { nav.popBackStack() }, onOpenDynamic = { nav.navigate(DynamicRoute) }) }
-        composable<DynamicRoute> { DynamicScreen(onBack = { nav.popBackStack() }, onPlaces = { nav.navigate(PlacesRoute) }, onLocation = { nav.navigate(LocationRoute) }, onCurfew = { nav.navigate(CurfewRoute) }) }
+        composable<SettingsRoute> { SettingsScreen(onBack = { nav.popBackStack() }, onOpenDynamic = { nav.navigate(DynamicRoute()) }) }
+        composable<DynamicRoute> { entry -> DynamicScreen(startInvite = entry.toRoute<DynamicRoute>().invite, onBack = { nav.popBackStack() }, onPlaces = { nav.navigate(PlacesRoute) }, onLocation = { nav.navigate(LocationRoute) }, onCurfew = { nav.navigate(CurfewRoute) }) }
         composable<CurfewRoute> { app.obey.ui.location.CurfewScreen(onBack = { nav.popBackStack() }, onPlaces = { nav.navigate(PlacesRoute) }) }
         composable<PlacesRoute> { app.obey.ui.location.PlacesScreen(onBack = { nav.popBackStack() }) }
         composable<LocationRoute> { app.obey.ui.location.LocationScreen(onBack = { nav.popBackStack() }) }

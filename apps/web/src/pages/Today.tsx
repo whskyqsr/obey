@@ -10,6 +10,7 @@ import { TodayInbox } from "../components/Inbox";
 import { SceneCards } from "../components/SceneCards";
 import { RoleSwapCard } from "../components/RoleSwap";
 import { ChastityToday } from "../components/Chastity";
+import { SoloCards } from "../components/Solo";
 import { KitPrompt } from "./Kits";
 import { Button, Empty, ErrorBox, Fab, Icon, Loading, PageHeader, Section } from "../components/ui";
 import { addDays, fmtDate, fmtRelative, localDateOf, today } from "../lib/dates";
@@ -21,7 +22,7 @@ const byDue = (a: Occurrence, b: Occurrence) => a.dueAt.localeCompare(b.dueAt);
 const dueDay = (o: Occurrence) => localDateOf(new Date(o.dueAt));
 
 export function TodayPage({ selected, renderTask }: { selected?: string; renderTask?(id: string, close: () => void): ReactNode }) {
-  const { me, isDom, features, rel, memberName } = useRel();
+  const { me, isDom, solo, features, rel, memberName } = useRel();
   const navigate = useNavigate();
   const t = today();
   const occ = useTodayOccurrences();
@@ -79,10 +80,11 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
               .join(" · ")}
           />
           <RoleSwapCard />
+          <SoloCards />
           <ChastityToday />
           <CurfewStrip />
           <SceneCards />
-          {!isDom && occ.data && todays.length > 0 && <Progress today={todays} done={doneToday} points={features.points} />}
+          {(solo || !isDom) && occ.data && todays.length > 0 && <Progress today={todays} done={doneToday} points={features.points} />}
           <KitPrompt />
           <TodayInbox />
           {occ.isLoading && <Loading />}
@@ -152,10 +154,10 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
 
 /** With no task selected, the side panel shows the day at a glance and points toward the next reward. */
 function Glance({ today: list, done }: { today: Occurrence[]; done: number }) {
-  const { rel, me, isDom, features, memberName } = useRel();
+  const { rel, me, isDom, solo, features, memberName } = useRel();
   const balances = useBalances(rel.id);
   const rewards = useLibrary(rel.id, "rewards", features.points);
-  const earner = isDom ? rel.members.find((m) => m.userId !== me.user.id)?.userId : me.user.id;
+  const earner = isDom && !solo ? rel.members.find((m) => m.userId !== me.user.id)?.userId : me.user.id;
   const balance = balances.data?.find((b) => b.userId === earner)?.balance ?? 0;
   const next = (rewards.data ?? []).filter((r) => r.cost > balance).sort((a, b) => a.cost - b.cost)[0];
   return (
@@ -164,7 +166,7 @@ function Glance({ today: list, done }: { today: Occurrence[]; done: number }) {
       {list.length > 0 ? <Progress today={list} done={done} points={features.points} /> : <p className="text-body-medium text-on-surface-variant">Nothing due today.</p>}
       {features.points && earner && (
         <div className="rounded-lg bg-surface p-4">
-          <div className="text-title-small text-on-surface-variant">{isDom ? `${memberName(earner)}'s points` : "Your points"}</div>
+          <div className="text-title-small text-on-surface-variant">{isDom && !solo ? `${memberName(earner)}'s points` : "Your points"}</div>
           <div className="text-display-small text-on-surface tabular-nums">{balance}</div>
           {next && (
             <>

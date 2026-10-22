@@ -179,23 +179,35 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
 
                     // Each section collapses to a sentence, so the whole task reads at a glance.
                     val assignee = d.value.members.firstOrNull { it.userId == form.assigneeId }
+                    // On their own (solo mode), tasks are for themselves and there's nobody to approve them.
+                    val solo = d.value.members.size == 1
                     Fold(
                         Icons.Outlined.Person,
-                        "For ${assignee?.displayName ?: "nobody yet"}",
-                        listOfNotNull(if (form.approvalRequired) "Needs your approval" else "No approval needed", if (form.proofRequired) "proof required" else "no proof", if (form.askMood) "mood check-in" else null, if (form.asksJournal) "journal task" else null).joinToString(" · "),
+                        if (solo) "For you" else "For ${assignee?.displayName ?: "nobody yet"}",
+                        listOfNotNull(if (solo) null else if (form.approvalRequired) "Needs your approval" else "No approval needed", if (form.proofRequired) "proof required" else "no proof", if (form.askMood) "mood check-in" else null, if (form.asksJournal) "journal task" else null).joinToString(" · "),
                     ) {
-                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            d.value.members.forEach { m ->
-                                FilterChip(
-                                    selected = form.assigneeId == m.userId,
-                                    onClick = { vm.update { it.copy(assigneeId = m.userId) } },
-                                    label = { Text(m.displayName) },
-                                )
+                        if (solo) {
+                            Text(
+                                "Just you for now. Once a partner joins, a Dominant sets your tasks. \"Needs approval\" comes back then too.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
+                            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                d.value.members.forEach { m ->
+                                    FilterChip(
+                                        selected = form.assigneeId == m.userId,
+                                        onClick = { vm.update { it.copy(assigneeId = m.userId) } },
+                                        label = { Text(m.displayName) },
+                                    )
+                                }
                             }
                         }
                         if (form.placeId != null) {
-                            LabeledSwitch("Needs approval", "Getting there sends it to you to approve. A location task doesn't take proof, a mood or a journal entry.", form.approvalRequired) { v ->
-                                vm.update { it.copy(approvalRequired = v) }
+                            if (!solo) {
+                                LabeledSwitch("Needs approval", "Getting there sends it to you to approve. A location task doesn't take proof, a mood or a journal entry.", form.approvalRequired) { v ->
+                                    vm.update { it.copy(approvalRequired = v) }
+                                }
                             }
                         } else if (form.counted) {
                             Text(
@@ -204,10 +216,12 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         } else {
-                        LabeledSwitch("Needs approval", if (features.points) "Points post after you approve it" else "You confirm it's done", form.approvalRequired) { v ->
-                            vm.update { it.copy(approvalRequired = v) }
+                        if (!solo) {
+                            LabeledSwitch("Needs approval", if (features.points) "Points post after you approve it" else "You confirm it's done", form.approvalRequired) { v ->
+                                vm.update { it.copy(approvalRequired = v) }
+                            }
                         }
-                        LabeledSwitch("Proof required", "A photo or text must be attached", form.proofRequired) { v ->
+                        LabeledSwitch("Proof required", if (solo) "A photo or text goes with it, kept for your own record" else "A photo or text must be attached", form.proofRequired) { v ->
                             vm.update { it.copy(proofRequired = v) }
                         }
                         LabeledSwitch("Mood check-in", "Marking it done asks how they feel, for the mood graph in Your dynamic", form.askMood) { v ->

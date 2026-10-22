@@ -212,7 +212,7 @@ function clockAfter(minutes: number) {
 }
 
 function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readOnly: boolean; defaultAssignee: string; start?: string }) {
-  const { rel, features, memberName } = useRel();
+  const { rel, features, memberName, solo } = useRel();
   const navigate = useNavigate();
   const snack = useSnackbar();
   const save = useSaveTask(rel.id);
@@ -312,7 +312,7 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
             icon="person"
             title={`For ${memberName(form.assigneeId).replace(/^You$/, "you")}`}
             sub={[
-              form.approvalRequired ? "Needs your approval" : "No approval needed",
+              solo ? null : form.approvalRequired ? "Needs your approval" : "No approval needed",
               form.proofRequired ? "proof required" : "no proof",
               form.askMood ? "mood check-in" : null,
               form.asksJournal ? "journal task" : null,
@@ -321,35 +321,43 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
               .join(" · ")}
             open={readOnly}
           >
-            <Select label="Assigned to" value={form.assigneeId} onChange={(e) => set({ assigneeId: e.target.value })}>
-              {rel.members.map((m) => (
-                <option key={m.userId} value={m.userId}>
-                  {m.displayName} ({ROLE_LABEL[m.role]})
-                </option>
-              ))}
-            </Select>
+            {solo ? (
+              <p className="text-body-medium text-on-surface-variant">Just you for now. Once a partner joins, a Dominant sets your tasks. "Needs approval" comes back then too.</p>
+            ) : (
+              <Select label="Assigned to" value={form.assigneeId} onChange={(e) => set({ assigneeId: e.target.value })}>
+                {rel.members.map((m) => (
+                  <option key={m.userId} value={m.userId}>
+                    {m.displayName} ({ROLE_LABEL[m.role]})
+                  </option>
+                ))}
+              </Select>
+            )}
             {form.counted ? (
               <p className="text-body-medium text-on-surface-variant">A counted task is marked by counting, so it doesn't take approval, proof, a mood or a journal entry.</p>
             ) : form.placeId ? (
-              <Switch
-                checked={form.approvalRequired}
-                onChange={(approvalRequired) => set({ approvalRequired })}
-                label="Needs approval"
-                help="Getting there sends it to you to approve. A location task doesn't take proof, a mood or a journal entry."
-              />
-            ) : (
-              <div>
+              !solo && (
                 <Switch
                   checked={form.approvalRequired}
                   onChange={(approvalRequired) => set({ approvalRequired })}
                   label="Needs approval"
-                  help={features.points ? "Points post only after you approve the completion." : "It counts as done only after you approve it."}
+                  help="Getting there sends it to you to approve. A location task doesn't take proof, a mood or a journal entry."
                 />
+              )
+            ) : (
+              <div>
+                {!solo && (
+                  <Switch
+                    checked={form.approvalRequired}
+                    onChange={(approvalRequired) => set({ approvalRequired })}
+                    label="Needs approval"
+                    help={features.points ? "Points post only after you approve the completion." : "It counts as done only after you approve it."}
+                  />
+                )}
                 <Switch
                   checked={form.proofRequired}
                   onChange={(proofRequired) => set({ proofRequired })}
                   label="Proof required"
-                  help="A note or photo must accompany the completion."
+                  help={solo ? "A note or photo goes with the completion, kept with the task for your own record." : "A note or photo must accompany the completion."}
                 />
                 <Switch
                   checked={form.askMood}
@@ -526,8 +534,7 @@ function ReminderFold({ form, set, readOnly }: { form: Form; set(p: Partial<Form
   const who = memberName(form.assigneeId);
   const details = rel.members.find((m) => m.userId === form.assigneeId)?.notifyDetails ?? false;
   const words = form.reminderText.trim();
-  const title =
-    form.reminder === "none" ? "No reminder" : form.reminder === "custom" && words ? `Reminder: “${words}”` : "Reminder 30 min before";
+  const title = form.reminder === "none" ? "No reminder" : form.reminder === "custom" && words ? `Reminder: “${words}”` : "Reminder 30 min before";
   const sub =
     form.reminder === "none"
       ? "You'll nudge them yourself"

@@ -34,7 +34,7 @@ const KIND_ICON: Record<LedgerEntry["kind"], string> = {
 };
 
 export function RewardsPage() {
-  const { rel, me, isDom, memberName, features } = useRel();
+  const { rel, me, isDom, solo, memberName, features } = useRel();
   const snack = useSnackbar();
   const balances = useBalances(rel.id);
   const ledger = useLedger(rel.id);
@@ -50,7 +50,7 @@ export function RewardsPage() {
   const myBalance = balances.data?.find((b) => b.userId === me.user.id)?.balance ?? 0;
   const domName = useAskWho();
   // Rewards spent but not yet given: a Dominant marks them redeemed; a sub sees what they're waiting on.
-  const waiting = (ledger.data ?? []).filter((e) => e.kind === "redemption" && !e.redeemedAt && (isDom ? e.userId !== me.user.id : e.userId === me.user.id));
+  const waiting = (ledger.data ?? []).filter((e) => e.kind === "redemption" && !e.redeemedAt && (solo || (isDom ? e.userId !== me.user.id : e.userId === me.user.id)));
   const current = editing && editing !== "new" ? editing : null;
 
   return (
@@ -71,7 +71,7 @@ export function RewardsPage() {
         <div className="flex flex-wrap gap-3">
           {balances.data?.map((b) => {
             // The earner's balance is the headline: the sub's, or yours when you're the one earning.
-            const earner = rel.members.find((m) => m.userId === b.userId)?.role === "submissive" || (b.userId === me.user.id && !isDom);
+            const earner = rel.members.find((m) => m.userId === b.userId)?.role === "submissive" || (b.userId === me.user.id && (solo || !isDom));
             const next = rewards.data?.filter((r) => r.cost > b.balance).sort((a, z) => a.cost - z.cost)[0];
             return (
               <div
@@ -100,7 +100,11 @@ export function RewardsPage() {
         {rewards.isLoading && <Loading />}
         {rewards.error && <ErrorBox error={rewards.error} />}
         {rewards.data && !rewards.data.length && (
-          <Empty icon="redeem" title="No rewards yet" body={isDom ? "Add treats your sub can spend points on." : "Your Dominant hasn't added any rewards yet."} />
+          <Empty
+            icon="redeem"
+            title="No rewards yet"
+            body={solo ? "Add treats to spend your points on." : isDom ? "Add treats your sub can spend points on." : "Your Dominant hasn't added any rewards yet."}
+          />
         )}
         <div className="grid gap-2 sm:grid-cols-2">
           {rewards.data?.map((r) => (
@@ -121,7 +125,7 @@ export function RewardsPage() {
                     Edit
                   </Button>
                 )}
-                {!isDom && (
+                {(solo || !isDom) && (
                   <Button
                     variant="tonal"
                     icon="redeem"
@@ -129,8 +133,18 @@ export function RewardsPage() {
                     onClick={() =>
                       r.letsOff
                         ? setLettingOff(r)
-                        : confirm(`Spend ${r.cost} points on “${r.title}”? ${domName} marks it redeemed once it's given.`, () =>
-                            redeem.mutate({ id: r.id }, { onSuccess: () => snack(`Spent ${r.cost} points. ${domName} has been told.`), onError: (e) => snack(errorMessage(e)) }),
+                        : confirm(
+                            solo
+                              ? `Spend ${r.cost} points on “${r.title}”? Mark it redeemed once you've had it.`
+                              : `Spend ${r.cost} points on “${r.title}”? ${domName} marks it redeemed once it's given.`,
+                            () =>
+                              redeem.mutate(
+                                { id: r.id },
+                                {
+                                  onSuccess: () => snack(solo ? `Spent ${r.cost} points.` : `Spent ${r.cost} points. ${domName} has been told.`),
+                                  onError: (e) => snack(errorMessage(e)),
+                                },
+                              ),
                           )
                     }
                   >

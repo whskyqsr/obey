@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { Tx } from "../db/index.js";
 import { memberships, relationships } from "../db/schema.js";
 import { HttpError, forbidden, notFound } from "../errors.js";
@@ -20,16 +20,24 @@ export async function membership(db: Tx, relationshipId: string, userId: string)
   return m ?? null;
 }
 
-/** Throws 404 (not 403, to avoid leaking existence) unless the user belongs to the relationship. */
+/**
+ * Throws 404 (not 403, to avoid leaking existence) unless the user belongs to the relationship. Someone on their own in a
+ * live dynamic (solo mode) both sets and does their tasks, so they act as a switch until a partner joins.
+ */
 export async function requireMember(db: Tx, relationshipId: string, userId: string) {
   const [row] = await db
-    .select({ m: memberships, endedAt: relationships.endedAt })
+    .select({
+      m: memberships,
+      endedAt: relationships.endedAt,
+      members: sql<number>`(select count(*)::int from ${memberships} x where x.relationship_id = ${relationships.id})`,
+    })
     .from(memberships)
     .innerJoin(relationships, eq(relationships.id, memberships.relationshipId))
     .where(and(eq(memberships.relationshipId, relationshipId), eq(memberships.userId, userId)));
   if (!row) throw notFound();
   if (row.endedAt && requestScope.getStore()?.write) throw new HttpError(409, "this dynamic has ended; it's kept read-only");
-  return row.m;
+  if (row.members === 1 && !row.endedAt) return { ...row.m, role: "switch" as Role, solo: true };
+  return { ...row.m, solo: false };
 }
 
 /** Dominants and switches manage the dynamic: tasks, rewards, consequences, rules, points. */
