@@ -191,8 +191,9 @@ export function AppShell() {
   const editing = /^\/tasks\/(new|[^/]+\/edit)$/.test(pathname);
   const [menuOpen, setMenuOpen] = useState(false);
   const [safeOpen, setSafeOpen] = useState(false);
-  // Subs and switches get the safe word on every page; an ended dynamic has no one to tell.
-  const canCall = !!self && self.role !== "dominant" && !rel.endedAt && !solo;
+  // Subs and switches get the safe word on every page; an ended dynamic, or someone on their own, has no one to tell.
+  // While roles are swapped, both people are somewhere new, so both get it.
+  const canCall = !!self && (self.role !== "dominant" || rel.roleSwap?.status === "active") && !rel.endedAt && !solo;
   const [inviteOpen, setInviteOpen] = useState(false);
   const invite = solo ? () => setInviteOpen(true) : undefined;
   // The header's menu button, and whether it has scrolled out of view (then a floating copy takes its place).

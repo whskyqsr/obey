@@ -569,6 +569,22 @@ fun TodayScreen(
         PlanEndSheet(c, partnerNames, busy, onDismiss = { changingEnd = null }) { endsAt, note -> vm.changePlanEnd(c, endsAt, note) { changingEnd = null } }
     }
 
+    // The "I'm home" app shortcut: once tonight's curfew has loaded, do what its I'm home button does.
+    val pending by app.obey.push.PendingNav.target.collectAsStateWithLifecycle()
+    LaunchedEffect(pending, curfew) {
+        if (pending != app.obey.push.PendingNav.HOME) return@LaunchedEffect
+        val located = session?.relationship?.features?.location == true
+        val c = curfew
+        if (located && c == null) return@LaunchedEffect
+        app.obey.push.PendingNav.target.value = null
+        val n = c?.night?.takeIf { it.assigneeId == session?.userId }
+        when {
+            n != null && n.arrivedAt == null && n.canTap -> if (n.reportHome) telling = n else vm.homeForCurfew(n)
+            n != null && n.arrivedAt != null && n.reportHome && n.toldAt == null -> telling = n
+            else -> vm.nothingToReport(n?.arrivedAt != null)
+        }
+    }
+
     // A one-tap decision's snackbar offers "Add a note" for a few seconds.
     val noteFor by vm.noteFor.collectAsStateWithLifecycle()
     var writingNote by remember { mutableStateOf<NoteTarget?>(null) }

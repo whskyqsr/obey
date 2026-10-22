@@ -247,7 +247,9 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
             if (target == app.obey.push.PendingNav.RULES && features.rules) nav.navigate(RulesRoute)
             if (target == app.obey.push.PendingNav.PROTOCOLS && features.protocols) nav.navigate(ProtocolsRoute)
             if (target != null && target.startsWith(app.obey.push.PendingNav.SCENE) && features.scenes) nav.navigate(SceneRoute(target.removePrefix(app.obey.push.PendingNav.SCENE)))
-            if (target != null) app.obey.push.PendingNav.target.value = null
+            // Today picks up "I'm home" itself, once it knows tonight's curfew.
+            if (target == app.obey.push.PendingNav.HOME) nav.navigate(TodayRoute) { popUpTo(nav.graph.findStartDestination().id) }
+            else if (target != null) app.obey.push.PendingNav.target.value = null
         }
     }
 

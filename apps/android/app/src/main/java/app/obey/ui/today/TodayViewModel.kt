@@ -85,7 +85,7 @@ class TodayViewModel @Inject constructor(
     private val offline: OfflineStore,
     private val watcher: app.obey.location.LocationWatcher,
     private val placeStore: app.obey.location.PlaceStore,
-    @ApplicationContext context: Context,
+    @ApplicationContext private val context: Context,
 ) : BaseViewModel() {
     private val _state = MutableStateFlow<Load<TodayData>>(Load.Loading)
     val state: StateFlow<Load<TodayData>> = _state.asStateFlow()
@@ -247,9 +247,11 @@ class TodayViewModel @Inject constructor(
         val session = sessions.session ?: return
         if (session.relationship?.features?.location != true) {
             _curfew.value = null
+            app.obey.push.HomeShortcut.update(context, false)
             return
         }
         val c = runCatching { api.curfew(relId) }.getOrNull() ?: return
+        app.obey.push.HomeShortcut.update(context, c.night?.assigneeId == session.userId)
         val s = c.settings
         val features = session.relationship.features
         val consequence = if (session.canManage && features.consequences && s?.consequenceId != null) {
@@ -266,6 +268,9 @@ class TodayViewModel @Inject constructor(
         onDone()
         refresh()
     }
+
+    /** The "I'm home" shortcut with nothing for it to do. */
+    fun nothingToReport(home: Boolean) = say(if (home) "You're already home for curfew" else "No curfew to report home for right now")
 
     /** Home already (the phone noticed): tell the Dominant. */
     fun tellHome(n: CurfewNight, note: String?, who: String, onDone: () -> Unit) = action {

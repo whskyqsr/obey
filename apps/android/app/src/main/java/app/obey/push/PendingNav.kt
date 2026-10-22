@@ -9,6 +9,8 @@ object PendingNav {
     const val AGREEMENT = "agreement"
     const val RULES = "rules"
     const val PROTOCOLS = "protocols"
+    /** The "I'm home" app shortcut: Today, then the curfew's I'm home. */
+    const val HOME = "home"
     /** Followed by the scene's id. */
     const val SCENE = "scene:"
 
