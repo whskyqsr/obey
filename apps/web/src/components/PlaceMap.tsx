@@ -134,7 +134,7 @@ export function PlaceMap({
     if (!tiles || !m.isStyleLoaded()) return;
     if (!m.getSource("imagery")) {
       // 256 px tiles; past level 19 Esri's photos run out in most places, so the map stretches the last ones.
-      m.addSource("imagery", { type: "raster", tiles: [API_URL + tiles.tiles], tileSize: 256, maxzoom: 19, attribution: tiles.attribution });
+      m.addSource("imagery", { type: "raster", tiles: [API_URL + tiles.tiles], tileSize: 256, maxzoom: 19 });
       m.addLayer({ id: "imagery", type: "raster", source: "imagery", layout: { visibility: "none" } }, m.getLayer("radius-fill") ? "radius-fill" : undefined);
     }
     m.setLayoutProperty("imagery", "visibility", on ? "visible" : "none");
@@ -359,6 +359,12 @@ export function PlaceDialog({ place, open, onClose, onSaved }: { place: Place | 
               className="absolute top-3 left-3"
               onClick={() => setSatellite((v) => !v)}
             />
+          )}
+          {/* Esri's terms want its credit always visible while the photos are showing, not behind the map's info button. */}
+          {imagery && satellite && (
+            <span className="pointer-events-none absolute top-3 right-12 left-16 text-right">
+              <span className="rounded-xs bg-inverse-surface/70 px-1.5 py-0.5 text-label-small text-inverse-on-surface">{imagery.attribution}</span>
+            </span>
           )}
           <span className="pointer-events-none absolute bottom-3 left-3 rounded-xs bg-inverse-surface px-2.5 py-1 text-body-small text-inverse-on-surface">
             Drag the map to move the pin

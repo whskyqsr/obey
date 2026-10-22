@@ -27,7 +27,7 @@ import { statsRoutes } from "./routes/stats.js";
 import { monthRoutes } from "./routes/months.js";
 import { taskRoutes } from "./routes/tasks.js";
 import type { Geocoder } from "./services/geocode.js";
-import { type FetchTile, imageryRoutes } from "./routes/imagery.js";
+import { type FetchCredit, type FetchTile, imageryRoutes } from "./routes/imagery.js";
 
 export interface Deps {
   db: Db;
@@ -45,7 +45,7 @@ export interface Deps {
   /** Address search for places; defaults to Photon. Tests pass a stub. */
   geocode?: Geocoder;
   /** Satellite tiles for the place picker (Esri), when there's a key. Tests pass a stub fetch. */
-  imagery?: { key: string; fetchTile?: FetchTile } | null;
+  imagery?: { key: string; fetchTile?: FetchTile; fetchCredit?: FetchCredit } | null;
   logger?: boolean;
 }
 

@@ -125,7 +125,7 @@ fun formatRadius(m: Int) = when {
 private fun showPhoto(style: Style, imagery: ImageryLink?, satellite: Boolean) {
     val tiles = imagery?.tiles ?: return
     if (style.getLayer("imagery") == null) {
-        val set = TileSet("2.1.0", BuildConfig.API_BASE_URL.trimEnd('/') + tiles).apply { maxZoom = 19f; attribution = imagery.attribution }
+        val set = TileSet("2.1.0", BuildConfig.API_BASE_URL.trimEnd('/') + tiles).apply { maxZoom = 19f }
         style.addSource(RasterSource("imagery", set, 256))
         style.addLayerBelow(RasterLayer("imagery", "imagery"), "radius-fill")
     }
@@ -326,6 +326,7 @@ fun PlaceDialog(
                             Icon(if (satellite) Icons.Outlined.Map else Icons.Outlined.SatelliteAlt, if (satellite) "Map view" else "Satellite view")
                         }
                     }
+                    // Esri's terms want its credit always visible while the photos are showing.
                     if (satellite) {
                         photo?.attribution?.let {
                             Text(

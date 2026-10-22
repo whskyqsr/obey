@@ -21,13 +21,18 @@ describe("satellite tiles", () => {
       notifier: memoryNotifier(),
       now: () => ctx.clock.now,
       materializeDays: 14,
-      imagery: { key: "test-key", fetchTile: async (z, y, x) => (asked.push([z, y, x]), new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "image/jpeg" } })) },
+      imagery: {
+        key: "test-key",
+        fetchCredit: async () => "Esri, Some Provider",
+        fetchTile: async (z, y, x) => (asked.push([z, y, x]), new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "image/jpeg" } })),
+      },
     });
     await app.ready();
     const headers = { "x-dev-user": randomUUID(), "x-dev-name": "Dom" };
 
     expect((await app.inject({ method: "GET", url: "/imagery" })).statusCode).toBe(401);
-    const { tiles } = JSON.parse((await app.inject({ method: "GET", url: "/imagery", headers })).body);
+    const { tiles, attribution } = JSON.parse((await app.inject({ method: "GET", url: "/imagery", headers })).body);
+    expect(attribution).toBe("Powered by Esri | Esri, Some Provider");
     expect(tiles).toMatch(/^\/imagery\/\{z\}\/\{y\}\/\{x\}\?exp=\d+&sig=/);
 
     const tile = await app.inject({ method: "GET", url: tiles.replace("{z}", "17").replace("{y}", "48000").replace("{x}", "34000") });

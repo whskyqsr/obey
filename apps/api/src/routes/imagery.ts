@@ -5,16 +5,32 @@ import { HttpError, notFound } from "../errors.js";
 import { countUsage } from "../services/usage.js";
 
 /** Esri's World Imagery, the satellite view behind the place picker. 256 px tiles. */
-const ESRI_IMAGERY = "https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile";
+const ESRI_SERVICE = "https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer";
 /** How long a handed-out tile link works; a place dialog is open for minutes, not hours. */
 const LINK_HOURS = 2;
 
+/** Esri's own wording for the imagery providers, used until the service tells us its current list. */
+const FALLBACK_CREDIT = "Esri, Vantor, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS, AeroGRID, IGN, and the GIS User Community";
+/** Esri's terms ask for the provider list to stay current, so it's re-read from the service daily. */
+const CREDIT_HOURS = 24;
+
 export type FetchTile = (z: number, y: number, x: number) => Promise<Response>;
+export type FetchCredit = () => Promise<string | null>;
 
 export const esriTiles =
   (key: string): FetchTile =>
   (z, y, x) =>
-    fetch(`${ESRI_IMAGERY}/${z}/${y}/${x}?token=${encodeURIComponent(key)}`, { signal: AbortSignal.timeout(10_000) });
+    fetch(`${ESRI_SERVICE}/tile/${z}/${y}/${x}?token=${encodeURIComponent(key)}`, { signal: AbortSignal.timeout(10_000) });
+
+/** The service's copyrightText: the imagery providers Esri's terms say to credit. */
+export const esriCredit =
+  (key: string): FetchCredit =>
+  async () => {
+    const res = await fetch(`${ESRI_SERVICE}?f=json&token=${encodeURIComponent(key)}`, { signal: AbortSignal.timeout(5_000) });
+    if (!res.ok) return null;
+    const text = ((await res.json()) as { copyrightText?: unknown }).copyrightText;
+    return typeof text === "string" && text.trim() ? text.trim() : null;
+  };
 
 /**
  * Satellite tiles go through us so the Esri key never ships in the apps and every tile is counted.
@@ -24,11 +40,21 @@ export const esriTiles =
 export const imageryRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   const key = deps.imagery?.key;
   const sign = (exp: string) => createHmac("sha256", key!).update(`imagery:${exp}`).digest("base64url");
+  let credit = { text: FALLBACK_CREDIT, until: 0 };
+  const currentCredit = async () => {
+    const now = deps.now().getTime();
+    if (now >= credit.until) {
+      const text = await (deps.imagery!.fetchCredit ?? esriCredit(key!))().catch(() => null);
+      // A failed read keeps the last list and tries again in an hour.
+      credit = { text: text ?? credit.text, until: now + (text ? CREDIT_HOURS : 1) * 3600_000 };
+    }
+    return credit.text;
+  };
 
   app.get("/imagery", async () => {
     if (!key) return { tiles: null };
     const exp = String(Math.floor(deps.now().getTime() / 1000) + LINK_HOURS * 3600);
-    return { tiles: `/imagery/{z}/{y}/{x}?exp=${exp}&sig=${sign(exp)}`, attribution: "Powered by Esri | Esri, Maxar, Earthstar Geographics, and the GIS User Community" };
+    return { tiles: `/imagery/{z}/{y}/{x}?exp=${exp}&sig=${sign(exp)}`, attribution: `Powered by Esri | ${await currentCredit()}` };
   });
 
   app.get<{ Params: { z: string; y: string; x: string }; Querystring: { exp?: string; sig?: string } }>(
