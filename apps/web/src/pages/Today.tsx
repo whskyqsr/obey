@@ -7,6 +7,7 @@ import { isOverdue } from "../components/OccurrenceCard";
 import { RowGroup, RowLink, TaskRow } from "../components/TaskRow";
 import { CurfewStrip } from "../components/CurfewStrip";
 import { TodayInbox } from "../components/Inbox";
+import { SceneCards } from "../components/SceneCards";
 import { KitPrompt } from "./Kits";
 import { Button, Empty, ErrorBox, Fab, Icon, Loading, PageHeader, Section } from "../components/ui";
 import { addDays, fmtDate, fmtRelative, localDateOf, today } from "../lib/dates";
@@ -76,6 +77,7 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
               .join(" · ")}
           />
           <CurfewStrip />
+          <SceneCards />
           {!isDom && occ.data && todays.length > 0 && <Progress today={todays} done={doneToday} points={features.points} />}
           <KitPrompt />
           <TodayInbox />

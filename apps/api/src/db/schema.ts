@@ -763,3 +763,85 @@ export const libraryChanges = pgTable(
   },
   (t) => [index("library_changes_user_idx").on(t.userId, t.relationshipId)],
 );
+
+/** A scene someone in the dynamic logged. */
+export const scenes = pgTable(
+  "scenes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    title: text("title").notNull().default(""),
+    occurredAt: ts("occurred_at").notNull(),
+    timezone: text("timezone").notNull(),
+    what: text("what").notNull().default(""),
+    safeword: text("safeword", { enum: ["none", "yellow", "red"] })
+      .notNull()
+      .default("none"),
+    aftercare: jsonb("aftercare").$type<string[]>().notNull().default([]),
+    loggedBy: uuid("logged_by").references(() => users.id, { onDelete: "set null" }),
+    /** 10:00 the day after, in [timezone]: the next-day check-in opens and its push goes out. */
+    checkFrom: ts("check_from").notNull(),
+    checkPushedAt: ts("check_pushed_at"),
+    commentCount: integer("comment_count").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index("scenes_relationship_idx").on(t.relationshipId, t.occurredAt)],
+);
+
+/** One person's part in a scene: their shared side, their next-day check-in, and whether they closed the aftercare card. */
+export const sceneMembers = pgTable(
+  "scene_members",
+  {
+    sceneId: uuid("scene_id")
+      .notNull()
+      .references(() => scenes.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    mood: integer("mood"),
+    worked: text("worked").notNull().default(""),
+    change: text("change").notNull().default(""),
+    need: text("need").notNull().default(""),
+    sharedAt: ts("shared_at"),
+    checkMood: integer("check_mood"),
+    checkNote: text("check_note").notNull().default(""),
+    checkAt: ts("check_at"),
+    aftercareDoneAt: ts("aftercare_done_at"),
+  },
+  (t) => [primaryKey({ columns: [t.sceneId, t.userId] })],
+);
+
+export const sceneComments = pgTable(
+  "scene_comments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sceneId: uuid("scene_id")
+      .notNull()
+      .references(() => scenes.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("scene_comments_scene_idx").on(t.sceneId, t.createdAt)],
+);
+
+/** What someone needs after a scene, per dynamic. */
+export const aftercarePlans = pgTable(
+  "aftercare_plans",
+  {
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    needs: jsonb("needs").$type<string[]>().notNull().default([]),
+    note: text("note").notNull().default(""),
+    updatedAt: ts("updated_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.relationshipId, t.userId] })],
+);

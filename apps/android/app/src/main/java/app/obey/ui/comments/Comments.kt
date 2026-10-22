@@ -54,7 +54,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** The conversation on one due date ("why was this late") or under a journal entry, so it stays with what it's about. */
+/** The conversation on one due date ("why was this late"), under a journal entry or under a scene, so it stays with what it's about. */
 @HiltViewModel
 class CommentsViewModel @Inject constructor(private val api: ObeyApi, private val sessions: SessionRepository) : BaseViewModel() {
     private val _comments = MutableStateFlow<List<Comment>?>(null)
@@ -62,26 +62,28 @@ class CommentsViewModel @Inject constructor(private val api: ObeyApi, private va
     val session get() = sessions.session
     private var targetId: String? = null
     private var onNote = false
+    private var onScene = false
 
-    /** Loads the comments on an occurrence, or on a note when [note] is true. */
-    fun load(id: String, note: Boolean = false) {
-        if (targetId == id && onNote == note && _comments.value != null) return
+    /** Loads the comments on an occurrence, on a note when [note] is true, or on a scene when [scene] is. */
+    fun load(id: String, note: Boolean = false, scene: Boolean = false) {
+        if (targetId == id && onNote == note && onScene == scene && _comments.value != null) return
         targetId = id
         onNote = note
+        onScene = scene
         _comments.value = null
-        action { _comments.value = if (note) api.noteComments(id) else api.comments(id) }
+        action { _comments.value = if (scene) api.sceneComments(id) else if (note) api.noteComments(id) else api.comments(id) }
     }
 
     fun add(body: String, done: () -> Unit) = action {
         val id = targetId ?: return@action
         val input = CommentInput(body.trim())
-        val c: Comment = if (onNote) api.addNoteComment(id, input) else api.addComment(id, input)
+        val c: Comment = if (onScene) api.addSceneComment(id, input) else if (onNote) api.addNoteComment(id, input) else api.addComment(id, input)
         _comments.value = _comments.value.orEmpty() + c
         done()
     }
 
     fun delete(c: Comment, done: () -> Unit) = action {
-        if (onNote) api.deleteNoteComment(c.id) else api.deleteComment(c.id)
+        if (onScene) api.deleteSceneComment(c.id) else if (onNote) api.deleteNoteComment(c.id) else api.deleteComment(c.id)
         _comments.value = _comments.value.orEmpty().filter { it.id != c.id }
         done()
     }
@@ -168,13 +170,25 @@ private fun CommentComposer(text: String, onText: (String) -> Unit, enabled: Boo
 @Composable
 fun NoteCommentsSection(noteId: String, modifier: Modifier = Modifier, vm: CommentsViewModel = hiltViewModel(key = "note-comments-$noteId")) {
     LaunchedEffect(noteId) { vm.load(noteId, note = true) }
+    InlineComments(noteId, vm, modifier)
+}
+
+/** Comments under a scene, inline like a journal entry's. */
+@Composable
+fun SceneCommentsSection(sceneId: String, modifier: Modifier = Modifier, vm: CommentsViewModel = hiltViewModel(key = "scene-comments-$sceneId")) {
+    LaunchedEffect(sceneId) { vm.load(sceneId, scene = true) }
+    InlineComments(sceneId, vm, modifier)
+}
+
+@Composable
+private fun InlineComments(targetId: String, vm: CommentsViewModel, modifier: Modifier) {
     val comments by vm.comments.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val session = vm.session
     val me = session?.userId
     val readOnly = session?.readOnly == true
-    var text by rememberSaveable(noteId) { mutableStateOf("") }
+    var text by rememberSaveable(targetId) { mutableStateOf("") }
     val list = comments.orEmpty()
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(if (list.isEmpty()) "Comments" else "Comments · ${list.size}", style = MaterialTheme.typography.titleMedium)

@@ -28,6 +28,7 @@ const ALL: Dest[] = [
   { to: "/stats", label: "Stats", icon: "insights", feature: "stats" },
   { to: "/review", label: "Monthly review", icon: "flag", feature: "review" },
   { to: "/agreement", label: "Agreement", icon: "handshake", feature: "agreement" },
+  { to: "/scenes", label: "Scenes", icon: "auto_awesome", feature: "scenes" },
   // Tasks open from Today and Calendar; the full list is for managing them.
   { to: "/tasks", label: "All tasks", icon: "checklist" },
   { to: "/settings", label: "Settings", icon: "settings" },
@@ -43,8 +44,8 @@ export function useDestinations() {
   // The bar holds Today, Calendar, the next section that's on, and the first writing space; the rest go in the menu.
   const isWriting = (d: Dest) => d.to === "/notes" || d.to === "/journal";
   const writing = all.find(isWriting);
-  // Stats, the monthly review and the agreement always sit in the menu, however many sections are switched off.
-  const bar = [...all.filter((d) => !isWriting(d) && !["/stats", "/review", "/agreement"].includes(d.to)).slice(0, 3), ...(writing ? [writing] : [])];
+  // Stats, the monthly review, the agreement and scenes always sit in the menu, however many sections are switched off.
+  const bar = [...all.filter((d) => !isWriting(d) && !["/stats", "/review", "/agreement", "/scenes"].includes(d.to)).slice(0, 3), ...(writing ? [writing] : [])];
   const more = all.filter((d) => !bar.includes(d));
   return { all, bar, more };
 }

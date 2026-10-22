@@ -120,6 +120,7 @@ internal val featureRows = listOf(
     FeatureRow("Monthly review", "A focus for each month, and a look back on it together at the end.", { it.review }, { f, on -> f.copy(review = on) }),
     FeatureRow("Location tasks", "Tasks done by getting somewhere, like the gym by 6, checked by the sub's phone.", { it.location }, { f, on -> f.copy(location = on) }),
     FeatureRow("Agreement", "One page you both sign: why you're doing this, what each of you will do, limits and safewords.", { it.agreement }, { f, on -> f.copy(agreement = on) }),
+    FeatureRow("Scenes", "Log scenes and how each of you felt about them, keep aftercare plans, and check in the day after.", { it.scenes }, { f, on -> f.copy(scenes = on) }),
 )
 
 /** "Jake & Kitten": the relationship's own name, or everyone in it with you first. */

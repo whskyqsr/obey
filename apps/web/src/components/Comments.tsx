@@ -10,7 +10,7 @@ import { Button, Dialog, IconButton, TextArea, useSnackbar } from "./ui";
 type AnyComment = { id: string; authorId: string; body: string; createdAt: string };
 
 /** A list of comments with a box to add one; each person can delete their own. */
-function CommentThread<C extends AnyComment>({
+export function CommentThread<C extends AnyComment>({
   list,
   open,
   onOpen,

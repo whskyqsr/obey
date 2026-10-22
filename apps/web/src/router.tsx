@@ -19,6 +19,7 @@ import { RuleLogPage } from "./pages/RuleLog";
 import { StatsPage } from "./pages/Stats";
 import { MonthReviewPage } from "./pages/MonthReview";
 import { AgreementPage } from "./pages/Agreement";
+import { AftercarePage, ScenePage, ScenesPage } from "./pages/Scenes";
 import { PlacesPage } from "./pages/Places";
 import { LocationPage } from "./pages/LocationPage";
 import { CurfewPage } from "./pages/Curfew";
@@ -169,6 +170,19 @@ const protocolRoute = createRoute({
   },
 });
 
+const sceneRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/scenes/$sceneId",
+  component: function SceneRoute() {
+    const { sceneId } = sceneRoute.useParams();
+    return (
+      <Gate feature="scenes">
+        <ScenePage sceneId={sceneId} />
+      </Gate>
+    );
+  },
+});
+
 function OnboardingRoute() {
   const navigate = useNavigate();
   const { select } = useRel();
@@ -213,6 +227,9 @@ const routeTree = rootRoute.addChildren([
   page("/stats", gated("stats", StatsPage)),
   page("/review", gated("review", MonthReviewPage)),
   page("/agreement", gated("agreement", AgreementPage)),
+  page("/scenes", gated("scenes", ScenesPage)),
+  sceneRoute,
+  page("/aftercare", gated("scenes", AftercarePage)),
   page("/settings", SettingsPage),
   page("/dynamic", DynamicPage),
   page("/places", gated("location", PlacesPage)),

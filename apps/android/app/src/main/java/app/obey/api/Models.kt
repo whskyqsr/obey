@@ -205,6 +205,7 @@ data class Features(
     val review: Boolean = true,
     val location: Boolean = true,
     val agreement: Boolean = true,
+    val scenes: Boolean = true,
 )
 
 /** The relationship's name, or the partners' names when it has none. */
@@ -1329,3 +1330,80 @@ data class LibraryChange(
 
 @Serializable
 data class SeenLibraryChangesInput(val ids: List<String>)
+
+/** Aftercare offered when logging a scene or writing a plan; anything else can be typed in. */
+val AFTERCARE = listOf("Water", "Blanket", "Cuddles", "Snack", "Quiet time", "Talking it through")
+
+/** A scene as logged: either partner logs it, and anyone in the dynamic can change it. [timezone] is where it happened, for the next-day check-in. */
+@Serializable
+data class SceneInput(
+    val title: String = "",
+    val occurredAt: String,
+    val timezone: String,
+    val what: String = "",
+    /** "none", "yellow" or "red". */
+    val safeword: String = "none",
+    val aftercare: List<String> = emptyList(),
+)
+
+/** One person's side, written alone and shared once. */
+@Serializable
+data class SceneSideInput(val mood: Int, val worked: String = "", val change: String = "", val need: String = "")
+
+@Serializable
+data class SceneSide(
+    val userId: String,
+    val mood: Int,
+    val worked: String = "",
+    val change: String = "",
+    val need: String = "",
+    val sharedAt: String,
+)
+
+/** "How are you feeling after last night?", the day after. */
+@Serializable
+data class SceneCheckInput(val mood: Int, val note: String = "")
+
+@Serializable
+data class SceneCheck(val userId: String, val mood: Int, val note: String = "", val at: String)
+
+@Serializable
+data class Scene(
+    val id: String,
+    val title: String = "",
+    val occurredAt: String,
+    val timezone: String,
+    val what: String = "",
+    /** "none", "yellow" or "red". */
+    val safeword: String = "none",
+    val aftercare: List<String> = emptyList(),
+    val loggedBy: String? = null,
+    val createdAt: String,
+    /** When the next-day check-in opens (10:00 the day after, where it happened). */
+    val checkFrom: String,
+    /** Everyone who has shared their side. */
+    val shared: List<String> = emptyList(),
+    /** My side, and the others' once I've shared mine. */
+    val sides: List<SceneSide> = emptyList(),
+    val checks: List<SceneCheck> = emptyList(),
+    /** Whether I've closed the others' aftercare plans on Today. */
+    val aftercareDone: Boolean = false,
+    val commentCount: Int = 0,
+)
+
+/** What someone needs after a scene; only they edit it. */
+@Serializable
+data class AftercarePlanInput(val needs: List<String>, val note: String = "")
+
+@Serializable
+data class AftercarePlan(val userId: String, val needs: List<String> = emptyList(), val note: String = "", val updatedAt: String? = null)
+
+/** A comment under a scene. */
+@Serializable
+data class SceneComment(
+    override val id: String,
+    val sceneId: String,
+    override val authorId: String,
+    override val body: String,
+    override val createdAt: String,
+) : Comment

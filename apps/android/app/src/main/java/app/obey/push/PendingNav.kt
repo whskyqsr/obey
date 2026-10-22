@@ -9,6 +9,8 @@ object PendingNav {
     const val AGREEMENT = "agreement"
     const val RULES = "rules"
     const val PROTOCOLS = "protocols"
+    /** Followed by the scene's id. */
+    const val SCENE = "scene:"
 
     val target = MutableStateFlow<String?>(null)
 }
