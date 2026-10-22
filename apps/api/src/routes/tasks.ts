@@ -22,6 +22,7 @@ import type { Tx } from "../db/index.js";
 import { consequences, notes, occurrences, places, pointsLedger, relationships, reschedules, taskSeries } from "../db/schema.js";
 import { HttpError, forbidden, notFound, parsePatch } from "../errors.js";
 import { occurrenceDto, rescheduleDto, taskDto } from "../serialize.js";
+import { changeLockTime, openLock } from "../services/chastity.js";
 import { addComment } from "./comments.js";
 import { canManage, managers, membership, requireManager, requireMember } from "../services/access.js";
 import { pausedTasks } from "../services/roleSwaps.js";
@@ -216,6 +217,15 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const body = assignConsequence.parse(req.body);
     validZone(body.timezone);
     if (!(await membership(db, c.relationshipId, body.assigneeId))) throw new HttpError(400, "assignee is not in this relationship");
+    // Lock time is added to their running lock at once rather than handed out as a task.
+    if (c.lockMinutes) {
+      const lock = await openLock(db, c.relationshipId, body.assigneeId);
+      if (!lock || lock.status === "pending") throw new HttpError(409, "they aren't locked right now");
+      if (!lock.endsAt) throw new HttpError(409, "their lock is open-ended, so there's no end to move");
+      await db.transaction((tx) => changeLockTime(tx, lock, c.lockMinutes!, { note: body.reason ? `${c.title}: ${body.reason}` : c.title, byId: req.user.id }, deps.now()));
+      await notifier.send([body.assigneeId], { title: "Fealty", body: `${req.user.displayName} added time to your lock`, data: { type: "chastity", relationshipId: c.relationshipId } });
+      return reply.status(204).send();
+    }
     const series = (await db.transaction((tx) => issueConsequence(tx, c, { ...body, createdBy: req.user.id }, deps.now())))!;
     if (series.assigneeId !== req.user.id)
       await notifier.send([series.assigneeId], { title: "Fealty", body: "You've been given a consequence", data: { type: "task_assigned", taskId: series.id } });

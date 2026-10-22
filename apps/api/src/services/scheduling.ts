@@ -1,3 +1,4 @@
+import { lockTimeForMiss, withdrawLockTime } from "./chastity.js";
 import { and, count, eq, gte, inArray, isNotNull, isNull, lte, notInArray, or, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import {
@@ -452,10 +453,15 @@ async function issueMissConsequence(db: Tx, series: Series, occ: Occurrence, now
   if (rel?.features.consequences === false) return null;
   const [c] = await db.select().from(consequences).where(eq(consequences.id, series.consequenceId));
   if (!c) return null;
+  const day = occ.dueAt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: series.timezone });
+  // Lock time isn't something to do: it adds to their chastity lock, if one is running, and never becomes a task.
+  if (c.lockMinutes) {
+    await lockTimeForMiss(db, { ...c, lockMinutes: c.lockMinutes }, series.assigneeId, occ.id, `Missed “${series.title}”`, now);
+    return null;
+  }
   const date = addDays(localDate(now, series.timezone), series.consequenceDueDays);
   // A time that has already passed today would make it overdue on arrival; give it the rest of the day instead.
   const dueTime = series.consequenceDueTime && dueInstant(date, series.consequenceDueTime, series.timezone) > now ? series.consequenceDueTime : null;
-  const day = occ.dueAt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: series.timezone });
   return issueConsequence(
     db,
     c,
@@ -475,6 +481,7 @@ async function issueMissConsequence(db: Tx, series: Series, occ: Occurrence, now
 
 /** Takes back the automatic consequence for an occurrence that's no longer missed, if it hasn't been dealt with yet. */
 export async function withdrawMissConsequence(db: Tx, occ: Occurrence) {
+  await withdrawLockTime(db, occ.id, new Date());
   const issued = await db
     .update(taskSeries)
     .set({ active: false, updatedAt: new Date() })
