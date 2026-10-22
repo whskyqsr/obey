@@ -498,9 +498,14 @@ export const completeOccurrence = z.object({
 export const tally = z.object({ done: z.number().int(), missed: z.number().int(), excused: z.number().int(), rate: z.number().nullable() });
 export type Tally = z.infer<typeof tally>;
 
+/** A calendar month, "2026-10". */
+export const monthKey = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "expected YYYY-MM");
+
 /** How one person's tasks went over a stretch of days, for the Stats page. */
 export const dynamicStats = z.object({
   days: z.number().int(),
+  /** Set when the stretch is a calendar month (the whole month, matching the monthly review); `previous` is then the month before. */
+  month: monthKey.nullable(),
   totals: tally.extend({
     /** Done by the deadline it had when it was done. */
     onTime: z.number().int(),
@@ -519,8 +524,6 @@ export const dynamicStats = z.object({
 export type DynamicStats = z.infer<typeof dynamicStats>;
 export const STATS_RANGES = [7, 30, 90, 365] as const;
 
-/** A calendar month, "2026-10". */
-export const monthKey = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "expected YYYY-MM");
 export const monthFocusInput = z.object({ goal: z.string().trim().min(1).max(200), taskIds: z.array(id).max(10).default([]) });
 export const monthReviewInput = z.object({
   rating: z.number().int().min(1).max(5),

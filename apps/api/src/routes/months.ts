@@ -15,11 +15,11 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
 export const monthName = (month: string) => MONTHS[Number(month.slice(5, 7)) - 1]!;
 
 /** The first day of the month after `month`, as a date. */
-const nextMonthStart = (month: string) => {
+export const nextMonthStart = (month: string) => {
   const [y, m] = month.split("-").map(Number) as [number, number];
   return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
 };
-const previousMonth = (month: string) => {
+export const previousMonth = (month: string) => {
   const [y, m] = month.split("-").map(Number) as [number, number];
   return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
 };

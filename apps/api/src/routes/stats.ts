@@ -1,12 +1,13 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { type DynamicStats, STATS_RANGES, type Tally, allFeatures } from "@obey/contracts";
+import { type DynamicStats, STATS_RANGES, type Tally, allFeatures, monthKey } from "@obey/contracts";
 import { addDays, dueInstant, localDate } from "@obey/recurrence";
 import type { Deps } from "../app.js";
 import { memberships, occurrences, relationships, taskSeries } from "../db/schema.js";
 import { HttpError, forbidden } from "../errors.js";
 import { requireMember } from "../services/access.js";
+import { nextMonthStart, previousMonth } from "./months.js";
 import { taskStats } from "./tasks.js";
 
 const query = z.object({
@@ -15,6 +16,8 @@ const query = z.object({
     .int()
     .refine((d) => (STATS_RANGES as readonly number[]).includes(d), "unsupported range")
     .default(30),
+  /** A calendar month instead of the last `days` days. */
+  month: monthKey.optional(),
   zone: z.string().default("UTC"),
   userId: z.string().uuid().optional(),
 });
@@ -56,7 +59,10 @@ function bucketStarts(from: string, to: string, bucket: DynamicStats["bucket"], 
 export const statsRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   const { db } = deps;
 
-  /** How one person's tasks went over the last `days` days, by local due date in `zone`. Defaults to the first sub. */
+  /**
+   * How one person's tasks went over the last `days` days, or over a calendar month, by local due date in `zone`.
+   * Defaults to the first sub. A month counts all of it, the same as the monthly review, so the two agree.
+   */
   app.get<{ Params: { id: string } }>("/relationships/:id/stats", async (req): Promise<DynamicStats> => {
     await requireMember(db, req.params.id, req.user.id);
     const q = query.parse(req.query);
@@ -109,14 +115,17 @@ export const statsRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       : [];
 
     const today = localDate(deps.now(), q.zone);
-    const from = addDays(today, -(q.days - 1));
-    const prevFrom = addDays(from, -q.days);
-    const end = dueInstant(today, null, q.zone);
+    if (q.month && q.month > today.slice(0, 7)) throw new HttpError(400, "that month hasn't started");
+    const from = q.month ? `${q.month}-01` : addDays(today, -(q.days - 1));
+    const to = q.month ? addDays(nextMonthStart(q.month), -1) : today;
+    const days = q.month ? Number(to.slice(8)) : q.days;
+    const prevFrom = q.month ? `${previousMonth(q.month)}-01` : addDays(from, -q.days);
+    const end = dueInstant(to, null, q.zone);
     const dated = rows.filter((r) => r.dueAt <= end).map((r) => ({ ...r, date: localDate(r.dueAt, q.zone) }));
     const inRange = dated.filter((r) => r.date >= from);
 
-    const bucket: DynamicStats["bucket"] = q.days <= 31 ? "day" : q.days <= 92 ? "week" : "month";
-    const starts = bucketStarts(from, today, bucket, req.user.weekStart === "mon" ? "mon" : "sun");
+    const bucket: DynamicStats["bucket"] = days <= 31 ? "day" : days <= 92 ? "week" : "month";
+    const starts = bucketStarts(from, to, bucket, req.user.weekStart === "mon" ? "mon" : "sun");
     const buckets = starts.map((start, i) => ({ start, ...tally(inRange.filter((r) => r.date >= start && (i + 1 === starts.length || r.date < starts[i + 1]!))) }));
 
     const byTask = new Map<string, typeof dated>();
@@ -134,7 +143,8 @@ export const statsRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       .sort((a, b) => b.done + b.missed - (a.done + a.missed) || a.title.localeCompare(b.title));
 
     return {
-      days: q.days,
+      days,
+      month: q.month ?? null,
       totals: {
         ...tally(inRange),
         onTime: inRange.filter((r) => r.status === "completed" && r.completedAt && r.completedAt <= r.dueAt).length,

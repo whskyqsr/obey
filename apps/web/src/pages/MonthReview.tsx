@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { errorMessage } from "../api/client";
 import { useMonth, usePastMonths, useSaveMonthReview, useSetFocus, useTasks } from "../api/hooks";
 import type { MonthFocus, MonthReview, MonthSummary, Task } from "../api/types";
@@ -211,8 +212,10 @@ function FocusDialog({ month, focus, onClose }: { month: string; focus: MonthFoc
   );
 }
 
+/** The focus tasks and mood for the month. The full numbers live in Stats, which counts the same calendar month. */
 function ProgressCard({ s }: { s: MonthSummary }) {
-  const { memberName } = useRel();
+  const { memberName, features } = useRel();
+  const navigate = useNavigate();
   const t = s.totals;
   if (!s.subjectId || t.done + t.missed + t.excused === 0)
     return s.subjectId ? (
@@ -224,29 +227,22 @@ function ProgressCard({ s }: { s: MonthSummary }) {
     ) : null;
   const isCurrent = s.month === monthOf(today());
   const who = memberName(s.subjectId);
+  const summary = (
+    <span className="min-w-0 flex-1">
+      <span className="block text-title-small text-on-surface">All of {monthName(s.month)}'s tasks</span>
+      <span className="block text-body-medium text-on-surface-variant">
+        {pct(t.rate)} done{isCurrent ? " so far" : ""} · {t.done} done, {t.missed} missed
+      </span>
+    </span>
+  );
   return (
-    <section className="flex flex-col gap-3 rounded-lg bg-surface-container-low p-4">
-      <h2 className="text-title-medium text-on-surface">
+    <section className="flex flex-col gap-3 rounded-lg bg-surface-container-low pt-4 pb-1">
+      <h2 className="px-4 text-title-medium text-on-surface">
         {isCurrent ? `How ${monthName(s.month)} is going` : `How ${monthName(s.month)} went`}
         {who !== "You" && <span className="text-on-surface-variant"> for {who}</span>}
       </h2>
-      <div className="flex items-end justify-between gap-4">
-        <div className="min-w-0">
-          <div className="text-display-medium text-on-surface">{pct(t.rate)}</div>
-          <div className="text-body-medium text-on-surface-variant">
-            done{isCurrent ? " so far" : ""}
-            {s.previous.rate != null && ` · ${pct(s.previous.rate)} in ${monthName(prevMonthOf(s.month))}`}
-          </div>
-        </div>
-        <div className="shrink-0 text-right">
-          <div className="text-title-medium text-on-surface">{t.done} done</div>
-          <div className="text-body-medium text-on-surface-variant">
-            {t.missed} missed · {t.excused} excused
-          </div>
-        </div>
-      </div>
       {s.focusTasks.length > 0 && (
-        <>
+        <div className="flex flex-col gap-3 px-4">
           <p className="text-body-small text-on-surface-variant">Tasks for the focus</p>
           {s.focusTasks.map((f) => (
             <div key={f.taskId} className="flex items-center gap-3 text-body-medium text-on-surface">
@@ -257,9 +253,27 @@ function ProgressCard({ s }: { s: MonthSummary }) {
               <span className="w-10 text-right">{pct(f.rate)}</span>
             </div>
           ))}
-        </>
+        </div>
       )}
-      {s.moods.length > 0 && <MonthMoodLine month={s.month} moods={s.moods} />}
+      {s.moods.length > 0 && (
+        <div className="px-4">
+          <MonthMoodLine month={s.month} moods={s.moods} />
+        </div>
+      )}
+      {features.stats ? (
+        <button
+          type="button"
+          aria-label={`See ${monthName(s.month)}'s stats`}
+          onClick={() => navigate({ to: "/stats", search: { month: s.month, who: s.subjectId! } })}
+          className="state-layer flex items-center gap-3 border-t border-surface-container-highest px-4 py-3 text-left"
+        >
+          {summary}
+          <span className="shrink-0 text-label-large text-primary">Stats</span>
+          <Icon name="chevron_right" className="-ml-2 text-primary" />
+        </button>
+      ) : (
+        <div className="flex border-t border-surface-container-highest px-4 py-3">{summary}</div>
+      )}
     </section>
   );
 }
@@ -301,11 +315,6 @@ function MonthMoodLine({ month, moods }: { month: string; moods: MonthSummary["m
     </div>
   );
 }
-
-const prevMonthOf = (month: string) => {
-  const [y, m] = month.split("-").map(Number) as [number, number];
-  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
-};
 
 function ReviewSoon({ s }: { s: MonthSummary }) {
   const { isDom, partners } = useRel();

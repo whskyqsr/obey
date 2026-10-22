@@ -127,6 +127,24 @@ const gated = (feature: keyof Features, Component: () => React.ReactNode) => () 
   </Gate>
 );
 
+const statsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/stats",
+  // `month` (YYYY-MM) opens a calendar month and `who` a member, e.g. from the monthly review.
+  validateSearch: (s: Record<string, unknown>): { month?: string; who?: string } => ({
+    ...(typeof s.month === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(s.month) ? { month: s.month } : {}),
+    ...(typeof s.who === "string" ? { who: s.who } : {}),
+  }),
+  component: function StatsRoute() {
+    const { month, who } = statsRoute.useSearch();
+    return (
+      <Gate feature="stats">
+        <StatsPage key={`${month}-${who}`} month={month} who={who} />
+      </Gate>
+    );
+  },
+});
+
 const noteRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/notes/$noteId",
@@ -224,7 +242,7 @@ const routeTree = rootRoute.addChildren([
     gated("journal", () => <NotesPage kind="journal" />),
   ),
   journalEntryRoute,
-  page("/stats", gated("stats", StatsPage)),
+  statsRoute,
   page("/review", gated("review", MonthReviewPage)),
   page("/agreement", gated("agreement", AgreementPage)),
   page("/scenes", gated("scenes", ScenesPage)),

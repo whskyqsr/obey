@@ -108,12 +108,14 @@ export function useMoods(rel: string, days: number) {
   return useQuery({ queryKey: ["rel", rel, "moods", days], queryFn: () => api<MoodEntry[]>(`/relationships/${rel}/moods?days=${days}`), staleTime: 60_000 });
 }
 
-export function useStats(rel: string, days: number, userId: string | null) {
+/** Stats over the last `days` days, or over a calendar `month` ("2026-10") when one is given. */
+export function useStats(rel: string, days: number, userId: string | null, month?: string) {
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const who = userId ? `&userId=${userId}` : "";
+  const range = month ? `month=${month}` : `days=${days}`;
   return useQuery({
-    queryKey: ["rel", rel, "stats", days, userId],
-    queryFn: () => api<DynamicStats>(`/relationships/${rel}/stats?days=${days}&zone=${encodeURIComponent(zone)}${who}`),
+    queryKey: ["rel", rel, "stats", month ?? days, userId],
+    queryFn: () => api<DynamicStats>(`/relationships/${rel}/stats?${range}&zone=${encodeURIComponent(zone)}${who}`),
     staleTime: 60_000,
   });
 }
@@ -679,9 +681,10 @@ export function useTickStep(rel: string) {
 
 const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-export function useMonth(rel: string, month: string) {
+export function useMonth(rel: string, month: string, enabled = true) {
   return useQuery({
     queryKey: ["rel", rel, "month", month],
+    enabled,
     queryFn: () => api<MonthSummary>(`/relationships/${rel}/months/${month}?zone=${encodeURIComponent(zone())}`),
   });
 }

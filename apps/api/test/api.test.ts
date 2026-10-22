@@ -1354,6 +1354,14 @@ describe("stats", () => {
 
       expect((await sub.get(`/relationships/${relId}/stats?days=90&zone=${encodeURIComponent(NY)}`)).body).toMatchObject({ bucket: "week", totals: { done: 2, missed: 4 } });
       expect((await sub.get(`/relationships/${relId}/stats?userId=${domId}`)).body.totals).toMatchObject({ done: 0, missed: 0, rate: null });
+      // A calendar month counts the whole month, like the monthly review, against the month before.
+      const month = (await dom.get(`/relationships/${relId}/stats?month=2026-10&zone=${encodeURIComponent(NY)}`)).body;
+      expect(month).toMatchObject({ month: "2026-10", days: 31, bucket: "day", totals: { done: 2, missed: 4, excused: 1 }, previous: { done: 0, missed: 0, rate: null } });
+      expect(month.buckets).toHaveLength(31);
+      const review = (await dom.get(`/relationships/${relId}/months/2026-10?zone=${encodeURIComponent(NY)}`)).body;
+      expect(review.totals).toEqual({ done: month.totals.done, missed: month.totals.missed, excused: month.totals.excused, rate: month.totals.rate });
+      expect(stats.month).toBeNull();
+      expect((await sub.get(`/relationships/${relId}/stats?month=2026-11`)).status).toBe(400);
       expect((await sub.get(`/relationships/${relId}/stats?days=12`)).status).toBe(400);
       await dom.patch(`/relationships/${relId}`, { features: { stats: false } });
       expect((await sub.get(`/relationships/${relId}/stats`)).status).toBe(403);
