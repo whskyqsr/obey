@@ -228,6 +228,8 @@ data class Features(
     val location: Boolean = true,
     val agreement: Boolean = true,
     val scenes: Boolean = true,
+    /** Off until a dynamic switches it on. */
+    val chastity: Boolean = false,
 )
 
 /** The relationship's name, or the partners' names when it has none. */
@@ -847,6 +849,8 @@ data class RewardInput(
     val cost: Int,
     /** Lets the sub off one of their consequences, excused once a Dominant marks it redeemed. */
     val letsOff: Boolean = false,
+    /** Takes this much off their running lock once marked redeemed. */
+    val lockMinutes: Int? = null,
 )
 
 @Serializable
@@ -857,11 +861,18 @@ data class Reward(
     val bodyMd: String = "",
     val cost: Int,
     val letsOff: Boolean = false,
+    val lockMinutes: Int? = null,
     val createdAt: String,
 )
 
 @Serializable
-data class ConsequenceInput(val title: String, val bodyMd: String = "", val severity: Int = 1)
+data class ConsequenceInput(
+    val title: String,
+    val bodyMd: String = "",
+    val severity: Int = 1,
+    /** Adds this much to their running lock instead of making a task. */
+    val lockMinutes: Int? = null,
+)
 
 @Serializable
 data class Consequence(
@@ -870,6 +881,7 @@ data class Consequence(
     val title: String,
     val bodyMd: String = "",
     val severity: Int = 1,
+    val lockMinutes: Int? = null,
     val createdAt: String,
 )
 
@@ -1472,3 +1484,80 @@ data class SceneComment(
     override val body: String,
     override val createdAt: String,
 ) : Comment
+
+// Chastity
+
+@Serializable
+data class ChastityLockInput(
+    val wearerId: String? = null,
+    /** Null: until the keyholder releases them. */
+    val minutes: Int? = null,
+    val hideTime: Boolean = false,
+    /** "keyholder" or "keybox". */
+    val keyMode: String = "keyholder",
+)
+
+@Serializable
+data class ChastityLock(
+    val id: String,
+    val relationshipId: String,
+    val wearerId: String,
+    val keyholderId: String,
+    /** pending, active, break, ended, declined or cancelled. */
+    val status: String,
+    val keyMode: String,
+    val minutes: Int? = null,
+    val hideTime: Boolean = false,
+    val startedAt: String? = null,
+    /** Null when open-ended, and for a wearer whose keyholder hides the time. */
+    val endsAt: String? = null,
+    val timeHidden: Boolean = false,
+    val breakEndsAt: String? = null,
+    val hasKeybox: Boolean = false,
+    val canSeeKeybox: Boolean = false,
+    val createdAt: String,
+    val endedAt: String? = null,
+    /** "time" or "released". */
+    val endReason: String? = null,
+) {
+    val running: Boolean get() = status == "active" || status == "break"
+}
+
+@Serializable
+data class ChastityEvent(
+    val id: String,
+    val lockId: String,
+    /** started, time, release_ask, break, photo_ask, relocked or ended. */
+    val kind: String,
+    /** For asks: pending, approved, declined, done or overdue. */
+    val status: String? = null,
+    val minutes: Int? = null,
+    val note: String? = null,
+    val byId: String? = null,
+    val createdAt: String,
+    val decidedAt: String? = null,
+    val taskId: String? = null,
+)
+
+@Serializable
+data class ChastityView(val open: List<ChastityLock> = emptyList(), val events: List<ChastityEvent> = emptyList(), val past: List<ChastityLock> = emptyList())
+
+@Serializable
+data class ChastityTimeInput(val minutes: Int, val note: String? = null)
+
+@Serializable
+data class ChastityAskInput(
+    /** "release" or "break". */
+    val kind: String,
+    val minutes: Int? = null,
+    val note: String? = null,
+)
+
+@Serializable
+data class ChastityDecideInput(val approve: Boolean, val minutes: Int? = null, val note: String? = null)
+
+@Serializable
+data class ChastityPhotoAskInput(val dueAt: String, val timezone: String)
+
+@Serializable
+data class ChastityPhotoAsk(val taskId: String)

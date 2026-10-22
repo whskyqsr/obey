@@ -413,6 +413,7 @@ fun TodayScreen(
                     offlineSince?.let { at -> item(key = "offline") { OfflineBanner(at) } }
                     if (session?.readOnly == true) item(key = "ended") { EndedBanner(onOpenSettings) }
                     if (session?.relationship?.roleSwap != null) item(key = "role-swap") { app.obey.ui.roles.RoleSwapCard(session) }
+                    if (session != null && session.relationship?.features?.chastity == true && !session.readOnly) item(key = "chastity") { app.obey.ui.chastity.ChastityTodayCard(session) }
                     curfew?.night?.let { n ->
                         item(key = "curfew") {
                             val mine = n.assigneeId == me

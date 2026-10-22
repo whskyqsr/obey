@@ -41,7 +41,7 @@ import java.time.format.FormatStyle
 /** Hands out a consequence on its own; it shows up on their Today like a one-off task. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AssignConsequenceDialog(consequence: Consequence, assigneeId: String, onDismiss: () -> Unit, onAssign: (AssignConsequenceInput) -> Unit) {
+fun AssignConsequenceDialog(consequence: Consequence, assigneeId: String, chastity: Boolean, onDismiss: () -> Unit, onAssign: (AssignConsequenceInput) -> Unit) {
     val today = LocalDate.now()
     var date by remember { mutableStateOf(today) }
     var anyTime by remember { mutableStateOf(true) }
@@ -50,6 +50,8 @@ fun AssignConsequenceDialog(consequence: Consequence, assigneeId: String, onDism
     var approval by remember { mutableStateOf(false) }
     var pickDate by remember { mutableStateOf(false) }
     var pickTime by remember { mutableStateOf(false) }
+    // A lock-time consequence goes straight onto their running lock: there's nothing to schedule.
+    val lockTime = consequence.lockMinutes?.takeIf { chastity }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -57,6 +59,9 @@ fun AssignConsequenceDialog(consequence: Consequence, assigneeId: String, onDism
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(reason, { reason = it.take(2000) }, label = { Text("Reason (optional)") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+                if (lockTime != null) {
+                    Text("This adds ${app.obey.ui.chastity.fmtMinutes(lockTime)} to their lock straight away. It needs a running lock with an end time.")
+                } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = date == today, onClick = { date = today }, label = { Text("Today") })
                     FilterChip(selected = date == today.plusDays(1), onClick = { date = today.plusDays(1) }, label = { Text("Tomorrow") })
@@ -71,6 +76,7 @@ fun AssignConsequenceDialog(consequence: Consequence, assigneeId: String, onDism
                     OutlinedButton(onClick = { pickTime = true }) { Text("Due at ${time.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))}") }
                 }
                 LabeledSwitch("Needs approval", "It counts as served only after you approve it", approval) { approval = it }
+                }
             }
         },
         confirmButton = {

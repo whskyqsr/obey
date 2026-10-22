@@ -158,7 +158,7 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
                         modifier = if (canManage) Modifier.clickable { editReward = Editing(r) } else Modifier,
                         headlineContent = { Text(r.title) },
                         supportingContent = {
-                            Text(listOfNotNull(r.bodyMd.takeIf { it.isNotBlank() }, if (r.letsOff) "Gets ${if (canManage) "them" else "you"} out of a consequence" else null).joinToString(" · "))
+                            Text(listOfNotNull(r.bodyMd.takeIf { it.isNotBlank() }, if (r.letsOff) "Gets ${if (canManage) "them" else "you"} out of a consequence" else null, r.lockMinutes?.takeIf { features.chastity }?.let { "Takes ${app.obey.ui.chastity.fmtMinutes(it)} off the lock" }).joinToString(" · "))
                         },
                         trailingContent = {
                             if (canManage) Text("${r.cost} pts", style = MaterialTheme.typography.labelLarge)
@@ -196,7 +196,8 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
                     ListItem(
                         modifier = if (canManage) Modifier.clickable { editConsequence = Editing(c) } else Modifier,
                         headlineContent = { Text(c.title) },
-                        supportingContent = if (c.bodyMd.isNotBlank()) { { Text(c.bodyMd) } } else null,
+                        supportingContent = listOfNotNull(c.bodyMd.takeIf { it.isNotBlank() }, c.lockMinutes?.takeIf { features.chastity }?.let { "Adds ${app.obey.ui.chastity.fmtMinutes(it)} to their lock" })
+                            .takeIf { it.isNotEmpty() }?.let { lines -> { Text(lines.joinToString("\n")) } },
                         trailingContent = {
                             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                                 Text("●".repeat(c.severity), color = MaterialTheme.colorScheme.error)
@@ -240,6 +241,7 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
         val existing = editing.item
         RewardDialog(
             existing,
+            features.chastity,
             onDismiss = { editReward = null },
             onSave = { vm.saveReward(existing, it); editReward = null },
             onDelete = existing?.let { r -> { vm.deleteReward(r); editReward = null } },
@@ -249,13 +251,14 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
         // Usually the one partner; with more, the first submissive.
         val assignee = session?.partners?.let { p -> p.firstOrNull { it.role == app.obey.api.Role.Submissive } ?: p.firstOrNull() }?.userId ?: session?.userId
         if (assignee != null) {
-            AssignConsequenceDialog(c, assignee, onDismiss = { assigning = null }, onAssign = { vm.assignConsequence(c, it); assigning = null })
+            AssignConsequenceDialog(c, assignee, features.chastity, onDismiss = { assigning = null }, onAssign = { vm.assignConsequence(c, it, features.chastity); assigning = null })
         }
     }
     editConsequence?.let { editing ->
         val existing = editing.item
         ConsequenceDialog(
             existing,
+            features.chastity,
             onDismiss = { editConsequence = null },
             onSave = { vm.saveConsequence(existing, it); editConsequence = null },
             onDelete = existing?.let { c -> { vm.deleteConsequence(c); editConsequence = null } },
@@ -293,11 +296,12 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
 }
 
 @Composable
-private fun RewardDialog(existing: Reward?, onDismiss: () -> Unit, onSave: (RewardInput) -> Unit, onDelete: (() -> Unit)?) {
+private fun RewardDialog(existing: Reward?, chastity: Boolean, onDismiss: () -> Unit, onSave: (RewardInput) -> Unit, onDelete: (() -> Unit)?) {
     var title by remember { mutableStateOf(existing?.title.orEmpty()) }
     var body by remember { mutableStateOf(existing?.bodyMd.orEmpty()) }
     var cost by remember { mutableStateOf(existing?.cost?.toString() ?: "50") }
     var letsOff by remember { mutableStateOf(existing?.letsOff ?: false) }
+    var lockMinutes by remember { mutableStateOf(existing?.lockMinutes) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (existing == null) "New reward" else "Edit reward") },
@@ -311,11 +315,12 @@ private fun RewardDialog(existing: Reward?, onDismiss: () -> Unit, onSave: (Rewa
                     "Redeeming it means picking a consequence of theirs; it's excused when you mark the reward redeemed.",
                     letsOff,
                 ) { letsOff = it }
+                if (chastity) app.obey.ui.chastity.LockTimeField("Takes time off their lock", lockMinutes) { lockMinutes = it }
             }
         },
         confirmButton = {
             Button(
-                onClick = { onSave(RewardInput(title.trim(), body, cost.toInt().coerceAtLeast(0), letsOff)) },
+                onClick = { onSave(RewardInput(title.trim(), body, cost.toInt().coerceAtLeast(0), letsOff, lockMinutes)) },
                 enabled = title.isNotBlank() && cost.toIntOrNull() != null,
             ) { Text("Save") }
         },
@@ -375,10 +380,11 @@ private fun LetOffDialog(
 }
 
 @Composable
-private fun ConsequenceDialog(existing: Consequence?, onDismiss: () -> Unit, onSave: (ConsequenceInput) -> Unit, onDelete: (() -> Unit)?) {
+private fun ConsequenceDialog(existing: Consequence?, chastity: Boolean, onDismiss: () -> Unit, onSave: (ConsequenceInput) -> Unit, onDelete: (() -> Unit)?) {
     var title by remember { mutableStateOf(existing?.title.orEmpty()) }
     var body by remember { mutableStateOf(existing?.bodyMd.orEmpty()) }
     var severity by remember { mutableStateOf(existing?.severity ?: 1) }
+    var lockMinutes by remember { mutableStateOf(existing?.lockMinutes) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (existing == null) "New consequence" else "Edit consequence") },
@@ -387,10 +393,11 @@ private fun ConsequenceDialog(existing: Consequence?, onDismiss: () -> Unit, onS
                 OutlinedTextField(title, { title = it.take(200) }, label = { Text("Title") }, singleLine = true)
                 OutlinedTextField(body, { body = it.take(5000) }, label = { Text("Description") }, minLines = 2)
                 Stepper("Severity", severity, "of 5", 1..5) { severity = it }
+                if (chastity) app.obey.ui.chastity.LockTimeField("Adds lock time", lockMinutes) { lockMinutes = it }
             }
         },
         confirmButton = {
-            Button(onClick = { onSave(ConsequenceInput(title.trim(), body, severity)) }, enabled = title.isNotBlank()) { Text("Save") }
+            Button(onClick = { onSave(ConsequenceInput(title.trim(), body, severity, lockMinutes)) }, enabled = title.isNotBlank()) { Text("Save") }
         },
         dismissButton = {
             Row {
