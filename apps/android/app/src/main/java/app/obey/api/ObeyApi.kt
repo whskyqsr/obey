@@ -152,6 +152,10 @@ interface ObeyApi {
     @GET("relationships/{id}/stats")
     suspend fun stats(@Path("id") relationshipId: String, @Query("days") days: Int, @Query("zone") zone: String, @Query("userId") userId: String?): DynamicStats
 
+    /** Stats for a whole calendar month ("2026-10"), counted the same as the monthly review. */
+    @GET("relationships/{id}/stats")
+    suspend fun monthStats(@Path("id") relationshipId: String, @Query("month") month: String, @Query("zone") zone: String, @Query("userId") userId: String?): DynamicStats
+
     @GET("relationships/{id}/months/{month}")
     suspend fun month(@Path("id") relationshipId: String, @Path("month") month: String, @Query("zone") zone: String): MonthSummary
 

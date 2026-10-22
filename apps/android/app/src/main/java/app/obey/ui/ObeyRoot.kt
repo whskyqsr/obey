@@ -194,7 +194,7 @@ private fun topLevels(f: Features) = listOfNotNull(
     if (f.protocols) TopLevel(ProtocolsRoute, "Protocols", Icons.Outlined.FactCheck) { it.hasRoute<ProtocolsRoute>() } else null,
     TopLevel(NotesRoute, "Notes", Icons.AutoMirrored.Outlined.Notes) { it.hasRoute<NotesRoute>() },
     if (f.journal) TopLevel(JournalRoute, "Journal", Icons.Outlined.AutoStories) { it.hasRoute<JournalRoute>() } else null,
-    if (f.stats) TopLevel(StatsRoute, "Stats", Icons.Outlined.Insights) { it.hasRoute<StatsRoute>() } else null,
+    if (f.stats) TopLevel(StatsRoute(), "Stats", Icons.Outlined.Insights) { it.hasRoute<StatsRoute>() } else null,
     if (f.review) TopLevel(MonthReviewRoute, "Monthly review", Icons.Outlined.Flag) { it.hasRoute<MonthReviewRoute>() } else null,
     // The menu shows it next to Your dynamic rather than with the other pages.
     if (f.agreement) TopLevel(AgreementRoute(), "Agreement", Icons.Outlined.Handshake) { it.hasRoute<AgreementRoute>() } else null,
@@ -206,7 +206,7 @@ private fun topLevels(f: Features) = listOfNotNull(
 /** The phone's bar holds Today, Calendar, the next section that's on, and the first writing space; the rest go in the menu. Stats, the monthly review, the agreement and scenes are always in the menu. */
 private fun splitBar(all: List<TopLevel>): Pair<List<TopLevel>, List<TopLevel>> {
     val writing = all.firstOrNull { it.route in writingRoutes }
-    val bar = all.filter { it.route !in writingRoutes && it.route != StatsRoute && it.route != MonthReviewRoute && it.route !is AgreementRoute && it.route != ScenesRoute }.take(3) + listOfNotNull(writing)
+    val bar = all.filter { it.route !in writingRoutes && it.route !is StatsRoute && it.route != MonthReviewRoute && it.route !is AgreementRoute && it.route != ScenesRoute }.take(3) + listOfNotNull(writing)
     return bar to all.filter { it !in bar }
 }
 
@@ -426,8 +426,8 @@ private fun ObeyNavHost(nav: NavHostController) {
                 onOpenSettings = settings,
             )
         }
-        composable<StatsRoute> { StatsScreen(onOpenSettings = settings, onOpenTask = openTask) }
-        composable<MonthReviewRoute> { MonthReviewScreen(onOpenSettings = settings) }
+        composable<StatsRoute> { StatsScreen(onOpenSettings = settings, onOpenTask = openTask, onOpenReview = { nav.navigate(MonthReviewRoute) }) }
+        composable<MonthReviewRoute> { MonthReviewScreen(onOpenSettings = settings, onOpenStats = { month, who -> nav.navigate(StatsRoute(month, who)) }) }
         composable<AgreementRoute> { AgreementScreen(onOpenSettings = settings, onOpenNote = { nav.navigate(NoteEditorRoute(noteId = it)) }) }
         composable<ScenesRoute> { ScenesScreen(onOpenSettings = settings, onOpen = { nav.navigate(SceneRoute(it)) }, onAftercare = { nav.navigate(AftercareRoute) }) }
         composable<SceneRoute> { SceneScreen(onBack = { nav.popBackStack() }) }

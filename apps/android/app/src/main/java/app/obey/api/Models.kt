@@ -564,10 +564,14 @@ data class StatsBucket(val start: String, val done: Int, val missed: Int, val ex
 @Serializable
 data class TaskTally(val taskId: String, val title: String, val active: Boolean, val streak: Int, val done: Int, val missed: Int, val excused: Int, val rate: Double? = null)
 
-/** How one person's tasks went over the last [days] days. [bucket] is "day", "week" or "month"; [weekdays] starts on Sunday. */
+/**
+ * How one person's tasks went over the last [days] days, or over the calendar [month] when set. [bucket] is "day", "week"
+ * or "month"; [weekdays] starts on Sunday.
+ */
 @Serializable
 data class DynamicStats(
     val days: Int,
+    val month: String? = null,
     val totals: StatsTotals,
     val previous: Tally,
     val bucket: String,
