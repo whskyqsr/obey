@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type maplibregl from "maplibre-gl";
+import type * as maplibregl from "maplibre-gl";
 import type { Place, PlaceInput, PlaceSearchResult } from "../api/types";
 import { useDeletePlace, useSavePlace } from "../api/hooks";
 import { api, errorMessage } from "../api/client";
@@ -23,11 +23,10 @@ function circle(lng: number, lat: number, radiusM: number) {
   return { type: "Feature" as const, properties: {}, geometry: { type: "Polygon" as const, coordinates: [pts] } };
 }
 
-/** The map draws with WebGL; without it (hardware acceleration off, old GPU or driver) it can't start. */
+/** MapLibre 6 draws with WebGL 2 only; without it (hardware acceleration off, old GPU or driver) the map can't start. */
 function canDrawMap() {
   try {
-    const canvas = document.createElement("canvas");
-    return !!(canvas.getContext("webgl2") ?? canvas.getContext("webgl"));
+    return !!document.createElement("canvas").getContext("webgl2");
   } catch {
     return false;
   }
@@ -68,8 +67,14 @@ export function PlaceMap({
     let gone = false;
     let made: maplibregl.Map | null = null;
     // The map library is big, so it loads only when a map is first shown.
-    void Promise.all([import("maplibre-gl"), import("maplibre-gl/dist/maplibre-gl.css")]).then(([{ default: lib }]) => {
+    void Promise.all([
+      import("maplibre-gl"),
+      import("maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"),
+      import("maplibre-gl/dist/maplibre-gl.css"),
+    ]).then(([lib, { default: workerUrl }]) => {
       if (gone || !el.current) return;
+      // MapLibre 6 looks for its worker beside its own file, which bundling moves; point it at the bundled one.
+      lib.setWorkerUrl(workerUrl);
       made = make(lib, el.current);
     });
     return () => {
@@ -91,8 +96,10 @@ export function PlaceMap({
       center: [lng, lat],
       zoom: zoomFor(radiusM, lat),
       interactive,
-      attributionControl: { compact: true },
+      attributionControl: false,
     });
+    // Top right, so the credit doesn't cover the dialog's hint and locate button along the bottom.
+    m.addControl(new lib.AttributionControl({ compact: true }), "top-right");
     map.current = m;
     const draw = () => {
       const c = m.getCenter();
