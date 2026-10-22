@@ -23,6 +23,15 @@ function circle(lng: number, lat: number, radiusM: number) {
   return { type: "Feature" as const, properties: {}, geometry: { type: "Polygon" as const, coordinates: [pts] } };
 }
 
+/** MapLibre 6 draws with WebGL 2 only; without it the map can't start (hardware acceleration off, old GPU or driver). */
+function canDrawMap() {
+  try {
+    return !!document.createElement("canvas").getContext("webgl2");
+  } catch {
+    return false;
+  }
+}
+
 /** The zoom at which the circle comfortably fills the map. */
 const zoomFor = (radiusM: number, lat: number) => Math.max(10, Math.min(18, Math.log2((156_543 * Math.cos((lat * Math.PI) / 180) * 160) / radiusM)));
 
@@ -51,9 +60,10 @@ export function PlaceMap({
   radius.current = radiusM;
   const moved = useRef(onMove);
   moved.current = onMove;
+  const [drawable] = useState(canDrawMap);
 
   useEffect(() => {
-    if (!el.current) return;
+    if (!el.current || !drawable) return;
     let gone = false;
     let made: maplibregl.Map | null = null;
     // The map library is big, so it loads only when a map is first shown.
@@ -69,7 +79,11 @@ export function PlaceMap({
     });
     return () => {
       gone = true;
-      made?.remove();
+      try {
+        made?.remove();
+      } catch {
+        // A map that failed partway through starting can throw while being torn down; it's going away regardless.
+      }
     };
     // The map is made once; later changes move it below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -121,6 +135,11 @@ export function PlaceMap({
   return (
     <div className={cx("relative overflow-hidden bg-surface-container-highest", className)}>
       <div ref={el} className="absolute inset-0" />
+      {!drawable && (
+        <p className="absolute inset-x-4 top-4 text-center text-body-medium text-on-surface-variant">
+          This browser can't draw the map. Turn on hardware acceleration, or search for the address instead.
+        </p>
+      )}
       {/* The pin stays in the middle; its point is the place. */}
       <svg viewBox="-16 -44 32 46" className="pointer-events-none absolute top-1/2 left-1/2 h-11 w-8 -translate-x-1/2 -translate-y-full" aria-hidden>
         <path d="M0 0 C -4 -10, -14 -16, -14 -28 A 14 14 0 1 1 14 -28 C 14 -16, 4 -10, 0 0 Z" className="fill-primary stroke-surface" strokeWidth="2" />
