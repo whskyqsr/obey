@@ -33,6 +33,11 @@ export const FEATURE_ROWS: { key: keyof Features; label: string; help: string }[
   { key: "review", label: "Monthly review", help: "A focus for each month, and a look back on it together at the end." },
   { key: "agreement", label: "Agreement", help: "One page you both sign: why you're doing this, what each of you will do, limits and safewords." },
   { key: "scenes", label: "Scenes", help: "Log scenes and how each of you felt about them, keep aftercare plans, and check in the day after." },
+  {
+    key: "chastity",
+    label: "Chastity",
+    help: "Locks with a set time or until released, a sealed keybox code, asks for a break or release, and consequences and rewards that add or take off time.",
+  },
   { key: "location", label: "Location tasks", help: "Tasks done by getting somewhere, like the gym by 6, checked by the sub's phone." },
 ];
 

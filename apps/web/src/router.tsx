@@ -20,6 +20,7 @@ import { StatsPage } from "./pages/Stats";
 import { MonthReviewPage } from "./pages/MonthReview";
 import { AgreementPage } from "./pages/Agreement";
 import { AftercarePage, ScenePage, ScenesPage } from "./pages/Scenes";
+import { ChastityPage } from "./pages/Chastity";
 import { PlacesPage } from "./pages/Places";
 import { LocationPage } from "./pages/LocationPage";
 import { CurfewPage } from "./pages/Curfew";
@@ -270,6 +271,7 @@ const routeTree = rootRoute.addChildren([
   page("/scenes", gated("scenes", ScenesPage)),
   sceneRoute,
   page("/aftercare", gated("scenes", AftercarePage)),
+  page("/chastity", gated("chastity", ChastityPage)),
   page("/settings", SettingsPage),
   page("/dynamic", DynamicPage),
   page("/places", gated("location", PlacesPage)),

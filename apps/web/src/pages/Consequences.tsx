@@ -4,6 +4,7 @@ import { errorMessage } from "../api/client";
 import type { Consequence } from "../api/types";
 import { ItemDialog, type FieldDef } from "../components/ItemDialog";
 import { Button, Dialog, Empty, ErrorBox, Fab, Icon, Loading, PageHeader, Select, Switch, TextArea, TextField, useSnackbar } from "../components/ui";
+import { LOCK_TIME_OPTIONS, fmtMinutes } from "../components/Chastity";
 import { browserTimeZone, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 import { useConfirm } from "../lib/useConfirm";
@@ -20,8 +21,19 @@ const FIELDS: FieldDef[] = [
 ];
 
 export function ConsequencesPage() {
-  const { rel, isDom } = useRel();
+  const { rel, isDom, features } = useRel();
   const snack = useSnackbar();
+  const fields: FieldDef[] = features.chastity
+    ? [
+        ...FIELDS,
+        {
+          key: "lockMinutes",
+          label: "Adds lock time",
+          type: "select",
+          options: LOCK_TIME_OPTIONS,
+        },
+      ]
+    : FIELDS;
   const list = useLibrary(rel.id, "consequences");
   const save = useSaveLibraryItem(rel.id, "consequences");
   const del = useDeleteLibraryItem(rel.id, "consequences");
@@ -54,6 +66,12 @@ export function ConsequencesPage() {
               <div className="min-w-0 flex-1">
                 <div className="text-title-medium text-on-surface">{c.title}</div>
                 {c.bodyMd && <div className="mt-1 text-body-medium whitespace-pre-wrap text-on-surface-variant">{c.bodyMd}</div>}
+                {c.lockMinutes && (
+                  <div className="mt-1 flex items-center gap-1 text-body-small text-on-surface-variant">
+                    <Icon name="lock" size={16} />
+                    Adds {fmtMinutes(c.lockMinutes)} to their lock
+                  </div>
+                )}
               </div>
             </button>
             {isDom && (
@@ -68,8 +86,12 @@ export function ConsequencesPage() {
       <ItemDialog
         open={editing !== null}
         title={current ? "Edit consequence" : "New consequence"}
-        fields={FIELDS}
-        initial={current ? { title: current.title, bodyMd: current.bodyMd, severity: String(current.severity) } : { title: "", bodyMd: "", severity: "1" }}
+        fields={fields}
+        initial={
+          current
+            ? { title: current.title, bodyMd: current.bodyMd, severity: String(current.severity), lockMinutes: current.lockMinutes ? String(current.lockMinutes) : "" }
+            : { title: "", bodyMd: "", severity: "1", lockMinutes: "" }
+        }
         busy={save.isPending}
         onClose={() => setEditing(null)}
         onDelete={
@@ -79,7 +101,15 @@ export function ConsequencesPage() {
         }
         onSubmit={(v) =>
           save.mutate(
-            { id: current?.id, input: { title: String(v.title).trim(), bodyMd: String(v.bodyMd ?? ""), severity: Number(v.severity) || 1 } },
+            {
+              id: current?.id,
+              input: {
+                title: String(v.title).trim(),
+                bodyMd: String(v.bodyMd ?? ""),
+                severity: Number(v.severity) || 1,
+                lockMinutes: features.chastity ? Number(v.lockMinutes) || null : (current?.lockMinutes ?? null),
+              },
+            },
             { onSuccess: () => setEditing(null), onError: (e) => snack(errorMessage(e)) },
           )
         }
@@ -92,7 +122,7 @@ export function ConsequencesPage() {
 
 /** Hands out a consequence on its own; it shows up on their Today like a one-off task. */
 function AssignDialog({ consequence, onClose }: { consequence: Consequence; onClose(): void }) {
-  const { rel, me } = useRel();
+  const { rel, me, features } = useRel();
   const snack = useSnackbar();
   const assign = useAssignConsequence(rel.id);
   const subs = rel.members.filter((m) => m.userId !== me.user.id);
@@ -105,6 +135,7 @@ function AssignDialog({ consequence, onClose }: { consequence: Consequence; onCl
     approvalRequired: false,
   });
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
+  const lockTime = features.chastity ? consequence.lockMinutes : null;
   const submit = () =>
     assign.mutate(
       {
@@ -120,7 +151,7 @@ function AssignDialog({ consequence, onClose }: { consequence: Consequence; onCl
       },
       {
         onSuccess: () => {
-          snack("Consequence assigned");
+          snack(lockTime ? `Added ${fmtMinutes(lockTime)} to their lock` : "Consequence assigned");
           onClose();
         },
         onError: (e) => snack(errorMessage(e)),
@@ -154,17 +185,23 @@ function AssignDialog({ consequence, onClose }: { consequence: Consequence; onCl
           </Select>
         )}
         <TextArea label="Reason (optional)" value={form.reason} onChange={(e) => set({ reason: e.target.value })} maxLength={2000} rows={2} />
-        <div className="flex flex-wrap items-start gap-4">
-          <TextField label="Due" type="date" value={form.date} min={today()} onChange={(e) => set({ date: e.target.value })} className="w-44" />
-          {!form.allDay && <TextField label="At" type="time" value={form.dueTime} onChange={(e) => set({ dueTime: e.target.value })} className="w-36" />}
-        </div>
-        <Switch checked={form.allDay} onChange={(allDay) => set({ allDay })} label="Any time that day" />
-        <Switch
-          checked={form.approvalRequired}
-          onChange={(approvalRequired) => set({ approvalRequired })}
-          label="Needs approval"
-          help="It counts as served only after you approve it."
-        />
+        {lockTime ? (
+          <p className="text-body-medium text-on-surface-variant">This adds {fmtMinutes(lockTime)} to their lock straight away. It needs a running lock with an end time.</p>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-start gap-4">
+              <TextField label="Due" type="date" value={form.date} min={today()} onChange={(e) => set({ date: e.target.value })} className="w-44" />
+              {!form.allDay && <TextField label="At" type="time" value={form.dueTime} onChange={(e) => set({ dueTime: e.target.value })} className="w-36" />}
+            </div>
+            <Switch checked={form.allDay} onChange={(allDay) => set({ allDay })} label="Any time that day" />
+            <Switch
+              checked={form.approvalRequired}
+              onChange={(approvalRequired) => set({ approvalRequired })}
+              label="Needs approval"
+              help="It counts as served only after you approve it."
+            />
+          </>
+        )}
       </div>
     </Dialog>
   );

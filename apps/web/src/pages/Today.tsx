@@ -9,6 +9,7 @@ import { CurfewStrip } from "../components/CurfewStrip";
 import { TodayInbox } from "../components/Inbox";
 import { SceneCards } from "../components/SceneCards";
 import { RoleSwapCard } from "../components/RoleSwap";
+import { ChastityToday } from "../components/Chastity";
 import { KitPrompt } from "./Kits";
 import { Button, Empty, ErrorBox, Fab, Icon, Loading, PageHeader, Section } from "../components/ui";
 import { addDays, fmtDate, fmtRelative, localDateOf, today } from "../lib/dates";
@@ -78,6 +79,7 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
               .join(" · ")}
           />
           <RoleSwapCard />
+          <ChastityToday />
           <CurfewStrip />
           <SceneCards />
           {!isDom && occ.data && todays.length > 0 && <Progress today={todays} done={doneToday} points={features.points} />}

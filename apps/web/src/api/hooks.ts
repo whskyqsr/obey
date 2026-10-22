@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { api, apiObjectUrl } from "./client";
-import type { ApplyKitResult, Kit, RoleSwap, SharedKit, DynamicStats, MonthFocus, MonthReview, MonthSummary, MoodEntry, PastMonth } from "@obey/contracts";
+import type { ApplyKitResult, ChastityEvent, ChastityLock, ChastityView, Kit, RoleSwap, SharedKit, DynamicStats, MonthFocus, MonthReview, MonthSummary, MoodEntry, PastMonth } from "@obey/contracts";
 import type {
   AdminReport,
   OccurrenceComment,
@@ -604,7 +604,7 @@ export function useReorder(rel: string, kind: "rules" | "protocols") {
 export function useAssignConsequence(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: AssignConsequenceInput }) => api<Task>(`/consequences/${id}/assign`, { method: "POST", body: input }),
+    mutationFn: ({ id, input }: { id: string; input: AssignConsequenceInput }) => api<Task | undefined>(`/consequences/${id}/assign`, { method: "POST", body: input }),
     onSuccess: () => invalidate(),
   });
 }
@@ -1078,4 +1078,74 @@ export function useAcceptRoleSwap(rel: string) {
 export function useEndRoleSwap(rel: string) {
   const qc = useQueryClient();
   return useMutation({ mutationFn: () => api<void>(`/relationships/${rel}/role-swap`, { method: "DELETE" }), onSuccess: () => qc.invalidateQueries() });
+}
+
+// ---- chastity
+
+export function useChastity(rel: string, enabled = true) {
+  // Asks and answers come from the other person, so it checks back now and then while open.
+  return useQuery({ queryKey: ["rel", rel, "chastity"], queryFn: () => api<ChastityView>(`/relationships/${rel}/chastity`), enabled, refetchInterval: 60_000 });
+}
+
+export function useStartLock(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (body: { wearerId?: string; minutes: number | null; hideTime: boolean; keyMode: "keyholder" | "keybox" }) =>
+      api<ChastityLock>(`/relationships/${rel}/chastity`, { method: "POST", body }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+/** Locking up, or relocking after a break; with a keybox, the photo of the new code. */
+export function useLockUp(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ lockId, photo }: { lockId: string; photo?: Blob }) => api<ChastityLock>(`/chastity/${lockId}/lock`, { method: "POST", body: photo ?? {} }),
+    onSuccess: (l) => invalidate(["chastity-keybox", l.id]),
+  });
+}
+
+/** Declines or takes back an ask to lock up, or releases a running lock. */
+export function useEndLock(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({ mutationFn: (lockId: string) => api<void>(`/chastity/${lockId}`, { method: "DELETE" }), onSuccess: () => invalidate() });
+}
+
+export function useLockTime(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ lockId, ...body }: { lockId: string; minutes: number; note?: string }) => api<ChastityLock>(`/chastity/${lockId}/time`, { method: "POST", body }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useChastityAsk(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ lockId, ...body }: { lockId: string; kind: "release" | "break"; minutes?: number; note?: string }) =>
+      api<ChastityEvent>(`/chastity/${lockId}/asks`, { method: "POST", body }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useDecideChastityAsk(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ askId, ...body }: { askId: string; approve: boolean; minutes?: number; note?: string }) =>
+      api<ChastityLock>(`/chastity/asks/${askId}/decide`, { method: "POST", body }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function usePhotoAsk(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ lockId, ...body }: { lockId: string; dueAt: string; timezone: string }) => api<{ taskId: string }>(`/chastity/${lockId}/photo-ask`, { method: "POST", body }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+/** The sealed keybox photo, for someone allowed to see it now. Never cached past the page. */
+export function useKeyboxUrl(lockId: string, enabled: boolean) {
+  return useQuery({ queryKey: ["chastity-keybox", lockId], queryFn: () => apiObjectUrl(`/chastity/${lockId}/keybox`), enabled, staleTime: 0, gcTime: 0 });
 }
