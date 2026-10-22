@@ -6,7 +6,7 @@ import { memberships, places, taskSeries, users } from "../db/schema.js";
 import { HttpError, notFound, parsePatch } from "../errors.js";
 import { occurrenceDto } from "../serialize.js";
 import { managers, requireManager, requireMember } from "../services/access.js";
-import { photonGeocoder } from "../services/geocode.js";
+import { addressSearch } from "../services/geocode.js";
 import { reportsHome } from "../services/curfew.js";
 import { arriveAt, leaveFrom } from "../services/location.js";
 import { countUsage } from "../services/usage.js";
@@ -60,7 +60,7 @@ export const locationRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const near = req.query.lat && req.query.lng && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null;
     await countUsage(db, "place_search", deps.now());
     try {
-      return await (deps.geocode ?? photonGeocoder)(q, near);
+      return await (deps.geocode ?? addressSearch)(q, near);
     } catch (err) {
       req.log.warn({ err }, "place search failed");
       throw new HttpError(502, "search isn't working right now; drag the map to the spot instead");
