@@ -130,8 +130,8 @@ export function EndSwapDialog({ open, onClose, swap }: { open: boolean; onClose(
   // While it's on, roles are swapped: whoever is the submissive now goes back to being the Dominant.
   const iGoBack = rel.members.find((m) => m.userId === me.user.id)?.role === "submissive";
   const back = iGoBack
-    ? `You go back to being the Dominant and ${memberName(other)} the Submissive.`
-    : `${memberName(other)} goes back to being the Dominant and you the Submissive.`;
+    ? `You go back to being the Dominant and ${memberName(other)} the submissive.`
+    : `${memberName(other)} goes back to being the Dominant and you the submissive.`;
   return (
     <Dialog
       open={open}
@@ -178,7 +178,7 @@ export function RoleSwapCard() {
   const otherIsDom = rel.members.find((m) => m.userId === other)?.role === "dominant";
 
   if (swap.status === "pending" && swap.partnerId === me.user.id) {
-    const willBe = mine?.role === "dominant" ? "the Submissive" : "the Dominant";
+    const willBe = mine?.role === "dominant" ? "the submissive" : "the Dominant";
     const pausesMine = swap.pauseTasks && mine?.role === "submissive";
     return (
       <div className="px-4 pb-4 md:px-6">

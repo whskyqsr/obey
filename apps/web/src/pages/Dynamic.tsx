@@ -304,7 +304,7 @@ export function DynamicPage() {
                       ? swap.requestedBy === me.user.id
                         ? `Waiting for ${memberName(swap.partnerId)} to accept`
                         : `${memberName(swap.requestedBy)} asked; answer on Today`
-                      : `Trade Dominant and Submissive with ${swapWith!.displayName}, for a while or for good`
+                      : `Trade Dominant and submissive with ${swapWith!.displayName}, for a while or for good`
                 }
                 trailing={(!swap || swap.status === "active" || swap.requestedBy === me.user.id) && <Icon name="chevron_right" className="text-on-surface-variant" />}
                 onClick={!swap ? () => setSheet("swap") : swap.status === "active" || swap.requestedBy === me.user.id ? () => setSheet("end-swap") : undefined}

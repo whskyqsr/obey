@@ -710,7 +710,7 @@ export async function delaysLeft(db: Tx, rel: Relationship, userId: string, now:
 
 /**
  * Applies a reschedule directly when the actor may, or files a request for a Dominant to decide.
- * Dominants and switches always may. Submissives follow the relationship's policy.
+ * Dominants and switches always may. submissives follow the relationship's policy.
  */
 export async function requestReschedule(
   db: Tx,
