@@ -23,7 +23,7 @@ import { AftercarePage, ScenePage, ScenesPage } from "./pages/Scenes";
 import { PlacesPage } from "./pages/Places";
 import { LocationPage } from "./pages/LocationPage";
 import { CurfewPage } from "./pages/Curfew";
-import { KitsPage } from "./pages/Kits";
+import { KitPage, KitsPage, NewKitPage, SharedKitPage } from "./pages/Kits";
 import { RulesPage } from "./pages/Rules";
 import { SettingsPage } from "./pages/Settings";
 import { TaskEditorPage } from "./pages/TaskEditor";
@@ -188,6 +188,25 @@ const protocolRoute = createRoute({
   },
 });
 
+const kitRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/kits/$kitId",
+  component: function KitRoute() {
+    const { kitId } = kitRoute.useParams();
+    return <KitPage kitId={kitId} />;
+  },
+});
+
+/** A share link: `/kit/7KQM2P`. */
+const sharedKitRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/kit/$code",
+  component: function SharedKitRoute() {
+    const { code } = sharedKitRoute.useParams();
+    return <SharedKitPage code={code} />;
+  },
+});
+
 const sceneRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/scenes/$sceneId",
@@ -234,6 +253,9 @@ const routeTree = rootRoute.addChildren([
   page("/protocols", gated("protocols", ProtocolsPage)),
   page("/rule-log", RuleLogPage),
   page("/kits", KitsPage),
+  page("/kits/new", NewKitPage),
+  kitRoute,
+  sharedKitRoute,
   protocolRoute,
   page("/notes", () => <NotesPage kind="note" />),
   noteRoute,

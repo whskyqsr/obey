@@ -219,7 +219,7 @@ function KitsStep() {
           </Card>
         ))}
       </div>
-      {open && <KitDialog kit={open} onClose={() => setOpen(null)} onApplied={finishWelcome} />}
+      {open && <KitDialog kit={open} source={{ kit: open.id }} onClose={() => setOpen(null)} onApplied={finishWelcome} />}
     </>
   );
 }

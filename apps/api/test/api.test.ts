@@ -1467,7 +1467,7 @@ describe("starter kits", () => {
 
     const added = await dom.post(`/relationships/${relId}/kits/daily-basics`, { ...base, items: ["morning", "lights"], assigneeId: subId });
     expect(added.status).toBe(201);
-    expect(added.body).toEqual({ tasks: 2, rules: 0, protocols: 0 });
+    expect(added.body).toEqual({ tasks: 2, rules: 0, protocols: 0, rewards: 0, consequences: 0 });
     expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [subId], push: { body: "You have 2 new tasks" } });
     const tasks = (await sub.get(`/relationships/${relId}/tasks`)).body;
     expect(tasks.map((t: { title: string }) => t.title).sort()).toEqual(["Lights out", "Morning check-in"]);
@@ -1489,7 +1489,7 @@ describe("starter kits", () => {
 
     // Rules need no assignee; protocols point at the rule they spell out.
     const rules = await dom.post(`/relationships/${relId}/kits/rules`, { ...base, items: ["hydrated", "hydrated-p"] });
-    expect(rules.body).toEqual({ tasks: 0, rules: 1, protocols: 1 });
+    expect(rules.body).toEqual({ tasks: 0, rules: 1, protocols: 1, rewards: 0, consequences: 0 });
     const [rule] = (await sub.get(`/relationships/${relId}/rules`)).body;
     const [proto] = (await sub.get(`/relationships/${relId}/protocols`)).body;
     expect(proto.ruleId).toBe(rule.id);

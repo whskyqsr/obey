@@ -895,22 +895,65 @@ export const adminReport = z.object({
 export type AdminReport = z.infer<typeof adminReport>;
 export const resolveReport = z.object({ removePhoto: z.boolean().default(false) });
 
-/** One thing a starter kit can add: a recurring task, a rule, or a protocol (optionally spelling out one of the kit's rules). */
-export interface KitItem {
-  key: string;
-  kind: "task" | "rule" | "protocol";
-  title: string;
-  bodyMd?: string;
-  /** Tasks: how often, and by when. */
-  repeat?: { freq: "daily" | "weekly"; interval?: number; byWeekday?: ("MO" | "TU" | "WE" | "TH" | "FR" | "SA" | "SU")[] };
-  dueTime?: string;
+const kitKey = z.string().min(1).max(40);
+/**
+ * One thing a kit can add. Starter kits use tasks, rules and protocols; a kit someone saves from their own dynamic
+ * can also carry rewards and consequences, and a task's own settings. Never who a task is for, places, photos or history.
+ */
+export const kitItem = z.object({
+  key: kitKey,
+  kind: z.enum(["task", "rule", "protocol", "reward", "consequence"]),
+  title: z.string().min(1).max(200),
+  bodyMd: z.string().max(20_000).optional(),
+  /** Tasks: how often (absent for a one-off, which lands on the day the kit is added), and by when. */
+  repeat: recurrenceRule.omit({ count: true, until: true }).optional(),
+  anchor: z.enum(["calendar", "completion"]).optional(),
+  dueTime: timeOfDay.optional(),
   /** Tasks: a check-in that asks for a mood. */
-  askMood?: boolean;
+  askMood: z.boolean().optional(),
   /** Tasks: done by writing a journal entry; bodyMd is the prompt. */
-  asksJournal?: boolean;
+  asksJournal: z.boolean().optional(),
+  points: z.number().int().min(-10_000).max(10_000).optional(),
+  missPenalty: z.number().int().min(0).max(10_000).optional(),
+  proofRequired: z.boolean().optional(),
+  approvalRequired: z.boolean().optional(),
+  graceMinutes: z
+    .number()
+    .int()
+    .min(0)
+    .max(60 * 24 * 7)
+    .optional(),
+  /** Tasks: a ritual's steps, in order. */
+  steps: z.array(z.string().min(1).max(200)).max(30).optional(),
+  windowMinutes: z
+    .number()
+    .int()
+    .min(5)
+    .max(60 * 24)
+    .optional(),
+  countMin: z.number().int().min(1).max(1_000).optional(),
+  countMax: z.number().int().min(1).max(1_000).optional(),
+  countPer: z.enum(["task", "count"]).optional(),
+  reminder: z.enum(["default", "custom", "none"]).optional(),
+  reminderText: z.string().max(200).optional(),
+  /** Tasks: the kit's consequence handed out on a miss, and when it's due. */
+  consequenceKey: kitKey.optional(),
+  consequenceDueDays: z.number().int().min(0).max(30).optional(),
+  consequenceDueTime: timeOfDay.optional(),
+  /** Tasks: the kit's reward it earns. */
+  rewardKey: kitKey.optional(),
   /** Protocols: the key of the kit rule it spells out. */
-  ruleKey?: string;
-}
+  ruleKey: kitKey.optional(),
+  /** Rules: their heading. */
+  category: z.string().max(60).optional(),
+  /** Rewards. */
+  cost: z.number().int().min(0).max(1_000_000).optional(),
+  needsApproval: z.boolean().optional(),
+  letsOff: z.boolean().optional(),
+  /** Consequences. */
+  severity: z.number().int().min(1).max(5).optional(),
+});
+export type KitItem = z.infer<typeof kitItem>;
 export interface StarterKit {
   id: string;
   title: string;
@@ -998,7 +1041,45 @@ export const applyKit = z.object({
   timezone: z.string().min(1).max(64),
   start: plainDate,
 });
-export const applyKitResult = z.object({ tasks: z.number(), rules: z.number(), protocols: z.number() });
+export const applyKitResult = z.object({ tasks: z.number(), rules: z.number(), protocols: z.number(), rewards: z.number(), consequences: z.number() });
+export type ApplyKitResult = z.infer<typeof applyKitResult>;
+
+/** A kit someone saved: theirs alone, usable in any dynamic they manage, and shareable by a code. */
+export const kit = z.object({
+  id,
+  title: z.string(),
+  description: z.string(),
+  items: z.array(kitItem),
+  /** Set while it's shared: anyone with the code can see it and save a copy. */
+  shareCode: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type Kit = z.infer<typeof kit>;
+const kitTitle = z.string().trim().min(1).max(60);
+const kitDescription = z.string().trim().max(200);
+/** Save a kit from what a dynamic already has; a task brings its reward and consequence along. */
+export const kitInput = z.object({
+  title: kitTitle,
+  description: kitDescription.default(""),
+  tasks: z.array(id).max(50).default([]),
+  rules: z.array(id).max(50).default([]),
+  protocols: z.array(id).max(50).default([]),
+  rewards: z.array(id).max(50).default([]),
+  consequences: z.array(id).max(50).default([]),
+});
+/** Rename a kit, or keep only some of its items (by key). */
+export const kitPatch = z.object({ title: kitTitle.optional(), description: kitDescription.optional(), keep: z.array(kitKey).max(200).optional() });
+/** A shared kit as anyone with its code sees it: no owner, no dates. */
+export const sharedKit = z.object({ code: z.string(), title: z.string(), description: z.string(), items: z.array(kitItem) });
+export type SharedKit = z.infer<typeof sharedKit>;
+/** Share codes: six letters and digits, without look-alikes; typed with or without the dash, any case. */
+export const SHARE_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+export const normalizeShareCode = (input: string) => {
+  const m = /(?:\/kit\/)?([A-Za-z0-9-]{6,7})\s*$/.exec(input.trim());
+  const code = m ? m[1]!.replace("-", "").toUpperCase() : "";
+  return code.length === 6 && [...code].every((c) => SHARE_CODE_ALPHABET.includes(c)) ? code : null;
+};
 
 /**
  * The agreement: one versioned page both partners sign. Text sections are plain lines ("- " starts a bullet);

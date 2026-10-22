@@ -49,6 +49,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.Insights
@@ -91,6 +92,7 @@ import app.obey.ui.common.LocalSafeWord
 import app.obey.api.SafeCall
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import app.obey.api.ApplyKitResult
 import app.obey.api.Features
 import app.obey.ui.common.LocalFeatures
 import app.obey.auth.AuthState
@@ -116,7 +118,10 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import app.obey.ui.scenes.AftercareScreen
 import app.obey.ui.scenes.SceneScreen
 import app.obey.ui.scenes.ScenesScreen
+import app.obey.ui.kits.KitScreen
 import app.obey.ui.kits.KitsScreen
+import app.obey.ui.kits.NewKitScreen
+import app.obey.ui.kits.SharedKitScreen
 import app.obey.ui.kits.describe
 import app.obey.ui.rules.RulesScreen
 import app.obey.ui.settings.DynamicScreen
@@ -440,14 +445,39 @@ private fun ObeyNavHost(nav: NavHostController) {
                 onKits = { nav.navigate(KitsRoute) },
             )
         }
+        // After a kit is added, open what it added: tasks first, then rules, protocols, rewards, consequences.
+        val kitAdded: (ApplyKitResult) -> Unit = { r ->
+            android.widget.Toast.makeText(nav.context, r.describe(), android.widget.Toast.LENGTH_SHORT).show()
+            val to: Any = when {
+                r.tasks > 0 -> TaskListRoute
+                r.rules > 0 -> RulesRoute
+                r.protocols > 0 -> ProtocolsRoute
+                r.rewards > 0 -> RewardsRoute
+                else -> ConsequencesRoute
+            }
+            nav.navigate(to) { popUpTo<KitsRoute> { inclusive = true } }
+        }
         composable<KitsRoute> {
-            val context = androidx.compose.ui.platform.LocalContext.current
             KitsScreen(
                 onBack = { nav.popBackStack() },
-                onAdded = { r ->
-                    android.widget.Toast.makeText(context, r.describe(), android.widget.Toast.LENGTH_SHORT).show()
-                    nav.navigate(if (r.tasks > 0) TaskListRoute else if (r.rules > 0) RulesRoute else ProtocolsRoute) { popUpTo<KitsRoute> { inclusive = true } }
-                },
+                onAdded = { kitAdded(it) },
+                onOpenKit = { nav.navigate(KitRoute(it)) },
+                onNewKit = { nav.navigate(NewKitRoute) },
+                onOpenShared = { nav.navigate(SharedKitRoute(it)) },
+            )
+        }
+        composable<KitRoute> { entry ->
+            KitScreen(entry.toRoute<KitRoute>().kitId, onBack = { nav.popBackStack() }, onAdded = { kitAdded(it) })
+        }
+        composable<NewKitRoute> {
+            NewKitScreen(onBack = { nav.popBackStack() }, onSaved = { nav.navigate(KitRoute(it)) { popUpTo<NewKitRoute> { inclusive = true } } })
+        }
+        composable<SharedKitRoute> { entry ->
+            SharedKitScreen(
+                entry.toRoute<SharedKitRoute>().code,
+                onBack = { nav.popBackStack() },
+                onAdded = { kitAdded(it) },
+                onSaved = { nav.navigate(KitRoute(it)) { popUpTo<SharedKitRoute> { inclusive = true } } },
             )
         }
         composable<TaskDetailRoute> {

@@ -215,6 +215,33 @@ interface ObeyApi {
     @POST("relationships/{id}/kits/{kit}")
     suspend fun applyKit(@Path("id") relationshipId: String, @Path("kit") kit: String, @Body body: ApplyKitInput): ApplyKitResult
 
+    @POST("relationships/{id}/shared-kits/{code}")
+    suspend fun applySharedKit(@Path("id") relationshipId: String, @Path("code") code: String, @Body body: ApplyKitInput): ApplyKitResult
+
+    @GET("me/kits")
+    suspend fun myKits(): List<Kit>
+
+    @POST("relationships/{id}/kits")
+    suspend fun saveKit(@Path("id") relationshipId: String, @Body body: KitInput): Kit
+
+    @PATCH("kits/{id}")
+    suspend fun updateKit(@Path("id") id: String, @Body body: KitPatch): Kit
+
+    @DELETE("kits/{id}")
+    suspend fun deleteKit(@Path("id") id: String)
+
+    @POST("kits/{id}/share")
+    suspend fun shareKit(@Path("id") id: String, @Body body: Map<String, String> = emptyMap()): Kit
+
+    @DELETE("kits/{id}/share")
+    suspend fun unshareKit(@Path("id") id: String): Kit
+
+    @GET("shared-kits/{code}")
+    suspend fun sharedKit(@Path("code") code: String): SharedKit
+
+    @POST("shared-kits/{code}/save")
+    suspend fun copySharedKit(@Path("code") code: String, @Body body: Map<String, String> = emptyMap()): Kit
+
     @GET("relationships/{id}/rule-log")
     suspend fun ruleLog(@Path("id") relationshipId: String): List<RuleLogEntry>
 

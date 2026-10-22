@@ -19,6 +19,9 @@ import kotlinx.serialization.Serializable
 @Serializable data object DynamicRoute
 @Serializable data object TaskListRoute
 @Serializable data object KitsRoute
+@Serializable data class KitRoute(val kitId: String)
+@Serializable data object NewKitRoute
+@Serializable data class SharedKitRoute(val code: String)
 @Serializable data object PlacesRoute
 @Serializable data object LocationRoute
 @Serializable data object CurfewRoute
