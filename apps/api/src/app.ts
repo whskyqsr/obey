@@ -27,6 +27,7 @@ import { statsRoutes } from "./routes/stats.js";
 import { monthRoutes } from "./routes/months.js";
 import { taskRoutes } from "./routes/tasks.js";
 import type { Geocoder } from "./services/geocode.js";
+import { type FetchTile, imageryRoutes } from "./routes/imagery.js";
 
 export interface Deps {
   db: Db;
@@ -43,6 +44,8 @@ export interface Deps {
   deleteSignIn?: ((authUid: string) => Promise<void>) | null;
   /** Address search for places; defaults to Photon. Tests pass a stub. */
   geocode?: Geocoder;
+  /** Satellite tiles for the place picker (Esri), when there's a key. Tests pass a stub fetch. */
+  imagery?: { key: string; fetchTile?: FetchTile } | null;
   logger?: boolean;
 }
 
@@ -60,6 +63,8 @@ declare module "fastify" {
   interface FastifyContextConfig {
     /** Lets an email-and-password account that hasn't confirmed its address call this route. */
     allowUnverified?: boolean;
+    /** Checks its own signed link instead of the sign-in header (map tiles, which can't send one). */
+    signedLink?: boolean;
   }
 }
 
@@ -79,7 +84,7 @@ export function buildApp(deps: Deps) {
   // Callback style so the rest of the request runs inside the scope.
   app.addHook("onRequest", (req, _reply, done) => requestScope.run({ write: !["GET", "HEAD", "OPTIONS"].includes(req.method) }, done));
   app.addHook("onRequest", async (req: FastifyRequest) => {
-    if (req.method === "OPTIONS" || req.url === "/health") return;
+    if (req.method === "OPTIONS" || req.url === "/health" || req.routeOptions.config.signedLink) return;
     const identity = await deps.authenticate(req);
     if (identity.unverified && !req.routeOptions.config.allowUnverified) throw new HttpError(403, "verify your email", { code: "email_unverified" });
     req.user = await upsertUser(deps.db, identity);
@@ -116,5 +121,6 @@ export function buildApp(deps: Deps) {
   app.register(sceneRoutes(deps));
   app.register(kitRoutes(deps));
   app.register(verificationRoutes(deps));
+  app.register(imageryRoutes(deps));
   return app;
 }

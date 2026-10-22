@@ -377,6 +377,9 @@ interface ObeyApi {
     @GET("places/search")
     suspend fun searchPlaces(@Query("q") q: String, @Query("lat") lat: Double?, @Query("lng") lng: Double?): List<PlaceSearchResult>
 
+    @GET("imagery")
+    suspend fun imagery(): ImageryLink
+
     @POST("relationships/{id}/places")
     suspend fun createPlace(@Path("id") relationshipId: String, @Body body: PlaceInput): Place
 

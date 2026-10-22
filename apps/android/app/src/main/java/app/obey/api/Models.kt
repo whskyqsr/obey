@@ -1123,6 +1123,10 @@ data class Place(
 @Serializable
 data class PlaceSearchResult(val name: String, val address: String, val lat: Double, val lng: Double)
 
+/** A signed link to satellite tiles through the api, good for a couple of hours; tiles is null when satellite view is off. */
+@Serializable
+data class ImageryLink(val tiles: String? = null, val attribution: String? = null)
+
 /** The phone noticed arriving at a task's place ("enter"), or the person tapped I'm here ("checkin"). */
 @Serializable
 data class ArriveOccurrenceInput(

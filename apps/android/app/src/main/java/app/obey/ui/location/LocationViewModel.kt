@@ -1,6 +1,7 @@
 package app.obey.ui.location
 
 import androidx.lifecycle.viewModelScope
+import app.obey.api.ImageryLink
 import app.obey.api.LocationStatus
 import app.obey.api.ObeyApi
 import app.obey.api.Occurrence
@@ -98,6 +99,9 @@ class LocationViewModel @Inject constructor(
     }
 
     suspend fun search(q: String, lat: Double, lng: Double): List<PlaceSearchResult> = api.searchPlaces(q, lat, lng)
+
+    /** Satellite tiles for the place map, or null when they're off or unreachable. */
+    suspend fun imagery(): ImageryLink? = runCatching { api.imagery() }.getOrNull()?.takeIf { it.tiles != null }
 
     fun save(place: Place?, input: PlaceInput, onDone: () -> Unit) = action {
         val p = if (place == null) api.createPlace(relId!!, input) else api.updatePlace(place.id, input)

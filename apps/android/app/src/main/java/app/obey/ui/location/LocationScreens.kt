@@ -367,6 +367,7 @@ fun PlaceEditor(vm: LocationViewModel, place: Place?, busy: Boolean, onClose: ()
         place = place,
         busy = busy,
         search = vm::search,
+        imagery = vm::imagery,
         locate = { vm.watcher.currentFix() },
         canLocate = { vm.watcher.hasAny },
         onDismiss = onClose,

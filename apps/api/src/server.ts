@@ -28,6 +28,7 @@ const app = buildApp({
   // Generating the link needs the service account, the same credentials push uses.
   sendVerification:
     firebase?.canSendPush && config.resendApiKey ? verificationSender(firebase.app, { resendApiKey: config.resendApiKey, from: config.mailFrom, appUrl: config.appUrl }) : null,
+  imagery: config.esriApiKey ? { key: config.esriApiKey } : null,
   logger: true,
 });
 await app.listen({ port: config.port, host: "0.0.0.0" });
