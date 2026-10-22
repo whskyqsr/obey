@@ -21,6 +21,8 @@ export const config = {
   adminEmails: (process.env.ADMIN_EMAILS ?? "").split(",").filter(Boolean),
   /** Our own verification emails (Resend); without the key, clients fall back to Firebase's emails. */
   resendApiKey: process.env.RESEND_API_KEY,
+  /** Geoapify address search, which knows far more US house numbers than OpenStreetMap; without the key, search uses Photon only. */
+  geoapifyKey: process.env.GEOAPIFY_KEY,
   mailFrom: env("MAIL_FROM", "Fealty <hello@fealty.me>"),
   appUrl: env("APP_URL", "http://localhost:5173"),
 };
