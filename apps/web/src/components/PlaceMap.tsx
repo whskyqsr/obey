@@ -1,8 +1,10 @@
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import type * as maplibregl from "maplibre-gl";
 import type { Place, PlaceInput, PlaceSearchResult } from "../api/types";
 import { useDeletePlace, useSavePlace } from "../api/hooks";
 import { api, errorMessage } from "../api/client";
+import { API_URL } from "../env";
 import { useRel } from "../lib/relationship";
 import { Button, Dialog, Icon, IconButton, Spinner, TextField, cx, useSnackbar } from "./ui";
 
@@ -46,6 +48,8 @@ export function PlaceMap({
   onMove,
   className,
   interactive = true,
+  imagery = null,
+  satellite = false,
 }: {
   lat: number;
   lng: number;
@@ -53,11 +57,17 @@ export function PlaceMap({
   onMove?(p: { lat: number; lng: number }): void;
   className?: string;
   interactive?: boolean;
+  /** Where satellite tiles come from, when the server offers them. */
+  imagery?: Imagery | null;
+  /** Show the satellite photo instead of the street map. */
+  satellite?: boolean;
 }) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const radius = useRef(radiusM);
   radius.current = radiusM;
+  const photo = useRef({ imagery, satellite });
+  photo.current = { imagery, satellite };
   const moved = useRef(onMove);
   moved.current = onMove;
   const [drawable] = useState(canDrawMap);
@@ -105,6 +115,7 @@ export function PlaceMap({
       src?.setData(circle(c.lng, c.lat, radius.current));
     };
     m.on("load", () => {
+      showPhoto(m);
       m.addSource("radius", { type: "geojson", data: circle(lng, lat, radiusM) });
       m.addLayer({ id: "radius-fill", type: "fill", source: "radius", paint: { "fill-color": "#9C4332", "fill-opacity": 0.14 } });
       m.addLayer({ id: "radius-line", type: "line", source: "radius", paint: { "line-color": "#9C4332", "line-width": 2 } });
@@ -116,6 +127,24 @@ export function PlaceMap({
     });
     return m;
   }
+
+  /** Adds the satellite layer once tiles are on offer, under the radius, and shows or hides it. */
+  function showPhoto(m: maplibregl.Map) {
+    const { imagery: tiles, satellite: on } = photo.current;
+    if (!tiles || !m.isStyleLoaded()) return;
+    if (!m.getSource("imagery")) {
+      // 256 px tiles; past level 19 Esri's photos run out in most places, so the map stretches the last ones.
+      m.addSource("imagery", { type: "raster", tiles: [API_URL + tiles.tiles], tileSize: 256, maxzoom: 19 });
+      m.addLayer({ id: "imagery", type: "raster", source: "imagery", layout: { visibility: "none" } }, m.getLayer("radius-fill") ? "radius-fill" : undefined);
+    }
+    m.setLayoutProperty("imagery", "visibility", on ? "visible" : "none");
+  }
+
+  useEffect(() => {
+    if (map.current) showPhoto(map.current);
+    // showPhoto reads the latest values itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imagery, satellite]);
 
   // A new spot from search or "my location" recentres the map; the pin follows.
   useEffect(() => {
@@ -149,6 +178,23 @@ export function PlaceMap({
       </svg>
     </div>
   );
+}
+
+/** The satellite tile link the server hands out; null tiles when it has no imagery key. */
+type Imagery = { tiles: string; attribution: string };
+
+/** Satellite tiles, when the server has them. The signed link lasts two hours, so it's fetched again after one. */
+function useImagery(enabled: boolean) {
+  return useQuery({
+    queryKey: ["imagery"],
+    queryFn: async () => {
+      const r = await api<{ tiles: string | null; attribution?: string }>("/imagery");
+      return r.tiles ? { tiles: r.tiles, attribution: r.attribution ?? "" } : null;
+    },
+    enabled,
+    staleTime: 60 * 60_000,
+    refetchInterval: 60 * 60_000,
+  });
 }
 
 /** Looks up addresses and businesses, nearest to [near] first, through our server. The [chosen] address isn't searched again. */
@@ -188,6 +234,8 @@ export function PlaceDialog({ place, open, onClose, onSaved }: { place: Place | 
   // The address picked from the list stays in the field without searching for it again.
   const [chosen, setChosen] = useState<string | null>(null);
   const [located, setLocated] = useState(false);
+  const [satellite, setSatellite] = useState(false);
+  const imagery = useImagery(open).data ?? null;
   const { found, state: searching } = useAddressSearch(q, draft, chosen);
 
   useEffect(() => {
@@ -302,7 +350,22 @@ export function PlaceDialog({ place, open, onClose, onSaved }: { place: Place | 
           )}
         </div>
         <div className="relative">
-          <PlaceMap lat={draft.lat} lng={draft.lng} radiusM={draft.radiusM} onMove={(c) => set(c)} className="h-72 rounded-md md:h-80" />
+          <PlaceMap lat={draft.lat} lng={draft.lng} radiusM={draft.radiusM} onMove={(c) => set(c)} imagery={imagery} satellite={satellite} className="h-72 rounded-md md:h-80" />
+          {imagery && (
+            <IconButton
+              icon={satellite ? "map" : "satellite_alt"}
+              label={satellite ? "Map view" : "Satellite view"}
+              variant="tonal"
+              className="absolute top-3 left-3"
+              onClick={() => setSatellite((v) => !v)}
+            />
+          )}
+          {/* Esri's terms want its credit always visible while the photos are showing, not behind the map's info button. */}
+          {imagery && satellite && (
+            <span className="pointer-events-none absolute top-3 right-12 left-16 text-right">
+              <span className="rounded-xs bg-inverse-surface/70 px-1.5 py-0.5 text-label-small text-inverse-on-surface">{imagery.attribution}</span>
+            </span>
+          )}
           <span className="pointer-events-none absolute bottom-3 left-3 rounded-xs bg-inverse-surface px-2.5 py-1 text-body-small text-inverse-on-surface">
             Drag the map to move the pin
           </span>

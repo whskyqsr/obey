@@ -23,6 +23,8 @@ export const config = {
   resendApiKey: process.env.RESEND_API_KEY,
   /** Geoapify address search, which knows far more US house numbers than OpenStreetMap; without the key, search uses Photon only. */
   geoapifyKey: process.env.GEOAPIFY_KEY,
+  /** Esri (ArcGIS Location Platform) key for the place picker's satellite view; without it there's no satellite toggle. */
+  esriApiKey: process.env.ESRI_API_KEY,
   mailFrom: env("MAIL_FROM", "Fealty <hello@fealty.me>"),
   appUrl: env("APP_URL", "http://localhost:5173"),
 };

@@ -3,6 +3,7 @@ package app.obey.ui.location
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,8 +22,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.MyLocation
+import androidx.compose.material.icons.outlined.SatelliteAlt
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -60,6 +63,8 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import app.obey.BuildConfig
+import app.obey.api.ImageryLink
 import app.obey.api.Place
 import app.obey.api.PlaceInput
 import app.obey.api.PlaceSearchResult
@@ -78,8 +83,12 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
+import org.maplibre.android.style.layers.RasterLayer
 import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.android.style.sources.RasterSource
+import org.maplibre.android.style.sources.TileSet
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.Point
 import org.maplibre.geojson.Polygon
@@ -109,9 +118,31 @@ fun formatRadius(m: Int) = when {
     else -> "${m / 1000}.${m % 1000 / 100} km"
 }
 
+/**
+ * Satellite photos under the radius, added once and then shown or hidden. The tiles come through our api,
+ * which holds the Esri key, as a signed link.
+ */
+private fun showPhoto(style: Style, imagery: ImageryLink?, satellite: Boolean) {
+    val tiles = imagery?.tiles ?: return
+    if (style.getLayer("imagery") == null) {
+        val set = TileSet("2.1.0", BuildConfig.API_BASE_URL.trimEnd('/') + tiles).apply { maxZoom = 19f }
+        style.addSource(RasterSource("imagery", set, 256))
+        style.addLayerBelow(RasterLayer("imagery", "imagery"), "radius-fill")
+    }
+    style.getLayer("imagery")?.setProperties(PropertyFactory.visibility(if (satellite) Property.VISIBLE else Property.NONE))
+}
+
 /** A map with a fixed pin in the middle and the place's radius around it. Dragging the map moves the pin. */
 @Composable
-fun PlaceMap(lat: Double, lng: Double, radiusM: Int, onMove: (Double, Double) -> Unit, modifier: Modifier = Modifier) {
+fun PlaceMap(
+    lat: Double,
+    lng: Double,
+    radiusM: Int,
+    onMove: (Double, Double) -> Unit,
+    modifier: Modifier = Modifier,
+    imagery: ImageryLink? = null,
+    satellite: Boolean = false,
+) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val tint = MaterialTheme.colorScheme.primary.toArgb()
@@ -122,6 +153,8 @@ fun PlaceMap(lat: Double, lng: Double, radiusM: Int, onMove: (Double, Double) ->
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     val radius by rememberUpdatedState(radiusM)
     val moved by rememberUpdatedState(onMove)
+    val photo by rememberUpdatedState(imagery)
+    val showSatellite by rememberUpdatedState(satellite)
 
     fun redraw(m: MapLibreMap) {
         val c = m.cameraPosition.target ?: return
@@ -147,6 +180,7 @@ fun PlaceMap(lat: Double, lng: Double, radiusM: Int, onMove: (Double, Double) ->
                 style.addSource(GeoJsonSource("radius", circle(lat, lng, radius)))
                 style.addLayer(FillLayer("radius-fill", "radius").withProperties(PropertyFactory.fillColor(tint), PropertyFactory.fillOpacity(0.14f)))
                 style.addLayer(LineLayer("radius-line", "radius").withProperties(PropertyFactory.lineColor(tint), PropertyFactory.lineWidth(2f)))
+                showPhoto(style, photo, showSatellite)
             }
             m.addOnCameraMoveListener { redraw(m) }
             m.addOnCameraIdleListener { m.cameraPosition.target?.let { moved(it.latitude, it.longitude) } }
@@ -171,6 +205,7 @@ fun PlaceMap(lat: Double, lng: Double, radiusM: Int, onMove: (Double, Double) ->
         }
     }
     LaunchedEffect(map, radiusM) { map?.let(::redraw) }
+    LaunchedEffect(map, imagery, satellite) { map?.style?.takeIf { it.isFullyLoaded }?.let { showPhoto(it, imagery, satellite) } }
 
     Box(modifier) {
         AndroidView({ view }, Modifier.fillMaxSize())
@@ -191,6 +226,7 @@ fun PlaceDialog(
     place: Place?,
     busy: Boolean,
     search: suspend (String, Double, Double) -> List<PlaceSearchResult>,
+    imagery: suspend () -> ImageryLink?,
     locate: suspend () -> android.location.Location?,
     canLocate: () -> Boolean,
     onDismiss: () -> Unit,
@@ -207,6 +243,10 @@ fun PlaceDialog(
     // What the last search came to, shown under the field: "none" or "failed".
     var outcome by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    // Satellite view helps put the pin on the right roof, since address search can land a few houses off.
+    var photo by remember { mutableStateOf<ImageryLink?>(null) }
+    var satellite by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { photo = imagery() }
 
     fun goToMe() = scope.launch {
         val fix = locate()
@@ -272,7 +312,33 @@ fun PlaceDialog(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 )
                 Box(Modifier.weight(1f).fillMaxWidth()) {
-                    PlaceMap(draft.lat, draft.lng, draft.radiusM, onMove = { la, ln -> draft = draft.copy(lat = la, lng = ln) }, modifier = Modifier.fillMaxSize())
+                    PlaceMap(
+                        draft.lat,
+                        draft.lng,
+                        draft.radiusM,
+                        onMove = { la, ln -> draft = draft.copy(lat = la, lng = ln) },
+                        modifier = Modifier.fillMaxSize(),
+                        imagery = photo,
+                        satellite = satellite,
+                    )
+                    if (photo != null) {
+                        FilledTonalIconButton(onClick = { satellite = !satellite }, modifier = Modifier.align(Alignment.TopStart).padding(12.dp)) {
+                            Icon(if (satellite) Icons.Outlined.Map else Icons.Outlined.SatelliteAlt, if (satellite) "Map view" else "Satellite view")
+                        }
+                    }
+                    // Esri's terms want its credit always visible while the photos are showing.
+                    if (satellite) {
+                        photo?.attribution?.let {
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.inverseOnSurface,
+                                modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).padding(start = 56.dp)
+                                    .background(MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.7f), MaterialTheme.shapes.extraSmall)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
                     Surface(
                         color = MaterialTheme.colorScheme.inverseSurface,
                         shape = MaterialTheme.shapes.extraSmall,

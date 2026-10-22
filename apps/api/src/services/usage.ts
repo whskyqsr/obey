@@ -2,7 +2,7 @@ import { eq, gte, sql } from "drizzle-orm";
 import type { Db } from "../db/index.js";
 import { usageDaily } from "../db/schema.js";
 
-export type UsageKind = "place_search";
+export type UsageKind = "place_search" | "imagery_tile";
 
 const utcDay = (d: Date) => d.toISOString().slice(0, 10);
 
