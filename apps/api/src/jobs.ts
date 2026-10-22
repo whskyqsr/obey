@@ -4,12 +4,12 @@ import { claimCurfewNudges, clockTime } from "./services/curfew.js";
 import { finishStays } from "./services/location.js";
 import { claimReminders, markMissed, materializeAll } from "./services/scheduling.js";
 import { endSwap, expiredSwaps } from "./services/roleSwaps.js";
-import { roleSwaps } from "./db/schema.js";
+import { chastityEvents, chastityLocks, roleSwaps } from "./db/schema.js";
 import { eq } from "drizzle-orm";
 import { type Notifier, sendWithWords } from "./notify.js";
 import { promptMonthReviews } from "./routes/months.js";
 import { sceneCheckIns } from "./routes/scenes.js";
-import { finishLocks } from "./routes/chastity.js";
+import { finishLocks, fmtLength } from "./routes/chastity.js";
 import { deleteOldProofs } from "./services/proofRetention.js";
 
 /** One pass of the background work. Every step is idempotent, so overlapping or repeated runs are safe. */
@@ -48,10 +48,23 @@ export async function runJobs(db: Db, notifier: Notifier, now: Date, opts: { mat
 
   const missed = await db.transaction((tx) => markMissed(tx, now));
   for (const { occ, series, consequence } of missed) {
+    // A consequence that adds lock time never becomes a task, so the push says what it did instead.
+    const [lockTime] = await db
+      .select({ minutes: chastityEvents.minutes, hidden: chastityLocks.hideTime })
+      .from(chastityEvents)
+      .innerJoin(chastityLocks, eq(chastityEvents.lockId, chastityLocks.id))
+      .where(eq(chastityEvents.causedByOccurrenceId, occ.id));
+    const added = lockTime?.minutes
+      ? lockTime.hidden
+        ? ", and time was added to your lock"
+        : `, and ${fmtLength(lockTime.minutes)} ${lockTime.minutes === 60 || lockTime.minutes === 1440 ? "was" : "were"} added to your lock`
+      : consequence
+        ? ", and a consequence was added"
+        : "";
     if (series.curfewUntil) {
       await notifier.send([series.assigneeId], {
         title: "Fealty",
-        body: consequence ? "You weren't home by curfew, and a consequence was added" : "You weren't home by curfew",
+        body: `You weren't home by curfew${added}`,
         data: { type: "occurrence_missed", occurrenceId: occ.id },
       });
       await notifier.send(await managers(db, series.relationshipId, series.assigneeId), {
@@ -63,7 +76,7 @@ export async function runJobs(db: Db, notifier: Notifier, now: Date, opts: { mat
     }
     await notifier.send([series.assigneeId], {
       title: "Fealty",
-      body: consequence ? "A task was missed, and a consequence was added" : "A task was missed",
+      body: `A task was missed${added}`,
       data: { type: "occurrence_missed", occurrenceId: occ.id },
     });
     await notifier.send(await managers(db, series.relationshipId, series.assigneeId), {

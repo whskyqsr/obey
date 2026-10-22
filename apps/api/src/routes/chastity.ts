@@ -18,11 +18,13 @@ import { HttpError, forbidden, notFound } from "../errors.js";
 import { canManage, requireMember } from "../services/access.js";
 import { type Lock, OPEN, canSeeKeybox, changeLockTime, endLock, eventDto, expiredLocks, lockDto, openLock, overdueBreaks, redCallOpen } from "../services/chastity.js";
 import { materializeSeries } from "../services/scheduling.js";
+import { sendWithWords } from "../notify.js";
 
 const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_PHOTO_BYTES = 4_000_000;
 const BREAK_MINUTES = 20;
-const fmtLength = (m: number) => {
+/** "2 hours", "3 days", "45 minutes": a lock length or a change to one. */
+export const fmtLength = (m: number) => {
   const abs = Math.abs(m);
   if (abs % 1440 === 0) return `${abs / 1440} day${abs === 1440 ? "" : "s"}`;
   if (abs % 60 === 0) return `${abs / 60} hour${abs === 60 ? "" : "s"}`;
@@ -258,7 +260,10 @@ export const chastityRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       else await tx.update(chastityLocks).set({ status: "break", breakEndsAt: new Date(now.getTime() + minutes! * 60_000) }).where(eq(chastityLocks.id, lock.id));
     });
     const said = body.approve ? (ask.kind === "release_ask" ? "released you" : `allowed a ${minutes}-minute break`) : ask.kind === "release_ask" ? "said not yet to release" : "said no to a break";
-    await notifier.send([lock.wearerId], { title: "Fealty", body: `${req.user.displayName} ${said}`, data: { type: "chastity", relationshipId: lock.relationshipId } });
+    const push = { title: "Fealty", body: `${req.user.displayName} ${said}`, data: { type: "chastity", relationshipId: lock.relationshipId } };
+    // The keyholder's note rides along for a wearer who lets partners' words onto their lock screen.
+    const note = body.note?.trim();
+    await sendWithWords(db, notifier, [lock.wearerId], push, note ? { ...push, body: `${push.body}: “${note}”` } : null);
     return dto(await reread(lock.id), req.user.id);
   });
 
