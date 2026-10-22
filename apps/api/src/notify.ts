@@ -36,6 +36,7 @@ const CATEGORY: Record<string, NotifyCategory> = {
   task_assigned: "assigned",
   occurrence_edited: "assigned",
   rule_log: "assigned",
+  library_changed: "assigned",
   event_changed: "plans",
   reward_redeemed: "rewards",
   reward_honored: "rewards",

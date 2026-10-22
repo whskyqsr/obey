@@ -10,7 +10,7 @@ export const NOTIFY_TYPES: { key: NotifyCategory; label: string; help: string; f
   { key: "missed", label: "Missed tasks", help: "When a deadline passes" },
   { key: "requests", label: "More time", help: "Requests for more time, the answers, and moved deadlines" },
   { key: "comments", label: "Comments", help: "On a task or journal entry" },
-  { key: "assigned", label: "New tasks and consequences", help: "Tasks given to you, history corrections and logged broken rules" },
+  { key: "assigned", label: "New tasks and consequences", help: "Tasks given to you, history corrections, logged broken rules, and changes to rules and protocols" },
   { key: "plans", label: "Plans", help: "When a partner adds or changes a calendar plan" },
   { key: "rewards", label: "Rewards", help: "When a reward is redeemed", feature: "points" },
 ];
