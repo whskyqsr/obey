@@ -87,6 +87,7 @@ import app.obey.ui.common.EmptyBox
 import app.obey.ui.common.ErrorBox
 import app.obey.ui.common.Load
 import app.obey.ui.common.LoadingBox
+import app.obey.ui.common.LocalFeatures
 import app.obey.ui.common.MenuButton
 import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.SafeWordAction
@@ -115,7 +116,6 @@ private fun currentMonth() = YearMonth.now().toString()
 private fun ym(month: String) = YearMonth.parse(month)
 private fun monthName(month: String, year: Boolean = false) = ym(month).format(DateTimeFormatter.ofPattern(if (year) "MMMM yyyy" else "MMMM"))
 private fun nextMonth(month: String) = ym(month).plusMonths(1).toString()
-private fun prevMonth(month: String) = ym(month).minusMonths(1).toString()
 private fun shortDate(date: String) = LocalDate.parse(date).format(DateTimeFormatter.ofPattern("MMM d"))
 private fun pct(rate: Double?) = rate?.let { "${(it * 100).roundToInt()}%" } ?: "–"
 
@@ -188,7 +188,7 @@ private fun pickable(session: Session, tasks: List<Task>): List<Task> {
 /** A focus for each month, how it's going, and a look back on it together at the end. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MonthReviewScreen(onOpenSettings: () -> Unit, vm: MonthReviewViewModel = hiltViewModel()) {
+fun MonthReviewScreen(onOpenSettings: () -> Unit, onOpenStats: (month: String, who: String) -> Unit, vm: MonthReviewViewModel = hiltViewModel()) {
     LaunchedEffect(Unit) { vm.load() }
     val state by vm.state.collectAsStateWithLifecycle()
     val month by vm.month.collectAsStateWithLifecycle()
@@ -238,7 +238,7 @@ fun MonthReviewScreen(onOpenSettings: () -> Unit, vm: MonthReviewViewModel = hil
                 is Load.Ready -> {
                     val m = s.value
                     FocusCard(m, session, titles, pick, busy) { goal, ids, done -> vm.setFocus(m.month, goal, ids, done) }
-                    ProgressCard(m, session)
+                    ProgressCard(m, session, onOpenStats)
                     if (m.reviewOpen) {
                         LookBack(m, session, busy, vm::loadAvatar) { input, done -> vm.saveReview(m.month, input, done) }
                         if (!viewingPast && session.canManage) {
@@ -379,8 +379,9 @@ private fun FocusDialog(month: String, focus: MonthFocus?, tasks: List<Task>, bu
     )
 }
 
+/** The focus tasks and mood for the month. The full numbers live in Stats, which counts the same calendar month. */
 @Composable
-private fun ProgressCard(s: MonthSummary, session: Session) {
+private fun ProgressCard(s: MonthSummary, session: Session, onOpenStats: (String, String) -> Unit) {
     val colors = MaterialTheme.colorScheme
     val subject = s.subjectId ?: return
     val t = s.totals
@@ -394,38 +395,47 @@ private fun ProgressCard(s: MonthSummary, session: Session) {
         }
         return
     }
-    Card {
-        Row {
-            Text(if (isCurrent) "How ${monthName(s.month)} is going" else "How ${monthName(s.month)} went", style = MaterialTheme.typography.titleMedium)
-            if (subject != session.userId) Text(" for ${session.nameOf(subject)}", style = MaterialTheme.typography.titleMedium, color = colors.onSurfaceVariant)
-        }
-        Row(verticalAlignment = Alignment.Bottom) {
-            Column(Modifier.weight(1f)) {
-                Text(pct(t.rate), style = MaterialTheme.typography.displayMedium)
-                Text(
-                    "done" + (if (isCurrent) " so far" else "") + (s.previous.rate?.let { " · ${pct(it)} in ${monthName(prevMonth(s.month))}" } ?: ""),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.onSurfaceVariant,
-                )
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                Text("${t.done} done", style = MaterialTheme.typography.titleMedium)
-                Text("${t.missed} missed · ${t.excused} excused", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-            }
-        }
-        if (s.focusTasks.isNotEmpty()) {
-            Text("Tasks for the focus", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
-            s.focusTasks.forEach { f ->
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(f.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(128.dp))
-                    Box(Modifier.weight(1f).height(8.dp).clip(CircleShape).background(colors.surfaceContainerHighest)) {
-                        Box(Modifier.fillMaxWidth((f.rate ?: 0.0).toFloat()).fillMaxHeight().clip(CircleShape).background(colors.primary))
+    val stats = LocalFeatures.current.stats
+    Surface(color = colors.surfaceContainerLow, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row {
+                    Text(if (isCurrent) "How ${monthName(s.month)} is going" else "How ${monthName(s.month)} went", style = MaterialTheme.typography.titleMedium)
+                    if (subject != session.userId) Text(" for ${session.nameOf(subject)}", style = MaterialTheme.typography.titleMedium, color = colors.onSurfaceVariant)
+                }
+                if (s.focusTasks.isNotEmpty()) {
+                    Text("Tasks for the focus", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+                    s.focusTasks.forEach { f ->
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(f.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(128.dp))
+                            Box(Modifier.weight(1f).height(8.dp).clip(CircleShape).background(colors.surfaceContainerHighest)) {
+                                Box(Modifier.fillMaxWidth((f.rate ?: 0.0).toFloat()).fillMaxHeight().clip(CircleShape).background(colors.primary))
+                            }
+                            Text(pct(f.rate), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(40.dp), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                        }
                     }
-                    Text(pct(f.rate), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(40.dp), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                }
+                if (s.moods.isNotEmpty()) MonthMoodLine(s.month, s.moods)
+            }
+            HorizontalDivider(color = colors.surfaceContainerHighest)
+            Row(
+                (if (stats) Modifier.clickable { onOpenStats(s.month, subject) } else Modifier).fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("All of ${monthName(s.month)}'s tasks", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "${pct(t.rate)} done" + (if (isCurrent) " so far" else "") + " · ${t.done} done, ${t.missed} missed",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.onSurfaceVariant,
+                    )
+                }
+                if (stats) {
+                    Text("Stats", style = MaterialTheme.typography.labelLarge, color = colors.primary)
+                    Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = colors.primary)
                 }
             }
         }
-        if (s.moods.isNotEmpty()) MonthMoodLine(s.month, s.moods)
     }
 }
 

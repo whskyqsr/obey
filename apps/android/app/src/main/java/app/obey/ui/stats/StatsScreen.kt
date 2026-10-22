@@ -24,6 +24,16 @@ import androidx.compose.material.icons.automirrored.outlined.TrendingDown
 import androidx.compose.material.icons.automirrored.outlined.TrendingFlat
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.LocalFireDepartment
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material3.Button
+import androidx.compose.material3.IconButton
+import androidx.lifecycle.SavedStateHandle
+import androidx.navigation.toRoute
+import app.obey.api.MonthSummary
+import app.obey.ui.StatsRoute
+import java.time.YearMonth
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -79,26 +89,47 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-private val RANGES = listOf(Triple(7, "Week", "the week before"), Triple(30, "Month", "the month before"), Triple(90, "3 months", "the 3 months before"), Triple(365, "Year", "the year before"))
+// "Month" (0 here) is a calendar month, the same stretch the monthly review counts, so the two always agree.
+private const val MONTH = 0
+private val RANGES = listOf(Triple(7, "Week", "the week before"), Triple(MONTH, "Month", "the month before"), Triple(90, "3 months", "the 3 months before"), Triple(365, "Year", "the year before"))
 private val WEEKDAYS = listOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
 
 @HiltViewModel
-class StatsViewModel @Inject constructor(private val api: ObeyApi, private val sessions: SessionRepository) : BaseViewModel() {
+class StatsViewModel @Inject constructor(private val api: ObeyApi, private val sessions: SessionRepository, savedState: SavedStateHandle) : BaseViewModel() {
     val session get() = sessions.session
-    private val _days = MutableStateFlow(30)
+    private val route = savedState.toRoute<StatsRoute>()
+    private val _days = MutableStateFlow(MONTH)
     val days: StateFlow<Int> = _days.asStateFlow()
-    private val _who = MutableStateFlow(session?.relationship?.members?.firstOrNull { it.role == Role.Submissive }?.userId ?: session?.userId)
+    private val _month = MutableStateFlow(route.month?.takeIf { it <= YearMonth.now().toString() } ?: YearMonth.now().toString())
+    val month: StateFlow<String> = _month.asStateFlow()
+    private val _who = MutableStateFlow(
+        route.who?.takeIf { w -> session?.relationship?.members.orEmpty().any { it.userId == w } }
+            ?: session?.relationship?.members?.firstOrNull { it.role == Role.Submissive }?.userId ?: session?.userId,
+    )
     val who: StateFlow<String?> = _who.asStateFlow()
     private val _state = MutableStateFlow<Load<DynamicStats>>(Load.Loading)
     val state: StateFlow<Load<DynamicStats>> = _state.asStateFlow()
+    /** This month's review, for the way over to it while it's open. */
+    private val _review = MutableStateFlow<MonthSummary?>(null)
+    val review: StateFlow<MonthSummary?> = _review.asStateFlow()
 
-    fun load(days: Int = _days.value, who: String? = _who.value) {
+    fun load(days: Int = _days.value, who: String? = _who.value, month: String = _month.value) {
         _days.value = days
         _who.value = who
+        _month.value = month
         viewModelScope.launch {
-            val result = loadCatching { api.stats(sessions.requireRelationshipId(), days, ZoneId.systemDefault().id, who) }
-            if (days == _days.value && who == _who.value) _state.value = result
+            val zone = ZoneId.systemDefault().id
+            val result = loadCatching {
+                if (days == MONTH) api.monthStats(sessions.requireRelationshipId(), month, zone, who) else api.stats(sessions.requireRelationshipId(), days, zone, who)
+            }
+            if (days == _days.value && who == _who.value && month == _month.value) _state.value = result
         }
+    }
+
+    fun loadReview() {
+        val rel = session?.relationship ?: return
+        if (!rel.features.review || rel.endedAt != null) return
+        viewModelScope.launch { runCatching { api.month(rel.id, YearMonth.now().toString(), ZoneId.systemDefault().id) }.onSuccess { _review.value = it } }
     }
 }
 
@@ -107,20 +138,28 @@ private fun pct(rate: Double) = "${(rate * 100).roundToInt()}%"
 /** How one person's tasks have gone: rate and trend, done and missed over time, weekdays, and each task. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StatsScreen(onOpenSettings: () -> Unit, onOpenTask: (String) -> Unit, vm: StatsViewModel = hiltViewModel()) {
-    LaunchedEffect(Unit) { vm.load() }
+fun StatsScreen(onOpenSettings: () -> Unit, onOpenTask: (String) -> Unit, onOpenReview: () -> Unit, vm: StatsViewModel = hiltViewModel()) {
+    LaunchedEffect(Unit) {
+        vm.load()
+        vm.loadReview()
+    }
     val state by vm.state.collectAsStateWithLifecycle()
     val days by vm.days.collectAsStateWithLifecycle()
+    val month by vm.month.collectAsStateWithLifecycle()
     val who by vm.who.collectAsStateWithLifecycle()
+    val review by vm.review.collectAsStateWithLifecycle()
     val session = vm.session ?: return
     val members = session.relationship?.members.orEmpty()
     val sub = members.firstOrNull { it.role == Role.Submissive }?.userId
+    val current = YearMonth.now()
+    val shown = YearMonth.parse(month)
 
     Scaffold(topBar = { TopAppBar(title = { Text("Stats") }, navigationIcon = { MenuButton() }, actions = { SafeWordAction(); SettingsAction(onOpenSettings) }) }) { padding ->
         Column(
             Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            review?.takeIf { it.reviewOpen && session.userId in it.waitingOn }?.let { ReviewOpen(it, onOpenReview) }
             if (members.size > 1) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     members.forEach { m ->
@@ -135,19 +174,55 @@ fun StatsScreen(onOpenSettings: () -> Unit, onOpenTask: (String) -> Unit, vm: St
                     }
                 }
             }
+            if (days == MONTH) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { vm.load(month = shown.minusMonths(1).toString()) }) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "The month before") }
+                    Text(
+                        shown.format(DateTimeFormatter.ofPattern("MMMM yyyy")) + if (shown == current) " so far" else "",
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.widthIn(min = 160.dp),
+                    )
+                    IconButton(onClick = { vm.load(month = shown.plusMonths(1).toString()) }, enabled = shown < current) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, "The month after") }
+                }
+            }
             when (val s = state) {
                 Load.Loading -> LoadingBox()
                 is Load.Failed -> ErrorBox(s.message, { vm.load() })
                 is Load.Ready -> {
                     val t = s.value.totals
                     if (t.done + t.missed + t.excused == 0) {
-                        Text("Nothing finished in this stretch. Stats fill in as tasks are done or missed.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 24.dp))
+                        val empty = if (days == MONTH && shown != current) "Nothing was due in ${shown.format(DateTimeFormatter.ofPattern("MMMM"))}." else "Nothing finished in this stretch."
+                        Text("$empty Stats fill in as tasks are done or missed.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 24.dp))
                     } else {
-                        StatsBody(s.value, RANGES.first { it.first == days }.third, session.weekStart, onOpenTask)
+                        val before = if (days == MONTH) shown.minusMonths(1).format(DateTimeFormatter.ofPattern("MMMM")) else RANGES.first { it.first == days }.third
+                        StatsBody(s.value, before, session.weekStart, onOpenTask)
                     }
                 }
             }
             if (who == sub) MoodCard(header = { Text("Mood", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp)) })
+        }
+    }
+}
+
+/** While this month's review is open and you haven't looked back yet, a way over to it. */
+@Composable
+private fun ReviewOpen(m: MonthSummary, onOpen: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Surface(color = colors.secondaryContainer, contentColor = colors.onSecondaryContainer, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Icon(Icons.Outlined.Flag, null)
+                Column {
+                    Text("${YearMonth.parse(m.month).format(DateTimeFormatter.ofPattern("MMMM"))}'s review is open", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Look back on the month together" + (if (m.focus != null) " and how the focus went" else "") + ".",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.onSecondaryContainer.copy(alpha = 0.8f),
+                    )
+                }
+            }
+            Button(onClick = onOpen, modifier = Modifier.align(Alignment.End)) { Text("Look back") }
         }
     }
 }

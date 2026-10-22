@@ -12,7 +12,8 @@ import kotlinx.serialization.Serializable
 @Serializable data object RuleLogRoute
 @Serializable data object NotesRoute
 @Serializable data object JournalRoute
-@Serializable data object StatsRoute
+/** [month] ("2026-10") and [who] open a calendar month and a member, e.g. from the monthly review. */
+@Serializable data class StatsRoute(val month: String? = null, val who: String? = null)
 @Serializable data object MonthReviewRoute
 @Serializable data object SettingsRoute
 @Serializable data object DynamicRoute

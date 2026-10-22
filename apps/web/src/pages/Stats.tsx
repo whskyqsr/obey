@@ -1,35 +1,43 @@
 import { useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { useStats } from "../api/hooks";
+import { useMonth, useStats } from "../api/hooks";
 import type { DynamicStats, Tally } from "../api/types";
 import { MoodCard } from "../components/Mood";
-import { Chip, Empty, ErrorBox, Icon, Loading, PageHeader, SegmentedButtons, cx } from "../components/ui";
-import { fmtDate } from "../lib/dates";
+import { Button, Chip, Empty, ErrorBox, Icon, IconButton, Loading, PageHeader, SegmentedButtons, cx } from "../components/ui";
+import { addMonths, fmtDate, fmtMonth, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 
+// "Month" is a calendar month, the same stretch the monthly review counts, so the two always agree.
 const RANGES = [
   { value: "7", label: "Week", before: "the week before" },
-  { value: "30", label: "Month", before: "the month before" },
+  { value: "month", label: "Month", before: "the month before" },
   { value: "90", label: "3 months", before: "the 3 months before" },
   { value: "365", label: "Year", before: "the year before" },
 ] as const;
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 const pct = (rate: number) => `${Math.round(rate * 100)}%`;
+const monthOf = (date: string) => date.slice(0, 7);
+const shiftMonth = (month: string, by: number) => monthOf(addMonths(`${month}-01`, by));
 
 /** How one person's tasks have gone: rate and trend, done and missed over time, weekdays, and each task. */
-export function StatsPage() {
+export function StatsPage({ month: startMonth, who: startWho }: { month?: string; who?: string } = {}) {
   const { rel, me, memberName } = useRel();
-  const [range, setRange] = useState<string>("30");
+  const current = monthOf(today());
+  const [range, setRange] = useState<string>("month");
+  const [month, setMonth] = useState(startMonth && startMonth <= current ? startMonth : current);
   const sub = rel.members.find((m) => m.role === "submissive")?.userId;
-  const [who, setWho] = useState<string>(sub ?? me.user.id);
-  const stats = useStats(rel.id, Number(range), who);
+  const [who, setWho] = useState<string>(rel.members.some((m) => m.userId === startWho) ? startWho! : (sub ?? me.user.id));
+  const byMonth = range === "month";
+  const stats = useStats(rel.id, Number(range), who, byMonth ? month : undefined);
   const name = who === me.user.id ? "Your" : `${memberName(who)}'s`;
+  const before = byMonth ? fmtDate(`${shiftMonth(month, -1)}-01`, { month: "long" }) : RANGES.find((r) => r.value === range)!.before;
 
   return (
     <>
       <PageHeader title="Stats" subtitle={`${name} tasks`} />
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-10 md:px-6">
+        <ReviewOpen />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
             {rel.members.length > 1 &&
@@ -46,18 +54,52 @@ export function StatsPage() {
             options={RANGES.map(({ value, label }) => ({ value, label }))}
           />
         </div>
+        {byMonth && (
+          <div className="flex items-center justify-center gap-2">
+            <IconButton icon="chevron_left" label="The month before" onClick={() => setMonth(shiftMonth(month, -1))} />
+            <span className="min-w-40 text-center text-title-medium text-on-surface">
+              {fmtMonth(`${month}-01`)}
+              {month === current && <span className="text-on-surface-variant"> so far</span>}
+            </span>
+            <IconButton icon="chevron_right" label="The month after" disabled={month >= current} onClick={() => setMonth(shiftMonth(month, 1))} />
+          </div>
+        )}
         {stats.isPending ? (
           <Loading />
         ) : stats.error ? (
           <ErrorBox error={stats.error} onRetry={() => stats.refetch()} />
         ) : stats.data.totals.done + stats.data.totals.missed + stats.data.totals.excused === 0 ? (
-          <Empty icon="insights" title="Nothing finished in this stretch" body="Stats fill in as tasks are done or missed." />
+          <Empty icon="insights" title={byMonth && month !== current ? `Nothing was due in ${fmtDate(`${month}-01`, { month: "long" })}` : "Nothing finished in this stretch"} body="Stats fill in as tasks are done or missed." />
         ) : (
-          <Body s={stats.data} before={RANGES.find((r) => r.value === range)!.before} />
+          <Body s={stats.data} before={before} />
         )}
         {who === sub && <MoodCard heading={<h2 className="mt-2 text-title-medium text-on-surface">Mood</h2>} />}
       </div>
     </>
+  );
+}
+
+/** While this month's review is open and you haven't looked back yet, a way over to it. */
+function ReviewOpen() {
+  const { rel, me, features } = useRel();
+  const navigate = useNavigate();
+  const current = monthOf(today());
+  const month = useMonth(rel.id, current, features.review && !rel.endedAt);
+  if (!month.data?.reviewOpen || !month.data.waitingOn.includes(me.user.id)) return null;
+  const name = fmtDate(`${current}-01`, { month: "long" });
+  return (
+    <section className="flex flex-col gap-3 rounded-lg bg-secondary-container p-4 text-on-secondary-container sm:flex-row sm:items-center sm:gap-4">
+      <div className="flex min-w-0 flex-1 items-start gap-3">
+        <Icon name="flag" />
+        <div className="min-w-0">
+          <h2 className="text-title-medium">{name}'s review is open</h2>
+          <p className="text-body-medium opacity-80">Look back on the month together{month.data.focus ? " and how the focus went" : ""}.</p>
+        </div>
+      </div>
+      <Button className="self-end sm:self-auto" onClick={() => navigate({ to: "/review" })}>
+        Look back
+      </Button>
+    </section>
   );
 }
 
