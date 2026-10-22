@@ -129,7 +129,9 @@ export function PlaceMap({
 
   return (
     <div className={cx("relative overflow-hidden bg-surface-container-highest", className)}>
-      <div ref={el} className="absolute inset-0" />
+      {/* Sized inline: MapLibre's own stylesheet sets position: relative on this element, and as unlayered CSS it
+          beats Tailwind's layered "absolute", which left the map 0 px tall. */}
+      <div ref={el} style={{ position: "absolute", inset: 0 }} />
       {!drawable && (
         <p className="absolute inset-x-4 top-4 text-center text-body-medium text-on-surface-variant">
           This browser can't draw the map. Turn on hardware acceleration, or search for the address instead.
