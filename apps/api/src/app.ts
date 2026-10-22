@@ -17,6 +17,7 @@ import { safeCallRoutes } from "./routes/safeCalls.js";
 import { agreementRoutes } from "./routes/agreement.js";
 import { sceneRoutes } from "./routes/scenes.js";
 import { kitRoutes } from "./routes/kits.js";
+import { chastityRoutes } from "./routes/chastity.js";
 import { roleSwapRoutes } from "./routes/roleSwaps.js";
 import { verificationRoutes } from "./routes/verification.js";
 import { eventRoutes } from "./routes/events.js";
@@ -122,6 +123,7 @@ export function buildApp(deps: Deps) {
   app.register(sceneRoutes(deps));
   app.register(kitRoutes(deps));
   app.register(roleSwapRoutes(deps));
+  app.register(chastityRoutes(deps));
   app.register(verificationRoutes(deps));
   app.register(imageryRoutes(deps));
   return app;

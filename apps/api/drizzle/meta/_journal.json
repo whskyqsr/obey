@@ -323,6 +323,13 @@
       "when": 1792694336990,
       "tag": "0045_role_swaps",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1792702597730,
+      "tag": "0046_chastity",
+      "breakpoints": true
     }
   ]
 }

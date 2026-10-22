@@ -8,6 +8,7 @@ import { ledgerDto } from "../serialize.js";
 import { managers, membership, requireManager, requireMember } from "../services/access.js";
 import { editOccurrence, pointsEnabled } from "../services/scheduling.js";
 import { sendWithWords } from "../notify.js";
+import { lockTimeForReward } from "../services/chastity.js";
 
 export const pointsRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   const { db } = deps;
@@ -128,6 +129,11 @@ export const pointsRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         if (row?.occ.status === "pending")
           await tx.update(occurrences).set({ status: "excused", editedBy: req.user.id, editedAt: deps.now() }).where(eq(occurrences.id, row.occ.id));
         else if (row?.occ.status === "missed") await editOccurrence(tx, row.series, row.occ, req.user.id, { status: "excused" }, deps.now());
+      }
+      // A reward that takes lock time off does it now, if they're still locked.
+      if (entry.rewardId) {
+        const [r] = await tx.select().from(rewards).where(eq(rewards.id, entry.rewardId));
+        if (r?.lockMinutes) await lockTimeForReward(tx, { ...r, lockMinutes: r.lockMinutes }, entry.userId, entry.id, req.user.id, deps.now());
       }
       return u;
     });

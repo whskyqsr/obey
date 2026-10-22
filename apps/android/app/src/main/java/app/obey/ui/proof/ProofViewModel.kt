@@ -112,27 +112,29 @@ class ProofViewModel @Inject constructor(
         }.getOrNull()?.also { cache[photoId] = it }
     }
 
-    /** At most [max] px on the long side, as JPEG, upright where Android can tell. */
-    private fun shrink(uri: Uri, max: Int = 2000): ByteArray {
-        val bitmap: Bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) { decoder, info, _ ->
-                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                val scale = (max.toFloat() / maxOf(info.size.width, info.size.height)).coerceAtMost(1f)
-                decoder.setTargetSize((info.size.width * scale).toInt().coerceAtLeast(1), (info.size.height * scale).toInt().coerceAtLeast(1))
-            }
-        } else {
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            context.contentResolver.openInputStream(uri).use { BitmapFactory.decodeStream(it, null, bounds) }
-            var sample = 1
-            while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= max) sample *= 2
-            val decoded = context.contentResolver.openInputStream(uri).use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample }) }
-                ?: error("Couldn't read that photo")
-            val scale = (max.toFloat() / maxOf(decoded.width, decoded.height)).coerceAtMost(1f)
-            if (scale < 1f) Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt(), (decoded.height * scale).toInt(), true) else decoded
+    private fun shrink(uri: Uri) = shrinkPhoto(context, uri)
+}
+
+/** At most [max] px on the long side, as JPEG, upright where Android can tell. */
+fun shrinkPhoto(context: Context, uri: Uri, max: Int = 2000): ByteArray {
+    val bitmap: Bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) { decoder, info, _ ->
+            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            val scale = (max.toFloat() / maxOf(info.size.width, info.size.height)).coerceAtMost(1f)
+            decoder.setTargetSize((info.size.width * scale).toInt().coerceAtLeast(1), (info.size.height * scale).toInt().coerceAtLeast(1))
         }
-        return ByteArrayOutputStream().use { out ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
-            out.toByteArray()
-        }
+    } else {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.contentResolver.openInputStream(uri).use { BitmapFactory.decodeStream(it, null, bounds) }
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= max) sample *= 2
+        val decoded = context.contentResolver.openInputStream(uri).use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample }) }
+            ?: error("Couldn't read that photo")
+        val scale = (max.toFloat() / maxOf(decoded.width, decoded.height)).coerceAtMost(1f)
+        if (scale < 1f) Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt(), (decoded.height * scale).toInt(), true) else decoded
+    }
+    return ByteArrayOutputStream().use { out ->
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
+        out.toByteArray()
     }
 }

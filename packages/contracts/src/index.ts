@@ -38,10 +38,12 @@ export const reschedulePolicy = z.enum(["dominant_only", "request", "allowance"]
 /** Changes whenever the picture does; null when there is none. Fetch it from /users/:id/avatar. */
 const avatarVersion = z.string().nullable();
 /** Parts of the app a dynamic can switch off. Points covers rewards too; tasks and notes are always on. */
-export const FEATURES = ["points", "consequences", "rules", "protocols", "journal", "stats", "review", "location", "agreement", "scenes"] as const;
+export const FEATURES = ["points", "consequences", "rules", "protocols", "journal", "stats", "review", "location", "agreement", "scenes", "chastity"] as const;
+/** Modules most dynamics won't use: off until a dynamic switches them on. */
+const OFF_BY_DEFAULT: readonly (typeof FEATURES)[number][] = ["chastity"];
 export const features = z.object(Object.fromEntries(FEATURES.map((f) => [f, z.boolean()])) as Record<(typeof FEATURES)[number], z.ZodBoolean>);
 export type Features = z.infer<typeof features>;
-export const allFeatures = (stored: Partial<Features> = {}): Features => Object.fromEntries(FEATURES.map((f) => [f, stored[f] ?? true])) as Features;
+export const allFeatures = (stored: Partial<Features> = {}): Features => Object.fromEntries(FEATURES.map((f) => [f, stored[f] ?? !OFF_BY_DEFAULT.includes(f)])) as Features;
 
 /** The day calendars start their week on, per person. */
 export const weekStart = z.enum(["sun", "mon"]);
@@ -711,6 +713,13 @@ export type LedgerEntry = z.infer<typeof ledgerEntry>;
 export const markRedeemedInput = z.object({ note: z.string().trim().max(500).nullable().optional() });
 export const adjustPoints = z.object({ userId: id, delta: z.number().int(), note: z.string().min(1).max(500) });
 
+/** Lock time a consequence adds or a reward takes off: from 15 minutes to 30 days. */
+const lockMinutes = z
+  .number()
+  .int()
+  .min(15)
+  .max(30 * 24 * 60);
+
 export const rewardInput = z.object({
   title: z.string().min(1).max(200),
   bodyMd: z.string().max(5_000).default(""),
@@ -719,6 +728,8 @@ export const rewardInput = z.object({
   needsApproval: z.boolean().default(true),
   /** Gets the sub out of a consequence: redeeming it names one of theirs, excused once the Dominant marks it redeemed. */
   letsOff: z.boolean().default(false),
+  /** Takes this many minutes off their chastity lock once the Dominant marks it redeemed. */
+  lockMinutes: lockMinutes.nullable().default(null),
 });
 /** Redeeming a reward; one that lets them off a consequence names it (a consequence task's occurrence). */
 export const redeemInput = z.object({ consequenceOccurrenceId: id.nullable().optional() });
@@ -728,6 +739,8 @@ export const consequenceInput = z.object({
   title: z.string().min(1).max(200),
   bodyMd: z.string().max(5_000).default(""),
   severity: z.number().int().min(1).max(5).default(1),
+  /** Adds this many minutes to their chastity lock instead of becoming a task; nothing happens when they aren't locked. */
+  lockMinutes: lockMinutes.nullable().default(null),
 });
 export const consequence = consequenceInput.extend({ id, relationshipId: id, createdAt: z.string() });
 
@@ -1242,3 +1255,86 @@ export type AftercarePlan = z.infer<typeof aftercarePlan>;
 
 export const sceneComment = z.object({ id, sceneId: id, authorId: id, body: z.string(), createdAt: z.string() });
 export type SceneComment = z.infer<typeof sceneComment>;
+
+/**
+ * Chastity, an optional module. A Dominant (the keyholder) asks; the lock starts once the wearer locks up, sealing a
+ * photo of the keybox code they set without looking when there's a keybox. Timed or open-ended; the keyholder can
+ * hide the time left.
+ */
+export const chastityKeyMode = z.enum(["keyholder", "keybox"]);
+export const chastityLockInput = z.object({
+  wearerId: id.optional(),
+  /** Null: until the keyholder releases them. */
+  minutes: z
+    .number()
+    .int()
+    .min(15)
+    .max(90 * 24 * 60)
+    .nullable()
+    .default(null),
+  hideTime: z.boolean().default(false),
+  keyMode: chastityKeyMode.default("keyholder"),
+});
+export const chastityLock = z.object({
+  id,
+  relationshipId: id,
+  wearerId: id,
+  keyholderId: id,
+  /** "break": out for an approved hygiene break, until they relock. */
+  status: z.enum(["pending", "active", "break", "ended", "declined", "cancelled"]),
+  keyMode: chastityKeyMode,
+  /** How long it was asked for; null when open-ended. */
+  minutes: z.number().int().nullable(),
+  hideTime: z.boolean(),
+  startedAt: z.string().nullable(),
+  /** Null when open-ended, and for a wearer whose keyholder hides the time. */
+  endsAt: z.string().nullable(),
+  /** Whether there's an end the viewer isn't shown. */
+  timeHidden: z.boolean(),
+  breakEndsAt: z.string().nullable(),
+  /** Whether a keybox photo is sealed, and whether this viewer may see it now. */
+  hasKeybox: z.boolean(),
+  canSeeKeybox: z.boolean(),
+  createdAt: z.string(),
+  endedAt: z.string().nullable(),
+  endReason: z.enum(["time", "released"]).nullable(),
+});
+export type ChastityLock = z.infer<typeof chastityLock>;
+export const chastityEvent = z.object({
+  id,
+  lockId: id,
+  kind: z.enum(["started", "time", "release_ask", "break", "photo_ask", "relocked", "ended"]),
+  /** For asks: pending until decided. A break goes "overdue" when they haven't relocked in time. */
+  status: z.enum(["pending", "approved", "declined", "done", "overdue"]).nullable(),
+  /** Time added (negative: taken off), or a break's length. */
+  minutes: z.number().int().nullable(),
+  note: z.string().nullable(),
+  byId: id.nullable(),
+  createdAt: z.string(),
+  decidedAt: z.string().nullable(),
+  /** A photo ask's task. */
+  taskId: id.nullable(),
+});
+export type ChastityEvent = z.infer<typeof chastityEvent>;
+export const chastityView = z.object({
+  /** Locks waiting to start or running, newest first. */
+  open: z.array(chastityLock),
+  /** Everything that happened during the open locks, newest first. */
+  events: z.array(chastityEvent),
+  past: z.array(chastityLock),
+});
+export type ChastityView = z.infer<typeof chastityView>;
+export const chastityTimeInput = z.object({
+  minutes: z
+    .number()
+    .int()
+    .min(-90 * 24 * 60)
+    .max(90 * 24 * 60)
+    .refine((n) => n !== 0, "add or take off some time"),
+  note: z.string().trim().max(500).optional(),
+});
+const breakMinutes = z.number().int().min(5).max(180);
+export const chastityAskInput = z.object({ kind: z.enum(["release", "break"]), minutes: breakMinutes.optional(), note: z.string().trim().max(500).optional() });
+export const chastityDecideInput = z.object({ approve: z.boolean(), minutes: breakMinutes.optional(), note: z.string().trim().max(500).optional() });
+/** Asking the wearer for a photo: a task with photo proof, due when the keyholder says. */
+export const chastityPhotoAskInput = z.object({ dueAt: z.string().datetime({ offset: true }), timezone: z.string().min(1) });

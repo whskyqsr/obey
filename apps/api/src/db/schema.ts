@@ -102,6 +102,8 @@ export const rewards = pgTable("rewards", {
   needsApproval: boolean("needs_approval").notNull().default(true),
   /** Gets the sub out of a consequence of their choosing, once a Dominant marks the redemption redeemed. */
   letsOff: boolean("lets_off").notNull().default(false),
+  /** Minutes it takes off their chastity lock once marked redeemed. */
+  lockMinutes: integer("lock_minutes"),
   createdAt: createdAt(),
 });
 
@@ -113,6 +115,8 @@ export const consequences = pgTable("consequences", {
   title: text("title").notNull(),
   bodyMd: text("body_md").notNull().default(""),
   severity: integer("severity").notNull().default(1),
+  /** Adds this many minutes to their chastity lock instead of becoming a task. */
+  lockMinutes: integer("lock_minutes"),
   createdAt: createdAt(),
 });
 
@@ -895,4 +899,60 @@ export const roleSwaps = pgTable(
     endedBy: uuid("ended_by").references(() => users.id, { onDelete: "set null" }),
   },
   (t) => [index("role_swaps_relationship_idx").on(t.relationshipId, t.createdAt)],
+);
+
+/** A chastity lock. One open (pending, active or on a break) per wearer per dynamic. */
+export const chastityLocks = pgTable(
+  "chastity_locks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    wearerId: uuid("wearer_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    keyholderId: uuid("keyholder_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: text("status", { enum: ["pending", "active", "break", "ended", "declined", "cancelled"] }).notNull(),
+    keyMode: text("key_mode", { enum: ["keyholder", "keybox"] }).notNull(),
+    /** Asked-for length; null when open-ended. */
+    minutes: integer("minutes"),
+    hideTime: boolean("hide_time").notNull().default(false),
+    startedAt: ts("started_at"),
+    endsAt: ts("ends_at"),
+    breakEndsAt: ts("break_ends_at"),
+    /** The photo of the keybox code, sealed until release. Replaced on every relock. */
+    keybox: bytea("keybox"),
+    keyboxType: text("keybox_type"),
+    createdAt: createdAt(),
+    endedAt: ts("ended_at"),
+    endedBy: uuid("ended_by").references(() => users.id, { onDelete: "set null" }),
+    endReason: text("end_reason", { enum: ["time", "released"] }),
+  },
+  (t) => [index("chastity_locks_relationship_idx").on(t.relationshipId, t.createdAt)],
+);
+
+/** What happened during a lock: time changes, asks for release or a break and their answers, photo asks. */
+export const chastityEvents = pgTable(
+  "chastity_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    lockId: uuid("lock_id")
+      .notNull()
+      .references(() => chastityLocks.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["started", "time", "release_ask", "break", "photo_ask", "relocked", "ended"] }).notNull(),
+    status: text("status", { enum: ["pending", "approved", "declined", "done", "overdue"] }),
+    minutes: integer("minutes"),
+    note: text("note"),
+    byId: uuid("by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    decidedAt: ts("decided_at"),
+    /** Time a missed task's consequence added, or a redeemed reward took off; each at most once. */
+    causedByOccurrenceId: uuid("caused_by_occurrence_id").unique(),
+    ledgerId: uuid("ledger_id").unique(),
+    taskId: uuid("task_id").references(() => taskSeries.id, { onDelete: "set null" }),
+  },
+  (t) => [index("chastity_events_lock_idx").on(t.lockId, t.createdAt)],
 );

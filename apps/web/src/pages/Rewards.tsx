@@ -7,6 +7,7 @@ import { Badge, Button, Dialog, Empty, ErrorBox, Fab, Icon, Loading, PageHeader,
 import { ago, fmtDateTime } from "../lib/dates";
 import { useTodayOccurrences } from "../lib/today";
 import { useAskWho } from "../components/CurfewStrip";
+import { LOCK_TIME_OPTIONS, fmtMinutes } from "../components/Chastity";
 import { RedemptionRow } from "../components/NeedsYou";
 import { RowGroup } from "../components/TaskRow";
 import { useRel } from "../lib/relationship";
@@ -16,7 +17,12 @@ const REWARD_FIELDS: FieldDef[] = [
   { key: "title", label: "Reward", type: "text", required: true, max: 200 },
   { key: "bodyMd", label: "Description", type: "textarea", max: 5000 },
   { key: "cost", label: "Cost (points)", type: "number", min: 0 },
-  { key: "letsOff", label: "Gets them out of a consequence", type: "switch", help: "Redeeming it means picking a consequence of theirs; it's excused when you mark the reward redeemed." },
+  {
+    key: "letsOff",
+    label: "Gets them out of a consequence",
+    type: "switch",
+    help: "Redeeming it means picking a consequence of theirs; it's excused when you mark the reward redeemed.",
+  },
 ];
 
 const KIND_ICON: Record<LedgerEntry["kind"], string> = {
@@ -28,7 +34,7 @@ const KIND_ICON: Record<LedgerEntry["kind"], string> = {
 };
 
 export function RewardsPage() {
-  const { rel, me, isDom, memberName } = useRel();
+  const { rel, me, isDom, memberName, features } = useRel();
   const snack = useSnackbar();
   const balances = useBalances(rel.id);
   const ledger = useLedger(rel.id);
@@ -108,6 +114,7 @@ export function RewardsPage() {
               </div>
               <div className="flex items-center gap-2">
                 {r.letsOff && <span className="text-body-small text-on-surface-variant">Gets you out of a consequence</span>}
+                {features.chastity && r.lockMinutes && <span className="text-body-small text-on-surface-variant">Takes {fmtMinutes(r.lockMinutes)} off the lock</span>}
                 <div className="flex-1" />
                 {isDom && (
                   <Button variant="text" onClick={() => setEditing(r)}>
@@ -189,8 +196,10 @@ export function RewardsPage() {
       <ItemDialog
         open={editing !== null}
         title={current ? "Edit reward" : "New reward"}
-        fields={REWARD_FIELDS}
-        initial={current ? { ...current } : { title: "", bodyMd: "", cost: 10, letsOff: false }}
+        fields={features.chastity ? [...REWARD_FIELDS, { key: "lockMinutes", label: "Takes time off their lock", type: "select", options: LOCK_TIME_OPTIONS }] : REWARD_FIELDS}
+        initial={
+          current ? { ...current, lockMinutes: current.lockMinutes ? String(current.lockMinutes) : "" } : { title: "", bodyMd: "", cost: 10, letsOff: false, lockMinutes: "" }
+        }
         busy={save.isPending}
         onClose={() => setEditing(null)}
         onDelete={
@@ -205,6 +214,7 @@ export function RewardsPage() {
             cost: Math.max(0, Number(v.cost) || 0),
             needsApproval: current?.needsApproval ?? true,
             letsOff: Boolean(v.letsOff),
+            lockMinutes: features.chastity ? Number(v.lockMinutes) || null : (current?.lockMinutes ?? null),
           };
           save.mutate({ id: current?.id, input }, { onSuccess: () => setEditing(null), onError: (e) => snack(errorMessage(e)) });
         }}

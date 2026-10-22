@@ -344,7 +344,7 @@ interface ObeyApi {
     suspend fun consequences(@Path("id") relationshipId: String): List<Consequence>
 
     @POST("consequences/{id}/assign")
-    suspend fun assignConsequence(@Path("id") consequenceId: String, @Body body: AssignConsequenceInput): Task
+    suspend fun assignConsequence(@Path("id") consequenceId: String, @Body body: AssignConsequenceInput)
 
     @POST("relationships/{id}/consequences")
     suspend fun createConsequence(@Path("id") relationshipId: String, @Body body: ConsequenceInput): Consequence
@@ -540,6 +540,40 @@ interface ObeyApi {
 
     @PUT("relationships/{id}/aftercare")
     suspend fun saveAftercarePlan(@Path("id") relationshipId: String, @Body body: AftercarePlanInput): AftercarePlan
+
+    // Chastity
+    @GET("relationships/{id}/chastity")
+    suspend fun chastity(@Path("id") relationshipId: String): ChastityView
+
+    /** The keyholder asking to lock someone; it starts when they lock up. */
+    @POST("relationships/{id}/chastity")
+    suspend fun startLock(@Path("id") relationshipId: String, @Body body: ChastityLockInput): ChastityLock
+
+    /** The wearer locking up, or relocking after a break; a keybox lock sends the sealed photo of the code. */
+    @POST("chastity/{id}/lock")
+    suspend fun lockUp(@Path("id") lockId: String, @Body body: Map<String, String> = emptyMap()): ChastityLock
+
+    @POST("chastity/{id}/lock")
+    suspend fun lockUpWithKeybox(@Path("id") lockId: String, @Body image: RequestBody): ChastityLock
+
+    /** Declines or takes back a lock that hasn't started, or (the keyholder) releases a running one. */
+    @DELETE("chastity/{id}")
+    suspend fun endLock(@Path("id") lockId: String)
+
+    @POST("chastity/{id}/time")
+    suspend fun lockTime(@Path("id") lockId: String, @Body body: ChastityTimeInput): ChastityLock
+
+    @POST("chastity/{id}/asks")
+    suspend fun chastityAsk(@Path("id") lockId: String, @Body body: ChastityAskInput): ChastityEvent
+
+    @POST("chastity/asks/{id}/decide")
+    suspend fun decideChastityAsk(@Path("id") eventId: String, @Body body: ChastityDecideInput): ChastityLock
+
+    @POST("chastity/{id}/photo-ask")
+    suspend fun chastityPhotoAsk(@Path("id") lockId: String, @Body body: ChastityPhotoAskInput): ChastityPhotoAsk
+
+    @GET("chastity/{id}/keybox")
+    suspend fun keybox(@Path("id") lockId: String): ResponseBody
 
     // Push
     @POST("devices")

@@ -107,9 +107,9 @@ class RewardsViewModel @Inject constructor(
         refresh()
     }
 
-    fun assignConsequence(c: Consequence, input: AssignConsequenceInput) = action {
+    fun assignConsequence(c: Consequence, input: AssignConsequenceInput, lockTime: Boolean) = action {
         api.assignConsequence(c.id, input)
-        say("Consequence assigned")
+        say(if (lockTime && c.lockMinutes != null) "Added ${app.obey.ui.chastity.fmtMinutes(c.lockMinutes)} to their lock" else "Consequence assigned")
     }
 
     fun deleteConsequence(c: Consequence) = action { api.deleteConsequence(c.id); refresh() }

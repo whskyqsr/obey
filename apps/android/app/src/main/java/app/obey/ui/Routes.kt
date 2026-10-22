@@ -27,6 +27,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object CurfewRoute
 @Serializable data object ScenesRoute
 @Serializable data object AftercareRoute
+@Serializable data object ChastityRoute
 
 /** The agreement; [edit] opens the editor on your open proposal, [review] opens a partner's proposal to read (both from Today). */
 @Serializable data class AgreementRoute(val edit: Boolean = false, val review: Boolean = false)
