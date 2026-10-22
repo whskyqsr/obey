@@ -37,7 +37,9 @@ describe("the agreement", () => {
     expect(lastTo(domId)!.body).toBe("Sub agreed. Version 1 of your agreement is in force");
 
     // Sub proposes version 2; Dom asks for changes, then edits it into their own proposal.
-    const changed = sections.map((s: { id: string; body: string }) => (s.id === "sub-1" ? { ...s, body: `${s.body}\n- Be home by curfew.` } : s)).filter((s: { id: string }) => s.id !== "safewords");
+    const changed = sections
+      .map((s: { id: string; body: string }) => (s.id === "sub-1" ? { ...s, body: `${s.body}\n- Be home by curfew.` } : s))
+      .filter((s: { id: string }) => s.id !== "safewords");
     await dom.post(`/relationships/${relId}/rules`, { title: "Text when you leave work" });
     const v2 = (await sub.post(`/relationships/${relId}/agreement`, { sections: changed, note: "Curfew" })).body;
     expect(v2).toMatchObject({ number: 2, status: "proposed", removed: ["Safewords"], changes: 3 });
@@ -97,5 +99,23 @@ describe("the agreement", () => {
       { op: "same", text: "c" },
       { op: "add", text: "d" },
     ]);
+  });
+});
+
+describe("rule and protocol changes", () => {
+  it("tell the other partner, naming it only to someone who shows their partner's words", async () => {
+    const { dom, sub, relId, subId, domId } = await ctx.pair();
+    const rule = (await dom.post(`/relationships/${relId}/rules`, { title: "Lights out by 11" })).body;
+    expect(lastTo(subId)).toMatchObject({ body: "Dom added a rule", data: { type: "library_changed", kind: "rules" } });
+    expect(ctx.notifier.sent.at(-1)!.userIds).toEqual([subId]);
+    await sub.patch("/me", { notifyDetails: true });
+    await dom.patch(`/rules/${rule.id}`, { title: "Lights out by 10:30" });
+    expect(lastTo(subId)!.body).toBe("Dom changed the rule “Lights out by 10:30”");
+    const sent = ctx.notifier.sent.length;
+    await dom.put(`/relationships/${relId}/rules/order`, { ids: [rule.id] });
+    expect(ctx.notifier.sent.length).toBe(sent);
+    const p = (await dom.post(`/relationships/${relId}/protocols`, { title: "Morning greeting" })).body;
+    await dom.del(`/protocols/${p.id}`);
+    expect(lastTo(subId)!.body).toBe("Dom removed the protocol “Morning greeting”");
   });
 });

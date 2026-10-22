@@ -3,9 +3,10 @@ import type { FastifyInstance } from "fastify";
 import { consequenceInput, noteInput, protocolInput, reorderInput, rewardInput, ruleInput } from "@obey/contracts";
 import type { ZodObject, ZodRawShape } from "zod";
 import type { Deps } from "../app.js";
-import { consequences, noteRevisions, notes, protocols, relationships, rewards, rules } from "../db/schema.js";
+import { consequences, memberships, noteRevisions, notes, protocols, relationships, rewards, rules } from "../db/schema.js";
 import { HttpError, forbidden, notFound, parsePatch } from "../errors.js";
 import { libraryDto, noteDto } from "../serialize.js";
+import { sendWithWords } from "../notify.js";
 import { type Role, canManage, requireManager, requireMember } from "../services/access.js";
 
 /** Rewards, consequences, rules and protocols: anyone in the relationship reads, Dominants write. */
@@ -20,7 +21,16 @@ const LIBRARIES = [
 const SITTING_MS = 10 * 60_000;
 
 export const libraryRoutes = (deps: Deps) => async (app: FastifyInstance) => {
-  const { db } = deps;
+  const { db, notifier } = deps;
+
+  /** Tells everyone else in the dynamic that a rule or protocol was added, changed or removed; its title only with details on. */
+  const tellChanged = async (relationshipId: string, by: { id: string; displayName: string }, kind: "rule" | "protocol", verb: "added" | "changed" | "removed", title: string) => {
+    const others = (await db.select({ userId: memberships.userId }).from(memberships).where(eq(memberships.relationshipId, relationshipId)))
+      .map((m) => m.userId)
+      .filter((id) => id !== by.id);
+    const push = { title: "Fealty", body: `${by.displayName} ${verb} a ${kind}`, data: { type: "library_changed", kind: `${kind}s` } };
+    await sendWithWords(db, notifier, others, push, { ...push, body: `${by.displayName} ${verb} the ${kind} “${title}”` });
+  };
 
   for (const { path, table, input, order } of LIBRARIES) {
     // A protocol may only point at a rule in its own relationship.
@@ -56,6 +66,7 @@ export const libraryRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         .insert(t)
         .values({ ...(body as object), relationshipId: req.params.id } as typeof rewards.$inferInsert)
         .returning();
+      if (path === "rules" || path === "protocols") await tellChanged(req.params.id, req.user, path === "rules" ? "rule" : "protocol", "added", (row as { title: string }).title);
       reply.status(201);
       return libraryDto(row!);
     });
@@ -87,6 +98,9 @@ export const libraryRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       const body = parsePatch(schema.partial(), req.body) as Partial<typeof rewards.$inferInsert>;
       await checkRule(body as { ruleId?: string | null }, existing.relationshipId);
       const [row] = await db.update(t).set(body).where(eq(t.id, existing.id)).returning();
+      // Moving one in the list isn't a change worth a notification.
+      if ((path === "rules" || path === "protocols") && Object.keys(body).some((k) => k !== "position"))
+        await tellChanged(existing.relationshipId, req.user, path === "rules" ? "rule" : "protocol", "changed", (row as { title: string }).title);
       return libraryDto(row!);
     });
 
@@ -95,6 +109,8 @@ export const libraryRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       if (!existing) throw notFound();
       await requireManager(db, existing.relationshipId, req.user.id);
       await db.delete(t).where(eq(t.id, existing.id));
+      if (path === "rules" || path === "protocols")
+        await tellChanged(existing.relationshipId, req.user, path === "rules" ? "rule" : "protocol", "removed", (existing as { title: string }).title);
       reply.status(204);
     });
   }
