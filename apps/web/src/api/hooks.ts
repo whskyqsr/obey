@@ -33,6 +33,10 @@ import type {
   SafeCalls,
   Agreement,
   LibraryChange,
+  Scene,
+  SceneInput,
+  AftercarePlan,
+  SceneComment,
   AgreementInput,
   AgreementSectionInput,
   AgreementVersion,
@@ -912,4 +916,87 @@ export function useRequestAgreementChanges(rel: string) {
 export function useWithdrawAgreement(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({ mutationFn: (id: string) => api(`/agreement-versions/${id}`, { method: "DELETE" }), onSuccess: () => invalidate() });
+}
+
+// ---- scenes and aftercare
+
+export function useScenes(rel: string, enabled = true) {
+  return useQuery({ queryKey: ["rel", rel, "scenes"], queryFn: () => api<Scene[]>(`/relationships/${rel}/scenes`), enabled });
+}
+
+export function useScene(rel: string, id: string) {
+  return useQuery({ queryKey: ["rel", rel, "scene", id], queryFn: () => api<Scene>(`/scenes/${id}`) });
+}
+
+/** Logs a scene, or with an id changes one. */
+export function useSaveScene(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ id, body }: { id?: string; body: SceneInput }) => api<Scene>(id ? `/scenes/${id}` : `/relationships/${rel}/scenes`, { method: id ? "PUT" : "POST", body }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useDeleteScene(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (id: string) => api(`/scenes/${id}`, { method: "DELETE" }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useShareSide(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: { mood: number; worked: string; change: string; need: string } }) => api<Scene>(`/scenes/${id}/side`, { method: "PUT", body }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useSceneCheck(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ id, mood, note }: { id: string; mood: number; note?: string }) => api<Scene>(`/scenes/${id}/check`, { method: "PUT", body: { mood, note: note ?? "" } }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useAftercareDone(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (id: string) => api<Scene>(`/scenes/${id}/aftercare-done`, { method: "POST", body: {} }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useAftercarePlans(rel: string, enabled = true) {
+  return useQuery({ queryKey: ["rel", rel, "aftercare"], queryFn: () => api<AftercarePlan[]>(`/relationships/${rel}/aftercare`), enabled });
+}
+
+export function useSaveAftercarePlan(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (body: { needs: string[]; note: string }) => api<AftercarePlan>(`/relationships/${rel}/aftercare`, { method: "PUT", body }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useSceneComments(rel: string, id: string) {
+  return useQuery({ queryKey: ["rel", rel, "sceneComments", id], queryFn: () => api<SceneComment[]>(`/scenes/${id}/comments`) });
+}
+
+export function useAddSceneComment(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ sceneId, body }: { sceneId: string; body: string }) => api<SceneComment>(`/scenes/${sceneId}/comments`, { method: "POST", body: { body } }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useDeleteSceneComment(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (c: SceneComment) => api(`/scene-comments/${c.id}`, { method: "DELETE" }),
+    onSuccess: () => invalidate(),
+  });
 }

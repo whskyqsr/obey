@@ -21,9 +21,14 @@ import kotlinx.serialization.Serializable
 @Serializable data object PlacesRoute
 @Serializable data object LocationRoute
 @Serializable data object CurfewRoute
+@Serializable data object ScenesRoute
+@Serializable data object AftercareRoute
 
 /** The agreement; [edit] opens the editor on your open proposal, [review] opens a partner's proposal to read (both from Today). */
 @Serializable data class AgreementRoute(val edit: Boolean = false, val review: Boolean = false)
+
+/** One scene: its sides, the next-day check-ins and comments. */
+@Serializable data class SceneRoute(val sceneId: String)
 
 /** [taskId] null = new task; [date] (YYYY-MM-DD) pre-fills the start date. */
 @Serializable data class TaskEditorRoute(val taskId: String? = null, val date: String? = null)

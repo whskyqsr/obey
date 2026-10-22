@@ -453,6 +453,50 @@ interface ObeyApi {
     @DELETE("agreement-versions/{id}")
     suspend fun withdrawAgreement(@Path("id") id: String)
 
+    // Scenes and aftercare
+    @GET("relationships/{id}/scenes")
+    suspend fun scenes(@Path("id") relationshipId: String): List<Scene>
+
+    @POST("relationships/{id}/scenes")
+    suspend fun logScene(@Path("id") relationshipId: String, @Body body: SceneInput): Scene
+
+    @GET("scenes/{id}")
+    suspend fun scene(@Path("id") id: String): Scene
+
+    @PUT("scenes/{id}")
+    suspend fun updateScene(@Path("id") id: String, @Body body: SceneInput): Scene
+
+    /** Only whoever logged it can. */
+    @DELETE("scenes/{id}")
+    suspend fun deleteScene(@Path("id") id: String)
+
+    /** Shares my side the first time; later saves edit it. */
+    @PUT("scenes/{id}/side")
+    suspend fun shareSceneSide(@Path("id") id: String, @Body body: SceneSideInput): Scene
+
+    @PUT("scenes/{id}/check")
+    suspend fun checkInOnScene(@Path("id") id: String, @Body body: SceneCheckInput): Scene
+
+    /** Closes the others' aftercare plans on Today for this scene. */
+    @POST("scenes/{id}/aftercare-done")
+    suspend fun aftercareDone(@Path("id") id: String, @Body body: Map<String, String> = emptyMap()): Scene
+
+    @GET("scenes/{id}/comments")
+    suspend fun sceneComments(@Path("id") id: String): List<SceneComment>
+
+    @POST("scenes/{id}/comments")
+    suspend fun addSceneComment(@Path("id") id: String, @Body body: CommentInput): SceneComment
+
+    @DELETE("scene-comments/{id}")
+    suspend fun deleteSceneComment(@Path("id") commentId: String)
+
+    /** Everyone's plan in the dynamic, an empty one for whoever hasn't written theirs. */
+    @GET("relationships/{id}/aftercare")
+    suspend fun aftercarePlans(@Path("id") relationshipId: String): List<AftercarePlan>
+
+    @PUT("relationships/{id}/aftercare")
+    suspend fun saveAftercarePlan(@Path("id") relationshipId: String, @Body body: AftercarePlanInput): AftercarePlan
+
     // Push
     @POST("devices")
     suspend fun registerDevice(@Body body: RegisterDeviceInput)

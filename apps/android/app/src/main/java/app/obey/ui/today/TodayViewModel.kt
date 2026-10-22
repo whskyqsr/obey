@@ -137,6 +137,7 @@ class TodayViewModel @Inject constructor(
             launch { loadForDom(relId) }
             launch { loadAgreement(relId) }
             launch { loadLibraryChanges(relId) }
+            launch { loadScenes(relId) }
             try {
                 val snap = snapshot(relId)
                 offline.saveToday(relId, snap)
@@ -319,6 +320,34 @@ class TodayViewModel @Inject constructor(
         api.seenLibraryChanges(relId, app.obey.api.SeenLibraryChangesInput(ids))
         message?.let { say(it) }
         loadLibraryChanges(relId)
+    }
+
+    private val _scenes = MutableStateFlow<app.obey.ui.scenes.TodayScenes?>(null)
+    /** Scenes and aftercare plans, for the aftercare and next-day cards; null while scenes are off or the dynamic has ended. */
+    val scenes: StateFlow<app.obey.ui.scenes.TodayScenes?> = _scenes.asStateFlow()
+
+    private suspend fun loadScenes(relId: String) {
+        val session = sessions.session ?: return
+        if (session.relationship?.features?.scenes != true || session.readOnly) {
+            _scenes.value = null
+            return
+        }
+        runCatching { coroutineScope { val s = async { api.scenes(relId) }; val p = async { api.aftercarePlans(relId) }; app.obey.ui.scenes.TodayScenes(s.await(), p.await()) } }
+            .onSuccess { _scenes.value = it }
+    }
+
+    private fun replaceScene(s: app.obey.api.Scene) {
+        _scenes.value = _scenes.value?.let { t -> t.copy(scenes = t.scenes.map { if (it.id == s.id) s else it }) }
+    }
+
+    /** Closes the others' aftercare plans for [s]. */
+    fun aftercareDone(s: app.obey.api.Scene) = action {
+        replaceScene(api.aftercareDone(s.id))
+    }
+
+    fun checkInOnScene(s: app.obey.api.Scene, mood: Int, note: String) = action {
+        replaceScene(api.checkInOnScene(s.id, app.obey.api.SceneCheckInput(mood, note)))
+        say("Saved with the scene")
     }
 
     private suspend fun loadForDom(relId: String) {

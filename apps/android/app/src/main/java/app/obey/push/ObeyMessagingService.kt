@@ -56,15 +56,20 @@ class ObeyMessagingService : FirebaseMessagingService() {
         val agreement = message.data["type"] in setOf("agreement_proposed", "agreement_agreed", "agreement_changes")
         // A rule or protocol someone changed opens that page; the change waits on Today too.
         val library = if (message.data["type"] == "library_changed") (if (message.data["kind"] == "protocols") PendingNav.PROTOCOLS else PendingNav.RULES) else null
+        // Someone logged, shared or commented on a scene, or the next-day check-in: that scene opens.
+        val scene = message.data["sceneId"]?.takeIf { message.data["type"] in setOf("scene_logged", "scene_side", "scene_comment", "scene_check") }
         val intent = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
         if (setup) intent.putExtra(PendingNav.EXTRA, PendingNav.LOCATION)
         if (agreement) intent.putExtra(PendingNav.EXTRA, PendingNav.AGREEMENT)
         library?.let { intent.putExtra(PendingNav.EXTRA, it) }
+        scene?.let { intent.putExtra(PendingNav.EXTRA, PendingNav.SCENE + it) }
         val code = when {
             setup -> 1
             agreement -> 2
             library == PendingNav.RULES -> 3
             library == PendingNav.PROTOCOLS -> 4
+            // One per scene, so an older notification still opens its own scene.
+            scene != null -> 5 + (scene.hashCode() and 0xFFFFFF)
             else -> 0
         }
         val pending = PendingIntent.getActivity(this, code, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)

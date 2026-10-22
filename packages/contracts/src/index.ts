@@ -38,7 +38,7 @@ export const reschedulePolicy = z.enum(["dominant_only", "request", "allowance"]
 /** Changes whenever the picture does; null when there is none. Fetch it from /users/:id/avatar. */
 const avatarVersion = z.string().nullable();
 /** Parts of the app a dynamic can switch off. Points covers rewards too; tasks and notes are always on. */
-export const FEATURES = ["points", "consequences", "rules", "protocols", "journal", "stats", "review", "location", "agreement"] as const;
+export const FEATURES = ["points", "consequences", "rules", "protocols", "journal", "stats", "review", "location", "agreement", "scenes"] as const;
 export const features = z.object(Object.fromEntries(FEATURES.map((f) => [f, z.boolean()])) as Record<(typeof FEATURES)[number], z.ZodBoolean>);
 export type Features = z.infer<typeof features>;
 export const allFeatures = (stored: Partial<Features> = {}): Features => Object.fromEntries(FEATURES.map((f) => [f, stored[f] ?? true])) as Features;
@@ -1078,3 +1078,65 @@ export const libraryChange = z.object({
 });
 export type LibraryChange = z.infer<typeof libraryChange>;
 export const seenLibraryChangesInput = z.object({ ids: z.array(id).max(200) });
+
+/** Aftercare offered when logging a scene or writing a plan; anything else can be typed in. */
+export const AFTERCARE = ["Water", "Blanket", "Cuddles", "Snack", "Quiet time", "Talking it through"] as const;
+const aftercareList = z.array(z.string().trim().min(1).max(60)).max(20);
+
+/** A scene as logged: either partner logs it, and it can be changed by anyone in the dynamic. */
+export const sceneInput = z.object({
+  title: z.string().trim().max(120).default(""),
+  occurredAt: z.string().datetime({ offset: true }),
+  /** Where it happened, for the next-day check-in. */
+  timezone: z.string().min(1).max(64),
+  what: z.string().trim().max(4_000).default(""),
+  safeword: z.enum(["none", "yellow", "red"]).default("none"),
+  aftercare: aftercareList.default([]),
+});
+export type SceneInput = z.infer<typeof sceneInput>;
+
+/** One person's side, written alone and shared once. */
+export const sceneSideInput = z.object({
+  mood,
+  worked: z.string().trim().max(2_000).default(""),
+  change: z.string().trim().max(2_000).default(""),
+  need: z.string().trim().max(2_000).default(""),
+});
+export const sceneSide = sceneSideInput.extend({ userId: id, sharedAt: z.string() });
+export type SceneSide = z.infer<typeof sceneSide>;
+
+/** "How are you feeling after last night?", the day after. */
+export const sceneCheckInput = z.object({ mood, note: z.string().trim().max(500).default("") });
+export const sceneCheck = sceneCheckInput.extend({ userId: id, at: z.string() });
+export type SceneCheck = z.infer<typeof sceneCheck>;
+
+export const scene = z.object({
+  id,
+  title: z.string(),
+  occurredAt: z.string(),
+  timezone: z.string(),
+  what: z.string(),
+  safeword: z.enum(["none", "yellow", "red"]),
+  aftercare: z.array(z.string()),
+  loggedBy: id.nullable(),
+  createdAt: z.string(),
+  /** When the next-day check-in opens (10:00 the day after, where it happened). */
+  checkFrom: z.string(),
+  /** Everyone who has shared their side. */
+  shared: z.array(id),
+  /** My side, and the others' once I've shared mine. */
+  sides: z.array(sceneSide),
+  checks: z.array(sceneCheck),
+  /** Whether I've closed the other person's aftercare plan on Today. */
+  aftercareDone: z.boolean(),
+  commentCount: z.number().int(),
+});
+export type Scene = z.infer<typeof scene>;
+
+/** What someone needs after a scene; only they edit it. */
+export const aftercarePlanInput = z.object({ needs: aftercareList, note: z.string().trim().max(1_000).default("") });
+export const aftercarePlan = aftercarePlanInput.extend({ userId: id, updatedAt: z.string().nullable() });
+export type AftercarePlan = z.infer<typeof aftercarePlan>;
+
+export const sceneComment = z.object({ id, sceneId: id, authorId: id, body: z.string(), createdAt: z.string() });
+export type SceneComment = z.infer<typeof sceneComment>;

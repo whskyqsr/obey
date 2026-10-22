@@ -5,6 +5,7 @@ import { finishStays } from "./services/location.js";
 import { claimReminders, markMissed, materializeAll } from "./services/scheduling.js";
 import { type Notifier, sendWithWords } from "./notify.js";
 import { promptMonthReviews } from "./routes/months.js";
+import { sceneCheckIns } from "./routes/scenes.js";
 
 /** One pass of the background work. Every step is idempotent, so overlapping or repeated runs are safe. */
 export async function runJobs(db: Db, notifier: Notifier, now: Date, opts: { materializeDays: number; reminderLeadMinutes: number }) {
@@ -68,5 +69,6 @@ export async function runJobs(db: Db, notifier: Notifier, now: Date, opts: { mat
     });
   }
   const reviews = await promptMonthReviews(db, notifier, now);
-  return { missed: missed.length, reminders: reminders.length, reviews };
+  const sceneChecks = await sceneCheckIns(db, notifier, now);
+  return { missed: missed.length, reminders: reminders.length, reviews, sceneChecks };
 }

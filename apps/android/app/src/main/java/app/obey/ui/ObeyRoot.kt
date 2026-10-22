@@ -112,6 +112,10 @@ import app.obey.ui.stats.StatsScreen
 import app.obey.ui.stats.MonthReviewScreen
 import app.obey.ui.agreement.AgreementScreen
 import androidx.compose.material.icons.outlined.Handshake
+import androidx.compose.material.icons.outlined.AutoAwesome
+import app.obey.ui.scenes.AftercareScreen
+import app.obey.ui.scenes.SceneScreen
+import app.obey.ui.scenes.ScenesScreen
 import app.obey.ui.kits.KitsScreen
 import app.obey.ui.kits.describe
 import app.obey.ui.rules.RulesScreen
@@ -194,14 +198,15 @@ private fun topLevels(f: Features) = listOfNotNull(
     if (f.review) TopLevel(MonthReviewRoute, "Monthly review", Icons.Outlined.Flag) { it.hasRoute<MonthReviewRoute>() } else null,
     // The menu shows it next to Your dynamic rather than with the other pages.
     if (f.agreement) TopLevel(AgreementRoute(), "Agreement", Icons.Outlined.Handshake) { it.hasRoute<AgreementRoute>() } else null,
+    if (f.scenes) TopLevel(ScenesRoute, "Scenes", Icons.Outlined.AutoAwesome) { it.hasRoute<ScenesRoute>() } else null,
     // Tasks open from Today and Calendar; the full list is for managing them, so it sits under More.
     TopLevel(TaskListRoute, "All tasks", Icons.Outlined.Checklist) { it.hasRoute<TaskListRoute>() },
 )
 
-/** The phone's bar holds Today, Calendar, the next section that's on, and the first writing space; the rest go in the menu. Stats and the monthly review are always in the menu. */
+/** The phone's bar holds Today, Calendar, the next section that's on, and the first writing space; the rest go in the menu. Stats, the monthly review, the agreement and scenes are always in the menu. */
 private fun splitBar(all: List<TopLevel>): Pair<List<TopLevel>, List<TopLevel>> {
     val writing = all.firstOrNull { it.route in writingRoutes }
-    val bar = all.filter { it.route !in writingRoutes && it.route != StatsRoute && it.route != MonthReviewRoute && it.route !is AgreementRoute }.take(3) + listOfNotNull(writing)
+    val bar = all.filter { it.route !in writingRoutes && it.route != StatsRoute && it.route != MonthReviewRoute && it.route !is AgreementRoute && it.route != ScenesRoute }.take(3) + listOfNotNull(writing)
     return bar to all.filter { it !in bar }
 }
 
@@ -218,16 +223,19 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
     val wide = LocalConfiguration.current.screenWidthDp >= 600
     // A tab the dynamic just switched off (say, from Settings) shouldn't stay reachable underneath.
     val switchedOff = destination != null && !isTopLevel && destination.hierarchy.any {
-        it.hasRoute<RewardsRoute>() || it.hasRoute<ConsequencesRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<ProtocolsRoute>() || it.hasRoute<JournalRoute>() || it.hasRoute<StatsRoute>() || it.hasRoute<MonthReviewRoute>() || it.hasRoute<AgreementRoute>()
+        it.hasRoute<RewardsRoute>() || it.hasRoute<ConsequencesRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<ProtocolsRoute>() || it.hasRoute<JournalRoute>() || it.hasRoute<StatsRoute>() || it.hasRoute<MonthReviewRoute>() || it.hasRoute<AgreementRoute>() || it.hasRoute<ScenesRoute>() ||
+            // A scene and the aftercare plans aren't top-level, so they only go when scenes are off.
+            (!features.scenes && (it.hasRoute<SceneRoute>() || it.hasRoute<AftercareRoute>()))
     }
     LaunchedEffect(switchedOff) { if (switchedOff) nav.navigate(TodayRoute) { popUpTo(nav.graph.findStartDestination().id) } }
-    // A push naming a screen (location setup, the agreement, rules or protocols) opens it.
+    // A push naming a screen (location setup, the agreement, rules, protocols or a scene) opens it.
     LaunchedEffect(Unit) {
         app.obey.push.PendingNav.target.collect { target ->
             if (target == app.obey.push.PendingNav.LOCATION && features.location) nav.navigate(LocationRoute)
             if (target == app.obey.push.PendingNav.AGREEMENT && features.agreement) nav.navigate(AgreementRoute())
             if (target == app.obey.push.PendingNav.RULES && features.rules) nav.navigate(RulesRoute)
             if (target == app.obey.push.PendingNav.PROTOCOLS && features.protocols) nav.navigate(ProtocolsRoute)
+            if (target != null && target.startsWith(app.obey.push.PendingNav.SCENE) && features.scenes) nav.navigate(SceneRoute(target.removePrefix(app.obey.push.PendingNav.SCENE)))
             if (target != null) app.obey.push.PendingNav.target.value = null
         }
     }
@@ -421,6 +429,9 @@ private fun ObeyNavHost(nav: NavHostController) {
         composable<StatsRoute> { StatsScreen(onOpenSettings = settings, onOpenTask = openTask) }
         composable<MonthReviewRoute> { MonthReviewScreen(onOpenSettings = settings) }
         composable<AgreementRoute> { AgreementScreen(onOpenSettings = settings, onOpenNote = { nav.navigate(NoteEditorRoute(noteId = it)) }) }
+        composable<ScenesRoute> { ScenesScreen(onOpenSettings = settings, onOpen = { nav.navigate(SceneRoute(it)) }, onAftercare = { nav.navigate(AftercareRoute) }) }
+        composable<SceneRoute> { SceneScreen(onBack = { nav.popBackStack() }) }
+        composable<AftercareRoute> { AftercareScreen(onBack = { nav.popBackStack() }) }
         composable<TaskListRoute> {
             TaskListScreen(
                 onOpen = openTask,

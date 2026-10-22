@@ -104,6 +104,7 @@ fun TodayScreen(
     val redemptions by vm.redemptions.collectAsStateWithLifecycle()
     val agreement by vm.agreement.collectAsStateWithLifecycle()
     val libraryChanges by vm.libraryChanges.collectAsStateWithLifecycle()
+    val scenes by vm.scenes.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     var telling by remember { mutableStateOf<app.obey.api.CurfewNight?>(null) }
     var redeeming by remember { mutableStateOf<app.obey.api.LedgerEntry?>(null) }
@@ -436,6 +437,9 @@ fun TodayScreen(
                                 onMoreTime = if (mine && beforeCurfew && n.arrivedAt == null && n.status == OccurrenceStatus.Pending && asked == null) ({ askingMore = n }) else null,
                             )
                         }
+                    }
+                    if (session != null) scenes?.let { t ->
+                        item(key = "scenes") { app.obey.ui.scenes.SceneCards(t, session, busy, onAftercareDone = vm::aftercareDone, onCheck = vm::checkInOnScene) }
                     }
                     if (isDom) items(curfew?.requests.orEmpty(), key = { "ask-${it.id}" }) { r ->
                         CurfewAskCard(
