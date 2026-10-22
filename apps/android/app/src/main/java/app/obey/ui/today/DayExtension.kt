@@ -123,7 +123,7 @@ fun ExtensionRequestCard(
     val r = rows.first()
     val who = requester?.let { "$it asks" } ?: "You asked"
     Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.tertiaryContainer,

@@ -1,24 +1,18 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { useNoteAfter } from "../components/DecisionNote";
-import { useBalances, useDecideReschedule, useEvents, useLibrary, usePendingReschedules } from "../api/hooks";
-import { errorMessage } from "../api/client";
-import type { CalendarEvent, Occurrence, RescheduleRequest } from "../api/types";
-import { EventDialog, eventOn, eventWhen } from "../components/EventDialog";
+import { useBalances, useLibrary, usePendingReschedules } from "../api/hooks";
+import type { Occurrence } from "../api/types";
 import { DayRescheduleSheet } from "../components/DayRescheduleSheet";
 import { isOverdue } from "../components/OccurrenceCard";
-import { MissActions, ReviewActions, RowGroup, RowLink, TaskRow } from "../components/TaskRow";
+import { RowGroup, RowLink, TaskRow } from "../components/TaskRow";
 import { CurfewStrip } from "../components/CurfewStrip";
-import { PlanChanges } from "../components/PlanChanges";
-import { DelayCards, MoodRow, RedemptionRow } from "../components/NeedsYou";
+import { TodayInbox } from "../components/Inbox";
 import { KitPrompt } from "./Kits";
-import { Button, Dialog, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, Section, TextField, useSnackbar, cx } from "../components/ui";
-import { addDays, fmtDate, fmtDateTime, fmtRelative, fromLocalInput, localDateOf, toLocalInput, today } from "../lib/dates";
+import { Button, Empty, ErrorBox, Fab, Icon, Loading, PageHeader, Section } from "../components/ui";
+import { addDays, fmtDate, fmtRelative, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
-import { planTone } from "../lib/planColors";
 import { WIDE, useMediaQuery } from "../lib/useMediaQuery";
 import { useNeedsYou, useTodayOccurrences } from "../lib/today";
-import { AgreementCard } from "../components/AgreementCard";
 
 const byDue = (a: Occurrence, b: Occurrence) => a.dueAt.localeCompare(b.dueAt);
 const dueDay = (o: Occurrence) => localDateOf(new Date(o.dueAt));
@@ -82,41 +76,9 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
               .join(" · ")}
           />
           <CurfewStrip />
-          <PlanChanges />
-          <AgreementCard />
-          {isDom && <DelayCards />}
           {!isDom && occ.data && todays.length > 0 && <Progress today={todays} done={doneToday} points={features.points} />}
-          <PlanClashes />
           <KitPrompt />
-          {isDom ? (
-            <>
-              {needs.count > 0 && (
-                <Section title={`Needs you · ${needs.count}`}>
-                  <div className="flex flex-col gap-2">
-                    <PendingRequests bare />
-                    {(needs.review.length > 0 || needs.missed.length > 0 || needs.lowMoods.length > 0 || needs.redemptions.length > 0) && (
-                      <RowGroup>
-                        {needs.lowMoods.map((o) => (
-                          <MoodRow key={`mood-${o.id}`} o={o} />
-                        ))}
-                        {needs.review.map((o) => (
-                          <TaskRow key={o.id} o={o} showDate={dueDay(o) !== t} actions={<ReviewActions o={o} />} />
-                        ))}
-                        {needs.missed.map((o) => (
-                          <TaskRow key={o.id} o={o} showDate={dueDay(o) !== t} actions={<MissActions o={o} />} />
-                        ))}
-                        {needs.redemptions.map((e) => (
-                          <RedemptionRow key={e.id} e={e} />
-                        ))}
-                      </RowGroup>
-                    )}
-                  </div>
-                </Section>
-              )}
-            </>
-          ) : (
-            <PendingRequests />
-          )}
+          <TodayInbox />
           {occ.isLoading && <Loading />}
           {occ.error && <ErrorBox error={occ.error} onRetry={() => occ.refetch()} />}
           {occ.data && (
@@ -315,185 +277,6 @@ function LaterDay({ day, items }: { day: string; items: Occurrence[] }) {
           ))}
         </RowGroup>
       )}
-    </div>
-  );
-}
-
-/** One card per request; a whole-day request (shared groupId) is one card listing each task. */
-function PendingRequests({ bare }: { bare?: boolean }) {
-  const { rel, me, isDom, memberName } = useRel();
-  const snack = useSnackbar();
-  const pending = usePendingReschedules(rel.id);
-  const decide = useDecideReschedule(rel.id);
-  const noteAfter = useNoteAfter();
-
-  const cards = useMemo(() => {
-    const map = new Map<string, RescheduleRequest[]>();
-    for (const r of pending.data ?? []) {
-      // The Dom decides others' requests; everyone sees their own as "waiting".
-      if (!isDom && r.requestedBy !== me.user.id) continue;
-      const key = r.groupId ?? r.id;
-      map.set(key, [...(map.get(key) ?? []), r]);
-    }
-    return [...map.values()];
-  }, [pending.data, isDom, me.user.id]);
-
-  if (!cards.length) return null;
-  const mine = (r: RescheduleRequest) => r.requestedBy === me.user.id;
-
-  const [instead, setInstead] = useState<RescheduleRequest | null>(null);
-  const [insteadAt, setInsteadAt] = useState("");
-
-  function act(r: RescheduleRequest, approve: boolean, n: number) {
-    decide.mutate(
-      { id: r.id, approve },
-      {
-        onSuccess: () =>
-          noteAfter(`${approve ? "Approved" : "Declined"}${n > 1 ? ` ${n} tasks` : ""}`, {
-            relId: rel.id,
-            occurrenceId: r.occurrenceId,
-            to: memberName(r.requestedBy),
-            about: `${approve ? "approving" : "declining"} the request for “${r.title}”`,
-          }),
-        onError: (e) => snack(errorMessage(e)),
-      },
-    );
-  }
-  /** "Reschedule instead": the Dom picks the new deadline for this one task, whatever was asked. */
-  function openInstead(r: RescheduleRequest) {
-    setInsteadAt(toLocalInput(new Date(new Date(r.kind === "cancel" ? r.fromDueAt : r.toDueAt).getTime() + (r.kind === "cancel" ? 86_400_000 : 0)).toISOString()));
-    setInstead(r);
-  }
-  function moveInstead() {
-    if (!instead || !insteadAt) return;
-    decide.mutate(
-      { id: instead.id, approve: true, dueAt: fromLocalInput(insteadAt), item: true },
-      { onSuccess: () => (snack(`Moved “${instead.title}”`), setInstead(null)), onError: (e) => snack(errorMessage(e)) },
-    );
-  }
-  const change = (x: RescheduleRequest) => (x.kind === "cancel" ? "Call off" : `${fmtDateTime(x.fromDueAt)} → ${fmtDateTime(x.toDueAt)}`);
-
-  const body = (
-    <div className="flex flex-col gap-2">
-      {cards.map((rows) => {
-        const r = rows[0]!;
-        const who = mine(r) ? "You asked" : `${memberName(r.requestedBy)} asks`;
-        const single = rows.length === 1;
-        const canDecide = isDom && !mine(r);
-        return (
-          <div key={r.groupId ?? r.id} className="flex flex-col gap-3 rounded-md bg-tertiary-container p-4 text-on-tertiary-container">
-            <div>
-              <div className="text-title-medium">
-                {single && r.kind === "cancel" ? (
-                  <>
-                    {who} to call off “{r.title}”
-                  </>
-                ) : single ? (
-                  <>
-                    {who} for more time on “{r.title}”{r.scope === "following" ? " (this and following)" : ""}
-                  </>
-                ) : rows.some((x) => x.kind === "cancel") ? (
-                  <>
-                    {who} about {rows.length} tasks
-                  </>
-                ) : (
-                  <>
-                    {who} for more time on {rows.length} tasks today
-                  </>
-                )}
-              </div>
-              {single ? (
-                <div className="text-body-medium">{r.kind === "cancel" ? `Due ${fmtDateTime(r.fromDueAt)}` : change(r)}</div>
-              ) : (
-                <ul className="mt-2 flex flex-col gap-1">
-                  {rows.map((x) => (
-                    <li key={x.id} className="flex flex-wrap items-center justify-between gap-x-3 text-body-medium">
-                      <span className="font-medium">{x.title}</span>
-                      <span className="flex items-center gap-1">
-                        {change(x)}
-                        {canDecide && <IconButton icon="edit_calendar" label={`Pick a time for ${x.title}`} onClick={() => openInstead(x)} />}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {r.reason && <div className="mt-2 text-body-medium italic">“{r.reason}”</div>}
-            </div>
-            {canDecide && (
-              <div className="flex flex-wrap gap-2">
-                <Button icon="check" disabled={decide.isPending} onClick={() => act(r, true, rows.length)}>
-                  {single ? "Approve" : "Approve all"}
-                </Button>
-                {single && (
-                  <Button variant="tonal" icon="edit_calendar" disabled={decide.isPending} onClick={() => openInstead(r)}>
-                    {r.kind === "cancel" ? "Reschedule instead" : "Other time"}
-                  </Button>
-                )}
-                <Button variant="text" className="text-on-tertiary-container" disabled={decide.isPending} onClick={() => act(r, false, rows.length)}>
-                  Decline
-                </Button>
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-  const dialog = (
-    <Dialog
-      open={instead !== null}
-      onClose={() => setInstead(null)}
-      title={instead?.kind === "cancel" ? "Reschedule instead" : "Pick another time"}
-      actions={
-        <>
-          <Button variant="text" onClick={() => setInstead(null)}>
-            Cancel
-          </Button>
-          <Button busy={decide.isPending} disabled={!insteadAt} onClick={moveInstead}>
-            Move it
-          </Button>
-        </>
-      }
-    >
-      <p className="mb-3">
-        “{instead?.title}” moves to this deadline{instead?.kind === "cancel" ? " instead of being called off" : ""}. The rest of the request stays for you to decide.
-      </p>
-      <TextField type="datetime-local" label="New deadline" value={insteadAt} onChange={(e) => setInsteadAt(e.target.value)} />
-    </Dialog>
-  );
-  return (
-    <>
-      {bare ? body : <Section title={isDom ? "Extension requests" : "Waiting for approval"}>{body}</Section>}
-      {dialog}
-    </>
-  );
-}
-
-/** A heads-up for plans today or tomorrow that run into tasks, so they get moved before they're missed. */
-function PlanClashes() {
-  const { rel } = useRel();
-  const t = today();
-  const events = useEvents(rel.id, t, addDays(t, 1));
-  const [open, setOpen] = useState<CalendarEvent | null>(null);
-  const clashing = (events.data ?? []).filter((e) => e.conflictIds.length > 0 && new Date(e.endsAt).getTime() > Date.now() && (eventOn(e, t) || eventOn(e, addDays(t, 1))));
-  if (!clashing.length) return null;
-  return (
-    <div className="mx-4 mb-2 flex flex-col gap-2 md:mx-6">
-      {clashing.map((e) => (
-        <div key={e.id} className={cx("flex items-center gap-3 rounded-md px-4 py-3", planTone(e, rel).bg, planTone(e, rel).text)}>
-          <Icon name="event_busy" />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-title-small">{e.title}</div>
-            <div className="text-body-small opacity-80">
-              {eventWhen(e)} · overlaps {e.conflictIds.length === 1 ? "a task" : `${e.conflictIds.length} tasks`}
-            </div>
-          </div>
-          <Button variant="text" onClick={() => setOpen(e)}>
-            Sort it out
-          </Button>
-        </div>
-      ))}
-      <EventDialog event={open} open={open !== null} onClose={() => setOpen(null)} />
     </div>
   );
 }

@@ -268,7 +268,7 @@ fun PlanHeadsUp(e: CalendarEvent, tone: PlanTone, onOpen: () -> Unit) {
         color = tone.container,
         contentColor = tone.onContainer,
         shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Row(Modifier.padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.EventBusy, null)

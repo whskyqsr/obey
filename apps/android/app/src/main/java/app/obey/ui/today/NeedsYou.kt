@@ -107,7 +107,7 @@ fun RedeemedDialog(e: LedgerEntry, name: String, busy: Boolean, onDismiss: () ->
 }
 
 /** "6:00 PM" today, "Thu 22 Oct, 6:00 PM" another day. */
-private fun dayAndTime(iso: String) =
+internal fun dayAndTime(iso: String) =
     if (parseInstant(iso).local().toLocalDate() == LocalDate.now()) formatTime(iso) else formatDateTime(iso)
 
 /** A delay the sub took from their weekly allowance: no decision needed, but the Dominant hears about it. */
@@ -115,7 +115,7 @@ private fun dayAndTime(iso: String) =
 fun DelayCard(d: DelayUsed, name: String, onSeen: () -> Unit) {
     val c = MaterialTheme.colorScheme
     val one = d.items.singleOrNull()
-    Surface(color = c.surfaceContainerHigh, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+    Surface(color = c.surfaceContainerHigh, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp)) {
             Icon(Icons.Outlined.MoreTime, null, tint = c.primary, modifier = Modifier.padding(top = 2.dp))
             Spacer(Modifier.width(16.dp))

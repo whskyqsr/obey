@@ -53,22 +53,19 @@ export function useAskWho() {
   return doms.length === 1 ? doms[0]!.displayName : "your Dominant";
 }
 
-/** Today's curfew strip, from an hour before curfew until it ends, asks for more time, and plans that run into one (for a Dominant). */
+/** Today's curfew strip, from an hour before curfew until it ends, and asks for more time (for a Dominant). Plans that run into one are in Today's list. */
 export function CurfewStrip() {
   const { rel, features, isDom } = useRel();
   const curfew = useCurfew(rel.id, features.location);
   if (!features.location || !curfew.data) return null;
-  const { night, clashes, requests } = curfew.data;
+  const { night, requests } = curfew.data;
   const asks = isDom ? requests : [];
-  if (!night && !clashes.length && !asks.length) return null;
+  if (!night && !asks.length) return null;
   return (
     <div className="flex flex-col gap-3 px-4 pb-4 md:px-6">
       {night && <Night night={night} request={requests.find((r) => r.occurrenceId === night.occurrenceId)} />}
       {asks.map((r) => (
         <Ask key={r.id} request={r} />
-      ))}
-      {clashes.map((c) => (
-        <Clash key={c.occurrenceId} clash={c} />
       ))}
     </div>
   );
@@ -523,7 +520,8 @@ function ChangeSheet({ request, onClose }: { request: CurfewRequest; onClose(): 
   );
 }
 
-function Clash({ clash }: { clash: CurfewClash }) {
+/** A plan running past curfew, for a Dominant: excuse that night, move the plan's end, or leave curfew as it is. */
+export function Clash({ clash }: { clash: CurfewClash }) {
   const { rel, partners } = useRel();
   const noteAfter = useNoteAfter();
   const snack = useSnackbar();

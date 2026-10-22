@@ -32,6 +32,7 @@ import type {
   SafeCall,
   SafeCalls,
   Agreement,
+  LibraryChange,
   AgreementInput,
   AgreementSectionInput,
   AgreementVersion,
@@ -851,6 +852,19 @@ export function useSeenPlanChange(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({
     mutationFn: (id: string) => api(`/events/${id}/seen`, { method: "POST", body: {} }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+/** Rules and protocols someone else changed that this person hasn't marked seen. */
+export function useLibraryChanges(rel: string, enabled = true) {
+  return useQuery({ queryKey: ["rel", rel, "library-changes"], queryFn: () => api<LibraryChange[]>(`/relationships/${rel}/library-changes`), enabled });
+}
+
+export function useSeenLibraryChanges(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (ids: string[]) => api(`/relationships/${rel}/library-changes/seen`, { method: "POST", body: { ids } }),
     onSuccess: () => invalidate(),
   });
 }

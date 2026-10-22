@@ -1065,3 +1065,16 @@ export type AgreementVersionSummary = z.infer<typeof agreementVersionSummary>;
 /** The version in force, the open proposal if there is one, and every version newest first. */
 export const agreement = z.object({ current: agreementVersion.nullable(), proposal: agreementVersion.nullable(), versions: z.array(agreementVersionSummary) });
 export type Agreement = z.infer<typeof agreement>;
+
+/** A rule or protocol someone else added, changed or removed, not yet marked seen. */
+export const libraryChange = z.object({
+  id,
+  kind: z.enum(["rules", "protocols"]),
+  verb: z.enum(["added", "changed", "removed"]),
+  itemId: id,
+  title: z.string(),
+  changedBy: id.nullable(),
+  createdAt: z.string(),
+});
+export type LibraryChange = z.infer<typeof libraryChange>;
+export const seenLibraryChangesInput = z.object({ ids: z.array(id).max(200) });

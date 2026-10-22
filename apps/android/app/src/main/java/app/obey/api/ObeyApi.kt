@@ -346,6 +346,13 @@ interface ObeyApi {
     @PUT("relationships/{id}/protocols/order")
     suspend fun reorderProtocols(@Path("id") relationshipId: String, @Body body: ReorderInput): List<Protocol>
 
+    /** Rules and protocols someone else added, changed or removed that I haven't marked seen, newest first. */
+    @GET("relationships/{id}/library-changes")
+    suspend fun libraryChanges(@Path("id") relationshipId: String): List<LibraryChange>
+
+    @POST("relationships/{id}/library-changes/seen")
+    suspend fun seenLibraryChanges(@Path("id") relationshipId: String, @Body body: SeenLibraryChangesInput)
+
     // Notes
     @GET("relationships/{id}/notes")
     suspend fun notes(@Path("id") relationshipId: String): List<Note>

@@ -208,7 +208,7 @@ fun CurfewClashCard(clash: CurfewClash, onExcuse: () -> Unit, onChangeEnd: () ->
     Surface(
         color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
         shape = RoundedCornerShape(24.dp),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Row(Modifier.padding(16.dp)) {
             Icon(Icons.Outlined.EventBusy, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)

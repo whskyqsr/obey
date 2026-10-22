@@ -9,6 +9,7 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material.icons.outlined.RemoveDone
 import androidx.compose.material.icons.automirrored.outlined.Notes
+import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.AddComment
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Check
@@ -167,7 +168,7 @@ fun OccurrenceRow(
             } else if (actions.onApprove != null || actions.onReject != null) {
                 Row {
                     actions.onComments?.let { IconButton(onClick = it) { Icon(Icons.Outlined.AddComment, "Comment") } }
-                    actions.onReject?.let { IconButton(onClick = it) { Icon(Icons.Outlined.Close, "Send back") } }
+                    actions.onReject?.let { IconButton(onClick = it) { Icon(Icons.AutoMirrored.Outlined.Undo, "Send back") } }
                     actions.onApprove?.let { IconButton(onClick = it) { Icon(Icons.Outlined.TaskAlt, "Approve") } }
                 }
             } else if (listOf(actions.onCompleteWithNote, actions.onReschedule, actions.onEditTask, actions.onComments).any { it != null }) {

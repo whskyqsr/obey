@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { useDelays, useMarkRedeemed, useMoodSeen, useSeenDelay } from "../api/hooks";
+import { useMarkRedeemed, useMoodSeen } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { LedgerEntry, Occurrence } from "../api/types";
-import { ago, fmtDateTime, fmtTime, localDateOf, today } from "../lib/dates";
+import { ago, fmtDateTime } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 import { ReplyDialog } from "./Comments";
 import { MOOD_LABELS, MOODS } from "./Mood";
@@ -116,45 +116,5 @@ function RedeemedDialog({ e, onClose }: { e: LedgerEntry; onClose(): void }) {
         <TextField label={`Note to ${who} (optional)`} value={note} onChange={(x) => setNote(x.target.value)} maxLength={500} />
       </div>
     </Dialog>
-  );
-}
-
-/** "6:00 PM" today, "Thu, Oct 22, 6:00 PM" another day. */
-const dayAndTime = (at: string) => (localDateOf(new Date(at)) === today() ? fmtTime(at) : fmtDateTime(at));
-
-/** Delays the sub took from their weekly allowance: no decision needed, but the Dominant hears about each. */
-export function DelayCards() {
-  const { rel, isDom, memberName } = useRel();
-  const snack = useSnackbar();
-  const delays = useDelays(rel.id, isDom && rel.reschedulePolicy === "allowance");
-  const seen = useSeenDelay(rel.id);
-  if (!delays.data?.length) return null;
-  return (
-    <div className="flex flex-col gap-3 px-4 pb-4 md:px-6">
-      {delays.data.map((d) => {
-        const one = d.items.length === 1 ? d.items[0]! : null;
-        return (
-          <div key={d.id} className="flex items-start gap-4 rounded-xl bg-surface-container-high px-4 py-3 text-on-surface">
-            <Icon name="more_time" filled className="mt-0.5 text-primary" />
-            <div className="min-w-0 flex-1">
-              <div className="text-title-medium">{memberName(d.requestedBy)} used a delay</div>
-              <div className="text-body-medium text-on-surface-variant">
-                {one ? (
-                  <>
-                    {one.title} · {dayAndTime(one.fromDueAt)} <Icon name="arrow_forward" size={16} className="align-[-3px]" /> {fmtTime(one.toDueAt)}
-                  </>
-                ) : (
-                  `${d.items.length} tasks moved`
-                )}
-                {" · "}
-                {d.left} of {d.allowance} left this week
-              </div>
-              {d.reason && <div className="mt-0.5 text-body-medium italic text-on-surface-variant">“{d.reason}”</div>}
-            </div>
-            <IconButton icon="close" label="Got it" onClick={() => seen.mutate(d.id, { onError: (e) => snack(errorMessage(e)) })} />
-          </div>
-        );
-      })}
-    </div>
   );
 }

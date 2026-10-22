@@ -295,6 +295,13 @@
       "when": 1792625450090,
       "tag": "0041_agreement",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1792628091489,
+      "tag": "0042_library_changes",
+      "breakpoints": true
     }
   ]
 }
