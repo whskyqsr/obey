@@ -15,7 +15,7 @@ import {
   splitSeries,
 } from "@obey/recurrence";
 import type { Tx } from "../db/index.js";
-import { consequences, memberships, notes, occurrences, pointsLedger, relationships, reschedules, safeCalls, taskSeries } from "../db/schema.js";
+import { consequences, memberships, notes, occurrences, pointsLedger, relationships, reschedules, rewards, safeCalls, taskSeries } from "../db/schema.js";
 import { HttpError, forbidden } from "../errors.js";
 import { type Role, canManage } from "./access.js";
 import { tasksPausedAt } from "./roleSwaps.js";
@@ -86,12 +86,27 @@ export async function pointsEnabled(db: Tx, relationshipId: string): Promise<boo
   return rel?.features.points !== false;
 }
 
+/**
+ * A "let off" reward spent on a consequence that then got done before a Dominant marked it redeemed bought nothing, so
+ * the spend is dropped and the points come back. One that also takes lock time off stays, since that part still counts.
+ */
+async function refundLetOff(db: Tx, occ: Occurrence) {
+  const spent = await db
+    .select({ id: pointsLedger.id, lockMinutes: rewards.lockMinutes })
+    .from(pointsLedger)
+    .leftJoin(rewards, eq(pointsLedger.rewardId, rewards.id))
+    .where(and(eq(pointsLedger.occurrenceId, occ.id), eq(pointsLedger.kind, "redemption"), isNull(pointsLedger.redeemedAt)));
+  const ids = spent.filter((s) => !s.lockMinutes).map((s) => s.id);
+  if (ids.length) await db.delete(pointsLedger).where(inArray(pointsLedger.id, ids));
+}
+
 export async function finalizeCompletion(db: Tx, series: Series, occ: Occurrence, completedAt: Date, reviewerId: string | null, points = countedPoints(series, occ.count)) {
   const [updated] = await db
     .update(occurrences)
     .set({ status: "completed", completedAt, reviewedBy: reviewerId, reviewedAt: reviewerId ? new Date() : null })
     .where(eq(occurrences.id, occ.id))
     .returning();
+  await refundLetOff(db, occ);
   if (points !== 0 && (await pointsEnabled(db, series.relationshipId))) {
     await db
       .insert(pointsLedger)
@@ -403,6 +418,7 @@ export async function editOccurrence(
   if (status !== occ.status) {
     if (status === "missed") await issueMissConsequence(db, series, updated!, now);
     if (occ.status === "missed") await withdrawMissConsequence(db, occ);
+    if (status === "completed") await refundLetOff(db, occ);
     await db.delete(pointsLedger).where(and(eq(pointsLedger.occurrenceId, occ.id), inArray(pointsLedger.kind, ["completion", "miss"])));
     const earned = status === "completed" ? series.points : status === "missed" ? -series.missPenalty : 0;
     const delta = (await pointsEnabled(db, series.relationshipId)) ? earned : 0;
