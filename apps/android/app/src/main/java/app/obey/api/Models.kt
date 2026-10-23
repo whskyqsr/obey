@@ -1461,8 +1461,12 @@ data class SceneSide(
 @Serializable
 data class SceneCheckInput(val mood: Int, val note: String = "")
 
+/** [seen]: someone else has seen a check-in that asked for them (see [wantsPartner]). */
 @Serializable
-data class SceneCheck(val userId: String, val mood: Int, val note: String = "", val at: String)
+data class SceneCheck(val userId: String, val mood: Int, val note: String = "", val at: String, val seen: Boolean = false) {
+    /** Feeling bad or low, or anything written in "still need": the others should hear about it. */
+    val wantsPartner: Boolean get() = mood <= 2 || note.isNotBlank()
+}
 
 @Serializable
 data class Scene(

@@ -42,16 +42,31 @@ describe("the scene log", () => {
     await sub.put(`/scenes/${id}/side`, { mood: 3, worked: "Stopping when I called yellow." });
     expect(ctx.notifier.sent.length).toBe(sent);
 
-    // The check-in opens at 10 AM the day after, once, for whoever hasn't answered.
+    // The check-in opens at 10 AM the day after, once: each person is asked how they feel if they haven't said, and
+    // nudged to check in with the other.
     expect((await sub.put(`/scenes/${id}/check`, { mood: 4 })).status).toBe(409);
     expect(await sceneCheckIns(ctx.db, ctx.notifier, ctx.clock.now)).toBe(0);
     ctx.clock.now = new Date("2026-10-17T14:05:00Z");
-    expect((await sub.put(`/scenes/${id}/check`, { mood: 4, note: "A bit tired, all fine." })).body.checks).toEqual([
-      { userId: subId, mood: 4, note: "A bit tired, all fine.", at: "2026-10-17T14:05:00.000Z" },
-    ]);
+    expect((await sub.put(`/scenes/${id}/check`, { mood: 4 })).body.checks).toEqual([{ userId: subId, mood: 4, note: "", at: "2026-10-17T14:05:00.000Z", seen: false }]);
+    // A good check-in with nothing still needed doesn't ask for the Dominant.
+    expect(lastTo(domId)!.body).toBe("Sub shared how it went");
     expect(await sceneCheckIns(ctx.db, ctx.notifier, ctx.clock.now)).toBe(1);
-    expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [domId], push: { body: "How are you feeling after last night?", data: { type: "scene_check" } } });
+    expect(lastTo(domId)).toMatchObject({ body: "How are you feeling after last night? And check in with Sub.", data: { type: "scene_check" } });
+    expect(lastTo(subId)!.body).toBe("Check in with Dom about last night");
     expect(await sceneCheckIns(ctx.db, ctx.notifier, ctx.clock.now)).toBe(0);
+
+    // Something still needed reaches the others, in words only if they've asked for them; a reply counts as seen.
+    await sub.put(`/scenes/${id}/check`, { mood: 3, note: "A long hug tonight." });
+    expect(lastTo(domId)!.body).toBe("Sub checked in and still needs something");
+    await dom.patch("/me", { notifyDetails: true });
+    await sub.put(`/scenes/${id}/check`, { mood: 2, note: "A long hug tonight." });
+    expect(lastTo(domId)!.body).toBe("Sub checked in feeling low: “A long hug tonight.”");
+    expect((await sub.post(`/scenes/${id}/checks/${subId}/seen`)).status).toBe(403);
+    expect((await dom.post(`/scenes/${id}/checks/${subId}/seen`)).body.checks[0].seen).toBe(true);
+    await sub.put(`/scenes/${id}/check`, { mood: 1 });
+    expect((await dom.get(`/scenes/${id}`)).body.checks[0]).toMatchObject({ mood: 1, seen: false });
+    await dom.post(`/scenes/${id}/comments`, { body: "On my way." });
+    expect((await sub.get(`/scenes/${id}`)).body.checks[0].seen).toBe(true);
 
     // Aftercare: each person's own plan, and closing the card on Today.
     expect((await sub.put(`/relationships/${relId}/aftercare`, { needs: ["Water", "Cuddles"], note: "Stay close." })).status).toBe(200);
@@ -63,7 +78,7 @@ describe("the scene log", () => {
 
     // Comments, and only whoever logged it deletes it.
     expect((await sub.post(`/scenes/${id}/comments`, { body: "Thank you." })).status).toBe(201);
-    expect((await dom.get(`/relationships/${relId}/scenes`)).body[0]).toMatchObject({ id, commentCount: 1 });
+    expect((await dom.get(`/relationships/${relId}/scenes`)).body[0]).toMatchObject({ id, commentCount: 2 });
     expect((await sub.del(`/scenes/${id}`)).status).toBe(403);
     expect((await dom.del(`/scenes/${id}`)).status).toBe(204);
 

@@ -52,7 +52,8 @@ const val LOW_MOOD = 2
 
 /** Tonight's curfew night (if Today shows one), plans that run past curfew, and what a broken night costs. */
 /** A decision a note can follow: [text] for the snackbar, kept with [occurrenceId], sent to [to]. */
-data class NoteTarget(val text: String, val occurrenceId: String, val to: String, val about: String)
+/** [sceneId]: a reply to a scene check-in, which goes in the scene's comments instead of a task's. */
+data class NoteTarget(val text: String, val occurrenceId: String, val to: String, val about: String, val sceneId: String? = null)
 
 data class TodayCurfew(val night: CurfewNight?, val clashes: List<CurfewClash>, val cost: String?, val requests: List<app.obey.api.CurfewRequest> = emptyList())
 
@@ -350,6 +351,11 @@ class TodayViewModel @Inject constructor(
         replaceScene(api.aftercareDone(s.id))
     }
 
+    fun sceneCheckSeen(s: app.obey.api.Scene, c: app.obey.api.SceneCheck) = action {
+        replaceScene(api.sceneCheckSeen(s.id, c.userId))
+        say("Marked seen")
+    }
+
     fun checkInOnScene(s: app.obey.api.Scene, mood: Int, note: String) = action {
         replaceScene(api.checkInOnScene(s.id, app.obey.api.SceneCheckInput(mood, note)))
         say("Saved with the scene")
@@ -407,7 +413,10 @@ class TodayViewModel @Inject constructor(
 
     /** A note after a decision: a comment on that task or curfew night, and a notification. */
     fun addNote(t: NoteTarget, body: String, onDone: () -> Unit) = action {
-        api.addComment(t.occurrenceId, app.obey.api.CommentInput(body))
+        if (t.sceneId != null) {
+            api.addSceneComment(t.sceneId, app.obey.api.CommentInput(body))
+            replaceScene(api.scene(t.sceneId))
+        } else api.addComment(t.occurrenceId, app.obey.api.CommentInput(body))
         say(if (t.text.isEmpty()) "Reply sent to ${t.to}" else "Note sent to ${t.to}")
         onDone()
         refresh()

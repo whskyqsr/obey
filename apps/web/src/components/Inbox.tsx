@@ -24,7 +24,7 @@ import { Clash } from "./CurfewStrip";
 import { useNoteAfter } from "./DecisionNote";
 import { EventDialog, eventOn, eventWhen } from "./EventDialog";
 import { MOOD_LABELS } from "./Mood";
-import { MoodRow, RedemptionRow } from "./NeedsYou";
+import { MoodRow, RedemptionRow, SceneCheckRow } from "./NeedsYou";
 import { MissActions, ReviewActions, RowGroup, TaskRow } from "./TaskRow";
 import { Button, Dialog, Icon, IconButton, Section, TextField, cx, useSnackbar } from "./ui";
 
@@ -198,6 +198,24 @@ export function TodayInbox() {
         <RowGroup>
           {list.map((o) => (
             <MoodRow key={o.id} o={o} />
+          ))}
+        </RowGroup>
+      ),
+    });
+  }
+  if (needs.sceneChecks.length) {
+    const list = needs.sceneChecks;
+    groups.push({
+      key: "sceneChecks",
+      icon: "favorite",
+      tone: "error",
+      title: list.length === 1 ? `Check in with ${memberName(list[0]!.check.userId)}` : `${plural(list.length, "check-in")} after a scene`,
+      sub: names(list.map(({ check: c }) => (c.note ? `${memberName(c.userId)} still needs something` : `${memberName(c.userId)} felt ${MOOD_LABELS[c.mood - 1]!.toLowerCase()}`))),
+      count: list.length,
+      body: (
+        <RowGroup>
+          {list.map((x) => (
+            <SceneCheckRow key={`${x.scene.id}:${x.check.userId}`} x={x} />
           ))}
         </RowGroup>
       ),

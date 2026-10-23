@@ -468,7 +468,7 @@ export function CheckIn({ s, onDone }: { s: Scene; onDone?(): void }) {
       <MoodPicker value={mood} onChange={setMood} />
       {mood !== null && (
         <div className="flex items-end gap-2">
-          <TextField label="Anything to add (optional)" value={note} maxLength={500} className="flex-1" onChange={(e) => setNote(e.target.value)} />
+          <TextField label="Anything you still need? (optional)" value={note} maxLength={500} className="flex-1" onChange={(e) => setNote(e.target.value)} />
           <Button
             busy={check.isPending}
             onClick={() =>
@@ -483,7 +483,7 @@ export function CheckIn({ s, onDone }: { s: Scene; onDone?(): void }) {
   );
 }
 
-function SceneComments({ sceneId }: { sceneId: string }) {
+export function SceneComments({ sceneId }: { sceneId: string }) {
   const { rel } = useRel();
   const snack = useSnackbar();
   const comments = useSceneComments(rel.id, sceneId);

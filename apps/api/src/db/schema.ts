@@ -814,6 +814,8 @@ export const sceneMembers = pgTable(
     checkMood: integer("check_mood"),
     checkNote: text("check_note").notNull().default(""),
     checkAt: ts("check_at"),
+    /** When someone else saw a check-in that asked for them (low, or with a note), by marking it or commenting. */
+    checkSeenAt: ts("check_seen_at"),
     aftercareDoneAt: ts("aftercare_done_at"),
   },
   (t) => [primaryKey({ columns: [t.sceneId, t.userId] })],

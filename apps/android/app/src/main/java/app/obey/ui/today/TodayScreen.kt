@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.EventBusy
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.Handshake
 import androidx.compose.material.icons.outlined.MoreTime
@@ -305,6 +306,40 @@ fun TodayScreen(
                             ),
                         )
                     }
+                    // Scene check-ins that ask for the others reach anyone, not just a Dominant.
+                    val sceneChecks = scenes?.scenes.orEmpty()
+                        .flatMap { s -> s.checks.map { s to it } }
+                        .filter { (_, c) ->
+                            c.userId != me && !c.seen && c.wantsPartner &&
+                                !parseInstant(c.at).local().toLocalDate().isBefore(LocalDate.now().minusDays(1))
+                        }
+                        .sortedByDescending { it.second.at }
+                    if (sceneChecks.isNotEmpty()) add(
+                        InboxGroup(
+                            key = "sceneChecks",
+                            icon = Icons.Outlined.FavoriteBorder,
+                            tone = InboxTone.Error,
+                            title = if (sceneChecks.size == 1) "Check in with ${nameOr(sceneChecks[0].second.userId)}" else plural(sceneChecks.size, "check-in") + " after a scene",
+                            subtitle = sceneChecks.joinToString(", ") { (_, c) ->
+                                if (c.note.isNotBlank()) "${nameOr(c.userId)} still needs something" else "${nameOr(c.userId)} felt ${app.obey.ui.common.moodLabel(c.mood).lowercase()}"
+                            },
+                            count = sceneChecks.size,
+                            body = {
+                                InboxRows {
+                                    sceneChecks.forEach { (s, c) ->
+                                        val who = nameOr(c.userId)
+                                        SceneCheckRow(
+                                            s,
+                                            c,
+                                            who,
+                                            onSeen = { vm.sceneCheckSeen(s, c) },
+                                            onReply = { replying = NoteTarget("", "", who, "$who feeling ${app.obey.ui.common.moodLabel(c.mood).lowercase()} after ${s.title.ifBlank { "the scene" }}", sceneId = s.id) },
+                                        )
+                                    }
+                                }
+                            },
+                        ),
+                    )
                     if (isDom && d.lowMoods.isNotEmpty()) add(
                         InboxGroup(
                             key = "moods",
