@@ -5,6 +5,18 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material3.Button
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -99,6 +111,19 @@ class TaskListViewModel @Inject constructor(
         }
     }
 
+    /** Sends the kit tasks under review; whoever they're for hears once. */
+    fun sendDrafts(to: String) = action {
+        val sent = api.sendDrafts(sessions.requireRelationshipId())
+        say("Sent ${sent.size} task${if (sent.size == 1) "" else "s"} to $to")
+        refresh()
+    }
+
+    fun dropDraft(t: Task) = action {
+        api.deleteTask(t.id)
+        say("Dropped “${t.title}”")
+        refresh()
+    }
+
     /** A count task: [by] 1 for a tap, or [to] to set the count outright. */
     fun count(o: Occurrence, by: Int? = null, to: Int? = null) = action {
         val r = api.count(o.id, app.obey.api.CountChange(by = by, to = to))
@@ -156,8 +181,10 @@ fun TaskListScreen(
             Load.Loading -> LoadingBox(Modifier.padding(padding))
             is Load.Failed -> ErrorBox(s.message, vm::refresh, Modifier.padding(padding))
             is Load.Ready -> LazyColumn(Modifier.padding(padding).fillMaxSize()) {
-                if (s.value.isEmpty()) item { EmptyBox("No tasks yet", "Create one with the + button.") }
-                items(s.value, key = { it.id }) { t ->
+                val (drafts, tasks) = s.value.partition { it.draft }
+                if (drafts.isNotEmpty()) item(key = "kit-review") { KitReview(drafts, vm.session, onOpen, onSend = vm::sendDrafts, onDrop = vm::dropDraft) }
+                if (tasks.isEmpty() && drafts.isEmpty()) item { EmptyBox("No tasks yet", "Create one with the + button.") }
+                items(tasks, key = { it.id }) { t ->
                     val who = vm.session?.nameOf(t.assigneeId)
                     ListItem(
                         modifier = Modifier.clickable { onOpen(t.id) },
@@ -187,6 +214,42 @@ fun TaskListScreen(
     }
     running?.let { o -> app.obey.ui.today.RitualSheet(o, onDismiss = { running = null; vm.refresh() }, onNeedsProof = { running = null; noting = it }) }
     noting?.let { o -> app.obey.ui.today.DoneDialog(o, onDismiss = { noting = null }, onDone = { note, mood, entry -> vm.complete(o, note, mood, entry); noting = null }) }
+}
+
+/** Tasks just added from a kit, for the Dominant to look over (open to edit, or drop) before whoever they're for gets them. */
+@Composable
+private fun KitReview(drafts: List<Task>, session: Session?, onOpen: (String) -> Unit, onSend: (String) -> Unit, onDrop: (Task) -> Unit) {
+    val who = drafts.map { session?.nameOf(it.assigneeId) ?: "them" }.distinct().joinToString(" and ")
+    val c = MaterialTheme.colorScheme
+    Surface(
+        color = c.tertiaryContainer,
+        contentColor = c.onTertiaryContainer,
+        shape = RoundedCornerShape(24.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Look these over before $who gets them", style = MaterialTheme.typography.titleMedium)
+                Text("Added from a kit. Change or drop any of them, then send. $who hears once, when you do.", style = MaterialTheme.typography.bodyMedium)
+            }
+            Column(Modifier.clip(RoundedCornerShape(16.dp)), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                drafts.forEach { t ->
+                    ListItem(
+                        modifier = Modifier.clickable { onOpen(t.id) },
+                        colors = ListItemDefaults.colors(containerColor = c.surfaceContainerLow),
+                        headlineContent = { Text(t.title) },
+                        supportingContent = { Text(listOfNotNull(t.summary, t.dueTime?.let { "at ${formatClock(it)}" }).joinToString(" ")) },
+                        trailingContent = { IconButton(onClick = { onDrop(t) }) { Icon(Icons.Outlined.Delete, "Drop “${t.title}”") } },
+                    )
+                }
+            }
+            Button(onClick = { onSend(who) }) {
+                Icon(Icons.AutoMirrored.Outlined.Send, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Send to $who")
+            }
+        }
+    }
 }
 
 /** Today's state for a task, with a one-tap Done when it's the viewer's to do. */

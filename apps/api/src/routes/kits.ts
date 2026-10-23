@@ -38,12 +38,15 @@ function withDependencies(all: KitItem[], picked: KitItem[]) {
  * they manage and share by a code.
  */
 export const kitRoutes = (deps: Deps) => async (app: FastifyInstance) => {
-  const { db, notifier } = deps;
+  const { db } = deps;
   const horizon = (zone: string) => addDays(localDate(deps.now(), zone), deps.materializeDays);
 
   app.get("/kits", async () => starterKits);
 
-  /** Adds the chosen items of a kit to a dynamic, linking tasks to the rewards and consequences added with them. */
+  /**
+   * Adds the chosen items of a kit to a dynamic, linking tasks to the rewards and consequences added with them. Tasks for
+   * someone else arrive as drafts for the Dominant to look over and send, so a kit never lands on anyone unread.
+   */
   async function applyItems(req: { body: unknown; user: { id: string } }, relationshipId: string, items: KitItem[]): Promise<ApplyKitResult> {
     await requireManager(db, relationshipId, req.user.id);
     const body = applyKit.parse(req.body);
@@ -56,7 +59,7 @@ export const kitRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     }
 
     return db.transaction(async (tx) => {
-      const counts = { tasks: 0, rules: 0, protocols: 0, rewards: 0, consequences: 0 };
+      const counts = { tasks: 0, rules: 0, protocols: 0, rewards: 0, consequences: 0, drafts: 0 };
       const position = async (table: typeof rules | typeof protocols) => {
         const [{ last }] = (await tx
           .select({ last: sql<number>`coalesce(max(${table.position}), 0)::int` })
@@ -102,6 +105,7 @@ export const kitRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       // A task whose time has already passed today starts tomorrow, so nothing arrives overdue.
       const now = DateTime.fromJSDate(deps.now()).setZone(body.timezone);
       const startFor = (dueTime?: string) => (body.start === now.toISODate() && dueTime && dueTime <= now.toFormat("HH:mm") ? addDays(body.start, 1) : body.start);
+      const draft = body.assigneeId !== req.user.id;
       for (const item of tasks) {
         const [s] = await tx
           .insert(taskSeries)
@@ -132,20 +136,16 @@ export const kitRoutes = (deps: Deps) => async (app: FastifyInstance) => {
             consequenceDueTime: item.consequenceDueTime ?? null,
             rewardId: (item.rewardKey && ids.get(item.rewardKey)) || null,
             timezone: body.timezone,
+            draft,
           })
           .returning();
         await materializeSeries(tx, s!, horizon(s!.timezone), deps.now());
         counts.tasks++;
+        if (draft) counts.drafts++;
       }
       return counts;
     });
   }
-
-  const announce = async (assigneeId: string | undefined, me: string, result: ApplyKitResult) => {
-    if (result.tasks && assigneeId && assigneeId !== me) {
-      await notifier.send([assigneeId], { title: "Fealty", body: `You have ${result.tasks} new task${result.tasks === 1 ? "" : "s"}`, data: { type: "task_assigned" } });
-    }
-  };
 
   const ownKit = async (id: string, userId: string) => {
     if (!/^[0-9a-f-]{36}$/i.test(id)) throw notFound();
@@ -167,17 +167,13 @@ export const kitRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   app.post<{ Params: { id: string; kit: string } }>("/relationships/:id/kits/:kit", async (req, reply) => {
     const starter = starterKits.find((k) => k.id === req.params.kit);
     const items = starter ? starter.items : (await ownKit(req.params.kit, req.user.id)).items;
-    const result = await applyItems(req, req.params.id, items);
-    await announce((req.body as { assigneeId?: string }).assigneeId, req.user.id, result);
-    return reply.status(201).send(result);
+    return reply.status(201).send(await applyItems(req, req.params.id, items));
   });
 
   // Add a kit someone shared straight to a dynamic, without saving it first.
   app.post<{ Params: { id: string; code: string } }>("/relationships/:id/shared-kits/:code", async (req, reply) => {
     const k = await sharedKitByCode(req.params.code);
-    const result = await applyItems(req, req.params.id, k.items);
-    await announce((req.body as { assigneeId?: string }).assigneeId, req.user.id, result);
-    return reply.status(201).send(result);
+    return reply.status(201).send(await applyItems(req, req.params.id, k.items));
   });
 
   app.get("/me/kits", async (req) => (await db.select().from(kits).where(eq(kits.ownerId, req.user.id)).orderBy(desc(kits.updatedAt))).map(toKit));

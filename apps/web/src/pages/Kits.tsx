@@ -220,7 +220,7 @@ export function KitDialog({ kit, source, onClose, onApplied }: { kit: KitLike; s
       { ...source, items: chosen.map((i) => i.key), assigneeId: hasTasks ? assignee : undefined, timezone: browserTimeZone(), start: today() },
       {
         onSuccess: (r) => {
-          snack(addedText(r));
+          snack(r.drafts ? `${addedText(r)}. Look them over, then send` : addedText(r));
           onClose();
           onApplied?.();
           void navigate({ to: r.tasks ? "/tasks" : r.rules ? "/rules" : r.protocols ? "/protocols" : r.rewards ? "/rewards" : "/consequences" });
@@ -499,7 +499,7 @@ export function NewKitPage() {
   if (tasks.error) return <ErrorBox error={tasks.error} onRetry={() => void tasks.refetch()} />;
   if (!tasks.data) return <Loading />;
 
-  const usableTasks = tasks.data.filter((t) => t.active && !t.assignedConsequenceId);
+  const usableTasks = tasks.data.filter((t) => t.active && !t.draft && !t.assignedConsequenceId);
   const pickedTasks = usableTasks.filter((t) => picked.has(t.id));
   // What comes along without being ticked: a task's reward and consequence, a rule's protocols.
   const along = new Map<string, string>();

@@ -97,6 +97,10 @@ interface ObeyApi {
     @GET("relationships/{id}/tasks")
     suspend fun tasks(@Path("id") relationshipId: String): List<Task>
 
+    /** Sends kit tasks waiting for review to whoever they're for; an empty body sends all of them. */
+    @POST("relationships/{id}/tasks/send")
+    suspend fun sendDrafts(@Path("id") relationshipId: String, @Body body: Map<String, List<String>> = emptyMap()): List<Task>
+
     @POST("relationships/{id}/tasks")
     suspend fun createTask(@Path("id") relationshipId: String, @Body body: TaskInput): Task
 
