@@ -245,6 +245,8 @@ export const taskSeries = pgTable(
       .default("default"),
     reminderText: text("reminder_text"),
     active: boolean("active").notNull().default(true),
+    /** Added from a kit and waiting for the Dominant to look it over: no occurrences, and hidden from the assignee. */
+    draft: boolean("draft").notNull().default(false),
     /** Set on the consequence handed out automatically for this missed occurrence; unique, so it's issued once. */
     causedByOccurrenceId: uuid("caused_by_occurrence_id").references((): AnyPgColumn => occurrences.id, { onDelete: "set null" }),
     /** Set when "this and following" rescheduling splits the series. */

@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+import { DateTime } from "luxon";
 import { z } from "zod";
 import {
   type TaskStats,
@@ -15,6 +16,7 @@ import {
   reviewOccurrence as reviewBody,
   taskInput,
   tickStep as tickStepBody,
+  sendDraftsInput,
 } from "@obey/contracts";
 import { addDays, dueInstant, localDate } from "@obey/recurrence";
 import type { Deps } from "../app.js";
@@ -179,13 +181,46 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   const horizon = (zone: string) => addDays(localDate(deps.now(), zone), deps.materializeDays);
 
   app.get<{ Params: { id: string } }>("/relationships/:id/tasks", async (req) => {
-    await requireMember(db, req.params.id, req.user.id);
+    const member = await requireMember(db, req.params.id, req.user.id);
     const rows = await db
       .select()
       .from(taskSeries)
       .where(and(eq(taskSeries.relationshipId, req.params.id), eq(taskSeries.active, true), isNull(taskSeries.curfewUntil)))
       .orderBy(asc(taskSeries.title));
-    return rows.map(taskDto);
+    // A kit's tasks under review are the Dominant's until sent.
+    return rows.filter((s) => !s.draft || (canManage(member.role) && s.assigneeId !== req.user.id)).map(taskDto);
+  });
+
+  /** Sends kit tasks under review: they start today (or tomorrow, if today's time has passed) and the assignee hears once. */
+  app.post<{ Params: { id: string } }>("/relationships/:id/tasks/send", async (req) => {
+    await requireManager(db, req.params.id, req.user.id);
+    const { ids } = sendDraftsInput.parse(req.body);
+    const sent = await db.transaction(async (tx) => {
+      const drafts = await tx
+        .select()
+        .from(taskSeries)
+        .where(and(eq(taskSeries.relationshipId, req.params.id), eq(taskSeries.draft, true), eq(taskSeries.active, true), ...(ids ? [inArray(taskSeries.id, ids)] : [])))
+        .for("update");
+      const out: (typeof taskSeries.$inferSelect)[] = [];
+      for (const d of drafts) {
+        const now = DateTime.fromJSDate(deps.now()).setZone(d.timezone);
+        const today = now.toISODate()!;
+        const start = d.schedule.start > today ? d.schedule.start : d.dueTime && d.dueTime <= now.toFormat("HH:mm") ? addDays(today, 1) : today;
+        const [s] = await tx
+          .update(taskSeries)
+          .set({ draft: false, schedule: { ...d.schedule, start }, updatedAt: deps.now() })
+          .where(eq(taskSeries.id, d.id))
+          .returning();
+        await materializeSeries(tx, s!, horizon(s!.timezone), deps.now());
+        out.push(s!);
+      }
+      return out;
+    });
+    const byAssignee = new Map<string, number>();
+    for (const s of sent) byAssignee.set(s.assigneeId, (byAssignee.get(s.assigneeId) ?? 0) + 1);
+    for (const [userId, n] of byAssignee)
+      if (userId !== req.user.id) await notifier.send([userId], { title: "Fealty", body: `You have ${n} new task${n === 1 ? "" : "s"}`, data: { type: "task_assigned" } });
+    return sent.map(taskDto);
   });
 
   app.post<{ Params: { id: string } }>("/relationships/:id/tasks", async (req, reply) => {

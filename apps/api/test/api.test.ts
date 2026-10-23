@@ -1459,7 +1459,7 @@ describe("broken-rule log", () => {
 
 describe("starter kits", () => {
   it("adds the picked parts of a kit, with protocols linked to their rules", async () => {
-    const { dom, sub, relId, subId } = await ctx.pair();
+    const { dom, sub, relId, subId, domId } = await ctx.pair();
     expect((await sub.get("/kits")).body.map((k: { id: string }) => k.id)).toContain("daily-basics");
     const base = { timezone: "America/New_York", start: "2026-10-16" };
 
@@ -1467,13 +1467,22 @@ describe("starter kits", () => {
     expect((await dom.post(`/relationships/${relId}/kits/nope`, base)).status).toBe(404);
     expect((await dom.post(`/relationships/${relId}/kits/daily-basics`, base)).status).toBe(400);
 
+    const sentBefore = ctx.notifier.sent.length;
     const added = await dom.post(`/relationships/${relId}/kits/daily-basics`, { ...base, items: ["morning", "lights"], assigneeId: subId });
     expect(added.status).toBe(201);
-    expect(added.body).toEqual({ tasks: 2, rules: 0, protocols: 0, rewards: 0, consequences: 0 });
+    expect(added.body).toEqual({ tasks: 2, rules: 0, protocols: 0, rewards: 0, consequences: 0, drafts: 2 });
+    // The tasks wait for the Dominant to look them over: the sub neither hears nor sees them yet.
+    expect(ctx.notifier.sent.length).toBe(sentBefore);
+    expect((await sub.get(`/relationships/${relId}/tasks`)).body).toEqual([]);
+    const drafts = (await dom.get(`/relationships/${relId}/tasks`)).body;
+    expect(drafts.map((t: { draft: boolean }) => t.draft)).toEqual([true, true]);
+    expect((await dom.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-17`)).body).toEqual([]);
+    expect((await sub.post(`/relationships/${relId}/tasks/send`, {})).status).toBe(403);
+    expect((await dom.post(`/relationships/${relId}/tasks/send`, {})).body.map((t: { draft: boolean }) => t.draft)).toEqual([false, false]);
     expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [subId], push: { body: "You have 2 new tasks" } });
     const tasks = (await sub.get(`/relationships/${relId}/tasks`)).body;
     expect(tasks.map((t: { title: string }) => t.title).sort()).toEqual(["Lights out", "Morning check-in"]);
-    // It's 8 am in New York: both start today. At 10 am, the 9 am check-in would start tomorrow instead.
+    // It's 8 am in New York: both start today. Sent at 10 am, the 9 am check-in starts tomorrow instead.
     const firsts = async () =>
       Object.fromEntries(
         ((await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-17`)).body as { title: string; originalDate: string }[])
@@ -1481,17 +1490,17 @@ describe("starter kits", () => {
           .map((o) => [o.title, o.originalDate]),
       );
     expect(await firsts()).toMatchObject({ "Morning check-in": "2026-10-16", "Lights out": "2026-10-16" });
-    ctx.clock.now = new Date("2026-10-16T14:00:00Z");
     await dom.post(`/relationships/${relId}/kits/daily-basics`, { ...base, items: ["morning"], assigneeId: subId });
+    const draft = (await dom.get(`/relationships/${relId}/tasks`)).body.find((t: { draft: boolean }) => t.draft);
+    ctx.clock.now = new Date("2026-10-16T14:00:00Z");
+    expect((await dom.post(`/relationships/${relId}/tasks/send`, { ids: [draft.id] })).body[0].schedule.start).toBe("2026-10-17");
     ctx.clock.now = new Date("2026-10-16T12:00:00Z");
-    const later = (await sub.get(`/relationships/${relId}/tasks`)).body.find(
-      (t: { id: string; title: string }) => t.title === "Morning check-in" && !tasks.some((x: { id: string }) => x.id === t.id),
-    );
-    expect(later.schedule.start).toBe("2026-10-17");
+    // A kit's tasks for yourself need no review.
+    expect((await dom.post(`/relationships/${relId}/kits/daily-basics`, { ...base, items: ["lights"], assigneeId: domId })).body.drafts).toBe(0);
 
     // Rules need no assignee; protocols point at the rule they spell out.
     const rules = await dom.post(`/relationships/${relId}/kits/rules`, { ...base, items: ["hydrated", "hydrated-p"] });
-    expect(rules.body).toEqual({ tasks: 0, rules: 1, protocols: 1, rewards: 0, consequences: 0 });
+    expect(rules.body).toEqual({ tasks: 0, rules: 1, protocols: 1, rewards: 0, consequences: 0, drafts: 0 });
     const [rule] = (await sub.get(`/relationships/${relId}/rules`)).body;
     const [proto] = (await sub.get(`/relationships/${relId}/protocols`)).body;
     expect(proto.ruleId).toBe(rule.id);

@@ -1,0 +1,1 @@
+ALTER TABLE "task_series" ADD COLUMN "draft" boolean DEFAULT false NOT NULL;

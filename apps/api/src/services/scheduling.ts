@@ -32,7 +32,7 @@ const maxDate = (a: PlainDate, b: PlainDate) => (a > b ? a : b);
  * (series, original_date) key means re-running never duplicates or resurrects a moved occurrence.
  */
 export async function materializeSeries(db: Tx, series: Series, through: PlainDate, now: Date): Promise<void> {
-  if (!series.active) return;
+  if (!series.active || series.draft) return;
   const { schedule } = series;
   let dates: PlainDate[];
   if (!schedule.rule) {

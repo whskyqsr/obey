@@ -297,6 +297,15 @@ export function useSaveTask(rel: string) {
   });
 }
 
+/** Sends kit tasks waiting for review; with no ids, all of them. */
+export function useSendDrafts(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (ids?: string[]) => api<Task[]>(`/relationships/${rel}/tasks/send`, { method: "POST", body: ids ? { ids } : {} }),
+    onSuccess: () => invalidate(),
+  });
+}
+
 export function useDeleteTask(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({

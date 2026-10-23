@@ -394,6 +394,8 @@ data class Task(
     /** Set when this one-off task is a consequence handed out on its own. */
     val assignedConsequenceId: String? = null,
     val active: Boolean,
+    /** Added from a kit, waiting for the Dominant to look it over and send it; only they see it until then. */
+    val draft: Boolean = false,
     val createdBy: String,
     val createdAt: String,
 ) {
@@ -1121,7 +1123,8 @@ data class ApplyKitInput(
 )
 
 @Serializable
-data class ApplyKitResult(val tasks: Int, val rules: Int, val protocols: Int, val rewards: Int = 0, val consequences: Int = 0)
+/** [drafts]: tasks for someone else, waiting for the Dominant to look over and send. */
+data class ApplyKitResult(val tasks: Int, val rules: Int, val protocols: Int, val rewards: Int = 0, val consequences: Int = 0, val drafts: Int = 0)
 
 /** A kit someone saved from a dynamic: theirs alone, shareable by code. */
 @Serializable

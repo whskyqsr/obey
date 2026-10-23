@@ -196,7 +196,7 @@ class KitsViewModel @Inject constructor(private val api: ObeyApi, private val se
                     val protocols = async { if (f.protocols) api.protocols(rel) else emptyList() }
                     val rewards = async { if (f.points) api.rewards(rel) else emptyList() }
                     val consequences = async { if (f.consequences) api.consequences(rel) else emptyList() }
-                    KitLibrary(tasks.await().filter { it.active && it.assignedConsequenceId == null }, rules.await(), protocols.await(), rewards.await(), consequences.await())
+                    KitLibrary(tasks.await().filter { it.active && !it.draft && it.assignedConsequenceId == null }, rules.await(), protocols.await(), rewards.await(), consequences.await())
                 }
             }
         }
@@ -900,5 +900,6 @@ fun KitPrompt(onBrowse: () -> Unit, modifier: Modifier = Modifier) {
 /** "Added 3 tasks, 1 rule" for the snackbar after a kit is added. */
 fun ApplyKitResult.describe(): String {
     fun n(count: Int, word: String) = if (count == 0) null else "$count $word${if (count == 1) "" else "s"}"
-    return "Added " + listOfNotNull(n(tasks, "task"), n(rules, "rule"), n(protocols, "protocol"), n(rewards, "reward"), n(consequences, "consequence")).joinToString(", ")
+    return "Added " + listOfNotNull(n(tasks, "task"), n(rules, "rule"), n(protocols, "protocol"), n(rewards, "reward"), n(consequences, "consequence")).joinToString(", ") +
+        if (drafts > 0) ". Look them over, then send" else ""
 }

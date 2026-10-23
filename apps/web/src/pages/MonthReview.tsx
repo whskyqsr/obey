@@ -175,7 +175,7 @@ const usePickable = () => {
   const { rel, me } = useRel();
   const tasks = useTasks(rel.id);
   const sub = rel.members.find((m) => m.role === "submissive")?.userId ?? rel.members.find((m) => m.role === "switch" && m.userId !== me.user.id)?.userId;
-  return (tasks.data ?? []).filter((t) => t.active && !t.assignedConsequenceId && t.assigneeId === sub);
+  return (tasks.data ?? []).filter((t) => t.active && !t.draft && !t.assignedConsequenceId && t.assigneeId === sub);
 };
 
 function FocusDialog({ month, focus, onClose }: { month: string; focus: MonthFocus | null; onClose(): void }) {

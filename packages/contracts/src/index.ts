@@ -273,10 +273,14 @@ export const task = taskInput.extend({
   /** Set when this task is a consequence assigned on its own, not a regular task. */
   assignedConsequenceId: id.nullable().default(null),
   active: z.boolean(),
+  /** Added from a kit, waiting for the Dominant to look it over and send it; only they see it until then. */
+  draft: z.boolean().default(false),
   createdBy: id,
   createdAt: z.string(),
 });
 export type Task = z.infer<typeof task>;
+/** Sends kit tasks waiting for review to whoever they're for; with no ids, all of them. */
+export const sendDraftsInput = z.object({ ids: z.array(id).max(200).optional() });
 
 export const occurrenceStatus = z.enum(["pending", "submitted", "completed", "missed", "excused", "cancelled"]);
 export type OccurrenceStatus = z.infer<typeof occurrenceStatus>;
@@ -1089,7 +1093,15 @@ export const applyKit = z.object({
   timezone: z.string().min(1).max(64),
   start: plainDate,
 });
-export const applyKitResult = z.object({ tasks: z.number(), rules: z.number(), protocols: z.number(), rewards: z.number(), consequences: z.number() });
+export const applyKitResult = z.object({
+  tasks: z.number(),
+  rules: z.number(),
+  protocols: z.number(),
+  rewards: z.number(),
+  consequences: z.number(),
+  /** Tasks for someone else wait for review before they're sent. */
+  drafts: z.number().default(0),
+});
 export type ApplyKitResult = z.infer<typeof applyKitResult>;
 
 /** A kit someone saved: theirs alone, usable in any dynamic they manage, and shareable by a code. */

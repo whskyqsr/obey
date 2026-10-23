@@ -1,11 +1,12 @@
 import { CountRing, canCount, isCounted, useCountTap } from "../components/Count";
 import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { useTasks } from "../api/hooks";
-import type { Occurrence } from "../api/types";
+import { useDeleteTask, useSendDrafts, useTasks } from "../api/hooks";
+import { errorMessage } from "../api/client";
+import type { Occurrence, Task } from "../api/types";
 import { CompleteDialog, isOverdue } from "../components/OccurrenceCard";
 import { RitualDialog, isRitual } from "../components/Ritual";
-import { Badge, Button, Chip, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, TextField } from "../components/ui";
+import { Badge, Button, Chip, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, TextField, useSnackbar } from "../components/ui";
 import { useCurrentOccurrences } from "../lib/currentOccurrences";
 import { StreakStrip } from "../components/StreakStrip";
 import { fmtClock, fmtDate, localDateOf, today } from "../lib/dates";
@@ -19,10 +20,12 @@ export function TasksPage() {
   const [mineOnly, setMineOnly] = useState(false);
   const { byTask } = useCurrentOccurrences();
   const [completing, setCompleting] = useState<Occurrence | null>(null);
+  const drafts = (tasks.data ?? []).filter((t) => t.draft);
 
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return (tasks.data ?? [])
+      .filter((t) => !t.draft)
       .filter((t) => !needle || t.title.toLowerCase().includes(needle) || t.summary.toLowerCase().includes(needle))
       .filter((t) => !mineOnly || t.assigneeId === me.user.id)
       .sort((a, b) => Number(b.active) - Number(a.active) || a.title.localeCompare(b.title));
@@ -47,6 +50,7 @@ export function TasksPage() {
           Assigned to me
         </Chip>
       </div>
+      {drafts.length > 0 && <KitReview drafts={drafts} />}
       {tasks.isLoading && <Loading />}
       {tasks.error && <ErrorBox error={tasks.error} onRetry={() => tasks.refetch()} />}
       {tasks.data && !list.length && (
@@ -103,6 +107,54 @@ export function TasksPage() {
       {completing && isRitual(completing) && <RitualDialog o={completing} open onClose={() => setCompleting(null)} />}
       {isDom && <Fab icon="add" label="New task" onClick={() => navigate({ to: "/tasks/$taskId", params: { taskId: "new" } })} />}
     </>
+  );
+}
+
+/** Tasks just added from a kit, for the Dominant to look over (edit, or drop) before whoever they're for gets them. */
+function KitReview({ drafts }: { drafts: Task[] }) {
+  const { rel, memberName } = useRel();
+  const navigate = useNavigate();
+  const snack = useSnackbar();
+  const send = useSendDrafts(rel.id);
+  const remove = useDeleteTask(rel.id);
+  const who = [...new Set(drafts.map((t) => memberName(t.assigneeId)))].join(" and ");
+  const edit = (t: Task) => navigate({ to: "/tasks/$taskId/edit", params: { taskId: t.id } });
+  return (
+    <section aria-label="From a kit" className="mx-4 mb-4 flex flex-col gap-3 rounded-xl bg-tertiary-container p-4 text-on-tertiary-container md:mx-6">
+      <div>
+        <h2 className="text-title-medium">Look these over before {who} gets them</h2>
+        <p className="text-body-medium opacity-85">Added from a kit. Change or drop any of them, then send. {who} hears once, when you do.</p>
+      </div>
+      <div className="flex flex-col gap-px overflow-hidden rounded-lg">
+        {drafts.map((t) => (
+          <div key={t.id} className="flex items-center gap-1 bg-surface-container-low pr-1 text-on-surface">
+            <button type="button" onClick={() => edit(t)} className="state-layer flex min-w-0 flex-1 flex-col items-start px-4 py-3 text-left">
+              <span className="truncate text-body-large">{t.title}</span>
+              <span className="truncate text-body-medium text-on-surface-variant">
+                {t.summary}
+                {t.dueTime ? ` at ${fmtClock(t.dueTime)}` : ""}
+              </span>
+            </button>
+            <IconButton icon="edit" label={`Edit “${t.title}”`} onClick={() => edit(t)} />
+            <IconButton
+              icon="delete"
+              label={`Drop “${t.title}”`}
+              disabled={remove.isPending}
+              onClick={() => remove.mutate(t.id, { onSuccess: () => snack(`Dropped “${t.title}”`), onError: (e) => snack(errorMessage(e)) })}
+            />
+          </div>
+        ))}
+      </div>
+      <div>
+        <Button
+          icon="send"
+          busy={send.isPending}
+          onClick={() => send.mutate(undefined, { onSuccess: (sent) => snack(`Sent ${sent.length} task${sent.length === 1 ? "" : "s"} to ${who}`), onError: (e) => snack(errorMessage(e)) })}
+        >
+          Send to {who}
+        </Button>
+      </div>
+    </section>
   );
 }
 

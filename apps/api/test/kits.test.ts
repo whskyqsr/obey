@@ -58,7 +58,8 @@ describe("your own kits", () => {
     await sub2.post("/relationships/join", { code: (await dom.post(`/relationships/${rel2.id}/invites`)).body.code, role: "submissive" });
     const jo = (await sub2.get("/me")).body.user.id;
     const added = await dom.post(`/relationships/${rel2.id}/kits/${kit.id}`, { ...base, items: [t.key], assigneeId: jo });
-    expect(added.body).toEqual({ tasks: 1, rules: 0, protocols: 0, rewards: 0, consequences: 1 });
+    expect(added.body).toEqual({ tasks: 1, rules: 0, protocols: 0, rewards: 0, consequences: 1, drafts: 1 });
+    await dom.post(`/relationships/${rel2.id}/tasks/send`, {});
     const [newTask] = (await sub2.get(`/relationships/${rel2.id}/tasks`)).body;
     const [newLines] = (await sub2.get(`/relationships/${rel2.id}/consequences`)).body;
     expect(newTask).toMatchObject({ title: "Lights out", consequenceId: newLines.id, points: 5, proofRequired: true, dueTime: "23:00" });

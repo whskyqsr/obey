@@ -39,6 +39,7 @@ export const taskDto = (s: Series) => ({
   summary: describe(s.schedule),
   assignedConsequenceId: s.assignedConsequenceId,
   active: s.active,
+  draft: s.draft,
   createdBy: s.createdBy,
   createdAt: iso(s.createdAt),
 });
