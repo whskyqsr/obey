@@ -31,7 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
-import androidx.compose.material.icons.automirrored.outlined.EditNote
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.DoNotDisturbOn
 import androidx.compose.material.icons.filled.Favorite
@@ -619,7 +619,7 @@ fun LimitsEditScreen(onClose: () -> Unit, vm: LimitsViewModel = hiltViewModel())
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(i.title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                                     IconButton(onClick = { noting = i }) {
-                                        Icon(Icons.AutoMirrored.Outlined.EditNote, "Note on “${i.title}”", tint = if (now?.note.isNullOrEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary)
+                                        Icon(Icons.Outlined.EditNote, "Note on “${i.title}”", tint = if (now?.note.isNullOrEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary)
                                     }
                                     if (i.custom && i.createdBy == self.userId) IconButton(onClick = { vm.remove(i) }) { Icon(Icons.Outlined.Delete, "Remove “${i.title}”") }
                                 }
@@ -685,7 +685,7 @@ fun LimitsEditScreen(onClose: () -> Unit, vm: LimitsViewModel = hiltViewModel())
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(open) },
                             modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
                         )
-                        androidx.compose.material3.ExposedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                        ExposedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                             LIMIT_CATEGORIES.forEach { c -> DropdownMenuItem(text = { Text(c) }, onClick = { category = c; open = false }) }
                         }
                     }
