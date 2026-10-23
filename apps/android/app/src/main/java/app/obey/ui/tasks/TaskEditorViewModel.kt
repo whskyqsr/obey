@@ -35,6 +35,25 @@ import kotlinx.coroutines.launch
 enum class CountKind(val label: String) { Exactly("Exactly"), AtLeast("At least"), AtMost("At most"), Range("Range") }
 
 /** Grace chips. [Midnight] follows the due time, so moving the time keeps it meaning "until midnight". */
+val QUICK = listOf(15, 30, 60, 120)
+fun quickLabel(m: Int) = if (m < 60) "$m min" else if (m == 60) "1 hour" else "${m / 60} hours"
+
+/** "Due in 30 min": a one-off task due that long from now (to the next whole minute), with no grace period. */
+fun TaskForm.quickDeadline(minutes: Int): TaskForm {
+    val zone = ZoneId.systemDefault()
+    val due = java.time.ZonedDateTime.now(zone).plusMinutes(minutes.toLong()).plusSeconds(59).withSecond(0).withNano(0)
+    return copy(
+        quick = minutes,
+        start = due.toLocalDate(),
+        recurrence = RecurrenceDraft(),
+        allDay = false,
+        dueTime = due.toLocalTime(),
+        timezone = zone.id,
+        windowMinutes = null,
+        grace = Grace.None,
+    )
+}
+
 enum class Grace(val label: String) { None("None"), Quarter("15 min"), Hour("1 hour"), Midnight("Until midnight"), Custom("Custom") }
 
 data class TaskForm(
@@ -53,6 +72,8 @@ data class TaskForm(
     val dueTime: LocalTime = LocalTime.of(20, 0),
     val start: LocalDate = LocalDate.now(),
     val recurrence: RecurrenceDraft = RecurrenceDraft(),
+    /** A quick deadline, in minutes from now; the due time is worked out again on save. */
+    val quick: Int? = null,
     val consequenceId: String? = null,
     val consequenceDueDays: Int = 1,
     /** Null means any time that day. */
@@ -128,6 +149,7 @@ class TaskEditorViewModel @Inject constructor(
     val isNew: Boolean = route.taskId == null
     /** Weekday buttons follow the person's calendar. */
     val weekStart: java.time.DayOfWeek get() = sessions.session?.weekStart ?: java.time.DayOfWeek.SUNDAY
+    val myId: String? get() = sessions.session?.userId
 
     private val _data = MutableStateFlow<Load<EditorData>>(Load.Loading)
     val data: StateFlow<Load<EditorData>> = _data.asStateFlow()
@@ -212,7 +234,8 @@ class TaskEditorViewModel @Inject constructor(
     fun update(change: (TaskForm) -> TaskForm) = _form.update(change)
 
     fun save() {
-        val f = _form.value
+        // A quick deadline counts from when it's saved, not from when the chip was tapped.
+        val f = _form.value.let { f -> f.quick?.let { f.quickDeadline(it) } ?: f }
         if (!f.valid) {
             say(f.titleError ?: "Check the highlighted fields")
             return

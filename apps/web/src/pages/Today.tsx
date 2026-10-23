@@ -11,6 +11,7 @@ import { SceneCards } from "../components/SceneCards";
 import { RoleSwapCard } from "../components/RoleSwap";
 import { ChastityToday } from "../components/Chastity";
 import { SoloCards } from "../components/Solo";
+import { CountdownCard } from "../components/Countdown";
 import { KitPrompt } from "./Kits";
 import { Button, Empty, ErrorBox, Fab, Icon, Loading, PageHeader, Section } from "../components/ui";
 import { addDays, fmtDate, fmtRelative, localDateOf, today } from "../lib/dates";
@@ -79,6 +80,7 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
               .filter(Boolean)
               .join(" · ")}
           />
+          <CountdownCard />
           <RoleSwapCard />
           <SoloCards />
           <ChastityToday />

@@ -10,7 +10,7 @@ import { SortableList } from "../components/SortableList";
 import { MarkdownEditor } from "../components/MarkdownEditor";
 import { Button, Chip, ErrorBox, Icon, IconButton, Loading, SegmentedButtons, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
 import { type PickerState, defaultPicker, fromSchedule, preview, toSchedule } from "../recurrence/picker";
-import { browserTimeZone, fmtClock, fmtDate, today } from "../lib/dates";
+import { browserTimeZone, fmtClock, fmtDate, localDateOf, today } from "../lib/dates";
 import { ROLE_LABEL, useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
 
@@ -28,6 +28,8 @@ interface Form {
   proofRequired: boolean;
   approvalRequired: boolean;
   picker: PickerState;
+  /** A quick deadline, in minutes from now; the due time is worked out again on save. */
+  quick: number | null;
   allDay: boolean;
   dueTime: string;
   timezone: string;
@@ -66,6 +68,25 @@ const minutesOf = (hhmm: string) => {
   return h * 60 + m;
 };
 const toMidnight = (dueTime: string) => 24 * 60 - minutesOf(dueTime);
+
+const QUICK = [15, 30, 60, 120];
+const quickLabel = (m: number) => (m < 60 ? `${m} min` : m === 60 ? "1 hour" : `${m / 60} hours`);
+
+/** "Due in 30 min": a one-off task due that long from now (to the next whole minute), with no grace period. */
+function quickDeadline(minutes: number): Partial<Form> {
+  const due = new Date(Math.ceil((Date.now() + minutes * 60_000) / 60_000) * 60_000);
+  const hhmm = `${String(due.getHours()).padStart(2, "0")}:${String(due.getMinutes()).padStart(2, "0")}`;
+  return {
+    quick: minutes,
+    picker: defaultPicker(localDateOf(due)),
+    allDay: false,
+    dueTime: hhmm,
+    timezone: browserTimeZone(),
+    windowMinutes: null,
+    grace: "none",
+    graceMinutes: 0,
+  };
+}
 
 function graceOf(task: Task | undefined): Grace {
   const g = task?.graceMinutes ?? 0;
@@ -107,6 +128,7 @@ function formFrom(task: Task | undefined, defaultAssignee: string, start?: strin
     approvalRequired: task?.approvalRequired ?? false,
     // From a calendar day it's a one-off on that day, like a new calendar event; otherwise daily from today.
     picker: task ? fromSchedule(task.schedule) : start ? defaultPicker(start) : { ...defaultPicker(today()), kind: "days" },
+    quick: null,
     allDay: task ? task.dueTime === null : false,
     dueTime: task?.dueTime ?? "21:00",
     timezone: task?.timezone ?? browserTimeZone(),
@@ -212,7 +234,7 @@ function clockAfter(minutes: number) {
 }
 
 function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readOnly: boolean; defaultAssignee: string; start?: string }) {
-  const { rel, features, memberName, solo } = useRel();
+  const { rel, features, memberName, solo, me } = useRel();
   const navigate = useNavigate();
   const snack = useSnackbar();
   const save = useSaveTask(rel.id);
@@ -234,7 +256,8 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
     e.preventDefault();
     if (!canSave) return;
     save.mutate(
-      { id: task?.id, input: toInput(form) },
+      // A quick deadline counts from when it's saved, not from when the chip was tapped.
+      { id: task?.id, input: toInput(form.quick ? { ...form, ...quickDeadline(form.quick) } : form) },
       {
         onSuccess: (saved) => {
           snack(task ? "Task saved" : "Task created");
@@ -248,7 +271,12 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
 
   // Each section collapses to a sentence, so the whole task reads at a glance.
   const when = form.allDay ? ", all day" : form.dueTime ? ` at ${fmtClock(form.dueTime)}` : "";
-  const scheduleTitle = form.picker.kind === "once" ? `Once, ${fmtDate(form.picker.start)}${when}` : `${sched.summary || "Schedule"}${when}`;
+  const quickWhen = form.quick ? `Once, at ${fmtClock(form.dueTime)}${form.picker.start === today() ? " today" : ` ${fmtDate(form.picker.start, { weekday: "long" })}`}` : "";
+  const scheduleTitle = form.quick
+    ? `Due in ${quickLabel(form.quick)}`
+    : form.picker.kind === "once"
+      ? `Once, ${fmtDate(form.picker.start)}${when}`
+      : `${sched.summary || "Schedule"}${when}`;
   const scheduleSub = sched.errors.length
     ? (sched.errors[0] ?? "")
     : [
@@ -377,51 +405,78 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
             )}
           </Fold>
 
-          <Fold icon="event_repeat" title={scheduleTitle} sub={scheduleSub} error={!!sched.errors.length} open={readOnly || !task}>
-            <RecurrencePicker value={form.picker} onChange={(picker) => set({ picker })} />
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="w-full sm:w-auto">
-                <Switch checked={form.allDay} onChange={(allDay) => set({ allDay })} label="All day" help="Due by the end of the day" />
-              </div>
-              {!form.allDay && <TextField label="Due at" type="time" value={form.dueTime} onChange={(e) => set({ dueTime: e.target.value })} className="w-36" />}
-              {!form.allDay && (
-                <Select
-                  label="Can be done"
-                  value={form.windowMinutes ?? ""}
-                  onChange={(e) => set({ windowMinutes: e.target.value ? Number(e.target.value) : null })}
-                  className="w-48"
-                >
-                  {[...new Set([...WINDOWS, form.windowMinutes])].map((m) => (
-                    <option key={m ?? "any"} value={m ?? ""}>
-                      {windowLabel(m)}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </div>
-            {changingZone ? (
-              <Select label="Time zone" value={form.timezone} onChange={(e) => set({ timezone: e.target.value })}>
-                {[...new Set([form.timezone, ...Intl.supportedValuesOf("timeZone")])].map((z) => (
-                  <option key={z} value={z}>
-                    {z.replace(/_/g, " ")}
-                  </option>
+          <Fold
+            icon={form.quick ? "schedule" : "event_repeat"}
+            title={scheduleTitle}
+            sub={form.quick ? quickWhen : scheduleSub}
+            error={!form.quick && !!sched.errors.length}
+            open={readOnly || !task}
+          >
+            {!task && !readOnly && (
+              <div className="flex flex-wrap gap-2">
+                {QUICK.map((m) => (
+                  <Chip key={m} icon="bolt" selected={form.quick === m} onClick={() => set(quickDeadline(m))}>
+                    {m === QUICK[0] ? `In ${quickLabel(m)}` : quickLabel(m)}
+                  </Chip>
                 ))}
-              </Select>
-            ) : (
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <div className="text-body-large text-on-surface">Time zone</div>
-                  <div className="text-body-medium text-on-surface-variant">
-                    {tzName(form.timezone)}
-                    {form.timezone === browserTimeZone() ? " (this device)" : ""}
-                  </div>
-                </div>
-                {!readOnly && (
-                  <Button variant="text" onClick={() => setChangingZone(true)}>
-                    Change
-                  </Button>
-                )}
+                <Chip icon="calendar_month" selected={!form.quick} onClick={() => set({ quick: null })}>
+                  Pick a day and time
+                </Chip>
               </div>
+            )}
+            {form.quick ? (
+              <p className="text-body-medium text-on-surface-variant">
+                Quick deadlines are one-off tasks with no grace period.{" "}
+                {form.assigneeId === me.user.id ? "You get a countdown on Today." : `${memberName(form.assigneeId)} gets a push right away and a countdown on Today.`}
+              </p>
+            ) : (
+              <>
+                <RecurrencePicker value={form.picker} onChange={(picker) => set({ picker })} />
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="w-full sm:w-auto">
+                    <Switch checked={form.allDay} onChange={(allDay) => set({ allDay })} label="All day" help="Due by the end of the day" />
+                  </div>
+                  {!form.allDay && <TextField label="Due at" type="time" value={form.dueTime} onChange={(e) => set({ dueTime: e.target.value })} className="w-36" />}
+                  {!form.allDay && (
+                    <Select
+                      label="Can be done"
+                      value={form.windowMinutes ?? ""}
+                      onChange={(e) => set({ windowMinutes: e.target.value ? Number(e.target.value) : null })}
+                      className="w-48"
+                    >
+                      {[...new Set([...WINDOWS, form.windowMinutes])].map((m) => (
+                        <option key={m ?? "any"} value={m ?? ""}>
+                          {windowLabel(m)}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                </div>
+                {changingZone ? (
+                  <Select label="Time zone" value={form.timezone} onChange={(e) => set({ timezone: e.target.value })}>
+                    {[...new Set([form.timezone, ...Intl.supportedValuesOf("timeZone")])].map((z) => (
+                      <option key={z} value={z}>
+                        {z.replace(/_/g, " ")}
+                      </option>
+                    ))}
+                  </Select>
+                ) : (
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <div className="text-body-large text-on-surface">Time zone</div>
+                      <div className="text-body-medium text-on-surface-variant">
+                        {tzName(form.timezone)}
+                        {form.timezone === browserTimeZone() ? " (this device)" : ""}
+                      </div>
+                    </div>
+                    {!readOnly && (
+                      <Button variant="text" onClick={() => setChangingZone(true)}>
+                        Change
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </Fold>
 

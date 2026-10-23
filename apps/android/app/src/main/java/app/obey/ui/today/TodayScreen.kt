@@ -450,6 +450,26 @@ fun TodayScreen(
                     offlineSince?.let { at -> item(key = "offline") { OfflineBanner(at) } }
                     if (session?.readOnly == true) item(key = "ended") { EndedBanner(onOpenSettings) }
                     if (session?.relationship?.roleSwap != null) item(key = "role-swap") { app.obey.ui.roles.RoleSwapCard(session) }
+                    if (session?.readOnly != true) {
+                        item(key = "countdown") {
+                            val other = session?.partners?.firstOrNull()
+                            CountdownCard(
+                                list = d.today + d.later.flatMap { it.second },
+                                me = me,
+                                isDom = isDom,
+                                who = { o ->
+                                    when {
+                                        session?.solo == true -> null
+                                        o.assigneeId == me -> other?.let { "From ${it.displayName}" }
+                                        else -> "For ${session?.nameOf(o.assigneeId)}"
+                                    }
+                                },
+                                onDone = { o -> if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) },
+                                onMoreTime = { o -> rescheduling = o },
+                                onOpen = { o -> onOpenTask(o.seriesId) },
+                            )
+                        }
+                    }
                     if (session != null && !session.readOnly) item(key = "solo") { SoloCards(session, onInvite, onOpenTasks) }
                     if (session != null && session.relationship?.features?.chastity == true && !session.readOnly && !session.solo) item(key = "chastity") { app.obey.ui.chastity.ChastityTodayCard(session) }
                     curfew?.night?.let { n ->
