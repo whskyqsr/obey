@@ -16,6 +16,10 @@ import type {
   PastMonth,
 } from "@obey/contracts";
 import type {
+  LimitAnswer,
+  LimitItem,
+  LimitList,
+  LimitRating,
   AdminReport,
   OccurrenceComment,
   NoteComment,
@@ -1180,4 +1184,60 @@ export function usePhotoAsk(rel: string) {
 /** The sealed keybox photo, for someone allowed to see it now. Never cached past the page. */
 export function useKeyboxUrl(lockId: string, enabled: boolean) {
   return useQuery({ queryKey: ["chastity-keybox", lockId], queryFn: () => apiObjectUrl(`/chastity/${lockId}/keybox`), enabled, staleTime: 0, gcTime: 0 });
+}
+
+/** The limits list: the items, and each person's answers (a partner's once everyone has finished). */
+export function useLimitList(rel: string) {
+  return useQuery({ queryKey: ["rel", rel, "limit-list"], queryFn: () => api<LimitList>(`/relationships/${rel}/limit-list`) });
+}
+
+/** Rates (or skips, with a null rating) one item, updating the list in place so tapping through stays quick. */
+export function useAnswerLimit(rel: string, userId: string) {
+  const qc = useQueryClient();
+  const key = ["rel", rel, "limit-list"];
+  return useMutation({
+    mutationFn: ({ itemKey, ...body }: { itemKey: string; rating: LimitRating | null; note: string }) =>
+      api<LimitAnswer>(`/relationships/${rel}/limit-list/answers/${encodeURIComponent(itemKey)}`, { method: "PUT", body }),
+    onMutate: ({ itemKey, rating, note }) => {
+      qc.setQueryData<LimitList>(
+        key,
+        (list) =>
+          list && {
+            ...list,
+            people: list.people.map((p) => {
+              if (p.userId !== userId) return p;
+              const answers = { ...(p.answers ?? {}) };
+              if (rating || note) answers[itemKey] = { rating, note };
+              else delete answers[itemKey];
+              return { ...p, answers, rated: Object.values(answers).filter((a) => a.rating).length };
+            }),
+          },
+      );
+    },
+    onError: () => void qc.invalidateQueries({ queryKey: key }),
+  });
+}
+
+export function useAddLimitItem(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (body: { category: string; title: string }) => api<LimitItem>(`/relationships/${rel}/limit-list/items`, { method: "POST", body }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useRemoveLimitItem(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (key: string) => api<void>(`/relationships/${rel}/limit-list/items/${key}`, { method: "DELETE" }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useFinishLimits(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: () => api<{ ok: true }>(`/relationships/${rel}/limit-list/finished`, { method: "PUT", body: {} }),
+    onSuccess: () => invalidate(),
+  });
 }

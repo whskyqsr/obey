@@ -1607,3 +1607,24 @@ data class ChastityPhotoAskInput(val dueAt: String, val timezone: String)
 
 @Serializable
 data class ChastityPhotoAsk(val taskId: String)
+
+/** One item of the limits list: from the starter list, or added by one of the two of them. */
+@Serializable
+data class LimitItem(val key: String, val category: String, val title: String, val custom: Boolean = false, val createdBy: String? = null)
+
+/** One person's answer: "love", "like", "curious", "soft" or "hard" (null when they only left a note). */
+@Serializable
+data class LimitAnswer(val rating: String? = null, val note: String = "")
+
+/** A person's progress, and their answers by item key: always your own, a partner's once everyone has finished. */
+@Serializable
+data class LimitPerson(val userId: String, val finishedAt: String? = null, val updatedAt: String? = null, val rated: Int = 0, val answers: Map<String, LimitAnswer>? = null)
+
+@Serializable
+data class LimitList(val items: List<LimitItem>, val people: List<LimitPerson>)
+
+@Serializable
+data class LimitAnswerInput(val rating: String?, val note: String)
+
+@Serializable
+data class LimitItemInput(val category: String, val title: String)

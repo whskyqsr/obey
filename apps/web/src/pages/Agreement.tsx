@@ -216,6 +216,11 @@ function SectionView({ s, marked }: { s: AgreementSection; marked: boolean }) {
           <Icon name="sticky_note_2" size={18} /> {s.noteTitle}
         </Link>
       )}
+      {s.kind === "text" && s.id === "limits" && (
+        <Link to="/limits" className="flex items-center gap-1 self-start text-label-large text-primary">
+          <Icon name="tune" size={18} /> Your limits list
+        </Link>
+      )}
       {s.kind !== "text" && (
         <div className="text-body-small text-on-surface-variant">
           {s.items.length ? `From ${s.kind === "rules" ? "Rules" : "Protocols"}, as of this version` : `No ${s.kind} yet`}

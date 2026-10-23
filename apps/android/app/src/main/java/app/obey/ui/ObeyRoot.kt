@@ -117,7 +117,10 @@ import app.obey.ui.agreement.AgreementScreen
 import androidx.compose.material.icons.outlined.Handshake
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Tune
 import app.obey.ui.chastity.ChastityScreen
+import app.obey.ui.limits.LimitsEditScreen
+import app.obey.ui.limits.LimitsScreen
 import app.obey.ui.scenes.AftercareScreen
 import app.obey.ui.scenes.SceneScreen
 import app.obey.ui.scenes.ScenesScreen
@@ -210,14 +213,16 @@ private fun topLevels(f: Features) = listOfNotNull(
     if (f.agreement) TopLevel(AgreementRoute(), "Agreement", Icons.Outlined.Handshake) { it.hasRoute<AgreementRoute>() } else null,
     if (f.scenes) TopLevel(ScenesRoute, "Scenes", Icons.Outlined.AutoAwesome) { it.hasRoute<ScenesRoute>() } else null,
     if (f.chastity) TopLevel(ChastityRoute, "Chastity", Icons.Outlined.Lock) { it.hasRoute<ChastityRoute>() } else null,
+    // No switch: the limits list is always there, in the menu.
+    TopLevel(LimitsRoute, "Limits", Icons.Outlined.Tune) { it.hasRoute<LimitsRoute>() },
     // Tasks open from Today and Calendar; the full list is for managing them, so it sits under More.
     TopLevel(TaskListRoute, "All tasks", Icons.Outlined.Checklist) { it.hasRoute<TaskListRoute>() },
 )
 
-/** The phone's bar holds Today, Calendar, the next section that's on, and the first writing space; the rest go in the menu. Stats, the monthly review, the agreement, scenes and chastity are always in the menu. */
+/** The phone's bar holds Today, Calendar, the next section that's on, and the first writing space; the rest go in the menu. Stats, the monthly review, the agreement, scenes, chastity and limits are always in the menu. */
 private fun splitBar(all: List<TopLevel>): Pair<List<TopLevel>, List<TopLevel>> {
     val writing = all.firstOrNull { it.route in writingRoutes }
-    val bar = all.filter { it.route !in writingRoutes && it.route !is StatsRoute && it.route != MonthReviewRoute && it.route !is AgreementRoute && it.route != ScenesRoute && it.route != ChastityRoute }.take(3) + listOfNotNull(writing)
+    val bar = all.filter { it.route !in writingRoutes && it.route !is StatsRoute && it.route != MonthReviewRoute && it.route !is AgreementRoute && it.route != ScenesRoute && it.route != ChastityRoute && it.route != LimitsRoute }.take(3) + listOfNotNull(writing)
     return bar to all.filter { it !in bar }
 }
 
@@ -447,11 +452,13 @@ private fun ObeyNavHost(nav: NavHostController) {
         }
         composable<StatsRoute> { StatsScreen(onOpenSettings = settings, onOpenTask = openTask, onOpenReview = { nav.navigate(MonthReviewRoute) }) }
         composable<MonthReviewRoute> { MonthReviewScreen(onOpenSettings = settings, onOpenStats = { month, who -> nav.navigate(StatsRoute(month, who)) }) }
-        composable<AgreementRoute> { AgreementScreen(onOpenSettings = settings, onOpenNote = { nav.navigate(NoteEditorRoute(noteId = it)) }) }
+        composable<AgreementRoute> { AgreementScreen(onOpenSettings = settings, onOpenNote = { nav.navigate(NoteEditorRoute(noteId = it)) }, onOpenLimits = { nav.navigate(LimitsRoute) }) }
         composable<ScenesRoute> { ScenesScreen(onOpenSettings = settings, onOpen = { nav.navigate(SceneRoute(it)) }, onAftercare = { nav.navigate(AftercareRoute) }) }
         composable<SceneRoute> { SceneScreen(onBack = { nav.popBackStack() }) }
         composable<AftercareRoute> { AftercareScreen(onBack = { nav.popBackStack() }) }
         composable<ChastityRoute> { ChastityScreen(onOpenSettings = settings) }
+        composable<LimitsRoute> { LimitsScreen(onEdit = { nav.navigate(LimitsEditRoute) }) }
+        composable<LimitsEditRoute> { LimitsEditScreen(onClose = { nav.popBackStack() }) }
         composable<TaskListRoute> {
             TaskListScreen(
                 onOpen = openTask,

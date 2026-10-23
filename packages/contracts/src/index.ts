@@ -807,6 +807,83 @@ export const limitInput = z.object({
 export const limit = limitInput.extend({ id, relationshipId: id, ownerId: id, createdAt: z.string(), updatedAt: z.string() });
 export type Limit = z.infer<typeof limit>;
 
+/** The limits list: each person rates each item for themselves, in their own role. Skipping leaves no rating. */
+export const limitRating = z.enum(["love", "like", "curious", "soft", "hard"]);
+export type LimitRating = z.infer<typeof limitRating>;
+export const LIMIT_CATEGORIES = ["Service & protocol", "Restraint", "Impact & sensation", "Words & mind", "Body & care", "Out in the world"] as const;
+/** Where items the two of them add go when they don't pick a category. */
+export const OWN_CATEGORY = "Your own";
+
+/** The starter list, kept non-graphic. Keys are stable, so changing a title keeps everyone's answers. */
+export const LIMIT_STARTERS: { key: string; category: (typeof LIMIT_CATEGORIES)[number]; title: string }[] = (
+  [
+    [
+      "Service & protocol",
+      [
+        "Kneeling",
+        "Titles (Sir, Miss)",
+        "Serving drinks and meals",
+        "Asking permission",
+        "Waiting in position",
+        "Writing lines",
+        "Chores as service",
+        "Daily check-ins",
+        "Public protocol (discreet)",
+        "Bathroom permission",
+      ],
+    ],
+    [
+      "Restraint",
+      ["Wrist and ankle cuffs", "Rope", "Handcuffs", "Blindfolds", "Gags", "Spreader bars", "Collar and leash", "Being wrapped up", "Being left alone tied", "Suspension"],
+    ],
+    ["Impact & sensation", ["Spanking (hand)", "Paddles", "Belts", "Floggers", "Canes", "Wax", "Ice", "Tickling", "Biting", "Marks that show"]],
+    ["Words & mind", ["Praise", "Pet names", "Teasing", "Begging", "Orgasm control", "Role-play", "Being ignored", "Degradation", "Humiliation", "Name-calling in public"]],
+    [
+      "Body & care",
+      ["Aftercare cuddles", "Massage", "Hair pulling", "Breath play", "Chastity", "Grooming rules", "Food and water rules", "Exercise rules", "Bedtime rules", "Outfit rules"],
+    ],
+    [
+      "Out in the world",
+      ["Wearing a day collar", "Remote control toys", "Texted orders while out", "Discreet tasks in public", "Photos of you", "Videos of you", "Others knowing", "Others watching"],
+    ],
+  ] as const
+).flatMap(([category, titles]) =>
+  titles.map((title) => ({
+    key: title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, ""),
+    category,
+    title,
+  })),
+);
+
+export const limitItem = z.object({
+  key: z.string(),
+  category: z.string(),
+  title: z.string(),
+  /** Added by one of them rather than from the starter list; the person who added it can remove it. */
+  custom: z.boolean(),
+  createdBy: id.nullable(),
+});
+export type LimitItem = z.infer<typeof limitItem>;
+export const limitAnswer = z.object({ rating: limitRating.nullable(), note: z.string() });
+export type LimitAnswer = z.infer<typeof limitAnswer>;
+export const limitPerson = z.object({
+  userId: id,
+  finishedAt: z.string().nullable(),
+  updatedAt: z.string().nullable(),
+  /** How many items they've rated. */
+  rated: z.number().int(),
+  /** Their answers by item key: always your own; a partner's only once everyone has finished. */
+  answers: z.record(z.string(), limitAnswer).nullable(),
+});
+export type LimitPerson = z.infer<typeof limitPerson>;
+export const limitList = z.object({ items: z.array(limitItem), people: z.array(limitPerson) });
+export type LimitList = z.infer<typeof limitList>;
+export const limitAnswerInput = z.object({ rating: limitRating.nullable(), note: z.string().trim().max(500).default("") });
+export const limitItemInput = z.object({ category: z.string().trim().min(1).max(60).default(OWN_CATEGORY), title: z.string().trim().min(1).max(80) });
+
 /** A rule or protocol someone broke, logged by a Dominant or owned up to by the person themselves. */
 export const ruleLogInput = z
   .object({
