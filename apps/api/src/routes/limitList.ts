@@ -1,9 +1,9 @@
-import { LIMIT_STARTERS, type LimitAnswer, type LimitList, limitAnswerInput, limitItemInput } from "@obey/contracts";
+import { LIMIT_STARTERS, type LimitAnswer, type LimitList, allFeatures, limitAnswerInput, limitItemInput } from "@obey/contracts";
 import { and, asc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { Deps } from "../app.js";
-import { limitFinished, limitItems, limitRatings, memberships } from "../db/schema.js";
+import { limitFinished, limitItems, limitRatings, memberships, relationships } from "../db/schema.js";
 import { HttpError, forbidden, notFound } from "../errors.js";
 import { requireMember } from "../services/access.js";
 
@@ -17,10 +17,17 @@ const STARTER_KEYS = new Set(LIMIT_STARTERS.map((s) => s.key));
 export const limitListRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   const { db, notifier } = deps;
 
+  async function requireLimits(relationshipId: string, userId: string) {
+    const m = await requireMember(db, relationshipId, userId);
+    const [rel] = await db.select({ features: relationships.features }).from(relationships).where(eq(relationships.id, relationshipId));
+    if (!allFeatures(rel!.features).limits) throw forbidden("limits are switched off for this dynamic");
+    return m;
+  }
+
   const members = (relationshipId: string) => db.select({ userId: memberships.userId }).from(memberships).where(eq(memberships.relationshipId, relationshipId));
 
   app.get<{ Params: { id: string } }>("/relationships/:id/limit-list", async (req): Promise<LimitList> => {
-    await requireMember(db, req.params.id, req.user.id);
+    await requireLimits(req.params.id, req.user.id);
     const relId = req.params.id;
     const [people, custom, ratings, finished] = await Promise.all([
       members(relId),
@@ -52,7 +59,7 @@ export const limitListRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   });
 
   app.put<{ Params: { id: string; key: string } }>("/relationships/:id/limit-list/answers/:key", async (req) => {
-    await requireMember(db, req.params.id, req.user.id);
+    await requireLimits(req.params.id, req.user.id);
     const { key } = req.params;
     if (!STARTER_KEYS.has(key)) {
       const ok = z.string().uuid().safeParse(key).success
@@ -76,7 +83,7 @@ export const limitListRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   });
 
   app.post<{ Params: { id: string } }>("/relationships/:id/limit-list/items", async (req, reply) => {
-    await requireMember(db, req.params.id, req.user.id);
+    await requireLimits(req.params.id, req.user.id);
     const body = limitItemInput.parse(req.body);
     const count = await db.select({ id: limitItems.id }).from(limitItems).where(eq(limitItems.relationshipId, req.params.id));
     if (count.length >= 200) throw new HttpError(409, "that's as many as the list holds");
@@ -85,7 +92,7 @@ export const limitListRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   });
 
   app.delete<{ Params: { id: string; key: string } }>("/relationships/:id/limit-list/items/:key", async (req, reply) => {
-    await requireMember(db, req.params.id, req.user.id);
+    await requireLimits(req.params.id, req.user.id);
     if (!z.string().uuid().safeParse(req.params.key).success) throw notFound();
     const [item] = await db
       .select()
@@ -100,7 +107,7 @@ export const limitListRoutes = (deps: Deps) => async (app: FastifyInstance) => {
 
   /** Says you have finished. It can't be taken back: once everyone has, answers are shared, and later changes show as they happen. */
   app.put<{ Params: { id: string } }>("/relationships/:id/limit-list/finished", async (req) => {
-    await requireMember(db, req.params.id, req.user.id);
+    await requireLimits(req.params.id, req.user.id);
     const relId = req.params.id;
     await db.insert(limitFinished).values({ relationshipId: relId, userId: req.user.id, finishedAt: deps.now() }).onConflictDoNothing();
     const people = await members(relId);

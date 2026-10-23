@@ -213,8 +213,7 @@ private fun topLevels(f: Features) = listOfNotNull(
     if (f.agreement) TopLevel(AgreementRoute(), "Agreement", Icons.Outlined.Handshake) { it.hasRoute<AgreementRoute>() } else null,
     if (f.scenes) TopLevel(ScenesRoute, "Scenes", Icons.Outlined.AutoAwesome) { it.hasRoute<ScenesRoute>() } else null,
     if (f.chastity) TopLevel(ChastityRoute, "Chastity", Icons.Outlined.Lock) { it.hasRoute<ChastityRoute>() } else null,
-    // No switch: the limits list is always there, in the menu.
-    TopLevel(LimitsRoute, "Limits", Icons.Outlined.Tune) { it.hasRoute<LimitsRoute>() },
+    if (f.limits) TopLevel(LimitsRoute, "Limits", Icons.Outlined.Tune) { it.hasRoute<LimitsRoute>() } else null,
     // Tasks open from Today and Calendar; the full list is for managing them, so it sits under More.
     TopLevel(TaskListRoute, "All tasks", Icons.Outlined.Checklist) { it.hasRoute<TaskListRoute>() },
 )

@@ -115,6 +115,7 @@ import app.obey.ui.common.BaseViewModel
 import app.obey.ui.common.ErrorBox
 import app.obey.ui.common.Load
 import app.obey.ui.common.LoadingBox
+import app.obey.ui.common.LocalFeatures
 import app.obey.ui.common.MenuButton
 import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.SafeWordAction
@@ -743,7 +744,7 @@ private fun SectionView(s: AgreementSection, marked: Boolean, prevNumber: Int?, 
             )
         }
         lines.forEach { LineView(it, list) }
-        if (s.kind == "text" && s.id == "limits") {
+        if (s.kind == "text" && s.id == "limits" && LocalFeatures.current.limits) {
             val open = LocalOpenLimits.current
             TextButton(onClick = open, contentPadding = PaddingValues(horizontal = 0.dp)) {
                 Icon(Icons.Outlined.Tune, null, Modifier.size(18.dp))

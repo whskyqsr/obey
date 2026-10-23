@@ -1438,6 +1438,7 @@ describe("feature switches", () => {
       scenes: true,
       // Off until a dynamic switches it on.
       chastity: false,
+      limits: true,
     });
     // Notes can't be switched off; the key is ignored.
     expect((await dom.patch(`/relationships/${relId}`, { features: { notes: false } })).body.features).not.toHaveProperty("notes");
