@@ -86,7 +86,7 @@ export async function pointsEnabled(db: Tx, relationshipId: string): Promise<boo
   return rel?.features.points !== false;
 }
 
-export async function finalizeCompletion(db: Tx, series: Series, occ: Occurrence, completedAt: Date, reviewerId: string | null, points = series.points) {
+export async function finalizeCompletion(db: Tx, series: Series, occ: Occurrence, completedAt: Date, reviewerId: string | null, points = countedPoints(series, occ.count)) {
   const [updated] = await db
     .update(occurrences)
     .set({ status: "completed", completedAt, reviewedBy: reviewerId, reviewedAt: reviewerId ? new Date() : null })
@@ -131,7 +131,9 @@ export async function completeOccurrence(
   // It may have been marked missed while the phone was offline; done in time, the miss is taken back.
   if (offline && occ.status === "missed" && !occ.missConfirmedAt && at.getTime() < occ.dueAt.getTime() + series.graceMinutes * 60_000) occ = await takeBackMiss(db, series, occ);
   if (occ.status !== "pending") throw new HttpError(409, `occurrence is ${occ.status}`);
-  if (isCountTask(series)) throw new HttpError(409, "this one is counted; mark each one instead");
+  // A count task is marked by counting; one that asks for approval, proof, a mood or an entry is sent once its count is met.
+  if (isCountTask(series) && !(sentWhenMet(series) && series.countMin !== null && countState(series, occ.count) === "ok"))
+    throw new HttpError(409, sentWhenMet(series) ? "reach the count first" : "this one is counted; mark each one instead");
   if (series.placeId && isAssignee && !canManage(actor.role)) throw new HttpError(409, "this one is done by getting there");
   // The assignee can't work ahead into the next occurrence's turn (tomorrow's daily check-in today); a Dominant can.
   const opens = opensOn(series.schedule, occ.originalDate);
@@ -193,6 +195,10 @@ async function takeBackMiss(db: Tx, series: Series, occ: Occurrence): Promise<Oc
 
 /** A count task is marked once each time it's done, instead of once. */
 export const isCountTask = (s: Pick<Series, "countMin" | "countMax">) => s.countMin !== null || s.countMax !== null;
+
+/** A count task that asks for approval, proof, a mood or an entry: the assignee sends it once, when the count is met. */
+export const sentWhenMet = (s: Pick<Series, "countMin" | "countMax" | "approvalRequired" | "proofRequired" | "askMood" | "asksJournal">) =>
+  isCountTask(s) && (s.approvalRequired || s.proofRequired || s.askMood || s.asksJournal);
 
 /** Where a count stands against the task's bounds. */
 export function countState(s: Pick<Series, "countMin" | "countMax">, n: number): "short" | "ok" | "over" {
@@ -280,6 +286,8 @@ export async function countOccurrence(
   // Back within bounds or short of them: an over-the-limit miss is taken back first.
   if (occ.status === "missed") occ = await takeBackMiss(db, series, occ);
   const done = state === "ok" && (series.countMin !== null || late);
+  // The assignee sends one that asks for more (see completeOccurrence) instead of the count finishing it.
+  if (done && sentWhenMet(series) && !manager && occ.status === "pending") return occ;
   if (done) {
     if (occ.status === "completed") {
       if (pointsOn)
@@ -533,8 +541,11 @@ export async function markMissed(db: Tx, now: Date) {
       (series.placeId !== null && !series.curfewUntil && (await locationPausedAt(db, series.relationshipId, series.assigneeId, occ.dueAt))) ||
       (await tasksPausedAt(db, series.relationshipId, series.assigneeId, occ.dueAt));
     // A count task kept within its bounds is done at the deadline ("no more than 3" has nothing to reach before then).
-    if (!red && isCountTask(series) && countState(series, occ.count) === "ok") {
-      await finalizeCompletion(db, series, occ, occ.dueAt, null, countedPoints(series, occ.count));
+    // One that needs approval goes to the Dominant then, unless they already sent it back; one that only asked for proof,
+    // a mood or an entry the assignee never sent is still done, since the count was kept.
+    if (!red && isCountTask(series) && countState(series, occ.count) === "ok" && !(series.approvalRequired && occ.reviewedAt)) {
+      if (series.approvalRequired) await db.update(occurrences).set({ status: "submitted", completedAt: occ.dueAt }).where(eq(occurrences.id, occ.id));
+      else await finalizeCompletion(db, series, occ, occ.dueAt, null, countedPoints(series, occ.count));
       continue;
     }
     const [updated] = await db

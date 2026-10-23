@@ -40,22 +40,34 @@ val Occurrence.needsDoneDialog get() = proofRequired || askMood || asksJournal
  * check-in asks how they feel first.
  */
 @Composable
-fun DoneDialog(o: Occurrence, onDismiss: () -> Unit, onDone: (note: String, mood: Int?, entry: String?) -> Unit) {
+fun DoneDialog(o: Occurrence, onDismiss: () -> Unit, sendTo: String? = null, onDone: (note: String, mood: Int?, entry: String?) -> Unit) {
     var note by remember(o.id) { mutableStateOf("") }
     var mood by remember(o.id) { mutableStateOf<Int?>(null) }
     var entry by remember(o.id) { mutableStateOf("") }
     val photos by proofViewModel(o.id).photos.collectAsStateWithLifecycle()
     // A journal task is done by writing the entry, which also counts as proof.
     val needsProof = o.proofRequired && photos.isEmpty() && note.isBlank() && !(o.asksJournal && entry.isNotBlank())
+    // A count task met its count and is sent once, with what it asks for.
+    val sending = o.isCounted
+    val sendTitle = (if (o.countMax != null && o.countMax == o.countMin) "${o.count} of ${o.countMax}" else "${o.count} done") +
+        ", send it" + (if (o.approvalRequired && sendTo != null) " to $sendTo" else "") + "?"
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (o.askMood || o.asksJournal) o.title else "Mark done") },
+        title = { Text(if (sending) sendTitle else if (o.askMood || o.asksJournal) o.title else "Mark done") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
+                if (sending) {
+                    Text(
+                        if (o.approvalRequired) "${sendTo?.replaceFirstChar { it.uppercase() } ?: "Your Dominant"} approves it. Your count is locked until then." else "It's done once you send it.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 12.dp),
+                    )
+                }
                 if (o.askMood) {
                     Text("How do you feel?", style = MaterialTheme.typography.titleMedium)
                     MoodPicker(mood, { mood = it }, Modifier.padding(top = 8.dp))
-                } else if (!o.asksJournal) {
+                } else if (!o.asksJournal && !sending) {
                     Text("${o.title} · ${formatDue(o.dueAt)}", style = MaterialTheme.typography.bodyMedium)
                 }
                 if (o.asksJournal) {
@@ -97,8 +109,8 @@ fun DoneDialog(o: Occurrence, onDismiss: () -> Unit, onDone: (note: String, mood
             Button(
                 onClick = { onDone(note, mood, entry.takeIf { o.asksJournal }) },
                 enabled = !needsProof && (!o.askMood || mood != null) && (!o.asksJournal || entry.isNotBlank()),
-            ) { Text(if (o.asksJournal) "Save entry" else if (o.askMood) "Check in" else "Done") }
+            ) { Text(if (sending) "Send" else if (o.asksJournal) "Save entry" else if (o.askMood) "Check in" else "Done") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(if (sending) "Not yet" else "Cancel") } },
     )
 }

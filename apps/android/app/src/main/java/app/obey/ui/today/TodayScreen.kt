@@ -173,7 +173,7 @@ fun TodayScreen(
                     onReschedule = { rescheduling = o },
                     onEditTask = if (session?.canManage == true) ({ onEditTask(o.seriesId) }) else null,
                     onComments = { commenting = o },
-                    onCount = if (o.assigneeId == me && o.canCount(true, session?.canManage == true)) ({ vm.count(o, by = 1) }) else null,
+                    onCount = if (o.assigneeId == me && o.canCount(true, session?.canManage == true)) ({ if (o.readyToSend) noting = o else vm.count(o, by = 1) { noting = it } }) else null,
                     onCountHold = if (o.canCount(o.assigneeId == me, session?.canManage == true)) ({ counting = o }) else null,
                     onCheckIn = if (o.canCheckIn(o.assigneeId == me)) ({ vm.checkIn(o) }) else null,
                 )
@@ -188,7 +188,7 @@ fun TodayScreen(
                         onDone = if (o.isPlaced) {
                             if (o.canCheckIn(o.assigneeId == me)) ({ vm.checkIn(o) }) else null
                         } else if (o.isCounted) {
-                            if (o.assigneeId == me && o.canCount(true, isDom)) ({ vm.count(o, by = 1) }) else null
+                            if (o.assigneeId == me && o.canCount(true, isDom)) ({ if (o.readyToSend) noting = o else vm.count(o, by = 1) { noting = it } }) else null
                         } else if (o.assigneeId == me && o.status == OccurrenceStatus.Pending && o.isOpen()) ({ if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) }) else null,
                         // A Dominant moves anyone's deadline the same way a sub asks for more time on their own.
                         onMoreTime = if ((o.assigneeId == me || isDom) && o.status == OccurrenceStatus.Pending) ({ rescheduling = o }) else null,
@@ -613,7 +613,7 @@ fun TodayScreen(
         if (askLocation != null) locationPermission.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION))
     }
 
-    noting?.let { o -> DoneDialog(o, onDismiss = { noting = null }, onDone = { note, mood, entry -> vm.complete(o, note, mood, entry); noting = null }) }
+    noting?.let { o -> DoneDialog(o, onDismiss = { noting = null }, sendTo = askWho, onDone = { note, mood, entry -> vm.complete(o, note, mood, entry); noting = null }) }
     askingMore?.let { n ->
         MoreTimeSheet(n, askWho, busy, onDismiss = { askingMore = null }) { until, reason -> vm.askCurfew(n, until, reason, askWho) { askingMore = null } }
     }

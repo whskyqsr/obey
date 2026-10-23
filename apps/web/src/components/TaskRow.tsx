@@ -12,7 +12,7 @@ import { SendBackDialog } from "./Comments";
 import { RescheduleSheet } from "./RescheduleSheet";
 import { StreakStrip } from "./StreakStrip";
 import { useNoteAfter } from "./DecisionNote";
-import { CountRing, CountSheet, canCount, countLine, isCounted, useCountTap } from "./Count";
+import { CountRing, CountSheet, canCount, countLine, isCounted, readyToSend, useCountTap } from "./Count";
 import { CheckInButton, PlaceRing, canCheckIn, isPlaced, placeLine, useCheckIn, usePlaceLookup } from "./Location";
 import { Button, Icon, IconButton, cx, useSnackbar } from "./ui";
 
@@ -100,7 +100,12 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
         {placed && o.status !== "completed" && o.status !== "excused" && o.status !== "submitted" ? (
           <PlaceRing o={o} onTap={checkable ? () => checkIn(o) : undefined} />
         ) : counted ? (
-          <CountRing o={o} onTap={countable && mine ? () => countTap(o) : undefined} onHold={countable ? () => setCounting(true) : undefined} disabled={!countable} />
+          <CountRing
+            o={o}
+            onTap={countable && mine ? () => (readyToSend(o) ? setCompleting(true) : countTap(o, () => setCompleting(true))) : undefined}
+            onHold={countable ? () => setCounting(true) : undefined}
+            disabled={!countable}
+          />
         ) : canComplete ? (
           isRitual(o) ? (
             <IconButton icon="play_circle" label={`Start “${o.title}”`} data-action="done" className={missed ? "text-error" : "text-primary"} onClick={() => setRunning(true)} />
@@ -159,6 +164,7 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
       </Link>
       <div className={"relative z-10 flex items-center gap-1"}>
         {actions}
+        {mine && readyToSend(o) && <IconButton icon="send" label={`Send “${o.title}”`} className="text-primary" onClick={() => setCompleting(true)} />}
         {checkable && <CheckInButton o={o} className="max-md:hidden" />}
         {/* A Dominant moves anyone's deadline as easily as a sub asks for more time on their own. */}
         {!actions && o.status === "pending" && (mine || isDom) && (

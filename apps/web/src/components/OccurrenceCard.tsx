@@ -10,7 +10,7 @@ import { ProofPhotos } from "./Proof";
 import { MOODS, MOOD_LABELS, MoodPicker } from "./Mood";
 import { RitualDialog, StepList, isRitual, stepProgress } from "./Ritual";
 import { RescheduleSheet } from "./RescheduleSheet";
-import { CountRing, CountSheet, canCount, countLine, isCounted, useCountTap } from "./Count";
+import { CountRing, CountSheet, canCount, countLine, isCounted, readyToSend, useCountTap } from "./Count";
 import { CheckInButton, PlaceRing, canCheckIn, isPlaced, placeLine, usePlaceLookup } from "./Location";
 import { StreakStrip } from "./StreakStrip";
 import { Badge, Button, Dialog, Icon, Spinner, TextArea, cx, useSnackbar } from "./ui";
@@ -110,13 +110,23 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
       {counted && (
         <div className="relative z-10 flex flex-col gap-2 rounded-sm bg-surface-container px-3 py-2">
           <div className="flex items-center gap-3">
-            <CountRing o={o} onTap={countable && mine ? () => countTap(o) : undefined} onHold={countable ? () => setCounting(true) : undefined} disabled={!countable} />
+            <CountRing
+              o={o}
+              onTap={countable && mine ? () => (readyToSend(o) ? setCompleting(true) : countTap(o, () => setCompleting(true))) : undefined}
+              onHold={countable ? () => setCounting(true) : undefined}
+              disabled={!countable}
+            />
             <span className="min-w-0 flex-1 text-body-medium text-on-surface">{countLine(o)}</span>
           </div>
           {countable && (
             <div className="flex flex-wrap gap-2">
+              {mine && readyToSend(o) && (
+                <Button icon="send" onClick={() => setCompleting(true)}>
+                  Send
+                </Button>
+              )}
               {mine && (
-                <Button variant="tonal" icon="add" onClick={() => countTap(o)}>
+                <Button variant="tonal" icon="add" onClick={() => countTap(o, () => setCompleting(true))}>
                   One more
                 </Button>
               )}
@@ -250,15 +260,18 @@ export function CompleteDialog({ o, open, onClose }: { o: Occurrence; open: bool
   const asksJournal = o.asksJournal && o.assigneeId === me.user.id;
   const [entry, setEntry] = useState("");
   const needsProof = o.proofRequired && o.photoCount === 0 && !note.trim() && !(asksJournal && entry.trim());
+  // A count task met its count and is sent once, with what it asks for.
+  const sending = isCounted(o);
+  const sendTitle = `${o.countMax != null && o.countMax === o.countMin ? `${o.count} of ${o.countMax}` : `${o.count} done`}, send it${o.approvalRequired && partnerNames ? ` to ${partnerNames}` : ""}?`;
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      title={asksMood || asksJournal ? o.title : `Done: ${o.title}`}
+      title={sending ? sendTitle : asksMood || asksJournal ? o.title : `Done: ${o.title}`}
       actions={
         <>
           <Button variant="text" onClick={onClose}>
-            Cancel
+            {sending ? "Not yet" : "Cancel"}
           </Button>
           <Button
             busy={complete.isPending}
@@ -284,12 +297,17 @@ export function CompleteDialog({ o, open, onClose }: { o: Occurrence; open: bool
               )
             }
           >
-            {asksJournal ? "Save entry" : asksMood ? "Check in" : "Mark done"}
+            {sending ? "Send" : asksJournal ? "Save entry" : asksMood ? "Check in" : "Mark done"}
           </Button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
+        {sending && (
+          <p className="text-body-medium text-on-surface-variant">
+            {o.approvalRequired ? `${partnerNames || "Your Dominant"} approves it. Your count is locked until then.` : "It's done once you send it."}
+          </p>
+        )}
         {asksMood && (
           <>
             <p className="text-title-medium text-on-surface">How do you feel?</p>

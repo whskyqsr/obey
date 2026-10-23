@@ -305,6 +305,8 @@ export const occurrence = z.object({
   commentCount: z.number().int().default(0),
   /** The task needs a photo or a note before it can be marked done. */
   proofRequired: z.boolean().default(false),
+  /** A Dominant approves it once it's marked done (a count task: once it's sent). */
+  approvalRequired: z.boolean().default(false),
   /** The ritual's steps (empty for an ordinary task) and the ids ticked off so far. */
   steps: z.array(taskStep).default([]),
   stepsDone: z.array(z.string()).default([]),

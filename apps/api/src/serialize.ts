@@ -61,6 +61,7 @@ export const occurrenceDto = (o: typeof occurrences.$inferSelect, s: Series, mis
   photoCount: o.photoCount,
   commentCount: o.commentCount,
   proofRequired: s.proofRequired,
+  approvalRequired: s.approvalRequired,
   steps: s.steps,
   // Only ids still in the ritual count; a step removed after it was ticked drops out.
   stepsDone: o.stepsDone.filter((id) => s.steps.some((st) => st.id === id)),

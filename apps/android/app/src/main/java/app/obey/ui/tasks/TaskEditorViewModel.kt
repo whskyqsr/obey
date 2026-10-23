@@ -34,7 +34,6 @@ import kotlinx.coroutines.launch
 /** How a count task's bounds are set: one number for the first three, two for a range. */
 enum class CountKind(val label: String) { Exactly("Exactly"), AtLeast("At least"), AtMost("At most"), Range("Range") }
 
-/** Grace chips. [Midnight] follows the due time, so moving the time keeps it meaning "until midnight". */
 val QUICK = listOf(15, 30, 60, 120)
 fun quickLabel(m: Int) = if (m < 60) "$m min" else if (m == 60) "1 hour" else "${m / 60} hours"
 
@@ -54,6 +53,7 @@ fun TaskForm.quickDeadline(minutes: Int): TaskForm {
     )
 }
 
+/** Grace chips. [Midnight] follows the due time, so moving the time keeps it meaning "until midnight". */
 enum class Grace(val label: String) { None("None"), Quarter("15 min"), Hour("1 hour"), Midnight("Until midnight"), Custom("Custom") }
 
 data class TaskForm(
@@ -98,6 +98,9 @@ data class TaskForm(
     val reminder: String = "default",
     val reminderText: String = "",
 ) {
+    /** An "at most" count: it has no moment it's met, so it's sent at the deadline and only takes approval. */
+    val atMost: Boolean get() = counted && countKind == CountKind.AtMost
+
     /** The bounds this form describes; both null for an ordinary task. */
     val countBounds: Pair<Int?, Int?> get() {
         if (!counted) return null to null
@@ -252,7 +255,8 @@ class TaskEditorViewModel @Inject constructor(
             consequenceDueDays = f.consequenceDueDays,
             consequenceDueTime = f.consequenceDueTime?.format(DateTimeFormatter.ofPattern("HH:mm")),
             // Getting there is the proof; a location task takes no proof, mood or journal entry.
-            proofRequired = f.proofRequired && f.placeId == null,
+            // "At most" counts are sent at the deadline, so they take approval but not proof, a mood or an entry.
+            proofRequired = f.proofRequired && f.placeId == null && !f.atMost,
             approvalRequired = f.approvalRequired,
             schedule = f.recurrence.toSchedule(f.start),
             dueTime = if (f.allDay) null else f.dueTime.format(DateTimeFormatter.ofPattern("HH:mm")),
@@ -261,8 +265,8 @@ class TaskEditorViewModel @Inject constructor(
             steps = if (f.placeId != null) emptyList() else f.steps.map { it.copy(title = it.title.trim()) }.filter { it.title.isNotEmpty() },
             // A window counts back from a due time, so an all-day task has none.
             windowMinutes = if (f.allDay) null else f.windowMinutes,
-            askMood = f.askMood && f.placeId == null,
-            asksJournal = f.asksJournal && f.placeId == null,
+            askMood = f.askMood && f.placeId == null && !f.atMost,
+            asksJournal = f.asksJournal && f.placeId == null && !f.atMost,
             countMin = if (f.placeId != null) null else f.countBounds.first,
             countMax = if (f.placeId != null) null else f.countBounds.second,
             countPer = f.countPer,

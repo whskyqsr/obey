@@ -69,6 +69,8 @@ const minutesOf = (hhmm: string) => {
 };
 const toMidnight = (dueTime: string) => 24 * 60 - minutesOf(dueTime);
 
+const atMostOf = (f: Pick<Form, "counted" | "countKind">) => f.counted && f.countKind === "atMost";
+
 const QUICK = [15, 30, 60, 120];
 const quickLabel = (m: number) => (m < 60 ? `${m} min` : m === 60 ? "1 hour" : `${m / 60} hours`);
 
@@ -179,7 +181,8 @@ function toInput(f: Form): TaskInput {
     consequenceId: f.consequenceId || null,
     consequenceDueDays: f.consequenceDueDays,
     consequenceDueTime: f.consequenceAllDay ? null : f.consequenceDueTime || null,
-    proofRequired: f.proofRequired,
+    // "At most" counts are sent at the deadline, so they take approval but not proof, a mood or an entry.
+    proofRequired: f.proofRequired && !atMostOf(f),
     approvalRequired: f.approvalRequired,
     schedule: toSchedule(f.picker),
     dueTime: f.allDay ? null : f.dueTime || null,
@@ -188,8 +191,8 @@ function toInput(f: Form): TaskInput {
     steps: f.steps.map((s) => ({ ...s, title: s.title.trim() })).filter((s) => s.title),
     // A window counts back from a due time, so an all-day task has none.
     windowMinutes: f.allDay ? null : f.windowMinutes,
-    askMood: f.askMood,
-    asksJournal: f.asksJournal,
+    askMood: f.askMood && !atMostOf(f),
+    asksJournal: f.asksJournal && !atMostOf(f),
     ...countBoundsOf(f),
     countPer: f.countPer,
     placeId: f.placeId || null,
@@ -271,6 +274,7 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
 
   // Each section collapses to a sentence, so the whole task reads at a glance.
   const when = form.allDay ? ", all day" : form.dueTime ? ` at ${fmtClock(form.dueTime)}` : "";
+  const atMost = atMostOf(form);
   const quickWhen = form.quick ? `Once, at ${fmtClock(form.dueTime)}${form.picker.start === today() ? " today" : ` ${fmtDate(form.picker.start, { weekday: "long" })}`}` : "";
   const scheduleTitle = form.quick
     ? `Due in ${quickLabel(form.quick)}`
@@ -341,9 +345,9 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
             title={`For ${memberName(form.assigneeId).replace(/^You$/, "you")}`}
             sub={[
               solo ? null : form.approvalRequired ? "Needs your approval" : "No approval needed",
-              form.proofRequired ? "proof required" : "no proof",
-              form.askMood ? "mood check-in" : null,
-              form.asksJournal ? "journal task" : null,
+              form.proofRequired && !atMost ? "proof required" : "no proof",
+              form.askMood && !atMost ? "mood check-in" : null,
+              form.asksJournal && !atMost ? "journal task" : null,
             ]
               .filter(Boolean)
               .join(" · ")}
@@ -360,9 +364,7 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
                 ))}
               </Select>
             )}
-            {form.counted ? (
-              <p className="text-body-medium text-on-surface-variant">A counted task is marked by counting, so it doesn't take approval, proof, a mood or a journal entry.</p>
-            ) : form.placeId ? (
+            {form.placeId ? (
               !solo && (
                 <Switch
                   checked={form.approvalRequired}
@@ -378,28 +380,50 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
                     checked={form.approvalRequired}
                     onChange={(approvalRequired) => set({ approvalRequired })}
                     label="Needs approval"
-                    help={features.points ? "Points post only after you approve the completion." : "It counts as done only after you approve it."}
+                    help={
+                      atMost
+                        ? "Sent to you at the deadline. Points post once you approve it."
+                        : form.counted
+                          ? "Asked once, when the count is met. The count locks while it waits for you."
+                          : features.points
+                            ? "Points post only after you approve the completion."
+                            : "It counts as done only after you approve it."
+                    }
                   />
                 )}
-                <Switch
-                  checked={form.proofRequired}
-                  onChange={(proofRequired) => set({ proofRequired })}
-                  label="Proof required"
-                  help={solo ? "A note or photo goes with the completion, kept with the task for your own record." : "A note or photo must accompany the completion."}
-                />
-                <Switch
-                  checked={form.askMood}
-                  onChange={(askMood) => set({ askMood })}
-                  label="Mood check-in"
-                  help="Marking it done asks how they feel. Their answers build the mood graph in Your dynamic."
-                />
-                {(features.journal || form.asksJournal) && (
-                  <Switch
-                    checked={form.asksJournal}
-                    onChange={(asksJournal) => set({ asksJournal })}
-                    label="Journal task"
-                    help="Marking it done means writing a journal entry, shared with you. Use the details as the prompt."
-                  />
+                {atMost ? (
+                  <p className="mt-2 rounded-sm bg-surface-container-high px-3 py-2 text-body-medium text-on-surface-variant">
+                    "At most" counts are sent at the deadline, since there's no moment they're met, so they only take approval. Counted tasks can't be rituals.
+                  </p>
+                ) : (
+                  <>
+                    <Switch
+                      checked={form.proofRequired}
+                      onChange={(proofRequired) => set({ proofRequired })}
+                      label="Proof required"
+                      help={
+                        form.counted
+                          ? "One photo or note when they send it, not one for each"
+                          : solo
+                            ? "A note or photo goes with the completion, kept with the task for your own record."
+                            : "A note or photo must accompany the completion."
+                      }
+                    />
+                    <Switch
+                      checked={form.askMood}
+                      onChange={(askMood) => set({ askMood })}
+                      label="Mood check-in"
+                      help={form.counted ? "Asked when the count is met" : "Marking it done asks how they feel. Their answers build the mood graph in Your dynamic."}
+                    />
+                    {(features.journal || form.asksJournal) && (
+                      <Switch
+                        checked={form.asksJournal}
+                        onChange={(asksJournal) => set({ asksJournal })}
+                        label="Journal task"
+                        help={form.counted ? "Written when the count is met" : "Marking it done means writing a journal entry, shared with you. Use the details as the prompt."}
+                      />
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -657,7 +681,7 @@ function CountFold({ form, set, readOnly, points }: { form: Form; set(p: Partial
     >
       <Switch
         checked={form.counted}
-        onChange={(counted) => set(counted ? { counted, steps: [], approvalRequired: false, proofRequired: false, askMood: false, asksJournal: false } : { counted })}
+        onChange={(counted) => set(counted ? { counted, steps: [] } : { counted })}
         label="Count it"
         help="A tap marks one more; hold to change the count."
       />

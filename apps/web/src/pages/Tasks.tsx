@@ -1,4 +1,4 @@
-import { CountRing, canCount, isCounted, useCountTap } from "../components/Count";
+import { CountRing, canCount, isCounted, readyToSend, useCountTap } from "../components/Count";
 import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useDeleteTask, useSendDrafts, useTasks } from "../api/hooks";
@@ -163,7 +163,7 @@ function NowStatus({ occurrences, mine, onComplete }: { occurrences: Occurrence[
   const t = today();
   const countTap = useCountTap();
   const open = occurrences.find((o) => o.status === "pending" && (isOverdue(o) || localDateOf(new Date(o.dueAt)) === t));
-  if (open && isCounted(open)) return <CountRing o={open} onTap={mine && canCount(open, true, false) ? () => countTap(open) : undefined} disabled={!mine} />;
+  if (open && isCounted(open)) return <CountRing o={open} onTap={mine && canCount(open, true, false) && !readyToSend(open) ? () => countTap(open) : undefined} disabled={!mine} />;
   if (open && mine)
     return (
       <IconButton

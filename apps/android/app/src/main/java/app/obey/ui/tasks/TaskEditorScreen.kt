@@ -188,7 +188,7 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                     Fold(
                         Icons.Outlined.Person,
                         if (solo) "For you" else "For ${assignee?.displayName ?: "nobody yet"}",
-                        listOfNotNull(if (solo) null else if (form.approvalRequired) "Needs your approval" else "No approval needed", if (form.proofRequired) "proof required" else "no proof", if (form.askMood) "mood check-in" else null, if (form.asksJournal) "journal task" else null).joinToString(" · "),
+                        listOfNotNull(if (solo) null else if (form.approvalRequired) "Needs your approval" else "No approval needed", if (form.proofRequired && !form.atMost) "proof required" else "no proof", if (form.askMood && !form.atMost) "mood check-in" else null, if (form.asksJournal && !form.atMost) "journal task" else null).joinToString(" · "),
                     ) {
                         if (solo) {
                             Text(
@@ -213,28 +213,46 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                                     vm.update { it.copy(approvalRequired = v) }
                                 }
                             }
-                        } else if (form.counted) {
-                            Text(
-                                "A counted task is marked by counting, so it doesn't take approval, proof, a mood or a journal entry.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
                         } else {
                         if (!solo) {
-                            LabeledSwitch("Needs approval", if (features.points) "Points post after you approve it" else "You confirm it's done", form.approvalRequired) { v ->
+                            LabeledSwitch(
+                                "Needs approval",
+                                when {
+                                    form.atMost -> "Sent to you at the deadline. Points post once you approve it."
+                                    form.counted -> "Asked once, when the count is met. The count locks while it waits for you."
+                                    features.points -> "Points post after you approve it"
+                                    else -> "You confirm it's done"
+                                },
+                                form.approvalRequired,
+                            ) { v ->
                                 vm.update { it.copy(approvalRequired = v) }
                             }
                         }
-                        LabeledSwitch("Proof required", if (solo) "A photo or text goes with it, kept for your own record" else "A photo or text must be attached", form.proofRequired) { v ->
+                        if (form.atMost) {
+                            Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth()) {
+                                Text(
+                                    "\"At most\" counts are sent at the deadline, since there's no moment they're met, so they only take approval. Counted tasks can't be rituals.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                )
+                            }
+                        } else {
+                        LabeledSwitch(
+                            "Proof required",
+                            if (form.counted) "One photo or note when they send it, not one for each" else if (solo) "A photo or text goes with it, kept for your own record" else "A photo or text must be attached",
+                            form.proofRequired,
+                        ) { v ->
                             vm.update { it.copy(proofRequired = v) }
                         }
-                        LabeledSwitch("Mood check-in", "Marking it done asks how they feel, for the mood graph in Your dynamic", form.askMood) { v ->
+                        LabeledSwitch("Mood check-in", if (form.counted) "Asked when the count is met" else "Marking it done asks how they feel, for the mood graph in Your dynamic", form.askMood) { v ->
                             vm.update { it.copy(askMood = v) }
                         }
                         if (features.journal || form.asksJournal) {
-                            LabeledSwitch("Journal task", "Marking it done means writing a journal entry, shared with you. The details are the prompt.", form.asksJournal) { v ->
+                            LabeledSwitch("Journal task", if (form.counted) "Written when the count is met" else "Marking it done means writing a journal entry, shared with you. The details are the prompt.", form.asksJournal) { v ->
                                 vm.update { it.copy(asksJournal = v) }
                             }
+                        }
                         }
                         }
                     }
@@ -564,7 +582,7 @@ private fun CountFold(form: TaskForm, points: Boolean, update: ((TaskForm) -> Ta
         if (form.counted) "Marked once each time, until it's due" else "Mark it more than once, like cups of water",
     ) {
         LabeledSwitch("Count it", "A tap marks one more; hold to change the count.", form.counted) { v ->
-            update { if (v) it.copy(counted = true, steps = emptyList(), approvalRequired = false, proofRequired = false, askMood = false, asksJournal = false) else it.copy(counted = false) }
+            update { if (v) it.copy(counted = true, steps = emptyList()) else it.copy(counted = false) }
         }
         if (form.counted) {
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {

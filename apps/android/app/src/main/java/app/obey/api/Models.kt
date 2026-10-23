@@ -440,6 +440,8 @@ data class Occurrence(
     val photoCount: Int = 0,
     /** Needs a photo or a note before it can be marked done. */
     val proofRequired: Boolean = false,
+    /** A Dominant approves it once it's marked done (a count task: once it's sent). */
+    val approvalRequired: Boolean = false,
     val commentCount: Int = 0,
     /** The ritual's steps (empty for an ordinary task) and the ids ticked off so far. */
     val steps: List<TaskStep> = emptyList(),
@@ -494,6 +496,12 @@ data class Occurrence(
         else -> "no more than $countMax"
     }
 
+    /** A count task that asks for approval, proof, a mood or an entry: the assignee sends it once, when the count is met. */
+    val sentWhenMet: Boolean get() = isCounted && (approvalRequired || proofRequired || askMood || asksJournal)
+
+    /** Its count is met and it's waiting to be sent. "At most" counts go at the deadline instead. */
+    val readyToSend: Boolean get() = sentWhenMet && countMin != null && status == OccurrenceStatus.Pending && countState() == CountState.Ok
+
     fun countState(n: Int = count): CountState = when {
         countMax != null && n > countMax -> CountState.Over
         countMin != null && n < countMin -> CountState.Short
@@ -505,6 +513,7 @@ data class Occurrence(
         val base = "$count of $countBounds"
         return when {
             countState() == CountState.Over -> "$base · over by ${count - countMax!!}"
+            readyToSend -> "$base · ready to send"
             status != OccurrenceStatus.Completed -> base
             countMax != null && countMin != countMax && count == countMax -> "$base · at the limit"
             countMax != null && countMin != countMax -> "$base · done, up to ${countMax - count} more"

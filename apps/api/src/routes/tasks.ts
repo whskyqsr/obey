@@ -85,7 +85,7 @@ export async function loadOccurrence(db: Tx, id: string, userId: string) {
   return { ...row, member: m, rel: rel! };
 }
 
-/** A count task's bounds must make sense, and it's marked by counting, so it can't also take steps, a review, proof, a mood or an entry. */
+/** A count task's bounds must make sense, and it's marked by counting, so it can't also take steps. Proof, a mood or an entry are sent once, when the count is met. */
 function checkCount(t: {
   countMin: number | null;
   countMax: number | null;
@@ -96,8 +96,10 @@ function checkCount(t: {
   asksJournal: boolean;
 }) {
   if (t.countMin !== null && t.countMax !== null && t.countMin > t.countMax) throw new HttpError(400, "the minimum can't be more than the maximum");
-  if (isCountTask(t) && (t.steps.length || t.approvalRequired || t.proofRequired || t.askMood || t.asksJournal))
-    throw new HttpError(400, "a counted task can't also be a ritual, need approval or proof, or ask for a mood or a journal entry");
+  if (isCountTask(t) && t.steps.length) throw new HttpError(400, "a counted task can't also be a ritual");
+  // "No more than" has no moment it's met, so it can only go for approval, at the deadline.
+  if (t.countMin === null && t.countMax !== null && (t.proofRequired || t.askMood || t.asksJournal))
+    throw new HttpError(400, 'an "at most" count can\'t ask for proof, a mood or a journal entry');
 }
 
 /** A reminder in the Dominant's words needs the words; any other kind keeps none. */
@@ -258,7 +260,11 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       if (!lock || lock.status === "pending") throw new HttpError(409, "they aren't locked right now");
       if (!lock.endsAt) throw new HttpError(409, "their lock is open-ended, so there's no end to move");
       await db.transaction((tx) => changeLockTime(tx, lock, c.lockMinutes!, { note: body.reason ? `${c.title}: ${body.reason}` : c.title, byId: req.user.id }, deps.now()));
-      await notifier.send([body.assigneeId], { title: "Fealty", body: `${req.user.displayName} added time to your lock`, data: { type: "chastity", relationshipId: c.relationshipId } });
+      await notifier.send([body.assigneeId], {
+        title: "Fealty",
+        body: `${req.user.displayName} added time to your lock`,
+        data: { type: "chastity", relationshipId: c.relationshipId },
+      });
       return reply.status(204).send();
     }
     const series = (await db.transaction((tx) => issueConsequence(tx, c, { ...body, createdBy: req.user.id }, deps.now())))!;
