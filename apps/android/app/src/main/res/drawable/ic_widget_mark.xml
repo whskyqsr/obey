@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Fealty mark from ic_launcher_foreground, cropped to the art for the widgets' header. Tinted where it's used. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="62"
+    android:viewportHeight="62">
+    <group android:translateX="-23" android:translateY="-23">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M68.79 61.92 L64.78 55.9 L63.2 58.3 L65.61 61.92 L54 79.34 L42.39 61.92 L44.25 59.13 L44.28 59.15 L49.35 51.42 L49.37 51.44 L54 44.5 L59.06 52.1 L60.64 49.7 L54 39.74 L47.91 48.87 L47.88 48.85 L42.81 56.58 L42.79 56.56 L39.21 61.92 L54 84.1 Z M60.09 59.13 L60.12 59.15 L65.19 51.42 L65.21 51.44 L68.79 46.08 L54 23.9 L39.21 46.08 L43.22 52.1 L44.8 49.7 L42.39 46.08 L54 28.66 L65.61 46.08 L63.75 48.87 L63.72 48.85 L58.65 56.58 L58.63 56.56 L54 63.5 L48.94 55.9 L47.36 58.3 L54 68.26 Z" />
+    </group>
+</vector>

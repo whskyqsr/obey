@@ -24,6 +24,7 @@ biometric = "1.1.0"
 fragment = "1.8.6"
 playServicesLocation = "21.3.0"
 maplibre = "11.13.5"
+glance = "1.1.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -46,6 +47,8 @@ androidx-biometric = { group = "androidx.biometric", name = "biometric", version
 androidx-fragment = { group = "androidx.fragment", name = "fragment-ktx", version.ref = "fragment" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 maplibre = { group = "org.maplibre.gl", name = "android-sdk", version.ref = "maplibre" }
+glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
+glance-material3 = { group = "androidx.glance", name = "glance-material3", version.ref = "glance" }
 
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }

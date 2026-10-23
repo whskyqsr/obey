@@ -8,4 +8,10 @@
     <string name="disguise_calendar">Calendar</string>
     <string name="disguise_weather">Weather</string>
     <string name="disguise_calculator">Calculator</string>
+    <string name="widget_today">Today</string>
+    <string name="widget_today_description">Today\'s tasks; tick the simple ones done</string>
+    <string name="widget_deadline">Next deadline</string>
+    <string name="widget_deadline_description">A countdown to the next thing due</string>
+    <string name="widget_points">Points</string>
+    <string name="widget_points_description">Points and the next reward</string>
 </resources>

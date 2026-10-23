@@ -15,7 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 
 // Fallback scheme (Android 8-11): Material 3 tonal-spot roles for the brand oxblood seed (#8C3A2B),
 // the same scheme the web app builds by default. Android 12+ uses the wallpaper's dynamic colour instead.
-private val LightColors: ColorScheme = lightColorScheme(
+internal val LightColors: ColorScheme = lightColorScheme(
     primary = Color(0xFF904B3E),
     onPrimary = Color(0xFFFFFFFF),
     primaryContainer = Color(0xFFFFDAD3),
@@ -50,7 +50,7 @@ private val LightColors: ColorScheme = lightColorScheme(
     surfaceContainerHighest = Color(0xFFF1DFDB),
 )
 
-private val DarkColors: ColorScheme = darkColorScheme(
+internal val DarkColors: ColorScheme = darkColorScheme(
     primary = Color(0xFFFFB4A6),
     onPrimary = Color(0xFF561E14),
     primaryContainer = Color(0xFF733428),

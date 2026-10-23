@@ -27,6 +27,22 @@ class SettingsStore @Inject constructor(@ApplicationContext private val context:
     private val appLockKey = androidx.datastore.preferences.core.booleanPreferencesKey("app_lock")
     private val lockAfterKey = androidx.datastore.preferences.core.intPreferencesKey("lock_after_seconds")
     private val welcomeKey = stringPreferencesKey("welcome_relationship_id")
+    private val widgetNamesKey = androidx.datastore.preferences.core.booleanPreferencesKey("widget_names")
+    private val widgetTickKey = androidx.datastore.preferences.core.booleanPreferencesKey("widget_tick")
+
+    /** Whether home screen widgets show task and reward names; off, they show counts and times, like notifications. */
+    val widgetNames: Flow<Boolean> = context.dataStore.data.map { it[widgetNamesKey] ?: false }
+
+    /** Whether simple tasks can be ticked done straight from the Today widget. */
+    val widgetTick: Flow<Boolean> = context.dataStore.data.map { it[widgetTickKey] ?: true }
+
+    suspend fun setWidgetNames(on: Boolean) {
+        context.dataStore.edit { it[widgetNamesKey] = on }
+    }
+
+    suspend fun setWidgetTick(on: Boolean) {
+        context.dataStore.edit { it[widgetTickKey] = on }
+    }
 
     /** The dynamic someone just started or joined, until they finish or skip its setup steps. */
     val welcome: Flow<String?> = context.dataStore.data.map { it[welcomeKey] }
@@ -43,6 +59,8 @@ class SettingsStore @Inject constructor(@ApplicationContext private val context:
 
     suspend fun setAppLock(on: Boolean) {
         context.dataStore.edit { it[appLockKey] = on }
+        // Widgets hide names while the app lock is on.
+        app.obey.widget.Widgets.update(context)
     }
 
     suspend fun setLockAfterSeconds(seconds: Int) {

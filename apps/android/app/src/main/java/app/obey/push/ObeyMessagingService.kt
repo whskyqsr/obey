@@ -45,6 +45,8 @@ class ObeyMessagingService : FirebaseMessagingService() {
         scope.launch { settings.markPushReceived() }
         // A new or changed task may name a place, or a pause may have ended; geofences follow the server.
         scope.launch { location.sync() }
+        // Something changed for this dynamic (a task, a review, a request): the widgets catch up.
+        app.obey.widget.Widgets.refresh(this)
         // Always the launcher name, so a discreet icon isn't given away by an "Obey" title.
         val title = appIcons.currentLabel()
         val body = message.notification?.body ?: message.data["body"] ?: "You have an update"
