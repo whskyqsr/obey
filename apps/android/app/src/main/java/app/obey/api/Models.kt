@@ -246,6 +246,7 @@ data class Features(
     val scenes: Boolean = true,
     /** Off until a dynamic switches it on. */
     val chastity: Boolean = false,
+    val limits: Boolean = true,
 )
 
 /** The relationship's name, or the partners' names when it has none. */

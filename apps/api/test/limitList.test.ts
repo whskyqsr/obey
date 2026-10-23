@@ -45,4 +45,14 @@ describe("limits list", () => {
     expect(after.people.find((p: { userId: string }) => p.userId === domId).answers).toEqual({ kneeling: { rating: "love", note: "" } });
     expect(after.people.find((p: { userId: string }) => p.userId === subId).rated).toBe(1);
   });
+
+  it("is closed while the dynamic has it switched off", async () => {
+    const { dom, sub, relId } = await ctx.pair();
+    const url = `/relationships/${relId}/limit-list`;
+    await dom.patch(`/relationships/${relId}`, { features: { limits: false } });
+    expect((await sub.get(url)).status).toBe(403);
+    expect((await sub.put(`${url}/answers/kneeling`, { rating: "love" })).status).toBe(403);
+    await dom.patch(`/relationships/${relId}`, { features: { limits: true } });
+    expect((await sub.get(url)).status).toBe(200);
+  });
 });

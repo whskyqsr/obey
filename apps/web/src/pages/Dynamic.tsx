@@ -31,6 +31,7 @@ export const FEATURE_ROWS: { key: keyof Features; label: string; help: string }[
   { key: "journal", label: "Journal", help: "Dated entries with a mood." },
   { key: "stats", label: "Stats", help: "How tasks are going: done and missed over time, by weekday and by task." },
   { key: "review", label: "Monthly review", help: "A focus for each month, and a look back on it together at the end." },
+  { key: "limits", label: "Limits", help: "A shared list you each rate, from love to hard limit, seen side by side once you've both finished." },
   { key: "agreement", label: "Agreement", help: "One page you both sign: why you're doing this, what each of you will do, limits and safewords." },
   { key: "scenes", label: "Scenes", help: "Log scenes and how each of you felt about them, keep aftercare plans, and check in the day after." },
   {

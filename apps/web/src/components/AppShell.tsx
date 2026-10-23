@@ -29,7 +29,7 @@ const ALL: Dest[] = [
   { to: "/stats", label: "Stats", icon: "insights", feature: "stats" },
   { to: "/review", label: "Monthly review", icon: "flag", feature: "review" },
   { to: "/agreement", label: "Agreement", icon: "handshake", feature: "agreement" },
-  { to: "/limits", label: "Limits", icon: "tune" },
+  { to: "/limits", label: "Limits", icon: "tune", feature: "limits" },
   { to: "/scenes", label: "Scenes", icon: "auto_awesome", feature: "scenes" },
   { to: "/chastity", label: "Chastity", icon: "lock", feature: "chastity" },
   // Tasks open from Today and Calendar; the full list is for managing them.

@@ -203,6 +203,7 @@ function Lines({ s, marked }: { s: AgreementSection; marked: boolean }) {
 }
 
 function SectionView({ s, marked }: { s: AgreementSection; marked: boolean }) {
+  const { features } = useRel();
   return (
     <section className="flex flex-col gap-1.5">
       <h3 className="flex items-center gap-2 text-title-medium">
@@ -216,7 +217,7 @@ function SectionView({ s, marked }: { s: AgreementSection; marked: boolean }) {
           <Icon name="sticky_note_2" size={18} /> {s.noteTitle}
         </Link>
       )}
-      {s.kind === "text" && s.id === "limits" && (
+      {s.kind === "text" && s.id === "limits" && features.limits && (
         <Link to="/limits" className="flex items-center gap-1 self-start text-label-large text-primary">
           <Icon name="tune" size={18} /> Your limits list
         </Link>

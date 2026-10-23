@@ -38,7 +38,7 @@ export const reschedulePolicy = z.enum(["dominant_only", "request", "allowance"]
 /** Changes whenever the picture does; null when there is none. Fetch it from /users/:id/avatar. */
 const avatarVersion = z.string().nullable();
 /** Parts of the app a dynamic can switch off. Points covers rewards too; tasks and notes are always on. */
-export const FEATURES = ["points", "consequences", "rules", "protocols", "journal", "stats", "review", "location", "agreement", "scenes", "chastity"] as const;
+export const FEATURES = ["points", "consequences", "rules", "protocols", "journal", "stats", "review", "location", "agreement", "scenes", "chastity", "limits"] as const;
 /** Modules most dynamics won't use: off until a dynamic switches them on. */
 const OFF_BY_DEFAULT: readonly (typeof FEATURES)[number][] = ["chastity"];
 export const features = z.object(Object.fromEntries(FEATURES.map((f) => [f, z.boolean()])) as Record<(typeof FEATURES)[number], z.ZodBoolean>);
