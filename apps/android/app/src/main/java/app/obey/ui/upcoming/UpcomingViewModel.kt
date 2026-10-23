@@ -137,9 +137,10 @@ class UpcomingViewModel @Inject constructor(
     }
 
     /** A count task: [by] 1 for a tap, or [to] to set the count outright. */
-    fun count(o: Occurrence, by: Int? = null, to: Int? = null) = action {
-        val r = api.count(o.id, app.obey.api.CountChange(by = by, to = to))
-        say("${o.title}: ${r.copy(title = o.title).countLine}")
+    fun count(o: Occurrence, by: Int? = null, to: Int? = null, onMet: ((Occurrence) -> Unit)? = null) = action {
+        val r = api.count(o.id, app.obey.api.CountChange(by = by, to = to)).copy(title = o.title)
+        // A count that's sent with approval, proof, a mood or an entry opens the send dialog once it's met.
+        if (onMet != null && r.readyToSend && !o.readyToSend) onMet(r) else say("${o.title}: ${r.countLine}")
         refresh()
     }
 

@@ -136,9 +136,10 @@ class TaskDetailViewModel @Inject constructor(
     }
 
     /** A count task: [by] 1 for a tap, or [to] to set the count outright. */
-    fun count(o: Occurrence, by: Int? = null, to: Int? = null) = action {
-        val r = api.count(o.id, app.obey.api.CountChange(by = by, to = to))
-        say("${o.title}: ${r.copy(title = o.title).countLine}")
+    fun count(o: Occurrence, by: Int? = null, to: Int? = null, onMet: ((Occurrence) -> Unit)? = null) = action {
+        val r = api.count(o.id, app.obey.api.CountChange(by = by, to = to)).copy(title = o.title)
+        // A count that's sent with approval, proof, a mood or an entry opens the send dialog once it's met.
+        if (onMet != null && r.readyToSend && !o.readyToSend) onMet(r) else say("${o.title}: ${r.countLine}")
         refresh()
     }
 
@@ -297,7 +298,7 @@ fun TaskDetailScreen(
                                     onCompleteWithNote = if (mine) ({ noting = o }) else null,
                                     onReschedule = { rescheduling = o },
                                     onComments = { commenting = o },
-                                    onCount = if (mine && o.canCount(true, canManage)) ({ vm.count(o, by = 1) }) else null,
+                                    onCount = if (mine && o.canCount(true, canManage)) ({ if (o.readyToSend) noting = o else vm.count(o, by = 1) { noting = it } }) else null,
                                     onCountHold = if (o.canCount(mine, canManage)) ({ counting = o }) else null,
                                 )
                             },

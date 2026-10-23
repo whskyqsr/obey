@@ -441,7 +441,7 @@ describe("tasks and occurrences", () => {
       sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`).then((r) => r.body.find((o: { seriesId: string }) => o.seriesId === id));
     const balance = async () => (await dom.get(`/relationships/${relId}/balances`)).body[0]?.balance ?? 0;
     expect((await dom.post(`/relationships/${relId}/tasks`, task(subId, { countMin: 5, countMax: 3 }))).status).toBe(400);
-    expect((await dom.post(`/relationships/${relId}/tasks`, task(subId, { countMin: 3, askMood: true }))).status).toBe(400);
+    expect((await dom.post(`/relationships/${relId}/tasks`, task(subId, { countMin: 3, steps: [{ id: "a", title: "One" }] }))).status).toBe(400);
 
     // Exactly 3, with a consequence: done at 3, failed at 4, and back to done when a mis-tap is fixed.
     const c = (await dom.post(`/relationships/${relId}/consequences`, { title: "Corner time" })).body;
@@ -484,6 +484,57 @@ describe("tasks and occurrences", () => {
       expect((await day(atMost.id)).status).toBe("completed");
       expect((await day(exact.id)).status).toBe("missed");
       expect(await balance()).toBe(3 + 5 - 4);
+    } finally {
+      ctx.clock.now = new Date("2026-10-16T12:00:00Z");
+    }
+  });
+
+  it("sends a count task that needs approval, proof or a mood once its count is met, and locks it while it waits", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    const opts = { materializeDays: 14, reminderLeadMinutes: 30 };
+    const day = (id: string) =>
+      sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`).then((r) => r.body.find((o: { seriesId: string }) => o.seriesId === id));
+    const balance = async () => (await dom.get(`/relationships/${relId}/balances`)).body[0]?.balance ?? 0;
+    const water = (
+      await dom.post(
+        `/relationships/${relId}/tasks`,
+        task(subId, { title: "Water", points: 2, countMin: 3, countMax: 3, countPer: "count", approvalRequired: true, proofRequired: true, askMood: true }),
+      )
+    ).body;
+    const o = await day(water.id);
+    expect((await sub.post(`/occurrences/${o.id}/complete`, { noteMd: "Done", mood: 4 })).body.error).toBe("reach the count first");
+    await sub.post(`/occurrences/${o.id}/count`, { by: 1 });
+    await sub.post(`/occurrences/${o.id}/count`, { by: 1 });
+    // Met, but it waits to be sent instead of finishing.
+    expect((await sub.post(`/occurrences/${o.id}/count`, { by: 1 })).body).toMatchObject({ count: 3, status: "pending" });
+    expect((await sub.post(`/occurrences/${o.id}/complete`, { mood: 4 })).status).toBe(409);
+    expect((await sub.post(`/occurrences/${o.id}/complete`, { noteMd: "3 glasses" })).status).toBe(409);
+    expect((await sub.post(`/occurrences/${o.id}/complete`, { noteMd: "3 glasses", mood: 4 })).body).toMatchObject({ status: "submitted", mood: 4, count: 3 });
+    expect((await sub.post(`/occurrences/${o.id}/count`, { by: 1 })).status).toBe(409);
+    expect((await dom.post(`/occurrences/${o.id}/review`, { approve: true })).body.status).toBe("completed");
+    expect(await balance()).toBe(6);
+
+    // Only a mood: sent and done at once. One never sent by the deadline is still done; "at most" with approval goes for review then.
+    const mood = (await dom.post(`/relationships/${relId}/tasks`, task(subId, { title: "Stretch", points: 1, countMin: 1, askMood: true }))).body;
+    const m = await day(mood.id);
+    await sub.post(`/occurrences/${m.id}/count`, { by: 1 });
+    const unsent = (await dom.post(`/relationships/${relId}/tasks`, task(subId, { title: "Steps", points: 1, countMin: 1, askMood: true }))).body;
+    await sub.post(`/occurrences/${(await day(unsent.id)).id}/count`, { by: 1 });
+    expect((await sub.post(`/occurrences/${m.id}/complete`, { mood: 5 })).body.status).toBe("completed");
+    expect((await dom.post(`/relationships/${relId}/tasks`, task(subId, { countMax: 2, askMood: true }))).status).toBe(400);
+    const atMost = (await dom.post(`/relationships/${relId}/tasks`, task(subId, { title: "Sweets", points: 5, countMax: 2, approvalRequired: true }))).body;
+    const s = await day(atMost.id);
+    expect((await sub.post(`/occurrences/${s.id}/count`, { by: 1 })).body.status).toBe("pending");
+    expect((await sub.post(`/occurrences/${s.id}/complete`, {})).status).toBe(409);
+    try {
+      ctx.clock.now = new Date("2026-10-17T02:01:00Z");
+      await runJobs(ctx.db, ctx.notifier, ctx.clock.now, opts);
+      expect((await day(unsent.id)).status).toBe("completed");
+      expect((await day(atMost.id)).status).toBe("submitted");
+      // Sent back after the deadline, it's missed rather than sent again.
+      await dom.post(`/occurrences/${s.id}/review`, { approve: false });
+      await runJobs(ctx.db, ctx.notifier, ctx.clock.now, opts);
+      expect((await day(atMost.id)).status).toBe("missed");
     } finally {
       ctx.clock.now = new Date("2026-10-16T12:00:00Z");
     }

@@ -25,12 +25,19 @@ export function countState(o: Counted, n: number): "short" | "ok" | "over" {
   return "ok";
 }
 
+/** A count task that asks for approval, proof, a mood or an entry: sent once, when the count is met. */
+export const sentWhenMet = (o: Occurrence) => isCounted(o) && (o.approvalRequired || o.proofRequired || o.askMood || o.asksJournal);
+
+/** Its count is met and it's waiting for the assignee to send it. "At most" counts go at the deadline instead. */
+export const readyToSend = (o: Occurrence) => sentWhenMet(o) && o.countMin != null && o.status === "pending" && countState(o, o.count) === "ok";
+
 /** "5 of at least 8", "3 of 3–5 · done, up to 2 more", "4 of exactly 3 · over by 1". */
 export function countLine(o: Occurrence) {
   const n = o.count;
   const base = `${n} of ${countBounds(o)}`;
   const state = countState(o, n);
   if (state === "over") return `${base} · over by ${n - o.countMax!}`;
+  if (readyToSend(o)) return `${base} · ready to send`;
   if (o.status !== "completed") return base;
   if (o.countMax != null && n === o.countMax && o.countMin !== o.countMax) return `${base} · at the limit`;
   if (o.countMax != null && o.countMin !== o.countMax) return `${base} · done, up to ${o.countMax - n} more`;
@@ -118,12 +125,15 @@ export function useCountTap() {
   const { rel } = useRel();
   const snack = useSnackbar();
   const count = useCountOccurrence(rel.id);
-  return (o: Occurrence) =>
+  // onMet opens the send sheet when this tap met a count that's sent with approval, proof, a mood or an entry.
+  return (o: Occurrence, onMet?: () => void) =>
     count.mutate(
       { id: o.id, by: 1 },
       {
-        onSuccess: (res) =>
-          snack(`${o.title}: ${countLine(res)}`, { label: "Undo", onClick: () => count.mutate({ id: o.id, by: -1 }, { onError: (e) => snack(errorMessage(e)) }) }),
+        onSuccess: (res) => {
+          if (onMet && readyToSend(res) && !readyToSend(o)) return onMet();
+          snack(`${o.title}: ${countLine(res)}`, { label: "Undo", onClick: () => count.mutate({ id: o.id, by: -1 }, { onError: (e) => snack(errorMessage(e)) }) });
+        },
         onError: (e) => snack(errorMessage(e)),
       },
     );

@@ -108,7 +108,7 @@ fun UpcomingScreen(
                 onComplete = if (mine) ({ if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) }) else null,
                 onReschedule = { rescheduling = o },
                 onEditTask = if (canManage) ({ onEditTask(o.seriesId) }) else null,
-                onCount = if (mine && o.canCount(true, canManage)) ({ vm.count(o, by = 1) }) else null,
+                onCount = if (mine && o.canCount(true, canManage)) ({ if (o.readyToSend) noting = o else vm.count(o, by = 1) { noting = it } }) else null,
                 onCountHold = if (o.canCount(mine, canManage)) ({ counting = o }) else null,
             ),
             onOpen = { onOpenTask(o.seriesId) },
