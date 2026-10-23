@@ -1,0 +1,1 @@
+ALTER TABLE "scene_members" ADD COLUMN "check_seen_at" timestamp with time zone;

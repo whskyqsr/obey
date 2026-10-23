@@ -524,6 +524,10 @@ interface ObeyApi {
     @PUT("scenes/{id}/check")
     suspend fun checkInOnScene(@Path("id") id: String, @Body body: SceneCheckInput): Scene
 
+    /** Someone else has seen a check-in that asked for them; a comment on the scene does this too. */
+    @POST("scenes/{id}/checks/{userId}/seen")
+    suspend fun sceneCheckSeen(@Path("id") id: String, @Path("userId") userId: String, @Body body: Map<String, String> = emptyMap()): Scene
+
     /** Closes the others' aftercare plans on Today for this scene. */
     @POST("scenes/{id}/aftercare-done")
     suspend fun aftercareDone(@Path("id") id: String, @Body body: Map<String, String> = emptyMap()): Scene

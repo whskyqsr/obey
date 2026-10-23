@@ -1033,6 +1033,15 @@ export function useSceneCheck(rel: string) {
   });
 }
 
+/** Marks someone else's next-day check-in seen; a comment on the scene does this too. */
+export function useSceneCheckSeen(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ sceneId, userId }: { sceneId: string; userId: string }) => api<Scene>(`/scenes/${sceneId}/checks/${userId}/seen`, { method: "POST", body: {} }),
+    onSuccess: () => invalidate(),
+  });
+}
+
 export function useAftercareDone(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({

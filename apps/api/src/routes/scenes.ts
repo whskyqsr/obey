@@ -1,10 +1,10 @@
-import { type AftercarePlan, type Scene, aftercarePlanInput, allFeatures, commentInput, sceneCheckInput, sceneInput, sceneSideInput } from "@obey/contracts";
-import { and, asc, desc, eq, inArray, isNull, lte, sql } from "drizzle-orm";
+import { type AftercarePlan, type Scene, aftercarePlanInput, allFeatures, checkWantsPartner, commentInput, sceneCheckInput, sceneInput, sceneSideInput } from "@obey/contracts";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, ne, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { DateTime } from "luxon";
 import type { Deps } from "../app.js";
 import type { Db } from "../db/index.js";
-import { aftercarePlans, memberships, relationships, sceneComments, sceneMembers, scenes } from "../db/schema.js";
+import { aftercarePlans, memberships, relationships, sceneComments, sceneMembers, scenes, users } from "../db/schema.js";
 import { HttpError, forbidden, notFound } from "../errors.js";
 import { type Notifier, sendWithWords } from "../notify.js";
 import { canManage, requireMember } from "../services/access.js";
@@ -41,7 +41,7 @@ function sceneDto(s: SceneRow, rows: MemberRow[], me: string): Scene {
     sides: shared
       .filter((r) => iShared || r.userId === me)
       .map((r) => ({ userId: r.userId, mood: r.mood!, worked: r.worked, change: r.change, need: r.need, sharedAt: r.sharedAt!.toISOString() })),
-    checks: rows.filter((r) => r.checkAt).map((r) => ({ userId: r.userId, mood: r.checkMood!, note: r.checkNote, at: r.checkAt!.toISOString() })),
+    checks: rows.filter((r) => r.checkAt).map((r) => ({ userId: r.userId, mood: r.checkMood!, note: r.checkNote, at: r.checkAt!.toISOString(), seen: !!r.checkSeenAt })),
     aftercareDone: !!rows.find((r) => r.userId === me)?.aftercareDoneAt,
     commentCount: s.commentCount,
   };
@@ -176,7 +176,30 @@ export const sceneRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const { s } = await loadScene(req.params.id, req.user.id);
     const body = sceneCheckInput.parse(req.body);
     if (deps.now() < s.checkFrom) throw new HttpError(409, "the check-in opens the day after");
-    await updateMine(s.id, req.user.id, { checkMood: body.mood, checkNote: body.note, checkAt: deps.now() });
+    await updateMine(s.id, req.user.id, { checkMood: body.mood, checkNote: body.note, checkAt: deps.now(), checkSeenAt: null });
+    // Feeling low, or still needing something, reaches the others the way a low task check-in does.
+    if (checkWantsPartner(body)) {
+      const name = req.user.displayName;
+      const push = {
+        title: "Fealty",
+        body: body.mood <= 2 ? `${name} checked in feeling ${body.mood === 1 ? "awful" : "low"}` : `${name} checked in and still needs something`,
+        data: { type: "scene_check", sceneId: s.id },
+      };
+      await sendWithWords(db, notifier, await others(s.relationshipId, req.user.id), push, body.note ? { ...push, body: `${push.body}: “${body.note}”` } : null);
+    }
+    return dto(s, req.user.id);
+  });
+
+  // Someone else has seen a check-in that asked for them; a comment on the scene does this too.
+  app.post<{ Params: { id: string; userId: string } }>("/scenes/:id/checks/:userId/seen", async (req) => {
+    const { s } = await loadScene(req.params.id, req.user.id);
+    if (req.params.userId === req.user.id) throw forbidden("someone else marks your check-in seen");
+    const [row] = await db
+      .update(sceneMembers)
+      .set({ checkSeenAt: deps.now() })
+      .where(and(eq(sceneMembers.sceneId, s.id), eq(sceneMembers.userId, req.params.userId), isNotNull(sceneMembers.checkAt), isNull(sceneMembers.checkSeenAt)))
+      .returning();
+    if (!row && !(await membersOf(s.id)).some((r) => r.userId === req.params.userId && r.checkAt)) throw notFound("no check-in to see");
     return dto(s, req.user.id);
   });
 
@@ -201,6 +224,11 @@ export const sceneRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         .update(scenes)
         .set({ commentCount: sql`${scenes.commentCount} + 1` })
         .where(eq(scenes.id, s.id));
+      // Replying is seeing: the others' check-ins leave this person's Needs you.
+      await tx
+        .update(sceneMembers)
+        .set({ checkSeenAt: deps.now() })
+        .where(and(eq(sceneMembers.sceneId, s.id), ne(sceneMembers.userId, req.user.id), isNotNull(sceneMembers.checkAt), isNull(sceneMembers.checkSeenAt)));
       return row!;
     });
     const push = { title: "Fealty", body: `${req.user.displayName} commented`, data: { type: "scene_comment", sceneId: s.id } };
@@ -247,7 +275,10 @@ export const sceneRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   });
 };
 
-/** The next-day check-in push, once per scene; a scene logged more than a day after its check-in opened gets none. */
+/**
+ * The next-day check-in push, once per scene; a scene logged more than a day after its check-in opened gets none. Each
+ * person is asked how they feel, if they haven't said, and nudged to check in with the others.
+ */
 export async function sceneCheckIns(db: Db, notifier: Notifier, now: Date) {
   const due = await db
     .update(scenes)
@@ -260,11 +291,20 @@ export async function sceneCheckIns(db: Db, notifier: Notifier, now: Date) {
     const [rel] = await db.select({ features: relationships.features, endedAt: relationships.endedAt }).from(relationships).where(eq(relationships.id, s.relationshipId));
     if (!rel || rel.endedAt || !allFeatures(rel.features).scenes) continue;
     const answered = new Set((await db.select().from(sceneMembers).where(eq(sceneMembers.sceneId, s.id))).filter((r) => r.checkAt).map((r) => r.userId));
-    const ids = (await db.select({ userId: memberships.userId }).from(memberships).where(eq(memberships.relationshipId, s.relationshipId)))
-      .map((m) => m.userId)
-      .filter((id) => !answered.has(id));
-    if (!ids.length) continue;
-    await notifier.send(ids, { title: "Fealty", body: `How are you feeling after ${whenWas(s)}?`, data: { type: "scene_check", sceneId: s.id } });
+    const people = await db
+      .select({ userId: memberships.userId, name: users.displayName })
+      .from(memberships)
+      .innerJoin(users, eq(users.id, memberships.userId))
+      .where(eq(memberships.relationshipId, s.relationshipId));
+    const when = whenWas(s);
+    for (const p of people) {
+      const withWhom = people.filter((o) => o.userId !== p.userId).map((o) => o.name);
+      const nudge = withWhom.length ? `check in with ${withWhom.join(" and ")}` : "";
+      const body = answered.has(p.userId)
+        ? nudge && `${nudge[0]!.toUpperCase()}${nudge.slice(1)} about ${when}`
+        : `How are you feeling after ${when}?${nudge && ` And ${nudge}.`}`;
+      if (body) await notifier.send([p.userId], { title: "Fealty", body, data: { type: "scene_check", sceneId: s.id } });
+    }
     sent++;
   }
   return sent;

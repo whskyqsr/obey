@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { useMarkRedeemed, useMoodSeen } from "../api/hooks";
+import { useMarkRedeemed, useMoodSeen, useSceneCheckSeen } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { LedgerEntry, Occurrence } from "../api/types";
 import { ago, fmtDateTime } from "../lib/dates";
 import { useRel } from "../lib/relationship";
+import type { SceneCheckFor } from "../lib/today";
+import { SceneComments } from "../pages/Scenes";
 import { ReplyDialog } from "./Comments";
 import { MOOD_LABELS, MOODS } from "./Mood";
 import { Button, Dialog, Icon, IconButton, TextField, useSnackbar } from "./ui";
@@ -43,6 +45,66 @@ export function MoodRow({ o }: { o: Occurrence }) {
           intro={`${o.noteMd ? `“${o.noteMd}” ` : ""}${o.title}, ${fmtDateTime(o.completedAt!)}. Your reply goes in its comments.`}
           onClose={() => setReplying(false)}
         />
+      )}
+    </div>
+  );
+}
+
+/** A next-day scene check-in that asks for this person: how they feel, what they still need, and Seen or Reply. */
+export function SceneCheckRow({ x: { scene, check } }: { x: SceneCheckFor }) {
+  const { rel, memberName } = useRel();
+  const snack = useSnackbar();
+  const seen = useSceneCheckSeen(rel.id);
+  const [replying, setReplying] = useState(false);
+  const who = memberName(check.userId);
+  const feeling = MOOD_LABELS[check.mood - 1]!.toLowerCase();
+  const what = scene.title || `the scene on ${fmtDateTime(scene.occurredAt)}`;
+  return (
+    <div className="flex min-h-16 items-center gap-2 bg-surface-container-low py-2 pr-2 pl-1">
+      <span className="flex size-10 shrink-0 items-center justify-center">
+        <Icon name={MOODS[check.mood - 1]!} filled className="text-tertiary" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="text-body-large text-on-surface">
+          {who} feels {feeling} after {scene.title ? `“${scene.title}”` : "the scene"}
+        </div>
+        <div className="text-body-medium text-on-surface-variant">
+          {check.note ? (
+            <>
+              Still needs: <span className="italic">“{check.note}”</span>
+            </>
+          ) : (
+            "Checked in"
+          )}{" "}
+          · {ago(check.at)}
+        </div>
+      </div>
+      <IconButton
+        icon="check"
+        label="Seen"
+        disabled={seen.isPending}
+        onClick={() => seen.mutate({ sceneId: scene.id, userId: check.userId }, { onSuccess: () => snack("Marked seen"), onError: (e) => snack(errorMessage(e)) })}
+      />
+      <IconButton icon="chat" label="Reply" variant="tonal" onClick={() => setReplying(true)} />
+      {replying && (
+        <Dialog
+          open
+          onClose={() => setReplying(false)}
+          icon="chat"
+          title={`${who} is feeling ${feeling}`}
+          actions={
+            <Button variant="text" onClick={() => setReplying(false)}>
+              Done
+            </Button>
+          }
+        >
+          <div className="flex flex-col gap-3">
+            <p className="text-body-medium text-on-surface-variant">
+              {check.note ? `“${check.note}” ` : ""}After {what}. Your reply goes in the scene's comments.
+            </p>
+            <SceneComments sceneId={scene.id} />
+          </div>
+        </Dialog>
       )}
     </div>
   );

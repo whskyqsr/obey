@@ -71,6 +71,28 @@ fun MoodRow(o: Occurrence, name: String, onSeen: () -> Unit, onReply: () -> Unit
     )
 }
 
+/** A next-day scene check-in that asks for this person: how they feel, what they still need, and Seen or Reply. */
+@Composable
+fun SceneCheckRow(scene: app.obey.api.Scene, c: app.obey.api.SceneCheck, name: String, onSeen: () -> Unit, onReply: () -> Unit) {
+    ListItem(
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        leadingContent = { Icon(moodIcon(c.mood, filled = true), null, tint = MaterialTheme.colorScheme.tertiary) },
+        headlineContent = { Text("$name feels ${moodLabel(c.mood).lowercase()} after ${scene.title.ifBlank { null }?.let { "“$it”" } ?: "the scene"}") },
+        supportingContent = {
+            Text(
+                (if (c.note.isNotBlank()) "Still needs: “${c.note}”" else "Checked in") + " · ${ago(c.at)}",
+                fontStyle = if (c.note.isNotBlank()) FontStyle.Italic else null,
+            )
+        },
+        trailingContent = {
+            Row {
+                IconButton(onClick = onSeen) { Icon(Icons.Outlined.Check, "Seen") }
+                FilledTonalIconButton(onClick = onReply) { Icon(Icons.AutoMirrored.Outlined.Chat, "Reply") }
+            }
+        },
+    )
+}
+
 /** A reward the sub spent points on, waiting for a Dominant to give it and mark it redeemed. */
 @Composable
 fun RedemptionRow(e: LedgerEntry, name: String, onRedeemed: () -> Unit) {

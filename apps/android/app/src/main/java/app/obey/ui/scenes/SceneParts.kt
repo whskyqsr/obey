@@ -309,7 +309,7 @@ internal fun SceneCheckIn(busy: Boolean, onSave: (mood: Int, note: String) -> Un
         MoodPicker(mood, { mood = it })
         mood?.let { m ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(note, { note = it.take(500) }, label = { Text("Anything to add (optional)") }, modifier = Modifier.weight(1f))
+                OutlinedTextField(note, { note = it.take(500) }, label = { Text("Anything you still need? (optional)") }, modifier = Modifier.weight(1f))
                 Button(onClick = { onSave(m, note.trim()) }, enabled = !busy) { Text("Save") }
             }
         }

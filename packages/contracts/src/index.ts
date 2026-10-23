@@ -1239,8 +1239,15 @@ export type SceneSide = z.infer<typeof sceneSide>;
 
 /** "How are you feeling after last night?", the day after. */
 export const sceneCheckInput = z.object({ mood, note: z.string().trim().max(500).default("") });
-export const sceneCheck = sceneCheckInput.extend({ userId: id, at: z.string() });
+export const sceneCheck = sceneCheckInput.extend({
+  userId: id,
+  at: z.string(),
+  /** A check-in that asks for the others (see [checkWantsPartner]) stays in their Needs you until one of them sees it. */
+  seen: z.boolean(),
+});
 export type SceneCheck = z.infer<typeof sceneCheck>;
+/** Feeling bad or low, or anything written in "still need": the others should hear about it. */
+export const checkWantsPartner = (c: { mood: number; note: string }) => c.mood <= 2 || c.note.trim() !== "";
 
 export const scene = z.object({
   id,
