@@ -21,11 +21,24 @@ const files = {
 // Only exists when the project has Firebase Hosting; the helpers work without it.
 const optional = { "__/firebase/init.json": "__/firebase/init.json" };
 
+// A build machine's network can drop a request now and then; try each file a few times before giving up.
+async function get(url) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fetch(url);
+    } catch (e) {
+      if (attempt === 4) throw e;
+      console.warn(`${url}: ${e.message}, trying again`);
+      await new Promise((r) => setTimeout(r, attempt * 2000));
+    }
+  }
+}
+
 try {
   await mkdir("dist/__/auth", { recursive: true });
   await mkdir("dist/__/firebase", { recursive: true });
   for (const [path, out] of Object.entries({ ...files, ...optional })) {
-    const res = await fetch(`${source}/${path}`);
+    const res = await get(`${source}/${path}`);
     console.log(`${source}/${path}: HTTP ${res.status}`);
     if (!res.ok) {
       if (path in optional) continue;
