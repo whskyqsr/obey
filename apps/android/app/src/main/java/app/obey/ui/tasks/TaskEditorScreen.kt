@@ -53,6 +53,10 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.foundation.layout.size
+import java.time.LocalDate
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -238,16 +242,47 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                     val schedule = form.recurrence.toSchedule(form.start)
                     val at = if (form.allDay) ", all day" else " at ${form.dueTime.format(timeFmt)}"
                     val zone = zoneName(form.timezone)
+                    val quick = form.quick
                     Fold(
-                        Icons.Outlined.EventRepeat,
-                        (if (schedule.rule == null) "Once, ${formatDate(form.start)}" else describe(schedule)) + at,
-                        listOfNotNull(
-                            if (schedule.rule != null) "From ${formatDate(form.start)}" else null,
-                            if (!form.allDay && form.windowMinutes != null) "opens ${windowLabel(form.windowMinutes)}" else null,
-                            "$zone time",
-                        ).joinToString(" · "),
+                        if (quick != null) Icons.Outlined.Schedule else Icons.Outlined.EventRepeat,
+                        if (quick != null) "Due in ${quickLabel(quick)}" else (if (schedule.rule == null) "Once, ${formatDate(form.start)}" else describe(schedule)) + at,
+                        if (quick != null) {
+                            "Once, at ${form.dueTime.format(timeFmt)} " + if (form.start == LocalDate.now()) "today" else form.start.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault())
+                        } else {
+                            listOfNotNull(
+                                if (schedule.rule != null) "From ${formatDate(form.start)}" else null,
+                                if (!form.allDay && form.windowMinutes != null) "opens ${windowLabel(form.windowMinutes)}" else null,
+                                "$zone time",
+                            ).joinToString(" · ")
+                        },
                         initiallyOpen = vm.isNew,
                     ) {
+                        if (vm.isNew) {
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                QUICK.forEachIndexed { i, m ->
+                                    FilterChip(
+                                        selected = quick == m,
+                                        onClick = { vm.update { it.quickDeadline(m) } },
+                                        leadingIcon = { Icon(Icons.Outlined.Bolt, null, Modifier.size(FilterChipDefaults.IconSize)) },
+                                        label = { Text(if (i == 0) "In ${quickLabel(m)}" else quickLabel(m)) },
+                                    )
+                                }
+                                FilterChip(
+                                    selected = quick == null,
+                                    onClick = { vm.update { it.copy(quick = null) } },
+                                    leadingIcon = { Icon(Icons.Outlined.CalendarMonth, null, Modifier.size(FilterChipDefaults.IconSize)) },
+                                    label = { Text("Pick a day and time") },
+                                )
+                            }
+                        }
+                        if (quick != null) {
+                            Text(
+                                "Quick deadlines are one-off tasks with no grace period. " +
+                                    if (form.assigneeId == vm.myId) "You get a countdown on Today." else "${assignee?.displayName ?: "They"} gets a push right away and a countdown on Today.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             OutlinedButton(onClick = { pickDate = true }) {
                                 Icon(Icons.Outlined.CalendarMonth, null)
@@ -280,6 +315,7 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                                 )
                             }
                             TextButton(onClick = { pickZone = true }) { Text("Change") }
+                        }
                         }
                     }
 
