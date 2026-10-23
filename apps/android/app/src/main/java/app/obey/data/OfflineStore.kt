@@ -1,11 +1,13 @@
 package app.obey.data
 
 import android.content.Context
+import app.obey.api.Balance
 import app.obey.api.CalendarEvent
 import app.obey.api.JournalEntryInput
 import app.obey.api.Me
 import app.obey.api.Occurrence
 import app.obey.api.RescheduleRequest
+import app.obey.api.Reward
 import app.obey.api.TaskStreak
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -30,6 +32,10 @@ data class TodaySnapshot(
     val events: List<CalendarEvent> = emptyList(),
     val noTasks: Boolean = false,
 )
+
+/** Balances and rewards as the Points widget last saw them. */
+@Serializable
+data class PointsSnapshot(val balances: List<Balance>, val rewards: List<Reward>)
 
 /** A completion made with no signal, sent once the phone is back online with the time it was done. */
 @Serializable
@@ -85,6 +91,9 @@ class OfflineStore @Inject constructor(
 
     suspend fun today(relationshipId: String): TodaySnapshot? = read("today-$relationshipId.json")
     suspend fun saveToday(relationshipId: String, snapshot: TodaySnapshot) = write("today-$relationshipId.json", snapshot)
+
+    suspend fun points(relationshipId: String): PointsSnapshot? = read("points-$relationshipId.json")
+    suspend fun savePoints(relationshipId: String, snapshot: PointsSnapshot) = write("points-$relationshipId.json", snapshot)
 
     suspend fun pending(): List<PendingCompletion> = read("pending.json") ?: emptyList()
     suspend fun addPending(p: PendingCompletion) = write("pending.json", pending().filter { it.occurrenceId != p.occurrenceId } + p)

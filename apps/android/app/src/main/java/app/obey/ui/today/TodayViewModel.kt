@@ -142,6 +142,7 @@ class TodayViewModel @Inject constructor(
             try {
                 val snap = snapshot(relId)
                 offline.saveToday(relId, snap)
+                app.obey.widget.Widgets.update(context)
                 _state.value = Load.Ready(derive(snap, offline.pending()))
                 _offlineSince.value = null
             } catch (c: CancellationException) {

@@ -181,6 +181,8 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, vm: SettingsVi
                 app.obey.lock.AppLockSetting()
                 androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
                 app.obey.ui.proof.ProofBlurSetting()
+                androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
+                app.obey.widget.WidgetSetting()
 
                 SectionHeader("App icon")
                 AppIconPicker(appIcon, vm::setAppIcon)

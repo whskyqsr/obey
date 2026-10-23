@@ -1,11 +1,13 @@
 package app.obey.data
 
+import android.content.Context
 import app.obey.api.Me
 import app.obey.api.Member
 import app.obey.api.ObeyApi
 import app.obey.api.Relationship
 import app.obey.api.Role
 import app.obey.api.userMessage
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -52,6 +54,7 @@ class SessionRepository @Inject constructor(
     private val api: ObeyApi,
     private val settings: SettingsStore,
     private val offline: OfflineStore,
+    @ApplicationContext private val context: Context,
 ) {
     private val _state = MutableStateFlow<SessionState>(SessionState.Loading)
     val state: StateFlow<SessionState> = _state.asStateFlow()
@@ -90,6 +93,8 @@ class SessionRepository @Inject constructor(
                 SessionState.Ready(s.session.copy(relationship = rel))
             } else s
         }
+        // The widgets follow the dynamic that's open.
+        app.obey.widget.Widgets.refresh(context)
     }
 
     /** Called after creating/joining/updating a relationship. */
@@ -102,5 +107,6 @@ class SessionRepository @Inject constructor(
     suspend fun clear() {
         _state.value = SessionState.Loading
         offline.clear()
+        app.obey.widget.Widgets.update(context)
     }
 }

@@ -112,6 +112,8 @@ dependencies {
     // Location tasks: geofences to notice arriving and leaving, and a map for placing the pin (OpenStreetMap tiles, no key).
     implementation(libs.play.services.location)
     implementation(libs.maplibre)
+    implementation(libs.glance.appwidget)
+    implementation(libs.glance.material3)
     debugImplementation(libs.compose.ui.tooling)
 
     implementation(libs.hilt.android)
