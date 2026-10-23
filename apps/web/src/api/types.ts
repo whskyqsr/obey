@@ -28,6 +28,7 @@ export type Scene = c.Scene;
 export type SceneInput = z.input<typeof c.sceneInput>;
 export type SceneSide = c.SceneSide;
 export type SceneCheck = c.SceneCheck;
+export type AgreementDrift = c.AgreementDrift;
 export type AftercarePlan = c.AftercarePlan;
 export type SceneComment = c.SceneComment;
 export type Relationship = c.Relationship;

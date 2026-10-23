@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import type { AgreementSection, AgreementSectionInput, AgreementVersion } from "../api/types";
+import type { AgreementDrift, AgreementSection, AgreementSectionInput, AgreementVersion } from "../api/types";
 import { useAgree, useAgreement, useAgreementTemplate, useAgreementVersion, useProposeAgreement, useRequestAgreementChanges, useWithdrawAgreement } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { Badge, Button, Checkbox, Dialog, ErrorBox, Icon, IconButton, Loading, OverflowMenu, PageHeader, TextArea, TextField, cx, useSnackbar } from "../components/ui";
@@ -24,7 +24,7 @@ export function AgreementPage() {
   const [editing, setEditing] = useState<"edit" | "template" | "blank" | null>(null);
   if (q.isLoading) return <Loading />;
   if (q.error || !q.data) return <ErrorBox error={q.error} onRetry={() => q.refetch()} />;
-  const { current, proposal } = q.data;
+  const { current, proposal, drift } = q.data;
   const waitingOnMe = !!proposal && proposal.status === "proposed" && !proposal.agreements.some((a) => a.userId === me.user.id);
   // Someone with a proposal to answer lands on it.
   const v = view ?? (waitingOnMe ? { kind: "review" } : { kind: "page" });
@@ -39,6 +39,7 @@ export function AgreementPage() {
       <PageHeader title="Agreement" subtitle={current ? `Version ${current.number} · agreed ${day(current.agreedAt!)}` : proposal ? "Nothing agreed yet" : "Not written yet"} />
       <div className="flex flex-col gap-4 px-4 pb-8 md:px-6">
         {proposal && <ProposalBanner v={proposal} onRead={() => setView({ kind: "review" })} onEdit={() => setEditing("edit")} />}
+        {current && !proposal && drift.length > 0 && <DriftBanner drift={drift} onPropose={readOnly ? undefined : () => setEditing("edit")} />}
         {current ? (
           <>
             <Body v={current} />
@@ -76,6 +77,32 @@ export function AgreementPage() {
         )}
       </div>
     </>
+  );
+}
+
+/** Rules or protocols changed after the version in force was written, so what's signed no longer matches them. */
+function DriftBanner({ drift, onPropose }: { drift: AgreementDrift[]; onPropose?(): void }) {
+  const { rel } = useRel();
+  const what = [...new Set(drift.map((d) => (d.kind === "rules" ? "Rules" : "Protocols")))].join(" and ");
+  const line = (verb: AgreementDrift["verb"]) => drift.filter((d) => d.verb === verb).map((d) => d.title);
+  const added = line("added"),
+    removed = line("removed");
+  return (
+    <div className="flex flex-col gap-1 rounded-xl bg-secondary-container px-4 py-3 text-on-secondary-container">
+      <div className="flex items-center gap-2 text-title-medium">
+        <Icon name="published_with_changes" />
+        {what} changed since you {rel.members.length > 2 ? "all" : "both"} signed
+      </div>
+      {added.length > 0 && <div className="text-body-medium opacity-85">Added: {added.join(", ")}</div>}
+      {removed.length > 0 && <div className="text-body-medium opacity-85">Removed: {removed.join(", ")}</div>}
+      {onPropose && (
+        <div className="mt-2">
+          <Button icon="edit" onClick={onPropose}>
+            Propose an update
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 

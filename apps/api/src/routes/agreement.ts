@@ -1,5 +1,6 @@
 import {
   type Agreement,
+  type AgreementDrift,
   type AgreementLine,
   type AgreementSection,
   type AgreementSectionInput,
@@ -135,12 +136,36 @@ export const agreementRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     await requireAgreement(req.params.id, req.user.id);
     const rows = await db.select().from(agreementVersions).where(eq(agreementVersions.relationshipId, req.params.id)).orderBy(desc(agreementVersions.number));
     const dtos = await Promise.all(rows.map((r) => versionDto(db, r)));
+    const agreed = rows.find((r) => r.status === "agreed");
     return {
+      drift: agreed ? await driftSince(agreed) : [],
       current: dtos.find((d) => d.status === "agreed") ?? null,
       proposal: dtos.find((d) => (OPEN as readonly string[]).includes(d.status)) ?? null,
       versions: dtos.map(({ id, number, status, proposedBy, proposedAt, agreedAt, changes }) => ({ id, number, status, proposedBy, proposedAt, agreedAt, changes })),
     };
   });
+
+  /**
+   * Rules and protocols added or removed since [v] took its snapshot of their titles, which is all the agreement shows of
+   * them; a renamed one is both. Order and wording inside them don't count.
+   */
+  async function driftSince(v: Row): Promise<AgreementDrift[]> {
+    const out: AgreementDrift[] = [];
+    for (const kind of ["rules", "protocols"] as const) {
+      if (!v.sections.some((s) => s.kind === kind)) continue;
+      const table = kind === "rules" ? rules : protocols;
+      const live = (await db.select({ title: table.title }).from(table).where(eq(table.relationshipId, v.relationshipId))).map((r) => r.title);
+      const signed = v.items[kind];
+      const left = [...signed];
+      for (const title of live) {
+        const at = left.indexOf(title);
+        if (at >= 0) left.splice(at, 1);
+        else out.push({ kind, verb: "added", title });
+      }
+      for (const title of left) out.push({ kind, verb: "removed", title });
+    }
+    return out;
+  }
 
   app.get<{ Params: { id: string } }>("/agreement-versions/:id", async (req) => versionDto(db, await loadVersion(req.params.id, req.user.id)));
 

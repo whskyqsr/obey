@@ -1194,8 +1194,19 @@ export const agreementVersion = z.object({
 export type AgreementVersion = z.infer<typeof agreementVersion>;
 export const agreementVersionSummary = agreementVersion.pick({ id: true, number: true, status: true, proposedBy: true, proposedAt: true, agreedAt: true, changes: true });
 export type AgreementVersionSummary = z.infer<typeof agreementVersionSummary>;
-/** The version in force, the open proposal if there is one, and every version newest first. */
-export const agreement = z.object({ current: agreementVersion.nullable(), proposal: agreementVersion.nullable(), versions: z.array(agreementVersionSummary) });
+/** A rule or protocol added or removed since the version in force was written. */
+export const agreementDrift = z.object({ kind: z.enum(["rules", "protocols"]), verb: z.enum(["added", "removed"]), title: z.string() });
+export type AgreementDrift = z.infer<typeof agreementDrift>;
+/**
+ * The version in force, the open proposal if there is one, every version newest first, and what has changed in Rules
+ * and Protocols since the version in force was written (only for the sections it has).
+ */
+export const agreement = z.object({
+  current: agreementVersion.nullable(),
+  proposal: agreementVersion.nullable(),
+  versions: z.array(agreementVersionSummary),
+  drift: z.array(agreementDrift),
+});
 export type Agreement = z.infer<typeof agreement>;
 
 /** A rule or protocol someone else added, changed or removed, not yet marked seen. */
