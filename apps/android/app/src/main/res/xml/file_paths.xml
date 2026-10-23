@@ -2,4 +2,6 @@
 <paths>
     <!-- Camera captures for proof photos; deleted once uploaded. -->
     <cache-path name="proof" path="proof/" />
+    <!-- The limits chart, shared as an image. -->
+    <cache-path name="share" path="share/" />
 </paths>

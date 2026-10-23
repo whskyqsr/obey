@@ -10,6 +10,7 @@ import { requestScope } from "./services/access.js";
 import { adminRoutes } from "./routes/admin.js";
 import { commentRoutes } from "./routes/comments.js";
 import { limitRoutes } from "./routes/limits.js";
+import { limitListRoutes } from "./routes/limitList.js";
 import { locationRoutes } from "./routes/location.js";
 import { curfewRoutes } from "./routes/curfew.js";
 import { ruleLogRoutes } from "./routes/ruleLog.js";
@@ -115,6 +116,7 @@ export function buildApp(deps: Deps) {
   app.register(adminRoutes(deps));
   app.register(commentRoutes(deps));
   app.register(limitRoutes(deps));
+  app.register(limitListRoutes(deps));
   app.register(locationRoutes(deps));
   app.register(curfewRoutes(deps));
   app.register(ruleLogRoutes(deps));

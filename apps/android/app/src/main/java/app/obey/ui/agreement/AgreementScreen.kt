@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -42,6 +43,7 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PublishedWithChanges
 import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material.icons.outlined.Handshake
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.UnfoldMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -68,6 +70,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -75,6 +78,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -273,9 +277,17 @@ private fun AgreementSection.draft() = DraftSection(id, kind, title, body, noteI
 private fun AgreementSectionInput.draft() = DraftSection(id, kind, title, body, noteId)
 
 /** The agreement: one versioned page everyone in the dynamic signs, proposals to change it, and every version before. */
+/** Opens the limits list from the agreement's limits section. */
+private val LocalOpenLimits = staticCompositionLocalOf<() -> Unit> { {} }
+
+@Composable
+fun AgreementScreen(onOpenSettings: () -> Unit, onOpenNote: (String) -> Unit, onOpenLimits: () -> Unit) {
+    CompositionLocalProvider(LocalOpenLimits provides onOpenLimits) { AgreementContent(onOpenSettings, onOpenNote) }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AgreementScreen(onOpenSettings: () -> Unit, onOpenNote: (String) -> Unit, vm: AgreementViewModel = hiltViewModel()) {
+private fun AgreementContent(onOpenSettings: () -> Unit, onOpenNote: (String) -> Unit, vm: AgreementViewModel = hiltViewModel()) {
     LaunchedEffect(Unit) { vm.load() }
     val state by vm.state.collectAsStateWithLifecycle()
     val version by vm.version.collectAsStateWithLifecycle()
@@ -731,6 +743,14 @@ private fun SectionView(s: AgreementSection, marked: Boolean, prevNumber: Int?, 
             )
         }
         lines.forEach { LineView(it, list) }
+        if (s.kind == "text" && s.id == "limits") {
+            val open = LocalOpenLimits.current
+            TextButton(onClick = open, contentPadding = PaddingValues(horizontal = 0.dp)) {
+                Icon(Icons.Outlined.Tune, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Your limits list")
+            }
+        }
         if (list) {
             val from = if (s.kind == "rules") "Rules" else "Protocols"
             val added = lines.count { it.op == "add" }

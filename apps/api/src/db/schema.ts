@@ -147,6 +147,56 @@ export const protocols = pgTable("protocols", {
   createdAt: createdAt(),
 });
 
+/** Items a couple added to their limits list, beside the starter list (whose items are keyed by name in code). */
+export const limitItems = pgTable(
+  "limit_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    category: text("category").notNull(),
+    title: text("title").notNull(),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("limit_items_relationship_idx").on(t.relationshipId)],
+);
+
+/** One person's answer for one item of the limits list, for themselves in their own role. Skipped items have no row. */
+export const limitRatings = pgTable(
+  "limit_ratings",
+  {
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** A starter item's key, or a limit_items id. */
+    itemKey: text("item_key").notNull(),
+    rating: text("rating", { enum: ["love", "like", "curious", "soft", "hard"] }),
+    note: text("note").notNull().default(""),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.relationshipId, t.userId, t.itemKey] })],
+);
+
+/** When someone said they'd finished their limits list; partners' answers show once everyone has. */
+export const limitFinished = pgTable(
+  "limit_finished",
+  {
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.relationshipId, t.userId] })],
+);
+
 /** Each person's hard and soft limits and things they're curious about; only the owner changes them. */
 export const limits = pgTable(
   "limits",

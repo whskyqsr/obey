@@ -29,6 +29,7 @@ const ALL: Dest[] = [
   { to: "/stats", label: "Stats", icon: "insights", feature: "stats" },
   { to: "/review", label: "Monthly review", icon: "flag", feature: "review" },
   { to: "/agreement", label: "Agreement", icon: "handshake", feature: "agreement" },
+  { to: "/limits", label: "Limits", icon: "tune" },
   { to: "/scenes", label: "Scenes", icon: "auto_awesome", feature: "scenes" },
   { to: "/chastity", label: "Chastity", icon: "lock", feature: "chastity" },
   // Tasks open from Today and Calendar; the full list is for managing them.
@@ -49,8 +50,11 @@ export function useDestinations() {
   // The bar holds Today, Calendar, the next section that's on, and the first writing space; the rest go in the menu.
   const isWriting = (d: Dest) => d.to === "/notes" || d.to === "/journal";
   const writing = all.find(isWriting);
-  // Stats, the monthly review, the agreement, scenes and chastity always sit in the menu, however many sections are switched off.
-  const bar = [...all.filter((d) => !isWriting(d) && !["/stats", "/review", "/agreement", "/scenes", "/chastity"].includes(d.to)).slice(0, 3), ...(writing ? [writing] : [])];
+  // Stats, the monthly review, the agreement, limits, scenes and chastity always sit in the menu, however many sections are switched off.
+  const bar = [
+    ...all.filter((d) => !isWriting(d) && !["/stats", "/review", "/agreement", "/limits", "/scenes", "/chastity"].includes(d.to)).slice(0, 3),
+    ...(writing ? [writing] : []),
+  ];
   const more = all.filter((d) => !bar.includes(d));
   return { all, bar, more };
 }
@@ -188,7 +192,7 @@ export function AppShell() {
   const todayBadge = useNeedsYou().count;
   const { all, bar, more } = useDestinations();
   // The editor's Save is the only action that matters while editing, so the phone bar steps aside.
-  const editing = /^\/tasks\/(new|[^/]+\/edit)$/.test(pathname);
+  const editing = /^\/tasks\/(new|[^/]+\/edit)$/.test(pathname) || pathname === "/limits/edit";
   const [menuOpen, setMenuOpen] = useState(false);
   const [safeOpen, setSafeOpen] = useState(false);
   // Subs and switches get the safe word on every page; an ended dynamic, or someone on their own, has no one to tell.

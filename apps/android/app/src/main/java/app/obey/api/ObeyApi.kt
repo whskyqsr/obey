@@ -595,4 +595,19 @@ interface ObeyApi {
 
     @POST("me/test-push")
     suspend fun testPush(): List<DeviceStatus>
+
+    @GET("relationships/{id}/limit-list")
+    suspend fun limitList(@Path("id") relationshipId: String): LimitList
+
+    @PUT("relationships/{id}/limit-list/answers/{key}")
+    suspend fun answerLimit(@Path("id") relationshipId: String, @Path("key") key: String, @Body body: LimitAnswerInput): LimitAnswer
+
+    @POST("relationships/{id}/limit-list/items")
+    suspend fun addLimitItem(@Path("id") relationshipId: String, @Body body: LimitItemInput): LimitItem
+
+    @DELETE("relationships/{id}/limit-list/items/{key}")
+    suspend fun removeLimitItem(@Path("id") relationshipId: String, @Path("key") key: String)
+
+    @PUT("relationships/{id}/limit-list/finished")
+    suspend fun finishLimits(@Path("id") relationshipId: String, @Body body: Map<String, String> = emptyMap())
 }
