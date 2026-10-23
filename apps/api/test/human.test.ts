@@ -185,4 +185,23 @@ describe("redeemed rewards", () => {
     const after = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-17&to=2026-10-17`)).body.find((o: { id: string }) => o.id === lines.id);
     expect(after.status).toBe("excused");
   });
+
+  it("refunds a let-off reward when the consequence gets done before it's marked redeemed", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    const pass = (await dom.post(`/relationships/${relId}/rewards`, { title: "Get out of a punishment", cost: 50, letsOff: true })).body;
+    const c = (await dom.post(`/relationships/${relId}/consequences`, { title: "Write lines" })).body;
+    const given = (await dom.post(`/consequences/${c.id}/assign`, { assigneeId: subId, date: "2026-10-17", dueTime: "20:00", timezone: "UTC" })).body;
+    const lines = (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-17&to=2026-10-17`)).body.find(
+      (o: { seriesId: string }) => o.seriesId === given.id,
+    );
+    await dom.post(`/relationships/${relId}/ledger/adjust`, { userId: subId, delta: 120, note: "Saved up" });
+    const spent = (await sub.post(`/rewards/${pass.id}/redeem`, { consequenceOccurrenceId: lines.id })).body;
+    expect((await sub.get(`/relationships/${relId}/balances`)).body[0].balance).toBe(70);
+
+    expect((await sub.post(`/occurrences/${lines.id}/complete`, {})).status).toBe(200);
+    expect((await sub.get(`/relationships/${relId}/balances`)).body[0].balance).toBe(120);
+    const ledger = (await dom.get(`/relationships/${relId}/ledger`)).body;
+    expect(ledger.some((e: { kind: string }) => e.kind === "redemption")).toBe(false);
+    expect((await dom.post(`/ledger/${spent.id}/redeemed`, {})).status).toBe(404);
+  });
 });
