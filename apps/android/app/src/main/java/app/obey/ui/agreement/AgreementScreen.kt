@@ -39,6 +39,7 @@ import androidx.compose.material.icons.outlined.HourglassTop
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.PublishedWithChanges
 import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material.icons.outlined.Handshake
 import androidx.compose.material.icons.outlined.UnfoldMore
@@ -446,6 +447,7 @@ private fun Main(
     onBlank: () -> Unit,
 ) {
     a.proposal?.let { ProposalBanner(it, session, onRead, onEdit, onWithdraw) }
+    if (a.current != null && a.proposal == null && a.drift.isNotEmpty()) DriftBanner(a, session, onEdit)
     val cur = a.current
     when {
         cur != null -> {
@@ -491,6 +493,32 @@ private fun EmptyCard(readOnly: Boolean, onTemplate: () -> Unit, onBlank: () -> 
             if (!readOnly) {
                 Button(onClick = onTemplate) { Text("Start from our template") }
                 TextButton(onClick = onBlank) { Text("Start blank") }
+            }
+        }
+    }
+}
+
+/** Rules or protocols changed after the version in force was written, so what's signed no longer matches them. */
+@Composable
+private fun DriftBanner(a: Agreement, session: Session, onPropose: () -> Unit) {
+    val what = a.drift.map { if (it.kind == "rules") "Rules" else "Protocols" }.distinct().joinToString(" and ")
+    val everyone = if (session.partners.size > 1) "all" else "both"
+    fun titles(verb: String) = a.drift.filter { it.verb == verb }.joinToString(", ") { it.title }
+    val c = MaterialTheme.colorScheme
+    Surface(color = c.secondaryContainer, contentColor = c.onSecondaryContainer, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.PublishedWithChanges, null)
+                Text("$what changed since you $everyone signed", style = MaterialTheme.typography.titleMedium)
+            }
+            titles("added").ifEmpty { null }?.let { Text("Added: $it", style = MaterialTheme.typography.bodyMedium) }
+            titles("removed").ifEmpty { null }?.let { Text("Removed: $it", style = MaterialTheme.typography.bodyMedium) }
+            if (!session.readOnly) {
+                Button(onClick = onPropose, modifier = Modifier.padding(top = 8.dp)) {
+                    Icon(Icons.Outlined.Edit, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Propose an update")
+                }
             }
         }
     }

@@ -1406,7 +1406,17 @@ data class AgreementVersionSummary(
 
 /** The version in force, the open proposal if there is one, and every version newest first. */
 @Serializable
-data class Agreement(val current: AgreementVersion? = null, val proposal: AgreementVersion? = null, val versions: List<AgreementVersionSummary> = emptyList())
+data class Agreement(
+    val current: AgreementVersion? = null,
+    val proposal: AgreementVersion? = null,
+    val versions: List<AgreementVersionSummary> = emptyList(),
+    /** Rules and protocols added or removed since the version in force was written. */
+    val drift: List<AgreementDrift> = emptyList(),
+)
+
+/** [kind]: "rules" or "protocols"; [verb]: "added" or "removed". */
+@Serializable
+data class AgreementDrift(val kind: String, val verb: String, val title: String)
 
 @Serializable
 data class AgreementTemplate(val sections: List<AgreementSectionInput>)

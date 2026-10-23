@@ -13,9 +13,9 @@ const lastTo = (userId: string) => [...ctx.notifier.sent].reverse().find((s) => 
 describe("the agreement", () => {
   it("takes effect once both agree, keeps the version before in force until then, and marks what changed", async () => {
     const { dom, sub, relId, domId, subId } = await ctx.pair();
-    await dom.post(`/relationships/${relId}/rules`, { title: "Ask before spending over $50" });
+    const spending = (await dom.post(`/relationships/${relId}/rules`, { title: "Ask before spending over $50" })).body;
     const limits = (await dom.post(`/relationships/${relId}/notes`, { title: "Limits", bodyMd: "Hard: none of that." })).body;
-    expect((await dom.get(`/relationships/${relId}/agreement`)).body).toEqual({ current: null, proposal: null, versions: [] });
+    expect((await dom.get(`/relationships/${relId}/agreement`)).body).toEqual({ current: null, proposal: null, versions: [], drift: [] });
 
     // The template has everyone's names and points at the Limits note.
     const { sections } = (await dom.get(`/relationships/${relId}/agreement/template`)).body;
@@ -58,6 +58,8 @@ describe("the agreement", () => {
     let state = (await dom.get(`/relationships/${relId}/agreement`)).body;
     expect(state.current.number).toBe(1);
     expect(state.proposal.number).toBe(2);
+    // Rules have moved on since version 1 was written.
+    expect(state.drift).toEqual([{ kind: "rules", verb: "added", title: "Text when you leave work" }]);
 
     expect((await dom.post(`/agreement-versions/${v2.id}/request-changes`, { note: "Keep the safewords" })).body).toMatchObject({
       status: "changes_requested",
@@ -77,7 +79,9 @@ describe("the agreement", () => {
     expect((await sub.del(`/agreement-versions/${v2b.id}`)).status).toBe(403);
     await sub.post(`/agreement-versions/${v2b.id}/agree`);
     state = (await dom.get(`/relationships/${relId}/agreement`)).body;
-    expect(state).toMatchObject({ current: { number: 2 }, proposal: null });
+    expect(state).toMatchObject({ current: { number: 2 }, proposal: null, drift: [] });
+    await dom.del(`/rules/${spending.id}`);
+    expect((await sub.get(`/relationships/${relId}/agreement`)).body.drift).toEqual([{ kind: "rules", verb: "removed", title: "Ask before spending over $50" }]);
     expect(state.versions.map((v: { number: number; status: string }) => [v.number, v.status])).toEqual([
       [2, "agreed"],
       [1, "superseded"],
