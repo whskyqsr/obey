@@ -417,7 +417,7 @@ export async function editOccurrence(
     .returning();
   if (status !== occ.status) {
     if (status === "missed") await issueMissConsequence(db, series, updated!, now);
-    if (occ.status === "missed") await withdrawMissConsequence(db, occ);
+    if (occ.status === "missed") await withdrawMissConsequence(db, occ, now);
     if (status === "completed") await refundLetOff(db, occ);
     await db.delete(pointsLedger).where(and(eq(pointsLedger.occurrenceId, occ.id), inArray(pointsLedger.kind, ["completion", "miss"])));
     const earned = status === "completed" ? series.points : status === "missed" ? -series.missPenalty : 0;
@@ -504,11 +504,11 @@ async function issueMissConsequence(db: Tx, series: Series, occ: Occurrence, now
 }
 
 /** Takes back the automatic consequence for an occurrence that's no longer missed, if it hasn't been dealt with yet. */
-export async function withdrawMissConsequence(db: Tx, occ: Occurrence) {
-  await withdrawLockTime(db, occ.id, new Date());
+export async function withdrawMissConsequence(db: Tx, occ: Occurrence, now = new Date()) {
+  await withdrawLockTime(db, occ.id, now);
   const issued = await db
     .update(taskSeries)
-    .set({ active: false, updatedAt: new Date() })
+    .set({ active: false, updatedAt: now })
     .where(and(eq(taskSeries.causedByOccurrenceId, occ.id), eq(taskSeries.active, true)))
     .returning({ id: taskSeries.id });
   if (issued.length)
