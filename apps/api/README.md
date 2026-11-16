@@ -13,6 +13,7 @@ pnpm --filter @obey/api dev:worker
 
 Production runs the bundle: `pnpm build` writes `dist/server.js`, `dist/worker.js` and `dist/migrate.js`,
 and Railway starts them with plain `node` (api: the Dockerfile's CMD; worker: `node --enable-source-maps dist/worker.js`).
+Starting through `pnpm` would keep an extra Node process resident, so Railway's start commands call `node` directly.
 
 With `DEV_AUTH=1`, requests can authenticate with `X-Dev-User: <any uuid>` (and optional `X-Dev-Name`).
 Never set it in production. Real sign-in uses Firebase ID tokens once `FIREBASE_PROJECT_ID` or `FIREBASE_SERVICE_ACCOUNT` is set.

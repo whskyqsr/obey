@@ -13,6 +13,10 @@ pnpm --filter @obey/web dev        # http://localhost:5173
 Scripts: `dev`, `build` (to `dist/`), `typecheck` (`tsc --noEmit`), `test` (`vitest run`), `serve` (static
 server for `dist/` on `$PORT`, SPA fallback, via sirv-cli).
 
+On Railway the start command calls sirv-cli with plain `node` (no pnpm process kept in memory), with healthcheck `/`:
+`node apps/web/node_modules/sirv-cli/bin.js apps/web/dist --single --host 0.0.0.0` (sirv-cli reads `PORT`).
+Keep it in step with the `serve` script.
+
 ## Configuration
 
 All variables are read at **build time** (Vite inlines `VITE_*`), so set them before `build`.
