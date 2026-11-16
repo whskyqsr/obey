@@ -34,5 +34,8 @@ async function tick() {
   }
   setTimeout(tick, INTERVAL_MS);
 }
+// Railway stops a deployment with SIGTERM, and Node as PID 1 has no default handler for it.
+// Jobs are safe to rerun, so the next worker picks up anything this one leaves unfinished.
+for (const signal of ["SIGTERM", "SIGINT"] as const) process.once(signal, () => process.exit(0));
 console.log("worker started");
 await tick();
