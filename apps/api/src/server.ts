@@ -32,3 +32,11 @@ const app = buildApp({
   logger: true,
 });
 await app.listen({ port: config.port, host: "0.0.0.0" });
+
+// Railway stops a deployment with SIGTERM. Node runs as PID 1 here, which has no default handler,
+// so finish in-flight requests and exit instead of waiting to be killed.
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  process.once(signal, () => {
+    app.close().finally(() => process.exit(0));
+  });
+}
