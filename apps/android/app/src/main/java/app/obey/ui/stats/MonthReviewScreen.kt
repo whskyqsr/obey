@@ -23,6 +23,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Check
@@ -91,7 +92,6 @@ import app.obey.ui.common.LocalFeatures
 import app.obey.ui.common.MenuButton
 import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.SafeWordAction
-import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.loadCatching
 import app.obey.ui.common.local
 import app.obey.ui.common.moodIcon
@@ -223,7 +223,7 @@ fun MonthReviewScreen(onOpenSettings: () -> Unit, onOpenStats: (month: String, w
                 navigationIcon = {
                     if (viewingPast) IconButton(onClick = { vm.load(current) }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "This month") } else MenuButton()
                 },
-                actions = { SafeWordAction(); SettingsAction(onOpenSettings) },
+                actions = { SafeWordAction() },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -391,6 +391,7 @@ private fun ProgressCard(s: MonthSummary, session: Session, onOpenStats: (String
             EmptyBox(
                 if (isCurrent) "Nothing finished yet this month" else "No tasks were due in ${monthName(s.month)}",
                 if (isCurrent) "This fills in as tasks are done or missed." else null,
+                icon = Icons.Outlined.Insights,
             )
         }
         return

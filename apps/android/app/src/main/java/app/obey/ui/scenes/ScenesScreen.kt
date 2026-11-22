@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Schedule
@@ -54,7 +55,6 @@ import app.obey.ui.common.LoadingBox
 import app.obey.ui.common.MenuButton
 import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.SafeWordAction
-import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.loadCatching
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -117,7 +117,6 @@ fun ScenesScreen(onOpenSettings: () -> Unit, onOpen: (String) -> Unit, onAfterca
                 actions = {
                     IconButton(onClick = onAftercare) { Icon(Icons.Outlined.VolunteerActivism, "Aftercare") }
                     SafeWordAction()
-                    SettingsAction(onOpenSettings)
                 },
             )
         },
@@ -136,6 +135,7 @@ fun ScenesScreen(onOpenSettings: () -> Unit, onOpen: (String) -> Unit, onAfterca
                     "No scenes yet",
                     "Log one afterwards: what you did, whether a safeword was called and the aftercare given. Each of you then writes how it went.",
                     Modifier.padding(padding),
+                    icon = Icons.Outlined.AutoAwesome,
                 )
             } else {
                 LazyColumn(

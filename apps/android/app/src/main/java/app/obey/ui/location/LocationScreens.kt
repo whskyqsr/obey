@@ -376,7 +376,7 @@ fun PlacesScreen(onBack: () -> Unit, vm: LocationViewModel = hiltViewModel()) {
                 if (canEdit) subs.forEach { m -> LocationReadiness(m) { vm.ask(m.displayName) } }
                 val list = places
                 if (list != null && list.isEmpty()) {
-                    EmptyBox("No places yet", if (canEdit) "Save the places tasks can ask for: the gym, work, home." else "Places a Dominant saves for location tasks show here.")
+                    EmptyBox("No places yet", if (canEdit) "Save the places tasks can ask for: the gym, work, home." else "Places a Dominant saves for location tasks show here.", icon = Icons.Outlined.LocationOn)
                 } else if (list != null) {
                     Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.large) {
                         Column {

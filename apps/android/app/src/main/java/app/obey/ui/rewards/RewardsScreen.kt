@@ -16,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Exposure
 import androidx.compose.material.icons.outlined.HourglassTop
@@ -61,7 +62,6 @@ import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.SectionHeader
 import app.obey.ui.common.MenuButton
 import app.obey.ui.common.SafeWordAction
-import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.formatDateTime
 import app.obey.ui.common.signed
 import app.obey.ui.tasks.LabeledSwitch
@@ -103,7 +103,6 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
                 actions = {
                     if (canManage && features.points) IconButton(onClick = { adjusting = true }) { Icon(Icons.Outlined.Exposure, "Adjust points") }
                     SafeWordAction()
-                    SettingsAction(onOpenSettings)
                 },
             )
         },
@@ -153,7 +152,7 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
                 }
 
                 if (features.points) item(key = "h-rewards") { SectionHeader("Rewards") }
-                if (features.points && d.rewards.isEmpty()) item(key = "e-rewards") { EmptyBox("No rewards yet", if (canManage) "Add things worth earning." else null) }
+                if (features.points && d.rewards.isEmpty()) item(key = "e-rewards") { EmptyBox("No rewards yet", if (canManage) "Add things worth earning." else null, icon = Icons.Outlined.Redeem) }
                 items(if (features.points) d.rewards else emptyList(), key = { "r-" + it.id }) { r ->
                     val myBalance = vm.balanceOf(session?.userId.orEmpty())
                     ListItem(
@@ -193,7 +192,7 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     )
                 }
-                if (features.consequences && d.consequences.isEmpty()) item(key = "e-cons") { EmptyBox("No consequences yet") }
+                if (features.consequences && d.consequences.isEmpty()) item(key = "e-cons") { EmptyBox("No consequences yet", icon = Icons.Outlined.Bolt) }
                 items(if (features.consequences) d.consequences else emptyList(), key = { "c-" + it.id }) { c ->
                     ListItem(
                         modifier = if (canManage) Modifier.clickable { editConsequence = Editing(c) } else Modifier,

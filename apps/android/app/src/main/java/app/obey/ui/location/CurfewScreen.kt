@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AddLocationAlt
 import androidx.compose.material.icons.outlined.Check
@@ -179,12 +181,12 @@ fun CurfewScreen(onBack: () -> Unit, onPlaces: () -> Unit, vm: CurfewViewModel =
                             )
                         }
                     } else {
-                        EmptyBox("No curfew", "A Dominant can set one here.")
+                        EmptyBox("No curfew", "A Dominant can set one here.", icon = Icons.Outlined.Bedtime)
                     }
                     return@Column
                 }
                 if (placeList.isNullOrEmpty()) {
-                    EmptyBox("Add Home first", "Curfew checks that they're at a place. Save their home in Places, then come back.")
+                    EmptyBox("Add Home first", "Curfew checks that they're at a place. Save their home in Places, then come back.", icon = Icons.Outlined.Home)
                     FilledTonalButton(onClick = onPlaces, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                         Icon(Icons.Outlined.AddLocationAlt, null, Modifier.size(18.dp))
                         Text("Go to Places", Modifier.padding(start = 8.dp))
