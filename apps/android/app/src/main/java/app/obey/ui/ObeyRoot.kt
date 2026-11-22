@@ -238,7 +238,9 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
     val wide = LocalConfiguration.current.screenWidthDp >= 600
     // A tab the dynamic just switched off (say, from Settings) shouldn't stay reachable underneath.
     val switchedOff = destination != null && !isTopLevel && destination.hierarchy.any {
-        it.hasRoute<RewardsRoute>() || it.hasRoute<ConsequencesRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<ProtocolsRoute>() || it.hasRoute<JournalRoute>() || it.hasRoute<StatsRoute>() || it.hasRoute<MonthReviewRoute>() || it.hasRoute<AgreementRoute>() || it.hasRoute<ScenesRoute>() || it.hasRoute<ChastityRoute>() ||
+        it.hasRoute<RewardsRoute>() || it.hasRoute<ConsequencesRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<ProtocolsRoute>() || it.hasRoute<JournalRoute>() || it.hasRoute<StatsRoute>() || it.hasRoute<MonthReviewRoute>() || it.hasRoute<AgreementRoute>() || it.hasRoute<ScenesRoute>() || it.hasRoute<ChastityRoute>() || it.hasRoute<LimitsRoute>() ||
+            // Limits' editor isn't top-level either.
+            (!features.limits && it.hasRoute<LimitsEditRoute>()) ||
             // A scene and the aftercare plans aren't top-level, so they only go when scenes are off.
             (!features.scenes && (it.hasRoute<SceneRoute>() || it.hasRoute<AftercareRoute>()))
     }
