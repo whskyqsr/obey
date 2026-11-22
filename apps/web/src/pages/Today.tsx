@@ -12,7 +12,6 @@ import { RoleSwapCard } from "../components/RoleSwap";
 import { ChastityToday } from "../components/Chastity";
 import { SoloCards } from "../components/Solo";
 import { CountdownCard } from "../components/Countdown";
-import { PopOutButton, canPopOut } from "../components/PopOut";
 import { KitPrompt } from "./Kits";
 import { Button, Empty, ErrorBox, Fab, Icon, Loading, PageHeader, Section } from "../components/ui";
 import { addDays, fmtDate, fmtRelative, localDateOf, today } from "../lib/dates";
@@ -67,15 +66,10 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
         <div className="min-w-0 flex-1 xl:mx-auto xl:max-w-4xl">
           <PageHeader
             actions={
-              wide && (canPopOut() || isDom) ? (
-                <>
-                  {canPopOut() && <PopOutButton />}
-                  {isDom && (
-                    <Button variant="tonal" icon="add" onClick={newTask}>
-                      New task
-                    </Button>
-                  )}
-                </>
+              wide && isDom ? (
+                <Button variant="tonal" icon="add" onClick={newTask}>
+                  New task
+                </Button>
               ) : undefined
             }
             title={`Hi${name ? `, ${name}` : ""}`}
