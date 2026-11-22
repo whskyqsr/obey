@@ -362,7 +362,6 @@ private fun SectionLabel(text: String) {
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun KitsScreen(
-    onBack: () -> Unit,
     onAdded: (ApplyKitResult) -> Unit,
     onOpenKit: (String) -> Unit,
     onNewKit: () -> Unit,
@@ -384,7 +383,8 @@ fun KitsScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Kits") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") } },
+                navigationIcon = { app.obey.ui.common.MenuButton() },
+                actions = { app.obey.ui.common.SafeWordAction() },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },

@@ -27,7 +27,7 @@ export function CurfewPage() {
   const { rel, isDom, me, features, memberName } = useRel();
   const navigate = useNavigate();
   const snack = useSnackbar();
-  const back = useBack(() => navigate({ to: "/dynamic" }));
+  const back = useBack(() => navigate({ to: "/location" }));
   const curfew = useCurfew(rel.id);
   const places = usePlaces(rel.id);
   const consequences = useLibrary(rel.id, "consequences");
