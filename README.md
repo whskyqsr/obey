@@ -1,4 +1,4 @@
-# Obey
+# Fealty
 
 A D/s tasks, rules and rewards app for Android and web, with flexible recurring schedules and rescheduling.
 
