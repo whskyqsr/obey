@@ -19,7 +19,7 @@ import type { AftercarePlan, Scene, SceneSide } from "../api/types";
 import { Avatar } from "../components/Avatar";
 import { CommentThread } from "../components/Comments";
 import { MOOD_LABELS, MOODS, MoodPicker } from "../components/Mood";
-import { Button, Chip, Dialog, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, SegmentedButtons, TextArea, TextField, cx, useSnackbar } from "../components/ui";
+import { SubHeader, Button, Chip, Dialog, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, SegmentedButtons, TextArea, TextField, cx, useSnackbar } from "../components/ui";
 import { fmtDateTime, fromLocalInput, toLocalInput } from "../lib/dates";
 import { useReadOnly, useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
@@ -515,14 +515,9 @@ export function AftercarePage() {
   const list = [...(plans.data ?? [])].sort((a, b) => Number(a.userId === me.user.id) - Number(b.userId === me.user.id));
   return (
     <div className="flex flex-col">
-      <header className="sticky top-0 z-20 flex h-14 items-center gap-1 bg-surface px-2 md:px-4">
-        <IconButton icon="arrow_back" label="Back" onClick={back} />
-      </header>
+      <SubHeader title="Aftercare" onBack={back} />
       <div className="flex flex-col gap-3 px-4 pb-10 md:px-6">
-        <div>
-          <h1 className="text-headline-medium text-on-surface">Aftercare</h1>
-          <p className="text-body-medium text-on-surface-variant">What each of you needs afterwards. It's shown to the others when a scene is logged.</p>
-        </div>
+        <p className="text-body-medium text-on-surface-variant">What each of you needs afterwards. It's shown to the others when a scene is logged.</p>
         {plans.isLoading && <Loading />}
         {plans.error && <ErrorBox error={plans.error} onRetry={() => plans.refetch()} />}
         {list.map((p) => {

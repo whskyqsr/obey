@@ -5,7 +5,7 @@ import { errorMessage } from "../api/client";
 import type { AdminReport } from "../api/types";
 import { fmtDateTime } from "../lib/dates";
 import { useBack } from "../lib/useBack";
-import { Button, Icon, IconButton, SegmentedButtons, Spinner, cx, useSnackbar } from "../components/ui";
+import { SubHeader, Button, Icon, IconButton, SegmentedButtons, Spinner, cx, useSnackbar } from "../components/ui";
 
 const REASON: Record<AdminReport["reason"], string> = {
   minor: "Shows someone under 18",
@@ -74,10 +74,7 @@ export function AdminReportsPage() {
   const reports = useAdminReports(all === "all");
   return (
     <div className="flex flex-col pb-10">
-      <header className="sticky top-0 z-10 flex h-16 items-center gap-1 bg-surface px-2 md:px-4">
-        <IconButton icon="arrow_back" label="Back" onClick={back} />
-        <h1 className="flex-1 text-title-large text-on-surface">Reports</h1>
-      </header>
+      <SubHeader title="Reports" onBack={back} />
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-3 px-4 md:px-6">
         <SegmentedButtons<"open" | "all">
           value={all}

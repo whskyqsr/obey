@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useAddRuleLog, useDeleteRuleLog, useLibrary, useRuleLog } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { sortRules } from "./Rules";
 import { Avatar } from "../components/Avatar";
-import { Button, Chip, Dialog, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, Select, Switch, TextArea, TextField, useSnackbar } from "../components/ui";
+import { SubHeader, Button, Chip, Dialog, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, Select, Switch, TextArea, TextField, useSnackbar } from "../components/ui";
 import { fmtDate, today } from "../lib/dates";
 import { useReadOnly, useRel } from "../lib/relationship";
 import { useConfirm } from "../lib/useConfirm";
+import { useBack } from "../lib/useBack";
 
 const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 const addDays = (d: string, n: number) => {
@@ -27,6 +28,8 @@ export function RuleLogPage() {
   const log = useRuleLog(rel.id);
   const del = useDeleteRuleLog(rel.id);
   const [who, setWho] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const back = useBack(() => navigate({ to: features.rules ? "/rules" : "/protocols" }));
   const [adding, setAdding] = useState(false);
   const [confirm, confirmEl] = useConfirm();
   const name = (id: string) => (id === me.user.id ? "You" : memberName(id));
@@ -37,7 +40,8 @@ export function RuleLogPage() {
 
   return (
     <>
-      <PageHeader title="Broken rules" subtitle={log.data ? `${log.data.length} logged` : undefined} />
+      <SubHeader title="Broken rules" onBack={back} />
+      {!!log.data?.length && <p className="px-4 pb-3 text-body-medium text-on-surface-variant md:px-6">{log.data.length} logged</p>}
       {people.length > 1 && (
         <div className="flex gap-2 overflow-x-auto px-4 pb-4 md:px-6">
           <Chip selected={!who} onClick={() => setWho(null)}>

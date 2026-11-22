@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import type { CurfewInput } from "../api/types";
 import { useCurfew, useLibrary, usePlaces, useSaveCurfew } from "../api/hooks";
 import { errorMessage } from "../api/client";
-import { Button, Empty, ErrorBox, Icon, IconButton, Loading, SegmentedButtons, Select, Switch, TextField, useSnackbar } from "../components/ui";
+import { SubHeader, Button, Empty, ErrorBox, Icon, IconButton, Loading, SegmentedButtons, Select, Switch, TextField, useSnackbar } from "../components/ui";
 import { browserTimeZone } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
@@ -57,10 +57,7 @@ export function CurfewPage() {
   }, [curfew.data, places.data, form, subs]);
 
   const header = (
-    <header className="sticky top-0 z-10 flex h-16 items-center gap-1 bg-surface px-2 md:px-4">
-      <IconButton icon="arrow_back" label="Back" onClick={back} />
-      <h1 className="flex-1 text-title-large text-on-surface">Curfew</h1>
-    </header>
+    <SubHeader title="Curfew" onBack={back} />
   );
   if (curfew.error || places.error)
     return (
@@ -91,7 +88,7 @@ export function CurfewPage() {
     return (
       <div className="flex flex-col pb-10">
         {header}
-        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 md:px-6">
+        <div className="flex flex-col gap-4 px-4 md:px-6">
           {saved?.enabled ? (
             <div className="flex flex-col gap-1 rounded-lg bg-surface-container-low p-4">
               <div className="text-body-large text-on-surface">{describeCurfew(saved)}</div>
@@ -111,7 +108,7 @@ export function CurfewPage() {
     return (
       <div className="flex flex-col pb-10">
         {header}
-        <div className="mx-auto w-full max-w-2xl px-4 md:px-6">
+        <div className="px-4 md:px-6">
           <Empty
             icon="home"
             title="Add Home first"
@@ -129,7 +126,7 @@ export function CurfewPage() {
   return (
     <div className="flex flex-col pb-10">
       {header}
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 md:px-6">
+      <div className="flex flex-col gap-4 px-4 md:px-6">
         <div className="rounded-lg bg-surface-container-low px-4 py-2">
           <Switch
             checked={form.enabled}
