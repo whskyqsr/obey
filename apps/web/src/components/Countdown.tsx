@@ -26,7 +26,7 @@ function useNow() {
 }
 
 /** The soonest open deadline in the next hour that this person does or hands out; counted and location tasks have their own rings. */
-export function nextDeadline(list: Occurrence[], userId: string, isDom: boolean, now: number) {
+function nextDeadline(list: Occurrence[], userId: string, isDom: boolean, now: number) {
   return list
     .filter((o) => o.status === "pending" && !o.curfew && !isAllDayDue(o.dueAt) && !isCounted(o) && !isPlaced(o))
     .filter((o) => o.assigneeId === userId || isDom)
@@ -37,7 +37,7 @@ export function nextDeadline(list: Occurrence[], userId: string, isDom: boolean,
     .sort((a, b) => a.dueAt.localeCompare(b.dueAt))[0];
 }
 
-export const mmss = (ms: number) => {
+const mmss = (ms: number) => {
   const s = Math.max(0, Math.ceil(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
