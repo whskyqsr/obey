@@ -99,7 +99,7 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
         topBar = {
             TopAppBar(
                 navigationIcon = { MenuButton() },
-                title = { Text(if (consequences) "Consequences" else "Rewards & points") },
+                title = { Text(if (consequences) "Consequences" else "Rewards") },
                 actions = {
                     if (canManage && features.points) IconButton(onClick = { adjusting = true }) { Icon(Icons.Outlined.Exposure, "Adjust points") }
                     SafeWordAction()

@@ -167,7 +167,7 @@ fun TaskListScreen(
                 navigationIcon = { MenuButton() },
                 title = { Text("All tasks") },
                 actions = {
-                    if (vm.session?.canManage == true && vm.session?.readOnly != true) IconButton(onClick = onKits) { Icon(Icons.Outlined.Widgets, "Starter kits") }
+                    if (vm.session?.canManage == true && vm.session?.readOnly != true) IconButton(onClick = onKits) { Icon(Icons.Outlined.Widgets, "Kits") }
                     SafeWordAction()
                     SettingsAction(onOpenSettings)
                 },

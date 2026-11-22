@@ -34,12 +34,12 @@ export function TasksPage() {
   return (
     <>
       <PageHeader
-        title="Tasks"
+        title="All tasks"
         subtitle={isDom ? "Everything you've set, recurring or one-off." : "What's been set for you."}
         actions={
           isDom ? (
-            <Button variant="text" icon="widgets" onClick={() => navigate({ to: "/kits" })}>
-              Starter kits
+            <Button variant="tonal" icon="widgets" onClick={() => navigate({ to: "/kits" })}>
+              Kits
             </Button>
           ) : undefined
         }

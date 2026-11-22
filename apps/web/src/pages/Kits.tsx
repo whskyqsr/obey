@@ -4,7 +4,7 @@ import { starterKits, type ApplyKitResult, type Features, type Kit, type KitItem
 import { describe } from "@obey/recurrence";
 import { useApplyKit, useCopySharedKit, useDeleteKit, useLibrary, useMyKits, useSaveKit, useShareKit, useSharedKit, useTasks, useUpdateKit } from "../api/hooks";
 import { errorMessage } from "../api/client";
-import { SubHeader, Button, Card, Checkbox, Dialog, Empty, ErrorBox, Icon, Loading, OverflowMenu, PageHeader, Select, TextField, useSnackbar } from "../components/ui";
+import { SubHeader, Button, Card, Checkbox, Dialog, Empty, ErrorBox, Fab, Icon, Loading, OverflowMenu, PageHeader, Select, TextField, useSnackbar } from "../components/ui";
 import { browserTimeZone, fmtClock, fmtDate, today } from "../lib/dates";
 import { useReadOnly, useRel } from "../lib/relationship";
 import { useConfirm } from "../lib/useConfirm";
@@ -111,13 +111,11 @@ export function KitsPage() {
     <>
       <PageHeader title="Kits" subtitle="Sets of tasks, rules and rewards you can add to any dynamic." />
       <div className="flex flex-wrap gap-2 px-4 pb-4 md:px-6">
-        <Button icon="add" onClick={() => navigate({ to: "/kits/new" })}>
-          New kit
-        </Button>
-        <Button variant="outlined" icon="download" onClick={() => setAdding(true)}>
+        <Button variant="tonal" icon="download" onClick={() => setAdding(true)}>
           Add from a link
         </Button>
       </div>
+      <Fab icon="add" label="New kit" onClick={() => void navigate({ to: "/kits/new" })} />
       {mine.data && mine.data.length > 0 && (
         <>
           <h2 className="px-4 pt-2 pb-2 text-title-small text-primary md:px-6">Your kits</h2>

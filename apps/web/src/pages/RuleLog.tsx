@@ -4,7 +4,7 @@ import { useAddRuleLog, useDeleteRuleLog, useLibrary, useRuleLog } from "../api/
 import { errorMessage } from "../api/client";
 import { sortRules } from "./Rules";
 import { Avatar } from "../components/Avatar";
-import { SubHeader, Button, Chip, Dialog, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, Select, Switch, TextArea, TextField, useSnackbar } from "../components/ui";
+import { SubHeader, Button, Chip, Dialog, Empty, ErrorBox, Fab, Icon, IconButton, Loading, Select, Switch, TextArea, TextField, useSnackbar } from "../components/ui";
 import { fmtDate, today } from "../lib/dates";
 import { useReadOnly, useRel } from "../lib/relationship";
 import { useConfirm } from "../lib/useConfirm";

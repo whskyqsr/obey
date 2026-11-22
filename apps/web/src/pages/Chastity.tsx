@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useChastity } from "../api/hooks";
 import type { ChastityEvent, ChastityLock } from "../api/types";
 import { LockCard, StartLockDialog, eventIcon, eventText, fmtLockTime, fmtSpan } from "../components/Chastity";
-import { Button, Empty, ErrorBox, Icon, Loading, PageHeader, Section, cx } from "../components/ui";
+import { Empty, ErrorBox, Fab, Icon, Loading, PageHeader, Section, cx } from "../components/ui";
 import { fmtDateTime } from "../lib/dates";
 import { useReadOnly, useRel } from "../lib/relationship";
 
@@ -62,14 +62,8 @@ export function ChastityPage() {
       <PageHeader
         title="Chastity"
         subtitle="Locks, time added and taken off, and asks to be let out."
-        actions={
-          wearers.length > 0 && (
-            <Button icon="lock" onClick={() => setStarting(true)}>
-              Lock
-            </Button>
-          )
-        }
       />
+      {wearers.length > 0 && <Fab icon="lock" label="Lock" onClick={() => setStarting(true)} />}
       <div className="flex flex-col gap-6 px-4 pb-24 md:px-6">
         {view.isLoading && <Loading />}
         {view.error && <ErrorBox error={view.error} onRetry={() => view.refetch()} />}

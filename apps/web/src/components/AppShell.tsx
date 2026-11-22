@@ -226,7 +226,7 @@ export function AppShell() {
 
   return (
     <MenuContext.Provider value={menu}>
-      <div className="min-h-dvh bg-surface">
+      <div className="min-h-dvh bg-surface" data-nobar={offBar || undefined}>
         {/* Navigation drawer (large): one list, with Settings at the bottom */}
         <nav className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col gap-1 overflow-y-auto border-r border-outline-variant/40 bg-surface px-3 py-4 lg:flex">
           <div className="mb-3">

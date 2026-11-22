@@ -139,7 +139,7 @@ fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, on
                 navigationIcon = { MenuButton() },
                 title = { Text("Rules") },
                 actions = {
-                    IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.History, "Broken-rule log") }
+                    IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.History, "Broken rules") }
                     SafeWordAction()
                     SettingsAction(onOpenSettings)
                 },
