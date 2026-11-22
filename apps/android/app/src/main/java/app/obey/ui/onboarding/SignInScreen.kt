@@ -73,7 +73,7 @@ fun SignInScreen(vm: SettingsViewModel = hiltViewModel()) {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text("Fealty", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
-                Text("Tasks, rules and rewards for the two of you.", style = MaterialTheme.typography.bodyLarge)
+                Text("Less upkeep. More of each other.", style = MaterialTheme.typography.bodyLarge)
 
                 if (vm.firebaseAvailable) {
                     Button(

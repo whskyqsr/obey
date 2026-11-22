@@ -42,7 +42,7 @@ export function SignInPage() {
       <div className="w-full max-w-md rounded-xl bg-surface p-8 shadow-elev-1">
         <BrandMark className="mb-6 size-16 rounded-lg" />
         <h1 className="text-headline-large text-on-surface">Fealty</h1>
-        <p className="mt-2 mb-8 text-body-large text-on-surface-variant">Tasks, rules and rewards for the two (or more) of you.</p>
+        <p className="mt-2 mb-8 text-body-large text-on-surface-variant">Less upkeep. More of each other.</p>
         {pendingInvite() && (
           <div className="-mt-4 mb-6 flex items-center gap-3 rounded-md bg-secondary-container p-3 text-body-medium text-on-secondary-container">
             <Icon name="mail" />
