@@ -21,6 +21,8 @@ function label(rel: Relationship, myId: string) {
 function subtitle(rel: Relationship, myId: string) {
   const self = rel.members.find((m) => m.userId === myId);
   if (rel.endedAt) return "Ended";
+  // On your own you set and do your own tasks, whatever role you picked for when someone joins.
+  if (rel.members.length === 1) return "On your own";
   return self ? `You're the ${ROLE_LABEL[self.role]}` : "";
 }
 

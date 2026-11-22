@@ -29,6 +29,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
@@ -166,7 +168,7 @@ internal fun inviteDefault(role: Role?): Role? = when (role) {
 /** Everything about the relationship itself: who's in it, inviting, how it works, and which features are on. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, onPlaces: () -> Unit = {}, onLocation: () -> Unit = {}, onCurfew: () -> Unit = {}, vm: SettingsViewModel = hiltViewModel()) {
+fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeatures: Boolean = false, onPlaces: () -> Unit = {}, onLocation: () -> Unit = {}, onCurfew: () -> Unit = {}, vm: SettingsViewModel = hiltViewModel()) {
     val sessionState by vm.session.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
@@ -194,7 +196,11 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, onPlaces: ()
         val rel = s.relationship ?: return@Scaffold
         val me = rel.members.firstOrNull { it.userId == s.userId }
         Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-            Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(rememberScrollState())) {
+            // Opened from Settings' Features row: scroll to the switches once they're laid out.
+            val scroll = rememberScrollState()
+            var featuresAt by remember { mutableStateOf<Int?>(null) }
+            LaunchedEffect(featuresAt) { if (startFeatures) featuresAt?.let { scroll.animateScrollTo(it) } }
+            Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(scroll)) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     AvatarStack(rel.members, vm::loadAvatar, size = 64.dp, ring = MaterialTheme.colorScheme.surface, collared = { rel.isCollared(it.userId) })
                     Spacer(Modifier.height(12.dp))
@@ -243,7 +249,8 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, onPlaces: ()
                     )
                 }
 
-                app.obey.ui.common.MoodCard(Modifier.padding(horizontal = 16.dp), header = { SectionHeader("Mood") })
+                // Journal and Stats both chart moods; this is the fallback when neither is on.
+                if (!rel.features.journal && !rel.features.stats) app.obey.ui.common.MoodCard(Modifier.padding(horizontal = 16.dp), header = { SectionHeader("Mood") })
 
                 val today = java.time.LocalDate.now()
                 val dates = rel.dates.sortedBy { d -> runCatching { daysUntilNext(java.time.LocalDate.parse(d.date), today) }.getOrDefault(Long.MAX_VALUE) }
@@ -393,7 +400,7 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, onPlaces: ()
                     ProofDaysDialog(rel.proofDays, onDismiss = { pickingProofDays = false }) { vm.setProofDays(it); pickingProofDays = false }
                 }
 
-                SectionHeader("Features")
+                SectionHeader("Features", Modifier.onGloballyPositioned { if (featuresAt == null) featuresAt = it.positionInParent().y.toInt() })
                 featureRows.forEach { (label, help, get, set) ->
                     ListItem(
                         headlineContent = { Text(label) },

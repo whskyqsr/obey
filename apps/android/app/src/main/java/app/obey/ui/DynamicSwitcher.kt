@@ -56,7 +56,12 @@ class SwitcherActions(
 private fun Relationship.heading(myId: String) = if (name != null || members.size < 2) title(myId) else "with ${title(myId)}"
 
 private fun Relationship.subtitle(myId: String): String =
-    if (ended) "Ended" else members.firstOrNull { it.userId == myId }?.let { "You're the ${it.role.label}" } ?: ""
+    when {
+        ended -> "Ended"
+        // On your own you set and do your own tasks, whatever role you picked for when someone joins.
+        members.size == 1 -> "On your own"
+        else -> members.firstOrNull { it.userId == myId }?.let { "You're the ${it.role.label}" } ?: ""
+    }
 
 /** A dynamic's mark: the partner's picture, or your own in a dynamic nobody has joined yet. */
 @Composable
