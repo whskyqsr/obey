@@ -198,8 +198,9 @@ export function AppShell() {
   const { rel, self, solo } = useRel();
   const todayBadge = useNeedsYou().count;
   const { all, bar, more } = useDestinations();
-  // The editor's Save is the only action that matters while editing, so the phone bar steps aside.
-  const editing = /^\/tasks\/(new|[^/]+\/edit)$/.test(pathname) || pathname === "/limits/edit";
+  // The phone bar belongs to the pages in the menu. Anything opened from one of them (a task, a note, Places, an editor)
+  // has its own back arrow instead, as on Android.
+  const offBar = !all.some((d) => d.to === pathname);
   const [menuOpen, setMenuOpen] = useState(false);
   const [safeOpen, setSafeOpen] = useState(false);
   // Subs and switches get the safe word on every page; an ended dynamic, or someone on their own, has no one to tell.
@@ -253,7 +254,7 @@ export function AppShell() {
           ))}
         </nav>
 
-        <main className={cx(editing ? "pb-10" : "pb-44", "md:pb-10 md:pl-24 lg:pl-64")}>
+        <main className={cx(offBar ? "pb-10" : "pb-44", "md:pb-10 md:pl-24 lg:pl-64")}>
           {/* Today brings its own side panel on wide screens, so it gets the full width. */}
           <div className={cx("mx-auto", pathname === "/" ? "max-w-5xl xl:max-w-none" : "max-w-5xl")}>
             {rel.endedAt && pathname !== "/dynamic" && (
@@ -274,7 +275,7 @@ export function AppShell() {
         <nav
           className={cx(
             "fixed inset-x-3 bottom-[calc(16px+env(safe-area-inset-bottom))] z-30 flex h-19 gap-1 rounded-3xl border border-outline-variant/70 bg-surface-container-lowest p-1.5 shadow-elev-2 md:hidden",
-            editing && "hidden",
+            offBar && "hidden",
           )}
         >
           {bar.map((d) => (
@@ -282,7 +283,7 @@ export function AppShell() {
           ))}
         </nav>
         {/* Once the header's menu button scrolls away, it floats at the top left. */}
-        {buttonHidden && !editing && (
+        {buttonHidden && !offBar && (
           <button
             type="button"
             aria-label="Menu"

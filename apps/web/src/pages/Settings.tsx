@@ -48,7 +48,7 @@ export function SettingsPage() {
       <PageHeader title="Settings" subtitle={me.user.email ?? me.user.displayName} />
 
       {/* The relationship has its own page; Settings is about you. */}
-      <div className="px-4 pb-6 md:px-6">
+      <div className="max-w-2xl px-4 pb-6 md:px-6">
         <Link to="/dynamic" className="state-layer flex items-center gap-4 rounded-xl bg-primary-container p-4 text-on-primary-container">
           <span className="flex">
             {rel.members.slice(0, 3).map((m, i) => (

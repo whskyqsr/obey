@@ -511,6 +511,17 @@ export const useSnackbar = () => useContext(SnackContext);
 // ---------- Page scaffolding
 
 /** On phones the menu button leads the title line, and the subtitle lines up under the title. */
+/** A secondary page's header: back, then the title, with optional actions at the end. Main pages use PageHeader. */
+export function SubHeader({ title, onBack, actions }: { title: ReactNode; onBack(): void; actions?: ReactNode }) {
+  return (
+    <header className="sticky top-0 z-10 flex h-16 items-center gap-1 bg-surface px-2 md:px-4">
+      <IconButton icon="arrow_back" label="Back" onClick={onBack} />
+      <h1 className="min-w-0 flex-1 truncate text-title-large text-on-surface">{title}</h1>
+      {actions}
+    </header>
+  );
+}
+
 export function PageHeader({ title, subtitle, actions }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode }) {
   const menu = useMenu();
   return (

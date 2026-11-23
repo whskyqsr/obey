@@ -7,7 +7,7 @@ import { Avatar } from "../components/Avatar";
 import { CollarIcon } from "../components/CollarIcon";
 import { MoodCard } from "../components/Mood";
 import { DynamicHero } from "../components/DynamicHero";
-import { Button, Checkbox, Chip, Dialog, Icon, IconButton, OverflowMenu, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
+import { SubHeader, Button, Checkbox, Chip, Dialog, Icon, IconButton, OverflowMenu, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
 import { ReportDialog } from "../components/Proof";
 import { EndSwapDialog, SwapDialog, fmtSwapEnd, swapPartner } from "../components/RoleSwap";
 import { fmtDate, fmtDateTime, localDateOf, today } from "../lib/dates";
@@ -185,10 +185,7 @@ export function DynamicPage() {
 
   return (
     <div className="flex flex-col pb-10">
-      <header className="sticky top-0 z-10 flex h-16 items-center gap-1 bg-surface px-2 md:px-4">
-        <IconButton icon="arrow_back" label="Back" onClick={back} />
-        <h1 className="text-title-large text-on-surface">Your dynamic</h1>
-      </header>
+      <SubHeader title="Your dynamic" onBack={back} />
       <div className="mx-auto w-full max-w-2xl px-4 md:px-6">
         <DynamicHero
           className="py-4"

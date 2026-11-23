@@ -4,7 +4,7 @@ import { starterKits, type ApplyKitResult, type Features, type Kit, type KitItem
 import { describe } from "@obey/recurrence";
 import { useApplyKit, useCopySharedKit, useDeleteKit, useLibrary, useMyKits, useSaveKit, useShareKit, useSharedKit, useTasks, useUpdateKit } from "../api/hooks";
 import { errorMessage } from "../api/client";
-import { Button, Card, Checkbox, Dialog, Empty, ErrorBox, Icon, Loading, OverflowMenu, PageHeader, Select, TextField, useSnackbar } from "../components/ui";
+import { SubHeader, Button, Card, Checkbox, Dialog, Empty, ErrorBox, Icon, Loading, OverflowMenu, PageHeader, Select, TextField, useSnackbar } from "../components/ui";
 import { browserTimeZone, fmtClock, fmtDate, today } from "../lib/dates";
 import { useReadOnly, useRel } from "../lib/relationship";
 import { useConfirm } from "../lib/useConfirm";
@@ -319,7 +319,8 @@ export function KitPage({ kitId }: { kitId: string }) {
   const items = sorted(kit.items);
   return (
     <>
-      <PageHeader title={kit.title} subtitle={kit.description || counts(items)} />
+      <SubHeader title={kit.title} onBack={() => void navigate({ to: "/kits" })} />
+      <p className="px-4 pb-4 text-body-medium text-on-surface-variant md:px-6">{kit.description || counts(items)}</p>
       <div className="flex flex-wrap items-center gap-2 px-4 pb-4 md:px-6">
         {isDom && !readOnly && (
           <Button icon="add" onClick={() => setDialog("add")}>
@@ -571,8 +572,9 @@ export function NewKitPage() {
 
   return (
     <>
-      <PageHeader
+      <SubHeader
         title="New kit"
+        onBack={() => void navigate({ to: "/kits" })}
         actions={
           <Button busy={save.isPending} disabled={!title.trim() || !total} onClick={submit}>
             Save
@@ -639,7 +641,8 @@ export function SharedKitPage({ code }: { code: string }) {
   const canUse = isDom && !readOnly;
   return (
     <>
-      <PageHeader title={kit.data.title} subtitle={`A shared kit · ${counts(items)}`} />
+      <SubHeader title={kit.data.title} onBack={() => void navigate({ to: "/kits" })} />
+      <p className="px-4 pb-2 text-body-medium text-on-surface-variant md:px-6">A shared kit · {counts(items)}</p>
       {kit.data.description && <p className="px-4 pb-4 text-body-medium text-on-surface-variant md:px-6">{kit.data.description}</p>}
       <ItemList items={items} />
       <div className="flex flex-wrap gap-2 px-4 pt-4 pb-24 md:px-6">

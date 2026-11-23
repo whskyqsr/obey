@@ -4,7 +4,7 @@ import type { Place } from "../api/types";
 import { useAskLocation, usePlaces } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { PlaceDialog } from "../components/PlaceMap";
-import { Button, Empty, ErrorBox, Icon, IconButton, Loading, useSnackbar } from "../components/ui";
+import { SubHeader, Button, Empty, ErrorBox, Icon, IconButton, Loading, useSnackbar } from "../components/ui";
 import { useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
 import { LocationReadiness } from "./LocationPage";
@@ -23,11 +23,8 @@ export function PlacesPage() {
 
   return (
     <div className="flex flex-col pb-10">
-      <header className="sticky top-0 z-10 flex h-16 items-center gap-1 bg-surface px-2 md:px-4">
-        <IconButton icon="arrow_back" label="Back" onClick={back} />
-        <h1 className="text-title-large text-on-surface">Places</h1>
-      </header>
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 md:px-6">
+      <SubHeader title="Places" onBack={back} />
+      <div className="flex flex-col gap-4 px-4 md:px-6">
         {isDom && subs.map((m) => <LocationReadiness key={m.userId} member={m} />)}
         {places.isPending ? (
           <Loading />
