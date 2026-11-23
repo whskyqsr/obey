@@ -107,12 +107,7 @@ fun ScenesScreen(onOpenSettings: () -> Unit, onOpen: (String) -> Unit, onAfterca
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Column {
-                        Text("Scenes")
-                        Text("Only your dynamic sees these", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                },
+                title = { Text("Scenes") },
                 navigationIcon = { MenuButton() },
                 actions = {
                     IconButton(onClick = onAftercare) { Icon(Icons.Outlined.VolunteerActivism, "Aftercare") }

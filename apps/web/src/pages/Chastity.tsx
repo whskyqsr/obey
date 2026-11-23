@@ -59,10 +59,7 @@ export function ChastityPage() {
 
   return (
     <>
-      <PageHeader
-        title="Chastity"
-        subtitle="Locks, time added and taken off, and asks to be let out."
-      />
+      <PageHeader title="Chastity" />
       {wearers.length > 0 && <Fab icon="lock" label="Lock" onClick={() => setStarting(true)} />}
       <div className="flex flex-col gap-6 px-4 pb-24 md:px-6">
         {view.isLoading && <Loading />}

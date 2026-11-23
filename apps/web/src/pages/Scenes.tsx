@@ -85,7 +85,6 @@ export function ScenesPage() {
     <>
       <PageHeader
         title="Scenes"
-        subtitle="Only your dynamic sees these"
         actions={
           <Button variant="tonal" icon="volunteer_activism" onClick={() => navigate({ to: "/aftercare" })}>
             Aftercare

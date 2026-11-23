@@ -17,10 +17,10 @@ import { ROLE_LABEL, isCollared, relTitle, useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
 import { describeCurfew } from "./Curfew";
 
-const POLICIES: { value: ReschedulePolicy; label: string; help: string }[] = [
-  { value: "dominant_only", label: "Dominant only", help: "Only a Dominant can move deadlines." },
-  { value: "request", label: "Sub may request", help: "The sub asks; a Dominant approves or declines." },
-  { value: "allowance", label: "Weekly allowance", help: "The sub gets a number of free delays each week; more need approval." },
+const POLICIES: { value: ReschedulePolicy; label: string }[] = [
+  { value: "dominant_only", label: "Dominant only" },
+  { value: "request", label: "Sub may request" },
+  { value: "allowance", label: "Weekly allowance" },
 ];
 
 export const FEATURE_ROWS: { key: keyof Features; label: string; help: string }[] = [
@@ -345,7 +345,7 @@ export function DynamicPage() {
           />
           <Row
             headline="Moving deadlines"
-            supporting={rel.reschedulePolicy === "allowance" ? `${policy?.label}: ${rel.weeklyDelayAllowance} free a week` : policy?.help}
+            supporting={rel.reschedulePolicy === "allowance" ? `${policy?.label}: ${rel.weeklyDelayAllowance} free a week` : policy?.label}
             trailing={isDom && <Icon name="chevron_right" className="text-on-surface-variant" />}
             onClick={isDom ? () => setSheet("deadlines") : undefined}
           />
@@ -387,7 +387,6 @@ export function DynamicPage() {
                 checked={features[f.key]}
                 onChange={(on) => isDom && patch({ features: { [f.key]: on } }, on ? `${f.label} on` : `${f.label} off`)}
                 label={f.label}
-                help={f.help}
               />
             ))}
           </div>
@@ -678,7 +677,7 @@ function DeadlinesDialog({ open, onClose, onSave }: { open: boolean; onClose(): 
       }
     >
       <div className="flex flex-col gap-4">
-        <Select label="Who can move deadlines" value={policy} onChange={(e) => setPolicy(e.target.value as ReschedulePolicy)} help={POLICIES.find((p) => p.value === policy)?.help}>
+        <Select label="Who can move deadlines" value={policy} onChange={(e) => setPolicy(e.target.value as ReschedulePolicy)}>
           {POLICIES.map((p) => (
             <option key={p.value} value={p.value}>
               {p.label}

@@ -127,7 +127,7 @@ export function LocationPage() {
 
   return (
     <>
-      <PageHeader title="Location" subtitle="Places, curfew and tasks done by getting somewhere." />
+      <PageHeader title="Location" />
       <div className="flex flex-col gap-4 px-4 pb-10 md:px-6">
         <div className="border border-outline-variant overflow-hidden rounded-lg">
           <LinkRow

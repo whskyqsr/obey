@@ -45,7 +45,7 @@ export function ConsequencesPage() {
 
   return (
     <>
-      <PageHeader title="Consequences" subtitle="Attach one to a task for when it's missed, or hand one out on its own." />
+      <PageHeader title="Consequences" />
       <div className="mx-4 flex flex-col divide-y divide-outline-variant border-y border-outline-variant md:mx-6">
         {list.isLoading && <Loading />}
         {list.error && <ErrorBox error={list.error} onRetry={() => list.refetch()} />}

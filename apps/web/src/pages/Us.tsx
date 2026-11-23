@@ -11,7 +11,6 @@ function Row({ d }: { d: Dest }) {
         <Icon name={d.icon} size={20} className="text-on-surface-variant" />
         <span className="min-w-0 flex-1">
           <span className="block font-serif text-[20px] leading-6 text-on-surface">{d.label}</span>
-          {d.hint && <span className="block truncate text-body-small text-outline">{d.hint}</span>}
         </span>
         <Icon name="chevron_right" size={20} className="text-outline" />
       </Link>

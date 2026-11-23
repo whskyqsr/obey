@@ -131,7 +131,6 @@ export function RewardsPage() {
             );
           })}
         </ul>
-        {(solo || !isDom) && !!rewards.data?.length && <p className="mt-2 text-body-small text-on-surface-variant">Tap a reward to spend your points on it.</p>}
       </Section>
 
       {waiting.length > 0 && (

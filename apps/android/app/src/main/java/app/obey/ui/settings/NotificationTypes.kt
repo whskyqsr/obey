@@ -46,7 +46,6 @@ fun NotificationTypes(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(t.label, style = MaterialTheme.typography.bodyLarge)
-                        Text(t.help, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
                     }
                     Switch(checked = t.key !in muted, enabled = enabled, onCheckedChange = { onChange(t.key, it) })
                 }

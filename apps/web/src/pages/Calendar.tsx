@@ -278,7 +278,6 @@ export function CalendarPage() {
               </div>
             );
           })}
-          <p className="py-4 text-body-medium text-on-surface-variant">Tap a day to see it, and a task to open it.</p>
         </div>
       )}
       <Dialog

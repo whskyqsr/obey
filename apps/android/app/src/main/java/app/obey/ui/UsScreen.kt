@@ -85,7 +85,6 @@ fun UsScreen(items: List<UsItem>, onSettings: () -> Unit, onInvite: (() -> Unit)
                     Icon(item.icon, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Column(Modifier.weight(1f)) {
                         Text(item.label, style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 24.sp))
-                        if (item.hint != null) Text(item.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.outline)
                 }

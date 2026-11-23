@@ -245,7 +245,6 @@ private fun NewSheet(items: List<NewItem>, onDismiss: () -> Unit) {
                     Icon(item.icon, null)
                     Column {
                         Text(item.label, style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 24.sp))
-                        Text(item.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
