@@ -3,6 +3,7 @@ package app.obey.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ExpandLess
@@ -205,6 +207,51 @@ fun DynamicSwitcherChip(a: SwitcherActions) {
                 modifier = Modifier.widthIn(max = 180.dp),
             )
             if (many) Icon(Icons.Outlined.ExpandMore, "Switch dynamic", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        DropdownMenu(open, onDismissRequest = { open = false }, shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceContainerLowest) {
+            Box(Modifier.width(288.dp)) { DynamicList(a) { open = false } }
+        }
+    }
+}
+
+/** Us: the people in the dynamic beside its name, large, with your role and how long it's been. Opens the list to switch. */
+@Composable
+fun DynamicSwitcherHero(a: SwitcherActions, modifier: Modifier = Modifier) {
+    val rel = a.session.relationship ?: return
+    val many = a.session.me.relationships.size > 1
+    var open by remember { mutableStateOf(false) }
+    val title = rel.name ?: rel.members.joinToString(" & ") { it.displayName }.ifEmpty { "Just you" }
+    val since = runCatching {
+        java.time.Instant.parse(rel.createdAt).atZone(java.time.ZoneId.systemDefault())
+            .format(java.time.format.DateTimeFormatter.ofPattern("MMM yyyy"))
+    }.getOrNull()
+    val sub = listOfNotNull(rel.subtitle(a.session.userId).ifEmpty { null }, since?.let { "since $it" }).joinToString(" · ")
+    Box(modifier) {
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { if (many) open = true else a.openDynamic() }.padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row {
+                rel.members.take(3).forEachIndexed { i, m ->
+                    Avatar(
+                        m.userId, m.displayName, m.avatarVersion, a.loadAvatar, size = 56.dp,
+                        modifier = Modifier.offset(x = (-12 * i).dp).border(2.dp, MaterialTheme.colorScheme.surface, CircleShape),
+                    )
+                }
+            }
+            Column(Modifier.weight(1f).offset(x = (-12 * (rel.members.take(3).size - 1)).dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(title, style = MaterialTheme.typography.headlineSmall.copy(fontSize = 30.sp, lineHeight = 36.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    Icon(
+                        if (many) Icons.Outlined.ExpandMore else Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                        if (many) "Switch dynamic" else "Your dynamic",
+                        Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         DropdownMenu(open, onDismissRequest = { open = false }, shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceContainerLowest) {
             Box(Modifier.width(288.dp)) { DynamicList(a) { open = false } }
