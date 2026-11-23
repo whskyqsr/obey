@@ -10,7 +10,6 @@ import { CalendarPage } from "./pages/Calendar";
 import { ConsequencesPage } from "./pages/Consequences";
 import { DynamicPage } from "./pages/Dynamic";
 import { AdminReportsPage } from "./pages/AdminReports";
-import { MorePage } from "./pages/More";
 import { NotesPage } from "./pages/Notes";
 import { Onboarding } from "./pages/Onboarding";
 import { RewardsPage } from "./pages/Rewards";
@@ -291,7 +290,6 @@ const routeTree = rootRoute.addChildren([
   page("/location", gated("location", LocationPage)),
   page("/curfew", gated("location", CurfewPage)),
   page("/admin/reports", AdminReportsPage),
-  page("/more", MorePage),
   page("/onboarding", OnboardingRoute),
 ]);
 
