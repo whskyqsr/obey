@@ -196,7 +196,7 @@ export const libraryRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     if (!mayWriteOwn(v, body.kind)) throw forbidden("your Dominant hasn't turned on writing notes");
     const [row] = await db
       .insert(notes)
-      .values({ ...body, subCanEdit: subCanEdit(v, body.kind, body.visibility, body.subCanEdit), relationshipId: req.params.id, authorId: req.user.id })
+      .values({ ...body, subCanEdit: subCanEdit(v, body.kind, body.visibility, body.subCanEdit), relationshipId: req.params.id, authorId: req.user.id, createdAt: deps.now(), updatedAt: deps.now() })
       .returning();
     reply.status(201);
     return noteDto(row!, true);
@@ -229,7 +229,10 @@ export const libraryRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       // starting version is already kept, so ticking a checklist or saving twice doesn't fill the history.
       if (textChanged) {
         const [last] = await tx.select().from(noteRevisions).where(eq(noteRevisions.noteId, note.id)).orderBy(desc(noteRevisions.createdAt)).limit(1);
-        const sameSitting = last && last.editorId === v.userId && now.getTime() - last.createdAt.getTime() < SITTING_MS;
+        // Writing a new note is a sitting too: the web saves a note as it's typed, so its first save is only the title.
+        const sameSitting = last
+          ? last.editorId === v.userId && now.getTime() - last.createdAt.getTime() < SITTING_MS
+          : note.authorId === v.userId && now.getTime() - note.createdAt.getTime() < SITTING_MS;
         if (!sameSitting) {
           await tx.insert(noteRevisions).values({ noteId: note.id, editorId: v.userId, title: note.title, bodyMd: note.bodyMd, createdAt: now });
           set = { ...set, revisionCount: note.revisionCount + 1 };

@@ -55,3 +55,15 @@ fun ago(iso: String, now: Instant = Instant.now()): String {
         else -> formatDateTime(iso)
     }
 }
+
+private val shortDateFmt = DateTimeFormatter.ofPattern("MMM d")
+
+/** "today", "yesterday", or "Nov 18": the day something last changed, as a list's small print says it. */
+fun dayWord(iso: String, today: LocalDate = LocalDate.now()): String {
+    val d = parseInstant(iso).local().toLocalDate()
+    return when (ChronoUnit.DAYS.between(d, today)) {
+        0L -> "today"
+        1L -> "yesterday"
+        else -> d.format(shortDateFmt)
+    }
+}
