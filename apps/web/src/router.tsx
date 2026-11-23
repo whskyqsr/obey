@@ -8,7 +8,7 @@ import { useRel } from "./lib/relationship";
 import { startWelcome, useWelcome } from "./lib/welcome";
 import { CalendarPage } from "./pages/Calendar";
 import { ConsequencesPage } from "./pages/Consequences";
-import { DynamicPage } from "./pages/Dynamic";
+import { DynamicPage, PeoplePage } from "./pages/Dynamic";
 import { AdminReportsPage } from "./pages/AdminReports";
 import { NoteRoutePage, NotesPage } from "./pages/Notes";
 import { Onboarding } from "./pages/Onboarding";
@@ -284,6 +284,7 @@ const routeTree = rootRoute.addChildren([
   page("/chastity", gated("chastity", ChastityPage)),
   page("/settings", SettingsPage),
   page("/dynamic", DynamicPage),
+  page("/dynamic/people", PeoplePage),
   page("/places", gated("location", PlacesPage)),
   page("/location", gated("location", LocationPage)),
   page("/curfew", gated("location", CurfewPage)),

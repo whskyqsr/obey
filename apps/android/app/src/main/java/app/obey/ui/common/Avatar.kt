@@ -36,6 +36,8 @@ fun Avatar(
     size: Dp = 40.dp,
     /** Shows a small collar badge at the bottom right. */
     collared: Boolean = false,
+    /** The initial in the serif, as in the Letters mockups. */
+    serif: Boolean = false,
 ) {
     var image by remember(userId, version) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(userId, version) { image = version?.let { load(userId, it) } }
@@ -48,11 +50,12 @@ fun Avatar(
             if (img != null) {
                 Image(img, null, Modifier.size(size), contentScale = ContentScale.Crop)
             } else {
-                val fontSize = with(LocalDensity.current) { (size * 0.42f).toSp() }
+                val fontSize = with(LocalDensity.current) { (size * (if (serif) 0.56f else 0.42f)).toSp() }
                 Text(
                     name.trim().take(1).uppercase().ifEmpty { "?" },
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     fontSize = fontSize,
+                    fontFamily = if (serif) app.obey.ui.theme.InstrumentSerif else null,
                 )
             }
         }
