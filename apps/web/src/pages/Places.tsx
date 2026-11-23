@@ -15,7 +15,7 @@ const fmtRadius = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(m % 1000 ? 1
 export function PlacesPage() {
   const { rel, isDom, me } = useRel();
   const navigate = useNavigate();
-  const back = useBack(() => navigate({ to: "/dynamic" }));
+  const back = useBack(() => navigate({ to: "/location" }));
   const places = usePlaces(rel.id);
   const [editing, setEditing] = useState<{ place: Place | null } | null>(null);
   const canEdit = isDom && rel.endedAt === null;

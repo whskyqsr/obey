@@ -13,10 +13,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Notes
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Checklist
-import androidx.compose.material.icons.outlined.EmojiEvents
+import androidx.compose.material.icons.outlined.Redeem
+import androidx.compose.material.icons.outlined.StickyNote2
+import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material3.Button
@@ -201,27 +203,33 @@ private val writingRoutes = setOf<Any>(NotesRoute, JournalRoute)
 private fun topLevels(f: Features) = listOfNotNull(
     TopLevel(TodayRoute, "Today", Icons.Outlined.Today) { it.hasRoute<TodayRoute>() },
     TopLevel(UpcomingRoute, "Calendar", Icons.Outlined.CalendarMonth) { it.hasRoute<UpcomingRoute>() },
-    if (f.points) TopLevel(RewardsRoute, "Rewards", Icons.Outlined.EmojiEvents) { it.hasRoute<RewardsRoute>() } else null,
-    if (f.consequences) TopLevel(ConsequencesRoute, "Consequences", Icons.Outlined.Bolt) { it.hasRoute<ConsequencesRoute>() } else null,
+    if (f.points) TopLevel(RewardsRoute, "Rewards", Icons.Outlined.Redeem) { it.hasRoute<RewardsRoute>() } else null,
     if (f.rules) TopLevel(RulesRoute, "Rules", Icons.Outlined.Gavel) { it.hasRoute<RulesRoute>() } else null,
     if (f.protocols) TopLevel(ProtocolsRoute, "Protocols", Icons.Outlined.FactCheck) { it.hasRoute<ProtocolsRoute>() } else null,
-    TopLevel(NotesRoute, "Notes", Icons.AutoMirrored.Outlined.Notes) { it.hasRoute<NotesRoute>() },
+    if (f.consequences) TopLevel(ConsequencesRoute, "Consequences", Icons.Outlined.Bolt) { it.hasRoute<ConsequencesRoute>() } else null,
+    TopLevel(NotesRoute, "Notes", Icons.Outlined.StickyNote2) { it.hasRoute<NotesRoute>() },
     if (f.journal) TopLevel(JournalRoute, "Journal", Icons.Outlined.AutoStories) { it.hasRoute<JournalRoute>() } else null,
     if (f.stats) TopLevel(StatsRoute(), "Stats", Icons.Outlined.Insights) { it.hasRoute<StatsRoute>() } else null,
     if (f.review) TopLevel(MonthReviewRoute, "Monthly review", Icons.Outlined.Flag) { it.hasRoute<MonthReviewRoute>() } else null,
-    // The menu shows it next to Your dynamic rather than with the other pages.
     if (f.agreement) TopLevel(AgreementRoute(), "Agreement", Icons.Outlined.Handshake) { it.hasRoute<AgreementRoute>() } else null,
+    if (f.limits) TopLevel(LimitsRoute, "Limits", Icons.Outlined.Tune) { it.hasRoute<LimitsRoute>() } else null,
     if (f.scenes) TopLevel(ScenesRoute, "Scenes", Icons.Outlined.AutoAwesome) { it.hasRoute<ScenesRoute>() } else null,
     if (f.chastity) TopLevel(ChastityRoute, "Chastity", Icons.Outlined.Lock) { it.hasRoute<ChastityRoute>() } else null,
-    if (f.limits) TopLevel(LimitsRoute, "Limits", Icons.Outlined.Tune) { it.hasRoute<LimitsRoute>() } else null,
-    // Tasks open from Today and Calendar; the full list is for managing them, so it sits under More.
+    if (f.location) TopLevel(LocationRoute, "Location", Icons.Outlined.LocationOn) { it.hasRoute<LocationRoute>() } else null,
+    // Tasks open from Today and Calendar; the full list is for managing them, so it sits in the menu.
     TopLevel(TaskListRoute, "All tasks", Icons.Outlined.Checklist) { it.hasRoute<TaskListRoute>() },
+    TopLevel(KitsRoute, "Kits", Icons.Outlined.Widgets) { it.hasRoute<KitsRoute>() },
 )
 
-/** The phone's bar holds Today, Calendar, the next section that's on, and the first writing space; the rest go in the menu. Stats, the monthly review, the agreement, scenes, chastity and limits are always in the menu. */
+/** Always in the menu, however many sections are switched off. Same list as the web's. */
+private val menuOnly: (Any) -> Boolean = { r ->
+    r is StatsRoute || r == MonthReviewRoute || r is AgreementRoute || r == LimitsRoute || r == ScenesRoute || r == ChastityRoute || r == LocationRoute || r == KitsRoute
+}
+
+/** The phone's bar holds Today, Calendar, the next section that's on, and the first writing space; the rest go in the menu. */
 private fun splitBar(all: List<TopLevel>): Pair<List<TopLevel>, List<TopLevel>> {
     val writing = all.firstOrNull { it.route in writingRoutes }
-    val bar = all.filter { it.route !in writingRoutes && it.route !is StatsRoute && it.route != MonthReviewRoute && it.route !is AgreementRoute && it.route != ScenesRoute && it.route != ChastityRoute && it.route != LimitsRoute }.take(3) + listOfNotNull(writing)
+    val bar = all.filter { it.route !in writingRoutes && !menuOnly(it.route) }.take(3) + listOfNotNull(writing)
     return bar to all.filter { it !in bar }
 }
 
@@ -295,6 +303,19 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
                         label = { Text(t.label) },
                     )
                 }
+                // Your dynamic and Settings close the list, as in the phone's menu.
+                NavigationRailItem(
+                    selected = destination?.hasRoute<DynamicRoute>() == true,
+                    onClick = { nav.navigate(DynamicRoute()) { launchSingleTop = true } },
+                    icon = { Icon(Icons.Outlined.FavoriteBorder, null) },
+                    label = { Text("Your dynamic") },
+                )
+                NavigationRailItem(
+                    selected = destination?.hasRoute<SettingsRoute>() == true,
+                    onClick = { nav.navigate(SettingsRoute) { launchSingleTop = true } },
+                    icon = { Icon(Icons.Outlined.Settings, null) },
+                    label = { Text("Settings") },
+                )
             }
             CompositionLocalProvider(LocalSafeWord provides openSafe.takeIf { safeVm.canCall() }) {
                 Box(Modifier.weight(1f)) { SafeCallFrame(safeVm, activeCall) { ObeyNavHost(nav) } }
@@ -315,9 +336,8 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
                     Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 12.dp)) {
                         DynamicSwitcher(switcher) { scope.launch { drawer.close() } }
                         Spacer(Modifier.height(8.dp))
-                        overflow.filter { it.route !is AgreementRoute }.forEach { t -> MenuItem(t.label, t.icon, selected(t)) { go(t.route) } }
+                        overflow.forEach { t -> MenuItem(t.label, t.icon, selected(t)) { go(t.route) } }
                         HorizontalDivider(Modifier.padding(horizontal = 28.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                        overflow.firstOrNull { it.route is AgreementRoute }?.let { t -> MenuItem(t.label, t.icon, selected(t)) { go(t.route) } }
                         MenuItem("Your dynamic", Icons.Outlined.FavoriteBorder, destination?.hasRoute<DynamicRoute>() == true) { nav.navigate(DynamicRoute()) }
                         MenuItem("Settings", Icons.Outlined.Settings, destination?.hasRoute<SettingsRoute>() == true) { nav.navigate(SettingsRoute) }
                         if (session.solo) {
@@ -482,7 +502,6 @@ private fun ObeyNavHost(nav: NavHostController) {
         }
         composable<KitsRoute> {
             KitsScreen(
-                onBack = { nav.popBackStack() },
                 onAdded = { kitAdded(it) },
                 onOpenKit = { nav.navigate(KitRoute(it)) },
                 onNewKit = { nav.navigate(NewKitRoute) },
@@ -518,6 +537,6 @@ private fun ObeyNavHost(nav: NavHostController) {
         composable<DynamicRoute> { entry -> DynamicScreen(startInvite = entry.toRoute<DynamicRoute>().invite, onBack = { nav.popBackStack() }, onPlaces = { nav.navigate(PlacesRoute) }, onLocation = { nav.navigate(LocationRoute) }, onCurfew = { nav.navigate(CurfewRoute) }) }
         composable<CurfewRoute> { app.obey.ui.location.CurfewScreen(onBack = { nav.popBackStack() }, onPlaces = { nav.navigate(PlacesRoute) }) }
         composable<PlacesRoute> { app.obey.ui.location.PlacesScreen(onBack = { nav.popBackStack() }) }
-        composable<LocationRoute> { app.obey.ui.location.LocationScreen(onBack = { nav.popBackStack() }) }
+        composable<LocationRoute> { app.obey.ui.location.LocationScreen(onPlaces = { nav.navigate(PlacesRoute) }, onCurfew = { nav.navigate(CurfewRoute) }) }
     }
 }

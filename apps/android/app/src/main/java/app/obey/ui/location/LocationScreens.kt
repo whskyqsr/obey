@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AddLocationAlt
+import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.LocationOff
 import androidx.compose.material.icons.outlined.LocationOn
@@ -163,11 +164,13 @@ private fun Step(done: Boolean, title: String, body: String, action: String?, on
 /** For the person being watched: setting it up, what's watched today, and pausing. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun LocationScreen(onBack: () -> Unit, vm: LocationViewModel = hiltViewModel()) {
+fun LocationScreen(onPlaces: () -> Unit, onCurfew: () -> Unit, vm: LocationViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val setup by vm.setup.collectAsStateWithLifecycle()
     val watching by vm.watching.collectAsStateWithLifecycle()
-    val onCurfew by vm.onCurfew.collectAsStateWithLifecycle()
+    val underCurfew by vm.onCurfew.collectAsStateWithLifecycle()
+    val curfew by vm.curfew.collectAsStateWithLifecycle()
+    val othersWatching by vm.othersWatching.collectAsStateWithLifecycle()
     val places by vm.places.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
@@ -186,12 +189,20 @@ fun LocationScreen(onBack: () -> Unit, vm: LocationViewModel = hiltViewModel()) 
     val session = vm.session
     val me = session?.myMember
     val who = session?.partners?.joinToString(" and ") { it.displayName }?.ifEmpty { null } ?: "Your partner"
+    val solo = session?.solo == true
+    val canManage = session?.canManage == true
+    val curfewOn = curfew?.enabled == true
+    // A sub (or switch, or someone on their own) carries the phone that checks in; a Dominant only does if a task or curfew names them.
+    val watched = session?.readOnly != true && (solo || me?.role != Role.Dominant || watching.isNotEmpty() || underCurfew)
+    val watchedOthers = session?.partners.orEmpty().filter { it.role != Role.Dominant }
+    val placeName = { o: app.obey.api.Occurrence -> places?.firstOrNull { it.id == o.placeId }?.name ?: "A place" }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Location") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") } },
+                navigationIcon = { app.obey.ui.common.MenuButton() },
+                actions = { app.obey.ui.common.SafeWordAction() },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -201,6 +212,41 @@ fun LocationScreen(onBack: () -> Unit, vm: LocationViewModel = hiltViewModel()) 
                 Modifier.widthIn(max = 640.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.large) {
+                    Column {
+                        ListItem(
+                            modifier = Modifier.clickable(onClick = onPlaces),
+                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                            leadingContent = { Icon(Icons.Outlined.LocationOn, null) },
+                            headlineContent = { Text("Places") },
+                            supportingContent = { Text(if (canManage) "Where location tasks can send someone" else "The places location tasks use") },
+                            trailingContent = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
+                        )
+                        if (canManage || curfewOn) {
+                            ListItem(
+                                modifier = Modifier.clickable(onClick = onCurfew),
+                                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                                leadingContent = { Icon(Icons.Outlined.Bedtime, null) },
+                                headlineContent = { Text("Curfew") },
+                                supportingContent = { Text(curfew?.takeIf { it.enabled }?.let { describeCurfew(it) } ?: "Off") },
+                                trailingContent = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
+                            )
+                        }
+                    }
+                }
+
+                if (!watched) {
+                    if (watchedOthers.isNotEmpty()) {
+                        SectionHeader(if (watchedOthers.size == 1) "${watchedOthers[0].displayName}'s phone" else "Their phones", horizontalPadding = 4.dp)
+                        watchedOthers.forEach { m -> LocationReadiness(m) { vm.ask(m.displayName) } }
+                        SectionHeader("Watching today", horizontalPadding = 4.dp)
+                        WatchList(othersWatching, placeName) { o -> if (watchedOthers.size > 1) session?.relationship?.members?.firstOrNull { it.userId == o.assigneeId }?.displayName else null }
+                    }
+                    Spacer(Modifier.height(24.dp))
+                    return@Column
+                }
+
+                SectionHeader("Your phone", horizontalPadding = 4.dp)
                 if (setup.ready) {
                     StatusCard(Icons.Outlined.CheckCircle, true, "On, allowed all the time", "$who sees when you arrive at or leave a place a task names, and nothing else.")
                 } else {
@@ -240,23 +286,7 @@ fun LocationScreen(onBack: () -> Unit, vm: LocationViewModel = hiltViewModel()) 
                 }
 
                 SectionHeader("Watching today", horizontalPadding = 4.dp)
-                if (watching.isEmpty()) {
-                    Text("No location tasks left today.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else {
-                    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.large) {
-                        Column {
-                            watching.forEach { o ->
-                                val place = places?.firstOrNull { it.id == o.placeId }
-                                ListItem(
-                                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-                                    leadingContent = { Icon(Icons.Outlined.LocationOn, null, tint = MaterialTheme.colorScheme.primary) },
-                                    headlineContent = { Text(place?.name ?: "A place") },
-                                    supportingContent = { Text("${o.title} · by ${formatTime(o.dueAt)}" + (o.stayMinutes?.let { ", stay ${stayLabel(it)}" } ?: "")) },
-                                )
-                            }
-                        }
-                    }
-                }
+                WatchList(watching, placeName) { null }
 
                 SectionHeader("Pause", horizontalPadding = 4.dp)
                 if (me?.locationPaused == true) {
@@ -271,8 +301,8 @@ fun LocationScreen(onBack: () -> Unit, vm: LocationViewModel = hiltViewModel()) 
                     }
                 } else {
                     Text(
-                        "Stops watching every place. Location tasks due while paused are excused, and $who is told you paused." +
-                            if (onCurfew) " Curfew still counts: tap I'm home on Today instead." else "",
+                        "Stops watching every place. Location tasks due while paused are excused" + (if (solo) "." else ", and $who is told you paused.") +
+                            if (underCurfew) " Curfew still counts: tap I'm home on Today instead." else "",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -287,6 +317,29 @@ fun LocationScreen(onBack: () -> Unit, vm: LocationViewModel = hiltViewModel()) 
                     }
                 }
                 Spacer(Modifier.height(24.dp))
+            }
+        }
+    }
+}
+
+/** Today's location tasks still to come, with whose they are when [who] says. */
+@Composable
+private fun WatchList(items: List<app.obey.api.Occurrence>, placeName: (app.obey.api.Occurrence) -> String, who: (app.obey.api.Occurrence) -> String?) {
+    if (items.isEmpty()) {
+        Text("No location tasks left today.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        return
+    }
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.large) {
+        Column {
+            items.forEach { o ->
+                ListItem(
+                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    leadingContent = { Icon(Icons.Outlined.LocationOn, null, tint = MaterialTheme.colorScheme.primary) },
+                    headlineContent = { Text(placeName(o)) },
+                    supportingContent = {
+                        Text("${o.title} · by ${formatTime(o.dueAt)}" + (o.stayMinutes?.let { ", stay ${stayLabel(it)}" } ?: "") + (who(o)?.let { " · $it" } ?: ""))
+                    },
+                )
             }
         }
     }

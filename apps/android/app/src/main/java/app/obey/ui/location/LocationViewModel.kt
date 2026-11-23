@@ -85,16 +85,28 @@ class LocationViewModel @Inject constructor(
     /** The person has a curfew, which a pause doesn't excuse. */
     val onCurfew: StateFlow<Boolean> = _onCurfew.asStateFlow()
 
+    private val _curfew = MutableStateFlow<app.obey.api.CurfewInput?>(null)
+    /** The dynamic's curfew settings, for the Location page's Curfew row. */
+    val curfew: StateFlow<app.obey.api.CurfewInput?> = _curfew.asStateFlow()
+
+    private val _othersWatching = MutableStateFlow<List<Occurrence>>(emptyList())
+    /** Location tasks left today for everyone else, for a Dominant who isn't watched themselves. */
+    val othersWatching: StateFlow<List<Occurrence>> = _othersWatching.asStateFlow()
+
     fun loadWatching() {
         val s = sessions.session ?: return
         val id = relId ?: return
         viewModelScope.launch {
-            _onCurfew.value = runCatching { api.curfew(id).settings }.getOrNull()?.let { it.enabled && it.assigneeId == s.userId } == true
+            val settings = runCatching { api.curfew(id).settings }.getOrNull()
+            _curfew.value = settings
+            _onCurfew.value = settings?.let { it.enabled && it.assigneeId == s.userId } == true
         }
         viewModelScope.launch {
             val today = LocalDate.now().toString()
-            _watching.value = runCatching { api.occurrences(id, today, today) }.getOrDefault(emptyList())
-                .filter { it.isPlaced && it.assigneeId == s.userId && it.status == OccurrenceStatus.Pending }
+            val placed = runCatching { api.occurrences(id, today, today) }.getOrDefault(emptyList())
+                .filter { it.isPlaced && it.status == OccurrenceStatus.Pending }
+            _watching.value = placed.filter { it.assigneeId == s.userId }
+            _othersWatching.value = placed.filter { it.assigneeId != s.userId }
         }
     }
 

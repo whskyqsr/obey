@@ -32,16 +32,24 @@ const ALL: Dest[] = [
   { to: "/limits", label: "Limits", icon: "tune", feature: "limits" },
   { to: "/scenes", label: "Scenes", icon: "auto_awesome", feature: "scenes" },
   { to: "/chastity", label: "Chastity", icon: "lock", feature: "chastity" },
+  { to: "/location", label: "Location", icon: "location_on", feature: "location" },
   // Tasks open from Today and Calendar; the full list is for managing them.
   { to: "/tasks", label: "All tasks", icon: "checklist" },
+  { to: "/kits", label: "Kits", icon: "widgets" },
   { to: "/settings", label: "Settings", icon: "settings" },
 ];
 
 /** What needs a second person, so it stays out of the way while someone is on their own. */
 const NOT_SOLO = ["/agreement", "/chastity"];
 
+/** Always in the menu, however many sections are switched off. */
+const MENU_ONLY = ["/stats", "/review", "/agreement", "/limits", "/scenes", "/chastity", "/location", "/kits"];
+
 /** Destinations the desktop drawer pins to the bottom instead of the main list. */
 const DRAWER_BOTTOM = ["/settings"];
+
+/** Your dynamic: not a section, so it sits with Settings at the bottom of every menu. */
+const DYNAMIC: Dest = { to: "/dynamic", label: "Your dynamic", icon: "favorite" };
 
 /** Destinations for the current dynamic: everything, plus the phone's bar and what goes in its menu. */
 export function useDestinations() {
@@ -50,9 +58,8 @@ export function useDestinations() {
   // The bar holds Today, Calendar, the next section that's on, and the first writing space; the rest go in the menu.
   const isWriting = (d: Dest) => d.to === "/notes" || d.to === "/journal";
   const writing = all.find(isWriting);
-  // Stats, the monthly review, the agreement, limits, scenes and chastity always sit in the menu, however many sections are switched off.
   const bar = [
-    ...all.filter((d) => !isWriting(d) && !["/stats", "/review", "/agreement", "/limits", "/scenes", "/chastity"].includes(d.to)).slice(0, 3),
+    ...all.filter((d) => !isWriting(d) && !MENU_ONLY.includes(d.to)).slice(0, 3),
     ...(writing ? [writing] : []),
   ];
   const more = all.filter((d) => !bar.includes(d));
@@ -124,7 +131,7 @@ function MenuDrawer({ open, onClose, items, onInvite }: { open: boolean; onClose
         </div>
         {items.filter((d) => !DRAWER_BOTTOM.includes(d.to)).map(row)}
         <hr className="mx-4 my-2 border-outline-variant" />
-        {row({ to: "/dynamic", label: "Your dynamic", icon: "favorite" })}
+        {row(DYNAMIC)}
         {bottom.map(row)}
         {onInvite && (
           <InviteButton
@@ -231,11 +238,9 @@ export function AppShell() {
             ))}
           {invite && <InviteButton onClick={invite} className="h-12" />}
           <div className="flex-1" />
-          {all
-            .filter((d) => DRAWER_BOTTOM.includes(d.to))
-            .map((d) => (
-              <DrawerItem key={d.to} d={d} active={isActive(pathname, d.to)} />
-            ))}
+          {[DYNAMIC, ...all.filter((d) => DRAWER_BOTTOM.includes(d.to))].map((d) => (
+            <DrawerItem key={d.to} d={d} active={isActive(pathname, d.to)} />
+          ))}
         </nav>
 
         {/* Navigation rail (medium) */}
@@ -243,7 +248,7 @@ export function AppShell() {
           <div className="mb-4">
             <DynamicSwitcher compact />
           </div>
-          {all.map((d) => (
+          {[...all.filter((d) => !DRAWER_BOTTOM.includes(d.to)), DYNAMIC, ...all.filter((d) => DRAWER_BOTTOM.includes(d.to))].map((d) => (
             <NavItem key={d.to} d={d} active={isActive(pathname, d.to)} badge={d.to === "/" ? todayBadge : 0} />
           ))}
         </nav>
