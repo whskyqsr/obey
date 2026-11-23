@@ -3,9 +3,9 @@ import { useNavigate } from "@tanstack/react-router";
 import { useLibrary, useSaveLibraryItem } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { Note } from "../api/types";
-import { MOODS, MoodCard } from "../components/Mood";
+import { MOODS, MOOD_LABELS, MoodCard } from "../components/Mood";
 import { Chip, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, TextField, cx, useSnackbar } from "../components/ui";
-import { fmtDateTime } from "../lib/dates";
+import { fmtDate, fmtDateTime, localDateOf } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 
 /** Plain-text preview of a Markdown body. */
@@ -96,37 +96,40 @@ export function NotesPage({ kind }: { kind: "note" | "journal" }) {
           <Empty icon={copy.icon} title={q || tag ? "Nothing matches" : copy.empty} body={q || tag ? undefined : canWrite ? "Start one with the button below." : undefined} />
         </div>
       )}
-      <div className="grid gap-3 px-4 sm:grid-cols-2 md:px-6 xl:grid-cols-3">
+      {/* Letters: entries on hairlines like pages of a notebook, not cards. */}
+      <div className={cx("mx-4 flex max-w-3xl flex-col divide-y divide-outline-variant md:mx-6", list.length > 0 && "border-t border-outline-variant")}>
         {list.map((n) => (
-          <div
-            key={n.id}
-            className={cx(
-              "group relative flex flex-col gap-2 rounded-md p-4",
-              n.pinned ? "bg-secondary-container text-on-secondary-container" : "bg-surface-container-low text-on-surface",
-            )}
-          >
+          <div key={n.id} className="group relative flex flex-col gap-1.5 py-4">
             <button
               type="button"
-              className="absolute inset-0 rounded-md"
+              className="state-layer absolute inset-0"
               aria-label={`Open ${n.title || "note"}`}
               onClick={() => navigate({ to: `${copy.base}/$noteId`, params: { noteId: n.id } })}
             />
-            {/* Card content lets clicks through to the open button underneath; only the pin takes its own. */}
+            {/* Content lets clicks through to the open button underneath; only the pin takes its own. */}
             <div className="pointer-events-none flex items-start gap-2">
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 text-title-medium">
-                  {kind === "journal" && n.mood && <Icon name={MOODS[n.mood - 1]!} size={18} />}
-                  {n.visibility === "private" && <Icon name="lock" size={16} />}
-                  <span className="truncate">{n.title || "Untitled"}</span>
-                </div>
-                <div className="flex items-center gap-1 text-body-small opacity-75">
-                  {memberName(n.authorId)} · {fmtDateTime(kind === "journal" ? n.createdAt : n.updatedAt)}
-                  {kind === "journal" && n.commentCount > 0 && (
-                    <span className="flex items-center gap-0.5" aria-label={`${n.commentCount} comment${n.commentCount === 1 ? "" : "s"}`}>
-                      · <Icon name="chat_bubble" size={14} /> {n.commentCount}
+                {kind === "journal" ? (
+                  <div className="eyebrow flex items-center gap-1.5">
+                    {n.mood && <Icon name={MOODS[n.mood - 1]!} size={16} />}
+                    {n.visibility === "private" && <Icon name="lock" size={14} />}
+                    <span>
+                      {fmtDate(localDateOf(new Date(n.createdAt)), { weekday: "long", month: "short", day: "numeric" })}
+                      {n.mood ? ` · feeling ${MOOD_LABELS[n.mood - 1]!.toLowerCase()}` : ""}
+                      {n.authorId !== me.user.id ? ` · ${memberName(n.authorId)}` : ""}
                     </span>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-1.5">
+                      {n.visibility === "private" && <Icon name="lock" size={16} className="text-on-surface-variant" />}
+                      <span className="truncate font-serif text-[24px] leading-8 text-on-surface">{n.title || "Untitled"}</span>
+                    </div>
+                    <div className="text-body-small text-on-surface-variant">
+                      {memberName(n.authorId)} · {fmtDateTime(n.updatedAt)}
+                    </div>
+                  </>
+                )}
               </div>
               {/* Pinning changes the note, so only its author can; others just see that it's pinned. */}
               {kind === "note" &&
@@ -138,14 +141,27 @@ export function NotesPage({ kind }: { kind: "note" | "journal" }) {
                   n.pinned && <Icon name="push_pin" filled size={20} className="m-2.5" />
                 ))}
             </div>
-            {n.bodyMd && <p className="pointer-events-none line-clamp-4 text-body-medium opacity-85">{excerpt(n.bodyMd, 280)}</p>}
-            {n.tags.length > 0 && (
-              <div className="pointer-events-none flex flex-wrap gap-1">
+            {kind === "journal" && n.title && n.title !== "Untitled" && <div className="pointer-events-none text-title-medium text-on-surface">{n.title}</div>}
+            {n.bodyMd && (
+              <p
+                className={cx(
+                  "pointer-events-none line-clamp-4",
+                  kind === "journal" ? "font-serif text-[21px] leading-7 text-on-surface" : "text-body-medium text-on-surface-variant",
+                )}
+              >
+                {excerpt(n.bodyMd, 280)}
+              </p>
+            )}
+            {(n.tags.length > 0 || (kind === "journal" && n.commentCount > 0)) && (
+              <div className="pointer-events-none flex flex-wrap items-center gap-2 text-label-medium text-on-surface-variant">
                 {n.tags.map((t) => (
-                  <span key={t} className="text-label-medium opacity-80">
-                    #{t}
-                  </span>
+                  <span key={t}>#{t}</span>
                 ))}
+                {kind === "journal" && n.commentCount > 0 && (
+                  <span className="flex items-center gap-0.5 text-primary">
+                    <Icon name="chat_bubble" size={14} /> {n.commentCount === 1 ? "1 reply" : `${n.commentCount} replies`}
+                  </span>
+                )}
               </div>
             )}
           </div>
