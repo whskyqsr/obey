@@ -37,6 +37,34 @@ SHA1:   86:C1:EE:33:A8:2C:77:FF:C9:39:20:35:18:1E:AB:24:05:83:43:BF
 SHA256: 59:09:56:10:A7:AB:0B:DD:C5:44:A8:5B:0B:9D:01:A8:D2:53:C3:E8:32:52:9B:BD:A5:12:DD:E4:A5:31:BA:77
 ```
 
+### Release builds for Google Play
+
+Play builds are Android App Bundles (`.aab`) signed with an **upload key**. Google re-signs them with the app
+signing key it holds (Play App Signing), so a lost upload key can be reset through Play Console support. The
+upload key never goes in this repo; it lives in four repository secrets:
+
+| Secret | What it holds |
+| --- | --- |
+| `UPLOAD_KEYSTORE_BASE64` | the keystore file, base64-encoded |
+| `UPLOAD_STORE_PASSWORD` | the keystore password |
+| `UPLOAD_KEY_ALIAS` | the key alias (`upload`) |
+| `UPLOAD_KEY_PASSWORD` | the key password (the same as the store password for a PKCS12 keystore) |
+
+To make the key once, on your own computer:
+
+```
+keytool -genkeypair -v -keystore fealty-upload.jks -storetype PKCS12 -alias upload \
+  -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=Fealty"
+base64 -i fealty-upload.jks | pbcopy        # macOS; on Linux: base64 -w0 fealty-upload.jks
+```
+
+Keep `fealty-upload.jks` and its password in a password manager. To build: Actions, **Android release**, Run
+workflow, enter the version name (like `1.0.0`). The versionCode is the workflow's run number, so it always goes up.
+The signed `.aab` is the run's `fealty-release-aab-…` artifact.
+
+After the first upload, copy the **app signing key** SHA-1 and SHA-256 from Play Console (Test and release, App
+integrity) into the `me.fealty` Android app in Firebase, or Google sign-in fails on Play installs.
+
 ### Signing in without Firebase (dev auth)
 
 Until the Firebase project exists, use dev auth:
