@@ -7,6 +7,7 @@ import { MOODS, MOOD_LABELS, MoodCard } from "../components/Mood";
 import { Chip, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, SegmentedButtons, TextField, cx, useSnackbar } from "../components/ui";
 import { fmtDate, fmtDateTime, localDateOf } from "../lib/dates";
 import { useRel } from "../lib/relationship";
+import { storage } from "../lib/storage";
 
 /** Plain-text preview of a Markdown body. */
 export function excerpt(md: string, max = 160): string {
@@ -58,6 +59,13 @@ export function NotesPage({ kind }: { kind: "note" | "journal" }) {
   const [q, setQ] = useState("");
   const [tag, setTag] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
+  // The mood chart sits behind its own header button, as in the mockup; the list leads.
+  const [chart, setChartState] = useState(() => storage.get("obey.journal.chart") === "1");
+  const setChart = (on: boolean) => {
+    storage.set("obey.journal.chart", on ? "1" : "0");
+    setChartState(on);
+  };
+  const newEntry = () => navigate({ to: `${copy.base}/$noteId`, params: { noteId: "new" } });
 
   const tags = useMemo(() => [...new Set((notes.data ?? []).filter((n) => n.kind === kind).flatMap((n) => n.tags))].sort(), [notes.data, kind]);
   const list = useMemo(() => {
@@ -90,11 +98,16 @@ export function NotesPage({ kind }: { kind: "note" | "journal" }) {
             />
           ) : undefined
         }
-        tools={<IconButton icon="search" label={copy.search} onClick={() => setSearching((v) => !v)} />}
+        tools={
+          <>
+            <IconButton icon="search" label={copy.search} onClick={() => setSearching((v) => !v)} />
+            {kind === "journal" && <IconButton icon="show_chart" label={chart ? "Hide the mood chart" : "Show the mood chart"} aria-pressed={chart} onClick={() => setChart(!chart)} />}
+          </>
+        }
       />
       <div className="flex flex-col gap-3 px-4 pb-4 md:px-6">
         {(searching || q) && <TextField autoFocus placeholder={copy.search} value={q} onChange={(e) => setQ(e.target.value)} aria-label={copy.search} type="search" />}
-        {kind === "journal" && !q && !tag && <MoodCard />}
+        {kind === "journal" && chart && !q && !tag && <MoodCard />}
         {tags.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-1">
             <Chip selected={!tag} onClick={() => setTag(null)}>
@@ -166,7 +179,7 @@ export function NotesPage({ kind }: { kind: "note" | "journal" }) {
               <p
                 className={cx(
                   "pointer-events-none line-clamp-4",
-                  kind === "journal" ? "font-serif text-[21px] leading-7 text-on-surface" : "text-body-medium text-on-surface-variant",
+                  kind === "journal" ? "font-serif text-[23px] leading-8 text-on-surface" : "text-body-medium text-on-surface-variant",
                 )}
               >
                 {excerpt(n.bodyMd, 280)}
@@ -187,7 +200,21 @@ export function NotesPage({ kind }: { kind: "note" | "journal" }) {
           </div>
         ))}
       </div>
-      {canWrite && <Fab icon="edit" label={copy.fab} onClick={() => navigate({ to: `${copy.base}/$noteId`, params: { noteId: "new" } })} />}
+      {canWrite && <Fab icon="edit" label={copy.fab} onClick={newEntry} />}
+      {kind === "journal" && canWrite && (
+        <>
+          {/* Phones: tonight's entry starts from a bar above the tabs, as in the mockup. */}
+          <div className="h-24 md:hidden" aria-hidden />
+          <div className="fixed inset-x-0 bottom-[calc(68px+env(safe-area-inset-bottom))] z-20 flex items-center gap-3 border-t border-outline-variant bg-surface px-5 pt-3 pb-8 md:hidden">
+            <button type="button" onClick={newEntry} className="min-w-0 flex-1 truncate text-left font-serif text-[22px] text-on-surface-variant italic">
+              Write tonight's entry…
+            </button>
+            <button type="button" onClick={newEntry} className="shrink-0 rounded-full border border-outline-variant px-4 py-1.5 text-label-large text-on-surface-variant">
+              Mood
+            </button>
+          </div>
+        </>
+      )}
     </>
   );
 }

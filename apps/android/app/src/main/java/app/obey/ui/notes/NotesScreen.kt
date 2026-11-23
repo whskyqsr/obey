@@ -8,11 +8,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ShowChart
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.StickyNote2
 import androidx.compose.material.icons.outlined.AutoStories
@@ -83,6 +85,8 @@ fun NotesScreen(
     var query by rememberSaveable { mutableStateOf("") }
     var tag by rememberSaveable { mutableStateOf<String?>(null) }
     var searching by rememberSaveable { mutableStateOf(false) }
+    // The mood chart sits behind its own header button, as in the mockup; the entries lead.
+    var chart by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -91,12 +95,35 @@ fun NotesScreen(
                 title = { Text(if (journal) "Journal" else "Notes") },
                 actions = {
                     IconButton(onClick = { searching = !searching; if (!searching) query = "" }) { Icon(Icons.Outlined.Search, "Search") }
+                    if (journal) IconButton(onClick = { chart = !chart }) {
+                        Icon(Icons.AutoMirrored.Outlined.ShowChart, if (chart) "Hide the mood chart" else "Show the mood chart")
+                    }
                     if (vm.canWrite(journal)) IconButton(onClick = onNew) { Icon(Icons.Outlined.Add, "Write") }
                     SafeWordAction()
                 },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
+        // Tonight's entry starts from a bar above the tabs, as in the mockup.
+        bottomBar = {
+            if (journal && vm.canWrite(true)) {
+                Column {
+                    androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Row(
+                        Modifier.fillMaxWidth().clickable(onClick = onNew).padding(horizontal = 20.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "Write tonight's entry…",
+                            style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                        )
+                        androidx.compose.material3.OutlinedButton(onClick = onNew, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp)) { Text("Mood") }
+                    }
+                }
+            }
+        },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             if (searching) {
@@ -136,9 +163,8 @@ fun NotesScreen(
                     LazyColumn(
                         Modifier.fillMaxSize(),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(if (journal) 12.dp else 0.dp),
                     ) {
-                        if (journal && q.isEmpty()) item(key = "mood") { app.obey.ui.common.MoodCard() }
+                        if (journal && chart && q.isEmpty()) item(key = "mood") { app.obey.ui.common.MoodCard(Modifier.padding(bottom = 12.dp)) }
                         if (shown.isEmpty()) {
                             item {
                                 when {
@@ -151,13 +177,9 @@ fun NotesScreen(
                         if (!journal) items(shown, key = { it.id }) { n ->
                             NoteRow(n, author = vm.session?.let { if (n.authorId == it.userId) null else it.nameOf(n.authorId) }, onOpen = { onOpen(n.id) })
                         }
+                        if (journal && shown.isNotEmpty()) item(key = "top") { androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant) }
                         if (journal) items(shown, key = { it.id }) { n ->
-                            NoteCard(
-                                n,
-                                author = vm.session?.let { if (n.authorId == it.userId) null else it.nameOf(n.authorId) },
-                                onOpen = { onOpen(n.id) },
-                                onToggleCheck = if (n.canEdit) ({ line: Int -> vm.toggleCheck(n, line) }) else null,
-                            )
+                            JournalEntryRow(n, author = vm.session?.let { if (n.authorId == it.userId) null else it.nameOf(n.authorId) }, onOpen = { onOpen(n.id) })
                         }
                         item { androidx.compose.foundation.layout.Spacer(Modifier.padding(32.dp)) }
                     }
@@ -191,38 +213,51 @@ private fun NoteRow(note: Note, author: String?, onOpen: () -> Unit) {
     }
 }
 
+/** Letters: a journal entry on a hairline, "MONDAY, NOV 23 · FEELING GOOD" over the first lines in the serif. */
 @Composable
-private fun NoteCard(note: Note, author: String?, onOpen: () -> Unit, onToggleCheck: ((Int) -> Unit)?) {
-    OutlinedCard(Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+private fun JournalEntryRow(note: Note, author: String?, onOpen: () -> Unit) {
+    val c = MaterialTheme.colorScheme
+    Column(Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
+        Column(Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (note.visibility == NoteVisibility.Private) Icon(Icons.Outlined.Lock, "Private", Modifier.padding(end = 4.dp).size(14.dp), tint = c.onSurfaceVariant)
                 Text(
-                    note.title.ifBlank { if (note.kind == NoteKind.Journal) "Journal entry" else "Untitled" },
-                    style = MaterialTheme.typography.titleMedium,
+                    listOfNotNull(
+                        journalDay(note.createdAt),
+                        note.mood?.let { m -> moods.firstOrNull { it.first == m }?.second?.let { "feeling ${it.lowercase()}" } },
+                        author,
+                    ).joinToString(" · ").uppercase(),
+                    style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.5.sp),
+                    color = c.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
                 )
-                if (note.visibility == NoteVisibility.Private) Icon(Icons.Outlined.Lock, "Private", Modifier.padding(start = 4.dp))
-                if (note.pinned) Icon(Icons.Outlined.PushPin, "Pinned", Modifier.padding(start = 4.dp))
             }
-            // A short rendered preview; checklists can be ticked right here.
-            MarkdownPreview(
-                markdown = note.bodyMd.lineSequence().take(8).joinToString("\n"),
-                onToggleCheck = onToggleCheck,
-                modifier = Modifier.heightIn(max = 220.dp).clipToBounds(),
+            if (note.title.isNotBlank() && note.title != "Untitled") Text(note.title, style = MaterialTheme.typography.titleMedium)
+            if (note.bodyMd.isNotBlank()) Text(
+                journalExcerpt(note.bodyMd),
+                style = MaterialTheme.typography.titleLarge.copy(fontSize = 23.sp, lineHeight = 31.sp),
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                listOfNotNull(
-                    author,
-                    if (note.kind == NoteKind.Journal) formatDateTime(note.createdAt) else formatDateTime(note.updatedAt),
-                    note.mood?.let { m -> moods.firstOrNull { it.first == m }?.second },
-                    note.commentCount.takeIf { note.kind == NoteKind.Journal && it > 0 }?.let { "$it comment${if (it == 1) "" else "s"}" },
-                    note.tags.takeIf { it.isNotEmpty() }?.joinToString(" ") { "#$it" },
-                ).joinToString(" · "),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            val extras = listOfNotNull(
+                note.tags.takeIf { it.isNotEmpty() }?.joinToString(" ") { "#$it" },
+                note.commentCount.takeIf { it > 0 }?.let { if (it == 1) "1 reply" else "$it replies" },
             )
+            if (extras.isNotEmpty()) Text(extras.joinToString(" · "), style = MaterialTheme.typography.labelMedium, color = c.primary)
         }
+        androidx.compose.material3.HorizontalDivider(color = c.outlineVariant)
     }
 }
+
+/** "Monday, Nov 23" in the reader's time zone. */
+private fun journalDay(iso: String): String =
+    java.time.OffsetDateTime.parse(iso).atZoneSameInstant(java.time.ZoneId.systemDefault())
+        .format(java.time.format.DateTimeFormatter.ofPattern("EEEE, MMM d"))
+
+/** The entry as plain sentences: markdown marks and checklist boxes dropped, lines joined. */
+private fun journalExcerpt(md: String): String = md.lineSequence()
+    .map { it.trim().replace(Regex("^(#+|[-*+]|\\d+\\.|- \\[[ xX]\\])\\s+"), "").replace(Regex("[*_`~]"), "") }
+    .filter { it.isNotBlank() }
+    .joinToString(" ")
+    .take(400)
