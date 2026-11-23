@@ -1,5 +1,13 @@
 package app.obey.ui.upcoming
 
+import app.obey.ui.plans.NewPlanRequest
+import java.time.YearMonth
+import androidx.compose.ui.semantics.heading
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.ChevronLeft
+import androidx.compose.material.icons.outlined.ViewWeek
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,19 +34,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.List
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -68,7 +70,6 @@ import app.obey.ui.today.OccurrenceActions
 import app.obey.ui.today.OccurrenceRow
 import app.obey.ui.today.RescheduleSheet
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.material.icons.outlined.EditCalendar
 import app.obey.api.CalendarEvent
 import app.obey.ui.common.parseInstant
 import app.obey.ui.plans.PlanChip
@@ -114,8 +115,16 @@ fun UpcomingScreen(
     val session = vm.session
     val today = LocalDate.now()
     val canManage = session?.canManage == true
-    // Week view opens today by default; any day can be opened or closed.
-    var openDays by remember { mutableStateOf(setOf(today)) }
+    // Week rows start closed, as in the mockup; tap a day to open it.
+    var openDays by remember { mutableStateOf(emptySet<LocalDate>()) }
+    // The + menu's "Plan" lands here and opens a new plan.
+    val planAsked by NewPlanRequest.pending.collectAsStateWithLifecycle()
+    LaunchedEffect(planAsked) {
+        if (planAsked) {
+            NewPlanRequest.pending.value = false
+            plan = null to today
+        }
+    }
 
     val occurrenceRow: @Composable (Occurrence) -> Unit = { o ->
         val mine = o.assigneeId == session?.userId
@@ -144,17 +153,12 @@ fun UpcomingScreen(
         topBar = {
             TopAppBar(
                 navigationIcon = { MenuButton() },
-                title = { Text("Week") },
+                title = {},
                 actions = {
-                    if (session?.readOnly != true) IconButton(onClick = {
-                        val day = if (view == CalendarView.Month && !selected.isBefore(today)) selected else today
-                        plan = null to day
-                    }) { Icon(Icons.Outlined.EditCalendar, "New plan") }
                     IconButton(onClick = onAllTasks) { Icon(Icons.AutoMirrored.Outlined.List, "All tasks") }
-                    if (canManage) {
-                        // Like a new calendar event: on the picked day in month view.
-                        val day = if (view == CalendarView.Month && !selected.isBefore(today)) selected else null
-                        IconButton(onClick = { onNewTask(day) }) { Icon(Icons.Outlined.Add, "New task") }
+                    IconButton(onClick = { vm.setView(if (view == CalendarView.Week) CalendarView.Month else CalendarView.Week) }) {
+                        if (view == CalendarView.Week) Icon(Icons.Outlined.CalendarMonth, "Show the month")
+                        else Icon(Icons.Outlined.ViewWeek, "Show the week")
                     }
                     SafeWordAction()
                 },
@@ -163,35 +167,47 @@ fun UpcomingScreen(
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                CalendarView.entries.forEachIndexed { i, v ->
-                    SegmentedButton(
-                        selected = view == v,
-                        onClick = { vm.setView(v) },
-                        shape = SegmentedButtonDefaults.itemShape(i, CalendarView.entries.size),
-                    ) { Text(if (v == CalendarView.Week) "Week" else "Month") }
-                }
+            val weekStart = session?.weekStart ?: DayOfWeek.SUNDAY
+            val thisWeek = today.with(TemporalAdjusters.previousOrSame(weekStart))
+            val shownWeek = anchor.with(TemporalAdjusters.previousOrSame(weekStart))
+            // "Nov 22–28", or "Nov 29–Dec 5" across a month.
+            val range = shownWeek.plusDays(6).let { end ->
+                shownWeek.format(DateTimeFormatter.ofPattern("MMM d")) + "–" +
+                    end.format(DateTimeFormatter.ofPattern(if (end.month == shownWeek.month) "d" else "MMM d"))
             }
+            val title = when {
+                view == CalendarView.Month -> anchor.format(DateTimeFormatter.ofPattern("MMMM"))
+                shownWeek == thisWeek -> "This week"
+                shownWeek == thisWeek.plusWeeks(1) -> "Next week"
+                shownWeek == thisWeek.minusWeeks(1) -> "Last week"
+                else -> range
+            }
+            val away = if (view == CalendarView.Month) YearMonth.from(anchor) != YearMonth.from(today) else shownWeek != thisWeek
             Row(
-                Modifier.padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 16.dp),
+                verticalAlignment = Alignment.Bottom,
             ) {
-                val unit = if (view == CalendarView.Week) "week" else "month"
-                IconButton(onClick = { vm.step(-1) }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Previous $unit") }
                 Text(
-                    when (view) {
-                        CalendarView.Month -> anchor.format(DateTimeFormatter.ofPattern("MMMM yyyy"))
-                        CalendarView.Week -> anchor.with(TemporalAdjusters.previousOrSame(session?.weekStart ?: DayOfWeek.SUNDAY)).let {
-                            "${it.format(DateTimeFormatter.ofPattern("d MMM"))} – ${it.plusDays(6).format(DateTimeFormatter.ofPattern("d MMM"))}"
-                        }
-                    },
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
+                    title,
+                    style = MaterialTheme.typography.displayMedium.copy(fontSize = 46.sp, lineHeight = 50.sp),
+                    modifier = Modifier.weight(1f).semantics { heading() },
                 )
-                TextButton(onClick = vm::goToday) { Text("Today") }
-                IconButton(onClick = { vm.step(1) }) { Icon(Icons.AutoMirrored.Outlined.ArrowForward, "Next $unit") }
+                if (view == CalendarView.Week && title != range) Text(
+                    range,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 12.dp, end = 4.dp),
+                )
+                val unit = if (view == CalendarView.Week) "week" else "month"
+                IconButton(onClick = { vm.step(-1) }) { Icon(Icons.Outlined.ChevronLeft, "Previous $unit") }
+                IconButton(onClick = { vm.step(1) }) { Icon(Icons.Outlined.ChevronRight, "Next $unit") }
             }
-            PlanLegend(session?.relationship, session?.userId, Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp))
+            if (away) TextButton(onClick = vm::goToday, modifier = Modifier.padding(start = 4.dp)) {
+                Text(if (view == CalendarView.Month) "Back to this month" else "Back to this week")
+            }
+            if ((state as? Load.Ready)?.value?.events?.isNotEmpty() == true) {
+                PlanLegend(session?.relationship, session?.userId, Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp))
+            }
             when (val s = state) {
                 Load.Loading -> LoadingBox()
                 is Load.Failed -> ErrorBox(s.message, vm::refresh)
