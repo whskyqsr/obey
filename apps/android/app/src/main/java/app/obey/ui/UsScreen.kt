@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.FrontHand
 import androidx.compose.material.icons.outlined.PersonAdd
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -31,7 +32,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.res.painterResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
@@ -64,7 +64,7 @@ fun UsScreen(items: List<UsItem>, switcher: SwitcherActions, onDynamic: () -> Un
         topBar = {
             TopAppBar(
                 title = {},
-                actions = { IconButton(onClick = onSettings) { Icon(painterResource(app.obey.R.drawable.ic_gear_six), "Settings", Modifier.size(24.dp)) } },
+                actions = { IconButton(onClick = onSettings) { Icon(Icons.Outlined.Settings, "Settings") } },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
