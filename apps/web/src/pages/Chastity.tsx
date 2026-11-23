@@ -10,7 +10,7 @@ import { useReadOnly, useRel } from "../lib/relationship";
 function EventLog({ events, wearerName }: { events: ChastityEvent[]; wearerName: string }) {
   if (!events.length) return null;
   return (
-    <div className="overflow-hidden rounded-lg bg-surface-container-low">
+    <div className="border border-outline-variant overflow-hidden rounded-lg">
       {events.map((e, i) => {
         const t = eventText(e, wearerName);
         return (
@@ -82,7 +82,7 @@ export function ChastityPage() {
         ))}
         {!!view.data?.past.length && (
           <Section title="Past locks">
-            <div className="overflow-hidden rounded-lg bg-surface-container-low">
+            <div className="border border-outline-variant overflow-hidden rounded-lg">
               {view.data.past.map((l, i) => (
                 <div key={l.id} className={cx(i > 0 && "border-t border-outline-variant")}>
                   <PastLock l={l} />

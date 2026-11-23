@@ -350,7 +350,7 @@ function TimeChoices({
 
 function Summary({ icon, title, body }: { icon: string; title: string; body: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg bg-surface-container px-4 py-3">
+    <div className="border border-outline-variant flex items-center gap-3 rounded-lg px-4 py-3">
       <Icon name={icon} filled className="text-primary" />
       <div>
         <div className="text-title-medium text-on-surface">{title}</div>

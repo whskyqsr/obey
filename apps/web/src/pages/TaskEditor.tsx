@@ -392,7 +392,7 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
                   />
                 )}
                 {atMost ? (
-                  <p className="mt-2 rounded-sm bg-surface-container-high px-3 py-2 text-body-medium text-on-surface-variant">
+                  <p className="mt-2 border-l-2 border-outline-variant px-3 py-1 text-body-medium text-on-surface-variant">
                     "At most" counts are sent at the deadline, since there's no moment they're met, so they only take approval. Counted tasks can't be rituals.
                   </p>
                 ) : (
@@ -921,7 +921,7 @@ function StepsFold({ steps, onChange, readOnly }: { steps: TaskStep[]; onChange(
 function Fold({ icon, title, sub, error, open: initiallyOpen, children }: { icon: string; title: string; sub: string; error?: boolean; open?: boolean; children: ReactNode }) {
   const [open, setOpen] = useState(!!initiallyOpen);
   return (
-    <section className="rounded-lg bg-surface-container-low" style={{ ["--field-bg" as string]: "var(--md-surface-container-low)" }}>
+    <section className="border border-outline-variant rounded-lg" style={{ ["--field-bg" as string]: "var(--md-surface-container-low)" }}>
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="state-layer flex w-full items-center gap-4 rounded-lg px-4 py-3 text-left">
         <Icon name={icon} className="text-on-surface-variant" />
         <span className="min-w-0 flex-1">

@@ -115,7 +115,7 @@ export function ScenesPage() {
 function SceneCard({ s }: { s: Scene }) {
   const { rel, me, memberName } = useRel();
   return (
-    <Link to="/scenes/$sceneId" params={{ sceneId: s.id }} className="state-layer flex flex-col gap-2 rounded-lg bg-surface-container-low p-4 text-on-surface">
+    <Link to="/scenes/$sceneId" params={{ sceneId: s.id }} className="border border-outline-variant state-layer flex flex-col gap-2 rounded-lg p-4 text-on-surface">
       <div className="flex items-center justify-between gap-2">
         <span className="text-body-medium text-on-surface-variant">{when(s)}</span>
         <SafewordBadge safeword={s.safeword} />
@@ -329,7 +329,7 @@ export function ScenePage({ sceneId }: { sceneId: string }) {
           </div>
         </div>
         {(s.safeword !== "none" || s.aftercare.length > 0 || s.what) && (
-          <div className="flex flex-col gap-2 rounded-lg bg-surface-container-low p-4 text-on-surface">
+          <div className="border border-outline-variant flex flex-col gap-2 rounded-lg p-4 text-on-surface">
             <div className="flex flex-wrap gap-2">
               <SafewordBadge safeword={s.safeword} />
               {s.aftercare.map((a) => (
@@ -347,7 +347,7 @@ export function ScenePage({ sceneId }: { sceneId: string }) {
             <SideView key={x.userId} side={x} />
           ))}
         {!mine && othersShared.length > 0 && (
-          <div className="flex items-center gap-3 rounded-lg bg-surface-container px-4 py-3 text-body-medium text-on-surface-variant">
+          <div className="border border-outline-variant flex items-center gap-3 rounded-lg px-4 py-3 text-body-medium text-on-surface-variant">
             <Icon name="lock" />
             {othersShared.map((m) => m.displayName).join(" and ")} {othersShared.length === 1 ? "has" : "have"} written their side. You'll see it once you share yours.
           </div>
@@ -378,7 +378,7 @@ function YourSide({ s }: { s: Scene }) {
     .map((p) => p.displayName)
     .join(" and ");
   return (
-    <section className="flex flex-col gap-3 rounded-lg bg-surface-container-low p-4" aria-label="Your side">
+    <section className="border border-outline-variant flex flex-col gap-3 rounded-lg p-4" aria-label="Your side">
       <div>
         <h2 className="text-title-large text-on-surface">Your side</h2>
         <p className="text-body-medium text-on-surface-variant">How do you feel about it now?</p>
@@ -410,7 +410,7 @@ function SideView({ side }: { side: SceneSide }) {
     ["Still needs", side.need],
   ];
   return (
-    <section className="flex flex-col gap-2 rounded-lg bg-surface-container-low p-4 text-on-surface">
+    <section className="border border-outline-variant flex flex-col gap-2 rounded-lg p-4 text-on-surface">
       <div className="flex items-center gap-2">
         <Person userId={side.userId} size={28} />
         <span className="text-title-medium">{side.userId === me.user.id ? "You" : memberName(side.userId)}</span>
@@ -436,7 +436,7 @@ function NextDay({ s }: { s: Scene }) {
   const readOnly = useReadOnly();
   const mine = s.checks.find((c) => c.userId === me.user.id);
   return (
-    <section className="flex flex-col gap-2 rounded-lg bg-surface-container-low p-4 text-on-surface">
+    <section className="border border-outline-variant flex flex-col gap-2 rounded-lg p-4 text-on-surface">
       <div className="flex items-center gap-2">
         <Icon name="wb_sunny" className="text-tertiary" />
         <span className="text-title-medium">Next day</span>
@@ -525,7 +525,7 @@ export function AftercarePage() {
         {list.map((p) => {
           const isMe = p.userId === me.user.id;
           return (
-            <section key={p.userId} className="flex flex-col gap-2 rounded-lg bg-surface-container-low p-4 text-on-surface">
+            <section key={p.userId} className="border border-outline-variant flex flex-col gap-2 rounded-lg p-4 text-on-surface">
               <div className="flex items-center gap-2">
                 <Person userId={p.userId} size={28} />
                 <span className="text-title-medium">{isMe ? `${me.user.displayName} (you)` : memberName(p.userId)}</span>

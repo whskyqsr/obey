@@ -121,11 +121,11 @@ export function useDynamicTitle() {
 }
 
 const Label = ({ children, id }: { children: ReactNode; id?: string }) => (
-  <h2 id={id} className="scroll-mt-4 px-1 pt-6 pb-2 text-title-small text-primary">
+  <h2 id={id} className="scroll-mt-4 px-1 pt-6 pb-2 eyebrow">
     {children}
   </h2>
 );
-const Group = ({ children }: { children: ReactNode }) => <div className="overflow-hidden rounded-lg bg-surface-container-low">{children}</div>;
+const Group = ({ children }: { children: ReactNode }) => <div className="border border-outline-variant overflow-hidden rounded-lg">{children}</div>;
 
 function Row({
   leading,
@@ -207,7 +207,7 @@ export function DynamicPage() {
         />
 
         {ended && (
-          <div className="mb-2 flex items-start gap-3 rounded-lg bg-surface-container-high px-4 py-3 text-body-medium text-on-surface-variant">
+          <div className="mb-2 flex items-start gap-3 border-l-2 border-outline-variant px-4 py-1 text-body-medium text-on-surface-variant">
             <Icon name="inventory_2" className="shrink-0" />
             {endedLine(rel, me.user.id, memberName)}
           </div>
@@ -236,7 +236,7 @@ export function DynamicPage() {
           {!ended && (
             <Row
               leading={
-                <span className="flex size-10 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
+                <span className="flex size-10 items-center justify-center text-on-surface-variant">
                   <Icon name="person_add" />
                 </span>
               }

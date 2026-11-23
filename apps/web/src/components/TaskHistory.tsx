@@ -37,7 +37,7 @@ export function TaskHistory({ taskId }: { taskId: string }) {
       {history.error && <ErrorBox error={history.error} onRetry={() => history.refetch()} />}
       {history.data && entries.length === 0 && <p className="text-body-medium text-on-surface-variant">Nothing yet. Finished and missed occurrences show up here.</p>}
       {entries.length > 0 && (
-        <ul className="overflow-hidden rounded-lg bg-surface-container-low">
+        <ul className="border border-outline-variant overflow-hidden rounded-lg">
           {entries.map((h) => {
             const s = LABEL[h.status];
             return (

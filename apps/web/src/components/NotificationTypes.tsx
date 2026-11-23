@@ -28,7 +28,7 @@ export function NotificationTypes() {
     updateMe.mutate({ mutedNotifications: [...next] }, { onError: (e) => snack(errorMessage(e)) });
   };
   return (
-    <div className="mt-3 rounded-lg bg-surface-container-low px-4 py-2">
+    <div className="border border-outline-variant mt-3 rounded-lg px-4 py-2">
       {NOTIFY_TYPES.filter((t) => !t.feature || features[t.feature]).map((t) => (
         <Switch key={t.key} checked={!muted.has(t.key)} onChange={(on) => set(t.key, on)} label={t.label} help={t.help} />
       ))}

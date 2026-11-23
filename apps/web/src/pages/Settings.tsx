@@ -49,7 +49,7 @@ export function SettingsPage() {
 
       {/* The relationship has its own page; Settings is about you. */}
       <div className="max-w-2xl px-4 pb-6 md:px-6">
-        <Link to="/dynamic" className="state-layer flex items-center gap-4 rounded-xl bg-primary-container p-4 text-on-primary-container">
+        <Link to="/dynamic" className="state-layer flex items-center gap-4 rounded-md border border-outline-variant p-4 text-on-surface">
           <span className="flex">
             {rel.members.slice(0, 3).map((m, i) => (
               <Avatar
@@ -71,7 +71,7 @@ export function SettingsPage() {
         </Link>
         {/* Feature switches live on Your dynamic, but Settings is where people look for them first. */}
         {isDom && !rel.endedAt && (
-          <Link to="/dynamic" hash="features" className="state-layer mt-2 flex min-h-14 items-center gap-4 rounded-lg bg-surface-container-low px-4 py-3">
+          <Link to="/dynamic" hash="features" className="border border-outline-variant state-layer mt-2 flex min-h-14 items-center gap-4 rounded-lg px-4 py-3">
             <Icon name="toggle_on" className="text-on-surface-variant" />
             <span className="min-w-0 flex-1">
               <span className="block text-body-large text-on-surface">Features</span>
@@ -83,7 +83,7 @@ export function SettingsPage() {
       </div>
 
       <Section title="Profile">
-        <div className="flex flex-col gap-4 rounded-lg bg-surface-container-low p-4" style={{ ["--field-bg" as string]: "var(--md-surface-container-low)" }}>
+        <div className="border border-outline-variant flex flex-col gap-4 rounded-lg p-4" style={{ ["--field-bg" as string]: "var(--md-surface-container-low)" }}>
           <div className="flex flex-wrap items-center gap-4">
             <Avatar userId={me.user.id} name={me.user.displayName} version={me.user.avatarVersion} size={72} />
             <div className="flex flex-wrap gap-2">
@@ -129,7 +129,7 @@ export function SettingsPage() {
       </Section>
 
       <Section title="Appearance">
-        <div className="flex flex-col gap-5 rounded-lg bg-surface-container-low p-4" style={{ ["--field-bg" as string]: "var(--md-surface-container-low)" }}>
+        <div className="border border-outline-variant flex flex-col gap-5 rounded-lg p-4" style={{ ["--field-bg" as string]: "var(--md-surface-container-low)" }}>
           <div>
             <div className="mb-2 text-label-large text-on-surface-variant">Theme</div>
             <SegmentedButtons<ThemeMode>
@@ -179,7 +179,7 @@ export function SettingsPage() {
       <Section title="Privacy">
         {session && <AppLockSetting uid={session.uid} />}
         <div className="h-3" />
-        <div className="rounded-lg bg-surface-container-low px-4 py-2">
+        <div className="border border-outline-variant rounded-lg px-4 py-2">
           <Switch
             checked={me.user.revealProofs}
             onChange={(on) => (on ? setConfirmReveal(true) : updateMe.mutate({ revealProofs: false }, { onError: (e) => snack(errorMessage(e)) }))}
@@ -208,7 +208,7 @@ export function SettingsPage() {
       </Section>
 
       <Section title="Notifications">
-        <div className="flex flex-wrap items-center gap-3 rounded-lg bg-surface-container-low p-4">
+        <div className="border border-outline-variant flex flex-wrap items-center gap-3 rounded-lg p-4">
           <Icon name={push === "granted" ? "notifications_active" : "notifications_off"} className="text-on-surface-variant" />
           <div className="min-w-0 flex-1 text-body-medium text-on-surface-variant">
             {push === "unavailable" && "Web push isn't configured for this build (needs Firebase and a VAPID key) or this browser doesn't support it."}
@@ -241,7 +241,7 @@ export function SettingsPage() {
 
       {me.admin && (
         <Section title="Fealty team">
-          <Link to="/admin/reports" className="state-layer flex items-center gap-3 rounded-lg bg-surface-container-low p-4">
+          <Link to="/admin/reports" className="border border-outline-variant state-layer flex items-center gap-3 rounded-lg p-4">
             <Icon name="flag" className="text-on-surface-variant" />
             <span className="flex-1 text-body-large text-on-surface">Reports to review</span>
             <Icon name="chevron_right" className="text-on-surface-variant" />
@@ -250,7 +250,7 @@ export function SettingsPage() {
       )}
 
       <Section title="Account">
-        <div className="flex flex-wrap items-center gap-3 rounded-lg bg-surface-container-low p-4">
+        <div className="border border-outline-variant flex flex-wrap items-center gap-3 rounded-lg p-4">
           <div className="min-w-0 flex-1">
             <div className="text-body-large text-on-surface">
               {session?.kind === "dev" ? "Dev sign-in" : session?.kind === "firebase" && session.provider === "password" ? "Signed in with email" : "Signed in with Google"}

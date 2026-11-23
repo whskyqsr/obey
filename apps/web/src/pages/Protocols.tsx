@@ -51,7 +51,7 @@ export function ProtocolsPage() {
             const rule = ruleLabel(p.ruleId);
             const isOpen = expanded.has(p.id);
             return (
-              <div className="flex items-start gap-1 rounded-md bg-surface-container-low py-2 pr-2 pl-1">
+              <div className="border border-outline-variant flex items-start gap-1 rounded-md py-2 pr-2 pl-1">
                 {handle ?? <span className="w-3" />}
                 {/* The whole card opens the protocol; only the chevron stays on the list. */}
                 <div className="relative min-w-0 flex-1 p-2">

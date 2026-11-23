@@ -91,7 +91,7 @@ export function LimitsPage() {
       {data && mine && (
         <div className="flex flex-col gap-4 px-4 pb-10 md:px-6">
           {!mine.finishedAt && (
-            <div className="flex flex-col gap-2 rounded-xl bg-secondary-container p-4 text-on-secondary-container">
+            <div className="border border-outline-variant flex flex-col gap-2 rounded-xl p-4 text-on-surface">
               <div className="text-title-medium">{mine.rated ? `You've rated ${mine.rated} of ${data.items.length}` : "Fill in your limits"}</div>
               <p className="text-body-medium">
                 Rate each item for yourself, as the {ROLE_LABEL[self.role]}: love it, like it, curious, a soft limit or a hard limit. Skip anything you'd rather not say.
@@ -182,7 +182,7 @@ function Person({ list, member, person, onChart }: { list: LimitList; member: Me
   const notes = list.items.filter((i) => answers[i.key]?.note);
   return (
     <>
-      <div className="flex flex-col gap-4 rounded-xl bg-surface-container-low p-4">
+      <div className="border border-outline-variant flex flex-col gap-4 rounded-xl p-4">
         <div className="flex items-center gap-3">
           <Avatar userId={member.userId} name={member.displayName} version={member.avatarVersion} size={48} />
           <div>
@@ -199,7 +199,7 @@ function Person({ list, member, person, onChart }: { list: LimitList; member: Me
         <Pills icon="do_not_disturb_on" color={ratingOf("soft").color} title="Soft limits, go slow" items={pick("soft")} />
         <Pills icon="favorite" color={ratingOf("love").color} title="Loves" items={pick("love")} />
       </div>
-      <div className="flex flex-col gap-3 rounded-xl bg-surface-container-low p-4">
+      <div className="border border-outline-variant flex flex-col gap-3 rounded-xl p-4">
         <div className="flex items-center">
           <div className="flex-1 text-title-medium text-on-surface">Everything</div>
           <Button variant="text" onClick={onChart}>
@@ -328,7 +328,7 @@ function Chart({ list, people, onClose }: { list: LimitList; people: Member[]; o
           const shown = items.filter((i) => people.some((m) => answersOf(m)[i.key]?.rating));
           if (!shown.length) return null;
           return (
-            <div key={category} className="mb-4 break-inside-avoid rounded-xl bg-surface-container-low p-4">
+            <div key={category} className="border border-outline-variant mb-4 break-inside-avoid rounded-xl p-4">
               <div className="mb-2 flex items-center gap-2">
                 <div className="flex-1 text-title-medium text-on-surface">{category}</div>
                 {people.map((m) => (
@@ -351,7 +351,7 @@ function Chart({ list, people, onClose }: { list: LimitList; people: Member[]; o
           );
         })}
         {notes.length > 0 && (
-          <div className="mb-4 break-inside-avoid rounded-xl bg-surface-container p-4">
+          <div className="border border-outline-variant mb-4 break-inside-avoid rounded-xl p-4">
             <Notes list={[]} rows={notes} />
           </div>
         )}
@@ -422,7 +422,7 @@ export function LimitsEditPage() {
       </header>
 
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 pt-4 pb-6 md:px-6">
-        <div className="flex flex-col gap-2 rounded-xl bg-surface-container-low p-4">
+        <div className="border border-outline-variant flex flex-col gap-2 rounded-xl p-4">
           <Legend />
           <p className="text-body-medium text-on-surface-variant">
             Tap one for each, and tap it again to clear it. Skip anything you'd rather not say.

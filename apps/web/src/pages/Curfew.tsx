@@ -90,7 +90,7 @@ export function CurfewPage() {
         {header}
         <div className="flex flex-col gap-4 px-4 md:px-6">
           {saved?.enabled ? (
-            <div className="flex flex-col gap-1 rounded-lg bg-surface-container-low p-4">
+            <div className="border border-outline-variant flex flex-col gap-1 rounded-lg p-4">
               <div className="text-body-large text-on-surface">{describeCurfew(saved)}</div>
               <div className="text-body-medium text-on-surface-variant">
                 At {places.data?.find((p) => p.id === saved.placeId)?.name ?? "Home"}. Leaving before then breaks curfew. Late or left early, it counts like a missed task.
@@ -127,7 +127,7 @@ export function CurfewPage() {
     <div className="flex flex-col pb-10">
       {header}
       <div className="flex flex-col gap-4 px-4 md:px-6">
-        <div className="rounded-lg bg-surface-container-low px-4 py-2">
+        <div className="border border-outline-variant rounded-lg px-4 py-2">
           <Switch
             checked={form.enabled}
             onChange={(on) => {
@@ -142,7 +142,7 @@ export function CurfewPage() {
 
         {form.enabled && (
           <>
-            <div className="flex flex-col gap-4 rounded-lg bg-surface-container-low p-4">
+            <div className="border border-outline-variant flex flex-col gap-4 rounded-lg p-4">
               {subs.length > 1 && (
                 <Select label="Who" value={form.assigneeId} onChange={(e) => set({ assigneeId: e.target.value })}>
                   {subs.map((m) => (
@@ -201,7 +201,7 @@ export function CurfewPage() {
             </div>
 
             {who !== "You" && (
-              <div className="rounded-lg bg-surface-container-low px-4 py-2">
+              <div className="border border-outline-variant rounded-lg px-4 py-2">
                 <Switch
                   checked={form.reportHome}
                   onChange={(reportHome) => set({ reportHome })}
@@ -212,7 +212,7 @@ export function CurfewPage() {
             )}
 
             {(features.points || features.consequences) && (
-              <div className="flex flex-col gap-4 rounded-lg bg-surface-container-low p-4">
+              <div className="border border-outline-variant flex flex-col gap-4 rounded-lg p-4">
                 <div className="text-title-medium text-on-surface">If it's broken</div>
                 {features.points && (
                   <div className="flex gap-4">

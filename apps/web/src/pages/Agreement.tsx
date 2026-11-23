@@ -57,7 +57,7 @@ export function AgreementPage() {
           </>
         ) : (
           !proposal && (
-            <div className="flex flex-col items-start gap-3 rounded-xl bg-surface-container-low p-5">
+            <div className="border border-outline-variant flex flex-col items-start gap-3 rounded-xl p-5">
               <Icon name="handshake" size={32} className="text-primary" />
               <h2 className="text-headline-small">Write down what you've agreed</h2>
               <p className="text-body-medium text-on-surface-variant">
@@ -88,7 +88,7 @@ function DriftBanner({ drift, onPropose }: { drift: AgreementDrift[]; onPropose?
   const added = line("added"),
     removed = line("removed");
   return (
-    <div className="flex flex-col gap-1 rounded-xl bg-secondary-container px-4 py-3 text-on-secondary-container">
+    <div className="border border-outline-variant flex flex-col gap-1 rounded-xl px-4 py-3 text-on-surface">
       <div className="flex items-center gap-2 text-title-medium">
         <Icon name="published_with_changes" />
         {what} changed since you {rel.members.length > 2 ? "all" : "both"} signed
@@ -235,7 +235,7 @@ function SectionView({ s, marked }: { s: AgreementSection; marked: boolean }) {
 function Body({ v, marked = false, only }: { v: AgreementVersion; marked?: boolean; only?: Set<string> }) {
   const sections = only ? v.sections.filter((s) => only.has(s.id)) : v.sections;
   return (
-    <div className="flex flex-col gap-5 rounded-xl bg-surface-container-low p-4 text-body-large md:p-5">
+    <div className="border border-outline-variant flex flex-col gap-5 rounded-xl p-4 text-body-large md:p-5">
       {sections.map((s) => (
         <SectionView key={s.id} s={s} marked={marked} />
       ))}
@@ -267,7 +267,7 @@ function Signatures({ v }: { v: AgreementVersion }) {
       {rel.members.map((m) => {
         const a = v.agreements.find((x) => x.userId === m.userId);
         return (
-          <div key={m.userId} className="flex flex-col gap-0.5 rounded-lg bg-surface-container px-3 py-3">
+          <div key={m.userId} className="border border-outline-variant flex flex-col gap-0.5 rounded-lg px-3 py-3">
             <span className="text-body-small text-on-surface-variant">Agreed by</span>
             {a ? (
               <span className="font-serif text-title-large italic">{m.displayName}</span>
@@ -319,7 +319,7 @@ function Review({ v, current, onBack, onEdit }: { v: AgreementVersion; current: 
           </div>
         )}
         {v.feedback && (
-          <div className="rounded-xl bg-surface-container-high px-4 py-3 text-body-medium">
+          <div className="border-l-2 border-outline-variant px-4 py-1 text-body-medium">
             {memberName(v.feedback.userId)} asked for changes: <span className="italic">“{v.feedback.note}”</span>
           </div>
         )}
@@ -471,7 +471,7 @@ function Versions({ onBack, onOpen }: { onBack(): void; onOpen(id: string): void
         subtitle="Agreement"
       />
       <div className="flex flex-col gap-3 px-4 pb-8 md:px-6">
-        <div className="flex flex-col overflow-hidden rounded-xl bg-surface-container-low">
+        <div className="border border-outline-variant flex flex-col overflow-hidden rounded-xl">
           {q.data?.versions.map((v, i) => (
             <button
               key={v.id}

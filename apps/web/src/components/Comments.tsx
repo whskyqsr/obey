@@ -37,7 +37,7 @@ export function CommentThread<C extends AnyComment>({
         return (
           <div key={c.id} className="group flex items-start gap-2">
             <Avatar userId={c.authorId} name={author?.displayName ?? "?"} version={author?.avatarVersion ?? null} size={28} />
-            <div className="min-w-0 flex-1 rounded-md bg-surface-container px-3 py-2">
+            <div className="border border-outline-variant min-w-0 flex-1 rounded-md px-3 py-2">
               <div className="text-label-medium text-on-surface-variant">
                 {c.authorId === me.user.id ? "You" : memberName(c.authorId)} · {Date.now() - Date.parse(c.createdAt) < 60_000 ? "just now" : fmtRelative(c.createdAt)}
               </div>

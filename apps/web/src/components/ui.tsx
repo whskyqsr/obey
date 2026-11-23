@@ -242,11 +242,12 @@ export function Badge({ children, tone = "primary" }: { children: ReactNode; ton
   return (
     <span
       className={cx(
-        "inline-flex h-5 items-center rounded-full px-2 text-label-small",
-        tone === "primary" && "bg-primary-container text-on-primary-container",
-        tone === "error" && "bg-error-container text-on-error-container",
-        tone === "tertiary" && "bg-tertiary-container text-on-tertiary-container",
-        tone === "neutral" && "bg-surface-container-highest text-on-surface-variant",
+        // Letters: a hairline pill, not a filled chip; the tone only colours the text and the line.
+        "inline-flex h-5 items-center rounded-full border px-2 text-label-small tabular-nums",
+        tone === "primary" && "border-outline-variant text-on-surface-variant",
+        tone === "error" && "border-error/50 text-error",
+        tone === "tertiary" && "border-outline-variant text-on-surface-variant",
+        tone === "neutral" && "border-outline-variant text-outline",
       )}
     >
       {children}
