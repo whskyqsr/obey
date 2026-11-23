@@ -400,7 +400,7 @@ private fun SafeCallFrame(vm: SafeCallViewModel, call: SafeCall?, content: @Comp
 /** The round ink + that starts anything new. */
 @Composable
 private fun NewButton(onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = CircleShape, color = MaterialTheme.colorScheme.onSurface, contentColor = MaterialTheme.colorScheme.surface, modifier = Modifier.size(48.dp)) {
+    Surface(onClick = onClick, shape = CircleShape, color = MaterialTheme.colorScheme.onSurface, contentColor = MaterialTheme.colorScheme.surface, modifier = Modifier.size(52.dp)) {
         Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Add, "New", Modifier.size(28.dp)) }
     }
 }
@@ -410,12 +410,13 @@ private fun NewButton(onClick: () -> Unit) {
 private fun TabBar(tabs: List<TopLevel>, selected: (TopLevel) -> Boolean, onClick: (TopLevel) -> Unit, onNew: (() -> Unit)?) {
     Column(Modifier.background(MaterialTheme.colorScheme.surface).windowInsetsPadding(WindowInsets.navigationBars)) {
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Row(Modifier.fillMaxWidth().height(68.dp).padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-            Row(Modifier.weight(1f).selectableGroup(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Row(Modifier.fillMaxWidth().height(68.dp).padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Grouped on the left, the way the mockup has them, with + on its own at the right.
+            Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(22.dp)) {
                 tabs.forEach { t ->
                     val on = selected(t)
                     Box(
-                        Modifier.width(76.dp).height(56.dp).clip(MaterialTheme.shapes.small).selectable(selected = on, role = Role.Tab, onClick = { onClick(t) }),
+                        Modifier.height(56.dp).clip(MaterialTheme.shapes.small).selectable(selected = on, role = Role.Tab, onClick = { onClick(t) }).padding(horizontal = 4.dp),
                         contentAlignment = Alignment.Center,
                     ) {
                         if (on) Box(Modifier.align(Alignment.TopCenter).padding(top = 4.dp).size(6.dp).rotate(45f).background(MaterialTheme.colorScheme.primary))
@@ -428,8 +429,8 @@ private fun TabBar(tabs: List<TopLevel>, selected: (TopLevel) -> Boolean, onClic
                     }
                 }
             }
+            Spacer(Modifier.weight(1f))
             if (onNew != null) {
-                Spacer(Modifier.width(16.dp))
                 NewButton(onNew)
             }
         }
