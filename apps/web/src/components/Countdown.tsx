@@ -10,7 +10,7 @@ import { RescheduleSheet } from "./RescheduleSheet";
 import { isCounted } from "./Count";
 import { isPlaced } from "./Location";
 import { useQuickComplete } from "./TaskRow";
-import { Button, Icon, cx } from "./ui";
+import { Icon, IconButton, cx } from "./ui";
 
 const HOUR = 60 * 60_000;
 const URGENT = 15 * 60_000;
@@ -64,32 +64,34 @@ export function CountdownCard() {
   return (
     <section
       aria-label={`Countdown: ${o.title}`}
-      className={cx("mx-4 mb-4 flex flex-col gap-3 rounded-xl p-4 md:mx-6", urgent ? "bg-error-container text-on-error-container" : "bg-tertiary-container text-on-tertiary-container")}
+      className={cx(
+        "relative mx-4 mb-4 flex items-center gap-3 overflow-hidden rounded-xl py-2.5 pr-2 pl-4 md:mx-6",
+        urgent ? "bg-error-container text-on-error-container" : "bg-tertiary-container text-on-tertiary-container",
+      )}
     >
-      <div className="flex items-start gap-3">
-        <Icon name="timer" filled className="mt-0.5" />
-        <Link to="/tasks/$taskId" params={{ taskId: o.seriesId }} className="min-w-0 flex-1 hover:underline">
-          <div className="truncate text-title-medium">{o.title}</div>
-          <div className="text-body-medium">{[who, `due ${fmtTime(o.dueAt)}`].filter(Boolean).join(" · ")}</div>
-        </Link>
-        <div className="text-display-small tabular-nums" role="timer" aria-live="off">
-          {mmss(left)}
-        </div>
+      <Icon name="timer" filled className="shrink-0" />
+      <Link to="/tasks/$taskId" params={{ taskId: o.seriesId }} className="min-w-0 flex-1 hover:underline">
+        <div className="truncate text-title-small">{o.title}</div>
+        <div className="truncate text-body-small">{[who, `due ${fmtTime(o.dueAt)}`].filter(Boolean).join(" · ")}</div>
+      </Link>
+      <div className="text-title-large tabular-nums" role="timer" aria-live="off">
+        {mmss(left)}
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-current/15" aria-hidden>
-        <div className={cx("h-full rounded-full transition-[width] duration-1000 ease-linear", urgent ? "bg-error" : "bg-tertiary")} style={{ width: `${(left / HOUR) * 100}%` }} />
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {mine && isOpen(o, now) && (
-          <Button icon={isRitual(o) ? "play_arrow" : "check"} variant={urgent ? "danger" : "filled"} onClick={done}>
-            {isRitual(o) ? "Start" : "Done"}
-          </Button>
-        )}
-        {(mine || isDom) && (
-          <Button variant="text" icon="more_time" onClick={() => setRescheduling(true)} className="text-current!">
-            {mine ? "More time" : "Reschedule"}
-          </Button>
-        )}
+      {(mine || isDom) && (
+        <IconButton icon="more_time" label={mine ? "More time" : "Reschedule"} onClick={() => setRescheduling(true)} className="text-current!" />
+      )}
+      {mine && isOpen(o, now) && (
+        <IconButton
+          icon={isRitual(o) ? "play_arrow" : "check"}
+          label={isRitual(o) ? "Start" : "Done"}
+          variant="filled"
+          onClick={done}
+          className={urgent ? "bg-error! text-on-error!" : undefined}
+        />
+      )}
+      {/* Time left, as a thin bar along the bottom edge. */}
+      <div className="absolute inset-x-0 bottom-0 h-1 bg-current/15" aria-hidden>
+        <div className={cx("h-full transition-[width] duration-1000 ease-linear", urgent ? "bg-error" : "bg-tertiary")} style={{ width: `${(left / HOUR) * 100}%` }} />
       </div>
       <RescheduleSheet occurrence={o} open={rescheduling} onClose={() => setRescheduling(false)} />
       {completing && <CompleteDialog o={o} open onClose={() => setCompleting(false)} />}
