@@ -324,7 +324,7 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
     val newItems = buildList {
         if (session.readOnly) return@buildList
         if (manage) add(NewItem("Task", "Something to do, once or on a schedule", Icons.Outlined.AddTask) { nav.navigate(TaskEditorRoute()) })
-        add(NewItem("Plan", "Something on the calendar", Icons.Outlined.Event) { go(UpcomingRoute) })
+        add(NewItem("Plan", "Something on the calendar", Icons.Outlined.Event) { app.obey.ui.plans.NewPlanRequest.pending.value = true; go(UpcomingRoute) })
         if (features.journal) add(NewItem("Journal entry", "Write tonight's entry", Icons.Outlined.AutoStories) { nav.navigate(NoteEditorRoute(journal = true)) })
         add(NewItem("Note", "Shared or just for you", Icons.Outlined.StickyNote2) { nav.navigate(NoteEditorRoute()) })
         if (features.rules || features.protocols) add(

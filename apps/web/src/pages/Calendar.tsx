@@ -66,10 +66,18 @@ export function CalendarPage() {
 
   const step = (dir: 1 | -1) => setAnchor((a) => (view === "week" ? addDays(a, 7 * dir) : addMonths(a, dir)));
   const sameMonth = from.slice(0, 7) === to.slice(0, 7);
-  // "Oct 18 – 24", or "Oct 25 – Nov 1" across a month; the year only on wide screens, where it fits.
-  const weekTitle = `${fmtDate(from, { month: "short", day: "numeric" })} – ${sameMonth ? Number(to.slice(8)) : fmtDate(to, { month: "short", day: "numeric" })}`;
-  const title = view === "month" ? fmtMonth(anchor) : weekTitle;
+  // "Oct 18–24", or "Oct 25–Nov 1" across a month.
+  const range = `${fmtDate(from, { month: "short", day: "numeric" })}–${sameMonth ? Number(to.slice(8)) : fmtDate(to, { month: "short", day: "numeric" })}`;
   const t = today();
+  const thisWeek = startOfWeek(t, weekStart);
+  const shownWeek = startOfWeek(anchor, weekStart);
+  const weekName =
+    shownWeek === thisWeek ? "This week" : shownWeek === addDays(thisWeek, 7) ? "Next week" : shownWeek === addDays(thisWeek, -7) ? "Last week" : range;
+  const heading = view === "month" ? fmtMonth(anchor) : weekName;
+  const away = view === "month" ? anchor.slice(0, 7) !== t.slice(0, 7) : shownWeek !== thisWeek;
+  // Phone week rows start closed; tap a day to open it.
+  const [openDay, setOpenDay] = useState("");
+  const hasEvents = (events.data ?? []).length > 0;
   const month = anchor.slice(0, 7);
   const selectedItems = byDay.get(selected) ?? [];
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -81,7 +89,8 @@ export function CalendarPage() {
   return (
     <>
       <PageHeader
-        title={view === "month" ? "Month" : "Week"}
+        hero
+        title={heading}
         tools={
           <>
             <IconButton icon="checklist" label="All tasks" onClick={() => void navigate({ to: "/tasks" })} />
@@ -92,34 +101,36 @@ export function CalendarPage() {
             />
           </>
         }
-      />
-      <div className="flex items-center gap-1 px-4 pb-3 md:px-6">
-        <IconButton icon="chevron_left" label="Previous" onClick={() => step(-1)} />
-        <IconButton icon="chevron_right" label="Next" onClick={() => step(1)} />
-        <h2 className="min-w-0 flex-1 truncate px-2 text-title-large text-on-surface">{title}</h2>
-        {!rel.endedAt && (
+        actions={
           <>
-            <span className="md:hidden">
-              <IconButton icon="event" label="New plan" onClick={() => setPlan(null)} />
-            </span>
-            <span className="hidden md:block">
-              <Button variant="tonal" icon="event" onClick={() => setPlan(null)}>
-                Plan
-              </Button>
-            </span>
+            {view === "week" && heading !== range && <span className="mr-1 text-body-large text-on-surface-variant">{range}</span>}
+            <IconButton icon="chevron_left" label={view === "month" ? "Previous month" : "Previous week"} onClick={() => step(-1)} />
+            <IconButton icon="chevron_right" label={view === "month" ? "Next month" : "Next week"} onClick={() => step(1)} />
           </>
-        )}
-        <Button
-          variant="text"
-          onClick={() => {
-            setAnchor(t);
-            setSelected(t);
-          }}
-        >
-          Today
-        </Button>
-      </div>
-      {legend.length > 0 && (
+        }
+      />
+      {(away || (!rel.endedAt && desk)) && (
+        <div className="-mt-2 flex items-center gap-2 px-4 pb-3 md:px-6">
+          {away && (
+            <Button
+              variant="text"
+              onClick={() => {
+                setAnchor(t);
+                setSelected(t);
+              }}
+            >
+              {view === "month" ? "Back to this month" : "Back to this week"}
+            </Button>
+          )}
+          <span className="flex-1" />
+          {!rel.endedAt && desk && (
+            <Button variant="tonal" icon="event" onClick={() => setPlan(null)}>
+              Plan
+            </Button>
+          )}
+        </div>
+      )}
+      {legend.length > 0 && hasEvents && (
         <div className="-mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 px-6 pb-3 text-label-medium text-on-surface-variant md:px-8">
           {legend.map((l) => (
             <span key={l.label} className="flex items-center gap-1.5">
@@ -243,13 +254,13 @@ export function CalendarPage() {
             const items = byDay.get(d) ?? [];
             // Like any calendar: all-day and multi-day plans head the day.
             const dayEvents = eventsOn(d).sort((a, b) => Number(inTopStrip(b)) - Number(inTopStrip(a)) || a.startsAt.localeCompare(b.startsAt));
-            const open = d === selected;
+            const open = d === openDay;
             return (
               <div key={d} className={cx("border-b border-outline-variant", d === t && "-mx-4 border-l-2 border-l-primary bg-surface-container-lowest px-[14px] md:-mx-6 md:px-[22px]")}>
                 <button
                   type="button"
                   aria-expanded={open}
-                  onClick={() => setSelected(open ? "" : d)}
+                  onClick={() => setOpenDay(open ? "" : d)}
                   className="state-layer flex min-h-[68px] w-full items-center gap-4 py-2 text-left"
                 >
                   <span className="flex w-10 shrink-0 flex-col">
@@ -258,7 +269,7 @@ export function CalendarPage() {
                   </span>
                   <span className="flex min-w-0 flex-1 flex-wrap items-center gap-3" aria-hidden>
                     {items.map((o) => (
-                      <Diamond key={o.id} state={dayState(o)} size={16} />
+                      <Diamond key={o.id} state={dayState(o)} size={12} />
                     ))}
                   </span>
                   <span className={cx("shrink-0 text-body-medium", items.some((o) => dayState(o) === "owed") ? "text-error" : "text-on-surface-variant")}>
