@@ -27,6 +27,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Exposure
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material3.ListItemDefaults
+import app.obey.ui.common.local
 import androidx.compose.material.icons.outlined.HourglassTop
 import androidx.compose.material.icons.outlined.Redeem
 import androidx.compose.material3.AlertDialog
@@ -98,6 +101,7 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
     var editConsequence by remember { mutableStateOf<Editing<Consequence>?>(null) }
     var assigning by remember { mutableStateOf<Consequence?>(null) }
     var adjusting by remember { mutableStateOf(false) }
+    var history by remember { mutableStateOf(false) }
     var confirmRedeem by remember { mutableStateOf<Reward?>(null) }
     var marking by remember { mutableStateOf<app.obey.api.LedgerEntry?>(null) }
     val busy by vm.busy.collectAsStateWithLifecycle()
@@ -110,7 +114,7 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
                 navigationIcon = { MenuButton() },
                 title = { Text(if (consequences) "Consequences" else "Rewards") },
                 actions = {
-                    if (canManage && features.points) IconButton(onClick = { adjusting = true }) { Icon(Icons.Outlined.Exposure, "Adjust points") }
+                    if (features.points) IconButton(onClick = { history = true }) { Icon(Icons.Outlined.History, "History") }
                     if (canManage && consequences && features.consequences) IconButton(onClick = { editConsequence = Editing(null) }) { Icon(Icons.Outlined.Add, "New consequence") }
                     if (canManage && !consequences && features.points) IconButton(onClick = { editReward = Editing(null) }) { Icon(Icons.Outlined.Add, "New reward") }
                     SafeWordAction()
@@ -137,13 +141,18 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
                             Text(nameOf(lead.first).uppercase(), style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Row(verticalAlignment = androidx.compose.ui.Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Text("${lead.second}", style = MaterialTheme.typography.displayLarge.copy(fontSize = 88.sp, lineHeight = 88.sp), color = MaterialTheme.colorScheme.onSurface)
-                                Text("points", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 14.dp))
+                                Text("points", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 14.dp).weight(1f))
+                                // A Dominant adjusts the balance right beside it, as in the mockup.
+                                if (canManage) androidx.compose.material3.OutlinedButton(onClick = { adjusting = true }, modifier = Modifier.padding(bottom = 10.dp)) { Text("Adjust") }
                             }
-                            if (d.rewards.isNotEmpty()) Text(
-                                next?.let { "${it.cost - lead.second} more for ${it.title}." } ?: "Enough for any reward.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            // Points since the week began (less spent), for "+31 this week".
+                            val weekFrom = java.time.LocalDate.now().with(java.time.temporal.TemporalAdjusters.previousOrSame(session?.weekStart ?: java.time.DayOfWeek.SUNDAY))
+                            val week = d.ledger.filter { it.userId == lead.first && !app.obey.ui.common.parseInstant(it.createdAt).local().toLocalDate().isBefore(weekFrom) }.sumOf { it.delta }
+                            val line = listOfNotNull(
+                                if (week != 0) "${signed(week)} this week." else null,
+                                if (d.rewards.isNotEmpty()) next?.let { "${it.cost - lead.second} more for ${it.title}." } ?: "Enough for any reward." else null,
                             )
+                            if (line.isNotEmpty()) Text(line.joinToString(" "), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             all.filter { it != lead && it.second != 0 }.forEach { (id, bal) ->
                                 Text("${nameOf(id)} $bal points.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
@@ -151,7 +160,19 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
                     }
                 }
 
-                if (features.points) item(key = "h-rewards") { SectionHeader("Rewards") }
+                // Rewards spent but not yet given: a Dominant marks them redeemed; a sub sees what they're waiting on.
+                val waiting = if (features.points) d.ledger.filter {
+                    it.kind == app.obey.api.LedgerKind.Redemption && it.redeemedAt == null && (solo || if (canManage) it.userId != session?.userId else it.userId == session?.userId)
+                } else emptyList()
+                // A Dominant's page leads with what's waiting on them: a card each, as in the mockup.
+                if (canManage && !solo && waiting.isNotEmpty()) {
+                    item(key = "h-waiting") { SectionHeader("Waiting on you") }
+                    items(waiting, key = { "w-" + it.id }) { e ->
+                        WaitingCard(e, session?.nameOf(e.userId) ?: "Your partner", busy, onRedeemed = { vm.markRedeemed(e, null) {} }, onAddWord = { marking = e })
+                    }
+                }
+
+                if (features.points) item(key = "h-rewards") { SectionHeader(if (canManage && !solo) "Your menu" else "Spend") }
                 if (features.points && d.rewards.isEmpty()) item(key = "e-rewards") { EmptyBox("No rewards yet", if (canManage) "Add things worth earning." else null, icon = Icons.Outlined.Redeem) }
                 items(if (features.points) d.rewards else emptyList(), key = { "r-" + it.id }) { r ->
                     val myBalance = vm.balanceOf(session?.userId.orEmpty())
@@ -178,70 +199,62 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
                     }
                 }
 
-                // Rewards spent but not yet given: a Dominant marks them redeemed; a sub sees what they're waiting on.
-                val waiting = if (features.points) d.ledger.filter {
-                    it.kind == app.obey.api.LedgerKind.Redemption && it.redeemedAt == null && (solo || if (canManage) it.userId != session?.userId else it.userId == session?.userId)
-                } else emptyList()
-                if (waiting.isNotEmpty()) item(key = "h-waiting") { SectionHeader(if (canManage) "To redeem" else "Waiting on $domName") }
-                items(waiting, key = { "w-" + it.id }) { e ->
-                    if (canManage) app.obey.ui.today.RedemptionRow(e, session?.nameOf(e.userId) ?: "Your partner") { marking = e }
-                    else ListItem(
-                        leadingContent = { Icon(Icons.Outlined.HourglassTop, null, tint = MaterialTheme.colorScheme.tertiary) },
-                        headlineContent = { Text(e.note) },
-                        supportingContent = { Text("${-e.delta} pts spent ${app.obey.ui.common.ago(e.createdAt)}" + (e.consequenceTitle?.let { " · gets you out of $it" } ?: "")) },
-                    )
+                // What's owed: on Rewards for the one who owes it, on Consequences for everyone.
+                val showOwed = (consequences || !canManage || solo) && (d.owed.isNotEmpty() || d.excused.isNotEmpty())
+                if (showOwed) {
+                    val earnerName = (d.owed + d.excused).firstOrNull()?.assigneeId?.let { if (it == session?.userId) null else session?.nameOf(it) }
+                    item(key = "h-owed") { SectionHeader(if (!consequences) "Owed" else earnerName?.let { "$it owes" } ?: "You owe") }
+                    items(d.owed + d.excused, key = { "o-" + it.id }) { o ->
+                        OwedRow(
+                            o,
+                            mine = o.assigneeId == session?.userId,
+                            canManage = canManage,
+                            excuser = if (canManage) "You" else domName,
+                            busy = busy,
+                            onDone = { vm.completeOwed(o) },
+                            onExcuse = { vm.excuse(o) },
+                        )
+                    }
                 }
 
+                if (!(canManage && !solo) && waiting.isNotEmpty()) {
+                    item(key = "h-waiting") { SectionHeader("Waiting on $domName") }
+                    items(waiting, key = { "w-" + it.id }) { e ->
+                        ListItem(
+                            colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+                            leadingContent = { app.obey.ui.common.Diamond(app.obey.ui.common.DiamondState.Waiting, size = 14.dp) },
+                            headlineContent = { Text(e.note) },
+                            supportingContent = { Text("${-e.delta} pts spent ${app.obey.ui.common.ago(e.createdAt)}" + (e.consequenceTitle?.let { " · gets you out of $it" } ?: "")) },
+                        )
+                    }
+                }
+
+                if (consequences && features.consequences) item(key = "h-list") { SectionHeader(if (canManage) "Your list" else "The list") }
                 if (features.consequences && d.consequences.isEmpty()) item(key = "e-cons") { EmptyBox("No consequences yet", icon = Icons.Outlined.Bolt) }
                 items(if (features.consequences) d.consequences else emptyList(), key = { "c-" + it.id }) { c ->
-                    ListItem(
-                        modifier = if (canManage) Modifier.clickable { editConsequence = Editing(c) } else Modifier,
-                        headlineContent = { Text(c.title) },
-                        supportingContent = listOfNotNull(c.bodyMd.takeIf { it.isNotBlank() }, c.lockMinutes?.takeIf { features.chastity }?.let { "Adds ${app.obey.ui.chastity.fmtMinutes(it)} to their lock" })
-                            .takeIf { it.isNotEmpty() }?.let { lines -> { Text(lines.joinToString("\n")) } },
-                        trailingContent = {
-                            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.semantics { contentDescription = "Severity ${c.severity} of 5" }) {
-                                    repeat(5) { i ->
-                                        val on = i < c.severity
-                                        androidx.compose.foundation.layout.Box(
-                                            Modifier.size(7.dp).rotate(45f)
-                                                .background(if (on) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent)
-                                                .border(1.dp, if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
-                                        )
-                                    }
-                                }
-                                if (canManage) TextButton(onClick = { assigning = c }) { Text("Assign") }
-                            }
-                        },
+                    val used = d.usedBy[c.id] ?: 0
+                    val notes = listOfNotNull(
+                        SEVERITY.getOrNull(c.severity - 1),
+                        c.bodyMd.takeIf { it.isNotBlank() },
+                        c.lockMinutes?.takeIf { features.chastity }?.let { "adds ${app.obey.ui.chastity.fmtMinutes(it)} to the lock" },
+                        if (used > 0) "used by $used task${if (used == 1) "" else "s"}" else null,
                     )
+                    Column(Modifier.padding(horizontal = 16.dp)) {
+                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Column(
+                                Modifier.weight(1f)
+                                    .then(if (canManage) Modifier.clickable { editConsequence = Editing(c) } else Modifier)
+                                    .padding(vertical = 12.dp),
+                            ) {
+                                Text(c.title, style = MaterialTheme.typography.bodyLarge)
+                                if (notes.isNotEmpty()) Text(notes.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                            }
+                            if (canManage) TextButton(onClick = { assigning = c }) { Text("Assign") }
+                        }
+                        androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    }
                 }
 
-                if (features.points) item(key = "h-ledger") { SectionHeader("Activity") }
-                if (features.points && d.ledger.isEmpty()) item(key = "e-ledger") { EmptyBox("No points yet") }
-                items(if (features.points) d.ledger else emptyList(), key = { "l-" + it.id }) { e ->
-                    ListItem(
-                        headlineContent = { Text(e.note.ifBlank { e.kind.name }) },
-                        supportingContent = {
-                            Column {
-                                Text(
-                                    "${session?.nameOf(e.userId) ?: ""} · ${formatDateTime(e.createdAt)}" +
-                                        if (e.kind == app.obey.api.LedgerKind.Redemption) {
-                                            if (e.redeemedAt != null) " · redeemed${e.consequenceTitle?.let { ", $it excused" } ?: ""}" else " · waiting on $domName"
-                                        } else "",
-                                )
-                                e.redeemNote?.let { Text("“$it”", fontStyle = androidx.compose.ui.text.font.FontStyle.Italic) }
-                            }
-                        },
-                        trailingContent = {
-                            Text(
-                                signed(e.delta),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = if (e.delta < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                            )
-                        },
-                    )
-                }
                 item(key = "pad") { androidx.compose.foundation.layout.Spacer(Modifier.padding(40.dp)) }
             }
         }
@@ -295,6 +308,42 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
     }
     marking?.let { e ->
         app.obey.ui.today.RedeemedDialog(e, session?.nameOf(e.userId) ?: "them", busy, onDismiss = { marking = null }) { note -> vm.markRedeemed(e, note) { marking = null } }
+    }
+    if (history) {
+        val ledger = (state as? Load.Ready)?.value?.ledger.orEmpty()
+        AlertDialog(
+            onDismissRequest = { history = false },
+            icon = { Icon(Icons.Outlined.History, null) },
+            title = { Text("History") },
+            text = {
+                androidx.compose.foundation.lazy.LazyColumn {
+                    if (ledger.isEmpty()) item { Text("No points yet.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    items(ledger, key = { it.id }) { e ->
+                        Row(Modifier.padding(vertical = 10.dp)) {
+                            Column(Modifier.weight(1f)) {
+                                Text(e.note.ifBlank { e.kind.name }, style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    listOfNotNull(
+                                        if (e.userId == session?.userId) null else session?.nameOf(e.userId),
+                                        app.obey.ui.common.ago(e.createdAt),
+                                        e.createdBy?.takeIf { it != e.userId }?.let { "by ${if (it == session?.userId) "you" else session?.nameOf(it)}" },
+                                        if (e.kind == app.obey.api.LedgerKind.Redemption) {
+                                            if (e.redeemedAt != null) "redeemed${e.consequenceTitle?.let { ", $it excused" } ?: ""}" else "waiting on ${if (canManage) "you" else domName}"
+                                        } else null,
+                                    ).joinToString(" · "),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                e.redeemNote?.let { Text("“$it”", style = MaterialTheme.typography.bodyMedium, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic) }
+                            }
+                            Text(signed(e.delta), style = MaterialTheme.typography.bodyMedium, color = if (e.delta < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { history = false }) { Text("Close") } },
+        )
     }
     if (adjusting) {
         AdjustDialog(
@@ -447,4 +496,87 @@ private fun AdjustDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
+}
+
+private val SEVERITY = listOf("Light", "Mild", "Moderate", "Strict", "Severe")
+
+/** "Kitten spent 20 on Choose tonight's movie." with Mark redeemed, and Add a word for a note with it. */
+@Composable
+private fun WaitingCard(e: app.obey.api.LedgerEntry, name: String, busy: Boolean, onRedeemed: () -> Unit, onAddWord: () -> Unit) {
+    androidx.compose.material3.Surface(
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                androidx.compose.ui.text.buildAnnotatedString {
+                    append("$name spent ${-e.delta} on ")
+                    pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold))
+                    append(e.note)
+                    pop()
+                    e.consequenceTitle?.let { append(" to get out of $it") }
+                    append(".")
+                },
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Button(onClick = onRedeemed, enabled = !busy) { Text("Mark redeemed") }
+                androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                TextButton(onClick = onAddWord) { Text("Add a word") }
+            }
+        }
+    }
+}
+
+/** An owed consequence: the oxblood diamond, what it is, when it's due; Done it for the one who owes it, Excuse for a Dominant. */
+@Composable
+private fun OwedRow(
+    o: app.obey.api.Occurrence,
+    mine: Boolean,
+    canManage: Boolean,
+    excuser: String,
+    busy: Boolean,
+    onDone: () -> Unit,
+    onExcuse: () -> Unit,
+) {
+    val excused = o.status == app.obey.api.OccurrenceStatus.Excused
+    val due = app.obey.ui.common.parseInstant(o.dueAt).local().toLocalDate()
+    val today = java.time.LocalDate.now()
+    val day = when (java.time.temporal.ChronoUnit.DAYS.between(today, due)) {
+        0L -> "today"
+        1L -> "tomorrow"
+        -1L -> "yesterday"
+        else -> app.obey.ui.common.formatDate(due)
+    }
+    val sub = when (o.status) {
+        app.obey.api.OccurrenceStatus.Excused -> "$excuser excused it"
+        app.obey.api.OccurrenceStatus.Submitted -> "Sent for approval"
+        app.obey.api.OccurrenceStatus.Missed -> "Not done, was due $day"
+        else -> "Due $day"
+    }
+    // Ones that need a photo, a mood or an entry are finished from Today, where those are asked for.
+    val canDo = mine && o.status == app.obey.api.OccurrenceStatus.Pending && !o.proofRequired && !o.askMood && !o.asksJournal
+    val canExcuse = canManage && !mine && (o.status == app.obey.api.OccurrenceStatus.Pending || o.status == app.obey.api.OccurrenceStatus.Missed)
+    Column(Modifier.padding(horizontal = 16.dp)) {
+        Row(Modifier.padding(vertical = 12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            app.obey.ui.common.Diamond(
+                when (o.status) {
+                    app.obey.api.OccurrenceStatus.Excused -> app.obey.ui.common.DiamondState.Off
+                    app.obey.api.OccurrenceStatus.Submitted -> app.obey.ui.common.DiamondState.Waiting
+                    else -> app.obey.ui.common.DiamondState.Owed
+                },
+                Modifier.padding(start = 4.dp),
+                size = 16.dp,
+            )
+            Column(Modifier.weight(1f)) {
+                Text(o.title, style = MaterialTheme.typography.bodyLarge, color = if (excused) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                Text(sub, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (canDo) androidx.compose.material3.OutlinedButton(onClick = onDone, enabled = !busy) { Text("Done it") }
+            if (canExcuse) androidx.compose.material3.OutlinedButton(onClick = onExcuse, enabled = !busy) { Text("Excuse") }
+        }
+        androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    }
 }

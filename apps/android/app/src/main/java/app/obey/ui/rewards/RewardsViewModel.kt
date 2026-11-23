@@ -15,6 +15,7 @@ import app.obey.data.SessionRepository
 import app.obey.ui.common.BaseViewModel
 import app.obey.ui.common.Load
 import app.obey.ui.common.loadCatching
+import app.obey.ui.common.local
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.async
@@ -31,6 +32,11 @@ data class RewardsData(
     val ledger: List<LedgerEntry>,
     /** The viewer's own consequences still to do or missed, which a "lets off" reward can excuse. */
     val myConsequences: List<app.obey.api.Occurrence> = emptyList(),
+    /** The earner's consequences (yours, or for a Dominant the submissive's): still owed, then any excused this past week. */
+    val owed: List<app.obey.api.Occurrence> = emptyList(),
+    val excused: List<app.obey.api.Occurrence> = emptyList(),
+    /** How many active tasks hand out each consequence on a miss. */
+    val usedBy: Map<String, Int> = emptyMap(),
 )
 
 @HiltViewModel
@@ -58,19 +64,34 @@ class RewardsViewModel @Inject constructor(
                     val l = async { api.ledger(rel) }
                     val today = java.time.LocalDate.now()
                     val me = sessions.session?.userId
-                    val mine = async {
-                        if (sessions.session?.canManage == true) emptyList()
-                        else runCatching { api.occurrences(rel, today.minusDays(14).toString(), today.plusDays(7).toString()) }.getOrDefault(emptyList()).filter {
-                            it.consequence && it.assigneeId == me &&
-                                (it.status == app.obey.api.OccurrenceStatus.Pending || it.status == app.obey.api.OccurrenceStatus.Missed)
-                        }
+                    // Whose consequences: your own, or for a Dominant (not on their own), the submissive's.
+                    val earner = sessions.session?.let { ss ->
+                        if (ss.canManage && !ss.solo) ss.relationship?.members?.firstOrNull { it.role == app.obey.api.Role.Submissive && it.userId != me }?.userId else me
+                    }
+                    val theirs = async {
+                        runCatching { api.occurrences(rel, today.minusDays(30).toString(), today.plusDays(7).toString()) }.getOrDefault(emptyList())
+                            .filter { it.consequence && it.assigneeId == earner }
+                            .sortedBy { it.dueAt }
+                    }
+                    val tasks = async { runCatching { api.tasks(rel) }.getOrDefault(emptyList()) }
+                    val all = theirs.await()
+                    val owing = setOf(app.obey.api.OccurrenceStatus.Pending, app.obey.api.OccurrenceStatus.Missed, app.obey.api.OccurrenceStatus.Submitted)
+                    val weekAgo = today.minusDays(7)
+                    val mine = all.filter {
+                        it.assigneeId == me && (it.status == app.obey.api.OccurrenceStatus.Pending || it.status == app.obey.api.OccurrenceStatus.Missed)
                     }
                     RewardsData(
                         b.await(),
                         r.await().sortedBy { it.cost },
                         c.await().sortedByDescending { it.severity },
                         l.await().sortedByDescending { it.createdAt }.take(100),
-                        mine.await(),
+                        mine,
+                        owed = all.filter { it.status in owing },
+                        excused = all.filter {
+                            it.status == app.obey.api.OccurrenceStatus.Excused &&
+                                !app.obey.ui.common.parseInstant(it.dueAt).local().toLocalDate().isBefore(weekAgo)
+                        },
+                        usedBy = tasks.await().filter { it.active && it.consequenceId != null }.groupingBy { it.consequenceId!! }.eachCount(),
                     )
                 }
             }
@@ -111,6 +132,20 @@ class RewardsViewModel @Inject constructor(
     fun assignConsequence(c: Consequence, input: AssignConsequenceInput, lockTime: Boolean) = action {
         api.assignConsequence(c.id, input)
         say(if (lockTime && c.lockMinutes != null) "Added ${app.obey.ui.chastity.fmtMinutes(c.lockMinutes)} to their lock" else "Consequence assigned")
+    }
+
+    /** The one who owes it says it's done. */
+    fun completeOwed(o: app.obey.api.Occurrence) = action {
+        val r = api.complete(o.id, app.obey.api.CompleteOccurrenceInput())
+        say(if (r.status == app.obey.api.OccurrenceStatus.Submitted) "Sent for approval: ${o.title}" else "Done: ${o.title}")
+        refresh()
+    }
+
+    /** A Dominant lets them off it: no penalty. */
+    fun excuse(o: app.obey.api.Occurrence) = action {
+        api.editOccurrence(o.id, app.obey.api.EditOccurrenceInput(app.obey.api.OccurrenceStatus.Excused))
+        say("Excused")
+        refresh()
     }
 
     fun deleteConsequence(c: Consequence) = action { api.deleteConsequence(c.id); refresh() }

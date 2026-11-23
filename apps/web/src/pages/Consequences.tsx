@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { useAssignConsequence, useDeleteLibraryItem, useLibrary, useSaveLibraryItem } from "../api/hooks";
+import { useAssignConsequence, useDeleteLibraryItem, useLibrary, useSaveLibraryItem, useTasks } from "../api/hooks";
+import { OwedList, useOwed } from "../components/Owed";
 import { errorMessage } from "../api/client";
 import type { Consequence } from "../api/types";
 import { ItemDialog, type FieldDef } from "../components/ItemDialog";
-import { Button, Dialog, Empty, ErrorBox, Fab, Icon, Loading, cx, PageHeader, Select, Switch, TextArea, TextField, useSnackbar } from "../components/ui";
+import { Button, Dialog, Empty, ErrorBox, Fab, Loading, PageHeader, Section, Select, Switch, TextArea, TextField, useSnackbar } from "../components/ui";
 import { LOCK_TIME_OPTIONS, fmtMinutes } from "../components/Chastity";
 import { browserTimeZone, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
@@ -20,8 +21,10 @@ const FIELDS: FieldDef[] = [
   },
 ];
 
+const SEVERITY = ["Light", "Mild", "Moderate", "Strict", "Severe"];
+
 export function ConsequencesPage() {
-  const { rel, isDom, features } = useRel();
+  const { rel, me, isDom, solo, memberName, features } = useRel();
   const snack = useSnackbar();
   const fields: FieldDef[] = features.chastity
     ? [
@@ -41,48 +44,57 @@ export function ConsequencesPage() {
   const [assigning, setAssigning] = useState<Consequence | null>(null);
   const [confirm, confirmEl] = useConfirm();
   const current = editing && editing !== "new" ? editing : null;
+  // Whose consequences show as owed: your own, or for a Dominant, the submissive's.
+  const whose = isDom && !solo ? rel.members.find((m) => m.role === "submissive" && m.userId !== me.user.id)?.userId : me.user.id;
+  const owed = useOwed(whose);
+  // How many tasks hand each one out on a miss.
+  const tasks = useTasks(rel.id);
+  const usedBy = new Map<string, number>();
+  for (const t of tasks.data ?? []) if (t.active && t.consequenceId) usedBy.set(t.consequenceId, (usedBy.get(t.consequenceId) ?? 0) + 1);
   const sorted = [...(list.data ?? [])].sort((a, b) => a.severity - b.severity || a.title.localeCompare(b.title));
 
   return (
     <>
       <PageHeader title="Consequences" />
-      <div className="mx-4 flex flex-col divide-y divide-outline-variant border-y border-outline-variant md:mx-6">
-        {list.isLoading && <Loading />}
-        {list.error && <ErrorBox error={list.error} onRetry={() => list.refetch()} />}
-        {list.data && !list.data.length && <Empty icon="bolt" title="No consequences yet" />}
-        {sorted.map((c) => (
-          <div key={c.id} className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={!isDom}
-              onClick={() => setEditing(c)}
-              className="state-layer flex min-w-0 flex-1 items-start gap-4 py-3 text-left disabled:cursor-default"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="text-body-large text-on-surface">{c.title}</div>
-                {/* Severity as five small diamonds, filled up to how heavy it is. */}
-                <div className="mt-1 flex gap-1" role="img" aria-label={`Severity ${c.severity} of 5`}>
-                  {Array.from({ length: 5 }, (_, i) => (
-                    <span key={i} className={cx("inline-block size-2 rotate-45 border border-primary", i < c.severity ? "bg-primary" : "opacity-40")} />
-                  ))}
-                </div>
-                {c.bodyMd && <div className="mt-1 text-body-medium whitespace-pre-wrap text-on-surface-variant">{c.bodyMd}</div>}
-                {c.lockMinutes && (
-                  <div className="mt-1 flex items-center gap-1 text-body-small text-on-surface-variant">
-                    <Icon name="lock" size={16} />
-                    Adds {fmtMinutes(c.lockMinutes)} to their lock
-                  </div>
+      {(owed.owed.length > 0 || owed.excused.length > 0) && (
+        <Section title={whose === me.user.id ? "You owe" : `${memberName(whose!)} owes`}>
+          <OwedList {...owed} />
+        </Section>
+      )}
+      <Section title={isDom ? "Your list" : "The list"}>
+        <div className="flex flex-col divide-y divide-outline-variant">
+          {list.isLoading && <Loading />}
+          {list.error && <ErrorBox error={list.error} onRetry={() => list.refetch()} />}
+          {list.data && !list.data.length && <Empty icon="bolt" title="No consequences yet" />}
+          {sorted.map((c) => {
+            const used = usedBy.get(c.id) ?? 0;
+            const notes = [
+              SEVERITY[c.severity - 1],
+              c.bodyMd.trim() || null,
+              features.chastity && c.lockMinutes ? `adds ${fmtMinutes(c.lockMinutes)} to the lock` : null,
+              used ? `used by ${used} task${used === 1 ? "" : "s"}` : null,
+            ].filter(Boolean);
+            return (
+              <div key={c.id} className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={!isDom}
+                  onClick={() => setEditing(c)}
+                  className="state-layer flex min-w-0 flex-1 flex-col py-3 text-left disabled:cursor-default"
+                >
+                  <span className="text-body-large text-on-surface">{c.title}</span>
+                  {notes.length > 0 && <span className="line-clamp-2 text-body-medium whitespace-pre-wrap text-on-surface-variant">{notes.join(" · ")}</span>}
+                </button>
+                {isDom && (
+                  <Button variant="text" className="-mr-3" onClick={() => setAssigning(c)}>
+                    Assign
+                  </Button>
                 )}
               </div>
-            </button>
-            {isDom && (
-              <Button variant="text" onClick={() => setAssigning(c)}>
-                Assign
-              </Button>
-            )}
-          </div>
-        ))}
-      </div>
+            );
+          })}
+        </div>
+      </Section>
       {isDom && <Fab icon="add" label="New consequence" onClick={() => setEditing("new")} />}
       <ItemDialog
         open={editing !== null}
