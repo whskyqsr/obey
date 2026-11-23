@@ -2,6 +2,7 @@ package app.obey.ui.rules
 
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -58,7 +59,6 @@ import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.ReorderableList
 import app.obey.ui.common.MenuButton
 import app.obey.ui.common.SafeWordAction
-import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.loadCatching
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -141,7 +141,6 @@ fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, on
                 actions = {
                     IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.History, "Broken rules") }
                     SafeWordAction()
-                    SettingsAction(onOpenSettings)
                 },
             )
         },
@@ -155,7 +154,7 @@ fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, on
             is Load.Failed -> ErrorBox(s.message, vm::refresh, Modifier.padding(padding))
             is Load.Ready -> {
                 if (s.value.isEmpty()) {
-                    EmptyBox("No rules yet", if (canManage) "Rules are numbered in the order you add them." else null, Modifier.padding(padding))
+                    EmptyBox("No rules yet", if (canManage) "Rules are numbered in the order you add them." else null, Modifier.padding(padding), icon = Icons.Outlined.Gavel)
                 } else {
                     // Numbers always follow the list order; a Dominant drags the handle to change it.
                     ReorderableList(

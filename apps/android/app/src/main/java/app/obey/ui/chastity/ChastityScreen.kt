@@ -49,7 +49,6 @@ import app.obey.ui.common.MenuButton
 import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.SafeWordAction
 import app.obey.ui.common.SectionHeader
-import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.formatDateTime
 import app.obey.ui.common.parseInstant
 
@@ -123,7 +122,6 @@ fun ChastityScreen(onOpenSettings: () -> Unit, vm: ChastityViewModel = hiltViewM
                 navigationIcon = { MenuButton() },
                 actions = {
                     SafeWordAction()
-                    SettingsAction(onOpenSettings)
                 },
             )
         },
@@ -140,6 +138,7 @@ fun ChastityScreen(onOpenSettings: () -> Unit, vm: ChastityViewModel = hiltViewM
                     "Nobody is locked",
                     if (session.canManage) "Ask to lock someone, for a set time or until you release them." else "When you're asked to lock up, it shows here and on Today.",
                     Modifier.padding(padding),
+                    icon = Icons.Outlined.LockOpen,
                 )
             } else {
                 val v = s.value

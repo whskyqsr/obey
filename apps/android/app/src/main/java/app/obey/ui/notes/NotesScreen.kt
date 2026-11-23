@@ -13,6 +13,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.StickyNote2
+import androidx.compose.material.icons.outlined.AutoStories
+import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PushPin
@@ -54,7 +57,6 @@ import app.obey.ui.common.LoadingBox
 import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.MenuButton
 import app.obey.ui.common.SafeWordAction
-import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.formatDateTime
 
 private enum class NoteFilter(val label: String) { All("All"), Pinned("Pinned") }
@@ -88,7 +90,6 @@ fun NotesScreen(
                 actions = {
                     IconButton(onClick = { searching = !searching; if (!searching) query = "" }) { Icon(Icons.Outlined.Search, "Search") }
                     SafeWordAction()
-                    SettingsAction(onOpenSettings)
                 },
             )
         },
@@ -139,9 +140,9 @@ fun NotesScreen(
                         if (shown.isEmpty()) {
                             item {
                                 when {
-                                    q.isNotEmpty() -> EmptyBox("Nothing matches")
-                                    journal -> EmptyBox("No entries yet", "Write about your day, and how you felt.")
-                                    else -> EmptyBox("No notes yet", "Plans, ideas, anything worth keeping. Notes support headings, lists and checklists.")
+                                    q.isNotEmpty() -> EmptyBox("Nothing matches", icon = Icons.Outlined.SearchOff)
+                                    journal -> EmptyBox("No entries yet", "Write about your day, and how you felt.", icon = Icons.Outlined.AutoStories)
+                                    else -> EmptyBox("No notes yet", "Plans, ideas, anything worth keeping. Notes support headings, lists and checklists.", icon = Icons.Outlined.StickyNote2)
                                 }
                             }
                         }

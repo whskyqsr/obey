@@ -6,10 +6,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FrontHand
 import androidx.compose.material.icons.outlined.Menu
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -43,12 +43,14 @@ fun ErrorBox(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier
 }
 
 @Composable
-fun EmptyBox(title: String, body: String? = null, modifier: Modifier = Modifier) {
+fun EmptyBox(title: String, body: String? = null, modifier: Modifier = Modifier, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
     Column(
         modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 48.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        // The same icon the web's empty state shows for this page.
+        if (icon != null) Icon(icon, null, Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary)
         Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
         if (body != null) {
             Text(
@@ -83,11 +85,6 @@ fun MenuButton() {
 fun SafeWordAction() {
     val open = LocalSafeWord.current ?: return
     IconButton(onClick = open) { Icon(Icons.Filled.FrontHand, contentDescription = "Safe word", tint = MaterialTheme.colorScheme.error) }
-}
-
-@Composable
-fun SettingsAction(onClick: () -> Unit) {
-    IconButton(onClick = onClick) { Icon(Icons.Outlined.Settings, contentDescription = "Settings") }
 }
 
 /** Shows the ViewModel's pending message once, then clears it. */

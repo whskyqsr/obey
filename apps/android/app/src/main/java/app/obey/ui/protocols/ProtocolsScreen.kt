@@ -1,6 +1,7 @@
 package app.obey.ui.protocols
 
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.FactCheck
 import app.obey.ui.notes.MarkdownPreview
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.draw.clipToBounds
@@ -57,7 +58,6 @@ import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.ReorderableList
 import app.obey.ui.common.MenuButton
 import app.obey.ui.common.SafeWordAction
-import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.loadCatching
 import app.obey.ui.rules.inOrder
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -131,7 +131,6 @@ fun ProtocolsScreen(onOpen: (String) -> Unit, onNew: () -> Unit, onOpenSettings:
                 actions = {
                     IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.History, "Broken rules") }
                     SafeWordAction()
-                    SettingsAction(onOpenSettings)
                 },
             )
         },
@@ -146,7 +145,7 @@ fun ProtocolsScreen(onOpen: (String) -> Unit, onNew: () -> Unit, onOpenSettings:
             is Load.Ready -> {
                 val rules = if (showRules) s.value.rules else emptyList()
                 if (s.value.protocols.isEmpty()) {
-                    EmptyBox("No protocols yet", if (canManage) "Spell out exactly what's expected, and when and how it's done." else null, Modifier.padding(padding))
+                    EmptyBox("No protocols yet", if (canManage) "Spell out exactly what's expected, and when and how it's done." else null, Modifier.padding(padding), icon = Icons.Outlined.FactCheck)
                 } else {
                     ReorderableList(
                         items = s.value.protocols,

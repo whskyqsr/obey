@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.ListItemDefaults
@@ -63,7 +64,6 @@ import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.formatClock
 import app.obey.ui.common.MenuButton
 import app.obey.ui.common.SafeWordAction
-import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.local
 import app.obey.ui.common.parseInstant
 import app.obey.ui.common.signed
@@ -169,7 +169,6 @@ fun TaskListScreen(
                 actions = {
                     if (vm.session?.canManage == true && vm.session?.readOnly != true) IconButton(onClick = onKits) { Icon(Icons.Outlined.Widgets, "Kits") }
                     SafeWordAction()
-                    SettingsAction(onOpenSettings)
                 },
             )
         },
@@ -184,7 +183,7 @@ fun TaskListScreen(
             is Load.Ready -> LazyColumn(Modifier.padding(padding).fillMaxSize()) {
                 val (drafts, tasks) = s.value.partition { it.draft }
                 if (drafts.isNotEmpty()) item(key = "kit-review") { KitReview(drafts, vm.session, onOpen, onSend = vm::sendDrafts, onDrop = vm::dropDraft) }
-                if (tasks.isEmpty() && drafts.isEmpty()) item { EmptyBox("No tasks yet", "Create one with the + button.") }
+                if (tasks.isEmpty() && drafts.isEmpty()) item { EmptyBox("No tasks yet", "Create one with the + button.", icon = Icons.Outlined.Checklist) }
                 items(tasks, key = { it.id }) { t ->
                     val who = vm.session?.nameOf(t.assigneeId)
                     ListItem(

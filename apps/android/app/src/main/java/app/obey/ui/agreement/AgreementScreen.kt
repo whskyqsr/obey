@@ -119,7 +119,6 @@ import app.obey.ui.common.LocalFeatures
 import app.obey.ui.common.MenuButton
 import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.SafeWordAction
-import app.obey.ui.common.SettingsAction
 import app.obey.ui.common.loadCatching
 import app.obey.ui.common.local
 import app.obey.ui.common.parseInstant
@@ -366,7 +365,7 @@ private fun AgreementContent(onOpenSettings: () -> Unit, onOpenNote: (String) ->
                         MenuButton()
                     }
                 },
-                actions = { SafeWordAction(); SettingsAction(onOpenSettings) },
+                actions = { SafeWordAction() },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },

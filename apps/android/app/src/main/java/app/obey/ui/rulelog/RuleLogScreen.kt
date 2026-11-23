@@ -178,6 +178,7 @@ fun RuleLogScreen(onBack: () -> Unit, onOpenTask: (String) -> Unit, vm: RuleLogV
                     "Nothing logged",
                     if (isDom) "When a rule or protocol is broken, log it here, with a consequence if you like." else "If you break a rule or protocol, you can own up to it here.",
                     Modifier.padding(padding),
+                    icon = Icons.Outlined.Gavel,
                 )
             } else {
                 val people = s.value.map { it.subjectId }.distinct()
