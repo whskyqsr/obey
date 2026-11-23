@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -52,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -136,9 +138,7 @@ fun TodayScreen(
         topBar = {
             TopAppBar(
                 navigationIcon = { MenuButton() },
-                title = {
-                    Text(LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE d MMMM")))
-                },
+                title = {},
                 actions = { SafeWordAction() },
             )
         },
@@ -155,7 +155,8 @@ fun TodayScreen(
             ) {
                 val d = s.value
                 val me = session?.userId
-                fun nameFor(o: Occurrence) = if (o.assigneeId == me) null else session?.nameOf(o.assigneeId)
+                // Whose a task is only needs saying when more than one other person has tasks.
+                fun nameFor(o: Occurrence) = if (o.assigneeId == me || (session?.partners?.size ?: 0) < 2) null else session?.nameOf(o.assigneeId)
                 fun actionsFor(o: Occurrence) = OccurrenceActions(
                     // A task that needs proof opens the Done sheet instead of completing in one tap.
                     onComplete = if (o.assigneeId == me && !o.isPlaced) ({ if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) }) else null,
@@ -443,8 +444,35 @@ fun TodayScreen(
                     }
                 }
                 val waiting = inbox.sumOf { it.count }
+                val solo = session?.solo == true
+                val partner = session?.partners?.firstOrNull()
+                val part = dayPart(java.time.LocalTime.now().hour)
+                val tonight = if (part == "evening" || part == "night") "tonight" else "today"
+                val todays = d.today.filter { it.status != OccurrenceStatus.Excused }
+                val doneToday = todays.count { it.status == OccurrenceStatus.Completed || it.status == OccurrenceStatus.Submitted }
+                val myLeft = d.today.count { it.status == OccurrenceStatus.Pending && it.assigneeId == me }
+                val theirLeft = d.today.count { it.status == OccurrenceStatus.Pending && it.assigneeId != me }
+                val greeting = if (isDom && !solo) {
+                    "Good ${if (part == "night") "evening" else part}${session?.me?.user?.displayName?.substringBefore(' ')?.let { ", $it" } ?: ""}."
+                } else "${LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE"))} $part."
+                // One line under the greeting: what's waiting, then what's left of the day.
+                val summary = if (isDom && !solo) {
+                    listOfNotNull(
+                        if (waiting > 0) "${countWord(waiting).replaceFirstChar { it.uppercase() }} ${if (waiting == 1) "thing is" else "things are"} waiting on you." else null,
+                        when {
+                            theirLeft > 0 -> "${partner?.displayName ?: "They"} has ${countWord(theirLeft)} left $tonight."
+                            waiting > 0 -> "After that, nothing until tomorrow."
+                            else -> "Nothing else until tomorrow."
+                        },
+                    ).joinToString(" ")
+                } else when {
+                    todays.isEmpty() -> "Nothing due today."
+                    myLeft == 0 -> "All done for today."
+                    else -> "${countWord(myLeft).replaceFirstChar { it.uppercase() }} left $tonight."
+                }
 
                 LazyColumn(Modifier.fillMaxSize()) {
+                    item(key = "greeting") { Greeting(greeting, summary) }
                     offlineSince?.let { at -> item(key = "offline") { OfflineBanner(at) } }
                     if (session?.readOnly == true) item(key = "ended") { EndedBanner(onOpenSettings) }
                     if (session?.relationship?.roleSwap != null) item(key = "role-swap") { app.obey.ui.roles.RoleSwapCard(session) }
@@ -515,10 +543,6 @@ fun TodayScreen(
                     if (!locationReady && !paused && (d.overdue + d.today + d.later.flatMap { it.second }).any { it.assigneeId == me && it.isPlaced && it.status == OccurrenceStatus.Pending }) {
                         item(key = "location") { app.obey.ui.location.LocationSetupPrompt(onOpenLocation) }
                     }
-                    if (!isDom || session?.solo == true) {
-                        val counted = d.today.filter { it.status != OccurrenceStatus.Excused }
-                        if (counted.isNotEmpty()) item(key = "progress") { ProgressCard(counted, showNext = next == null) }
-                    }
                     next?.let { o ->
                         item(key = "next") {
                             NextUp(
@@ -530,12 +554,16 @@ fun TodayScreen(
                             )
                         }
                     }
-                    if (inbox.isNotEmpty()) item(key = "inbox") { TodayInbox(if (isDom) "Needs you" else "For you", inbox, busy) }
+                    if (isDom && inbox.isNotEmpty()) item(key = "inbox") { NeedsYouCards(inbox, busy) }
                     if (d.overdue.isNotEmpty()) {
                         item(key = "h-over") { SectionHeader("Overdue") }
                         items(d.overdue, key = { "o-" + it.id }) { o -> row(o)() }
                     }
-                    item(key = "h-today") { SectionHeader(if (next != null) "Later today" else if (isDom && waiting > 0) "Rest of today" else "Today") }
+                    if (isDom && !solo && partner != null) {
+                        item(key = "h-today") { PartnerDayHeader("${partner.displayName}'s ${if (part == "night") "evening" else part}", doneToday, todays.size) }
+                    } else {
+                        item(key = "h-today") { SectionHeader(if (next != null) "Later $tonight" else "Today") }
+                    }
                     // Whole-day extension: the user's own open tasks for today, plus today's that already slipped.
                     // Tasks that already have a request waiting aren't offered again.
                     val asked = d.requests.flatten().map { it.occurrenceId }.toSet()
@@ -558,6 +586,7 @@ fun TodayScreen(
                     } else {
                         items(restOfToday, key = { "t-" + it.id }) { o -> row(o)() }
                     }
+                    if (!isDom && inbox.isNotEmpty()) item(key = "inbox") { TodayInbox("For you", inbox, busy) }
                     if (d.later.isNotEmpty()) {
                         item(key = "h-later") { SectionHeader("Later") }
                         items(d.later, key = { "l-" + it.first }) { (day, list) ->
@@ -668,4 +697,52 @@ fun TodayScreen(
         RedeemedDialog(e, session?.nameOf(e.userId) ?: "them", busy, onDismiss = { redeeming = null }) { note -> vm.markRedeemed(e, note) { redeeming = null } }
     }
     writingNote?.let { t -> NoteDialog(t, busy, onDismiss = { writingNote = null }) { body -> vm.addNote(t, body) { writingNote = null } } }
+}
+
+/** The part of the day a greeting names. */
+internal fun dayPart(hour: Int) = when {
+    hour < 5 -> "night"
+    hour < 12 -> "morning"
+    hour < 17 -> "afternoon"
+    hour < 22 -> "evening"
+    else -> "night"
+}
+
+private val WORDS = listOf("no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")
+internal fun countWord(n: Int) = WORDS.getOrNull(n) ?: n.toString()
+
+/** Today's greeting: the large serif line, and one line on what's waiting. */
+@Composable
+private fun Greeting(title: String, summary: String) {
+    androidx.compose.foundation.layout.Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp)) {
+        Text(title, style = MaterialTheme.typography.displayMedium.copy(fontSize = 46.sp, lineHeight = 50.sp))
+        Text(summary, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
+    }
+}
+
+/** "Kitten's evening   2 of 6", with a short bar for each task, done ones in ink. */
+@Composable
+private fun PartnerDayHeader(title: String, done: Int, total: Int) {
+    androidx.compose.foundation.layout.Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp)) {
+        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Text(
+                title.uppercase(),
+                style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            if (total > 0) Text("$done of $total", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (total > 0) {
+            val bars = minOf(total, 12)
+            val filled = Math.round(done.toFloat() / total * bars)
+            androidx.compose.foundation.layout.Row(Modifier.padding(top = 8.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)) {
+                repeat(bars) { i ->
+                    androidx.compose.foundation.layout.Box(
+                        Modifier.weight(1f).height(3.dp).background(if (i < filled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outlineVariant),
+                    )
+                }
+            }
+        }
+    }
 }

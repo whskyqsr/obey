@@ -60,6 +60,30 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
   const doneToday = todays.filter((o) => o.status === "completed" || o.status === "submitted").length;
   const partner = rel.members.find((m) => m.userId !== me.user.id);
   const wide = useMediaQuery(WIDE);
+  const part = dayPart(new Date().getHours());
+  const weekday = fmtDate(t, { weekday: "long" });
+  const tonight = part === "evening" || part === "night" ? "tonight" : "today";
+  const myLeft = groups.today.filter((o) => o.status === "pending" && o.assigneeId === me.user.id).length;
+  const theirLeft = groups.today.filter((o) => o.status === "pending" && o.assigneeId !== me.user.id).length;
+  // One line under the greeting: what's waiting, then what's left of the day.
+  const summary = !occ.data
+    ? undefined
+    : isDom && !solo
+      ? [
+          needs.count > 0 ? `${cap(count(needs.count))} ${needs.count === 1 ? "thing is" : "things are"} waiting on you.` : null,
+          theirLeft > 0
+            ? `${partner ? memberName(partner.userId) : "They"} ${theirLeft === 1 ? "has one" : `has ${count(theirLeft)}`} left ${tonight}.`
+            : needs.count > 0
+              ? "After that, nothing until tomorrow."
+              : "Nothing else until tomorrow.",
+        ]
+          .filter(Boolean)
+          .join(" ")
+      : todays.length === 0
+        ? "Nothing due today."
+        : myLeft === 0
+          ? "All done for today."
+          : `${cap(count(myLeft))} left ${tonight}.`;
   const newTask = () => navigate({ to: "/tasks/$taskId", params: { taskId: "new" } });
   useRowShortcuts(isDom ? newTask : undefined);
 
@@ -75,13 +99,9 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
                 </Button>
               ) : undefined
             }
-            title={`Hi${name ? `, ${name}` : ""}`}
-            subtitle={[
-              fmtDate(t, { weekday: "long", month: "long", day: "numeric" }),
-              isDom && partner && todays.length ? `${memberName(partner.userId)} has done ${doneToday} of ${todays.length}` : null,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
+            hero
+            title={isDom && !solo ? `Good ${part === "night" ? "evening" : part}${name ? `, ${name}` : ""}.` : `${weekday} ${part}.`}
+            subtitle={summary}
           />
           {/* The Next block counts down on its own, so the separate countdown is only for what it doesn't cover. */}
           <CountdownCard skip={next?.id} />
@@ -90,10 +110,9 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
           <ChastityToday />
           <CurfewStrip />
           <SceneCards />
-          {(solo || !isDom) && occ.data && todays.length > 0 && <Progress today={todays} done={doneToday} points={features.points} showNext={!next} />}
           {next && <NextUp o={next} />}
           <KitPrompt />
-          <TodayInbox />
+          {isDom && <TodayInbox />}
           {occ.isLoading && <Loading />}
           {occ.error && <ErrorBox error={occ.error} onRetry={() => occ.refetch()} />}
           {occ.data && (
@@ -108,15 +127,26 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
                 </Section>
               )}
               <Section
-                title={next ? "Later today" : isDom && needs.count > 0 ? "Rest of today" : "Today"}
+                title={
+                  isDom && !solo && partner
+                    ? `${memberName(partner.userId)}'s ${part === "night" ? "evening" : part}`
+                    : next
+                      ? `Later ${tonight}`
+                      : "Today"
+                }
                 action={
                   myOpenToday.length > 1 ? (
                     <Button variant="text" icon="more_time" onClick={() => setDaySheet(true)}>
                       More time
                     </Button>
+                  ) : isDom && !solo && todays.length > 0 ? (
+                    <span className="text-body-small text-on-surface-variant tabular-nums">
+                      {doneToday} of {todays.length}
+                    </span>
                   ) : undefined
                 }
               >
+                {isDom && !solo && todays.length > 0 && <Segments done={doneToday} total={todays.length} />}
                 {restOfToday.length ? (
                   <RowGroup>
                     {restOfToday.map((o) => (
@@ -131,6 +161,7 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
                   />
                 )}
               </Section>
+              {!isDom && <TodayInbox />}
               {groups.later.length > 0 && (
                 <Section title="Later">
                   <div className="flex flex-col gap-2">
@@ -157,6 +188,26 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
         )}
       </div>
     </RowLink.Provider>
+  );
+}
+
+/** The part of the day a greeting names. */
+function dayPart(hour: number) {
+  return hour < 5 ? "night" : hour < 12 ? "morning" : hour < 17 ? "afternoon" : hour < 22 ? "evening" : "night";
+}
+
+const WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+const count = (n: number) => WORDS[n] ?? String(n);
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** The partner's day as short bars, one per task, done ones in ink. */
+function Segments({ done, total }: { done: number; total: number }) {
+  return (
+    <div className="mb-2 flex gap-1.5" aria-hidden>
+      {Array.from({ length: Math.min(total, 12) }, (_, i) => (
+        <span key={i} className={i < Math.round((done / total) * Math.min(total, 12)) ? "h-[3px] flex-1 bg-on-surface" : "h-[3px] flex-1 bg-outline-variant"} />
+      ))}
+    </div>
   );
 }
 

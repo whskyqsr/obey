@@ -4,7 +4,7 @@ import { Link } from "@tanstack/react-router";
 import type { Occurrence } from "../api/types";
 import { useCompleteOccurrence, useConfirmMiss, useDropConsequence, useEditOccurrence, useUndoComplete } from "../api/hooks";
 import { errorMessage } from "../api/client";
-import { fmtDate, fmtDateTime, fmtRelative, fmtTime, isAllDayDue, localDateOf, today } from "../lib/dates";
+import { fmtDate, fmtDateTime, fmtTime, isAllDayDue, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 import { CompleteDialog, isOpen, isOverdue, opensLabel } from "./OccurrenceCard";
 import { RitualDialog, isRitual, stepProgress } from "./Ritual";
@@ -43,7 +43,7 @@ export function useQuickComplete() {
  * trailing actions. The whole row opens the task.
  */
 export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: boolean; actions?: ReactNode }) {
-  const { me, isDom, memberName, features } = useRel();
+  const { me, isDom, memberName, features, rel } = useRel();
   const quickComplete = useQuickComplete();
   const countTap = useCountTap();
   const { checkIn } = useCheckIn();
@@ -77,11 +77,12 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
     counted ? countLine(o) : null,
     placed ? placeLine(o, placeOf(o.placeId)) : null,
     o.status === "missed" && !counted && !o.leftAt ? "Missed" : overdue ? "Overdue" : null,
-    o.arrivedAt && o.status === "pending" ? null : when,
-    o.status === "pending" && !overdue && !o.arrivedAt ? fmtRelative(o.dueAt) : null,
+    // Today's time sits at the row's end, as in the mockups; other days keep the date here.
+    o.arrivedAt && o.status === "pending" ? null : showDate || !isToday ? when : null,
     o.status === "submitted" ? "waiting for approval" : null,
     o.status === "excused" ? "excused" : null,
-    !mine ? memberName(o.assigneeId) : null,
+    // Whose it is only needs saying when more than one other person has tasks.
+    !mine && rel.members.length > 2 ? memberName(o.assigneeId) : null,
     o.rescheduled ? "moved" : null,
     o.status === "pending" && mine && !isOpen(o) ? opensLabel(o) : null,
     o.status === "pending" && isRitual(o) && o.stepsDone.length ? stepProgress(o) : null,
@@ -133,9 +134,11 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
         className="min-w-0 flex-1 py-1 after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
       >
         <div className={cx("truncate text-body-large text-on-surface", done && !counted && "line-through opacity-70")}>{o.title}</div>
-        <div className={cx("flex flex-wrap items-center gap-x-2 text-body-medium", missed ? "text-error" : "text-on-surface-variant")}>
-          <StreakStrip taskId={o.seriesId} compact />
-          <span className="truncate">{parts.join(" · ")}</span>
+        <div className={cx("flex flex-wrap items-center gap-x-2 text-body-medium empty:hidden", missed ? "text-error" : "text-on-surface-variant")}>
+          <span className="contents max-md:hidden">
+            <StreakStrip taskId={o.seriesId} compact />
+          </span>
+          {parts.length > 0 && <span className="truncate">{parts.join(" · ")}</span>}
           {o.mood && (
             <span className="inline-flex items-center gap-0.5" aria-label={`Felt ${MOOD_LABELS[o.mood - 1]!.toLowerCase()}`}>
               <Icon name={MOODS[o.mood - 1]!} size={16} />
@@ -155,11 +158,15 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
         {mine && readyToSend(o) && <IconButton icon="send" label={`Send “${o.title}”`} className="text-primary" onClick={() => setCompleting(true)} />}
         {checkable && <CheckInButton o={o} className="max-md:hidden" />}
         {/* A Dominant moves anyone's deadline as easily as a sub asks for more time on their own. */}
+        {/* Phones keep rows to a title and a time; the task page and wider screens carry the rest. */}
         {!actions && o.status === "pending" && (mine || isDom) && (
-          <IconButton icon="more_time" label={mine ? "More time" : "Reschedule"} data-action="more" onClick={() => setRescheduling(true)} />
+          <IconButton icon="more_time" label={mine ? "More time" : "Reschedule"} data-action="more" className="max-md:hidden" onClick={() => setRescheduling(true)} />
+        )}
+        {isToday && !showDate && !(o.arrivedAt && o.status === "pending") && (
+          <span className={cx("px-1 text-body-medium tabular-nums", missed ? "text-error" : "text-on-surface-variant")}>{when}</span>
         )}
         {features.points && o.points !== 0 && (
-          <span className="min-w-9 px-1 text-right text-label-medium text-outline tabular-nums">
+          <span className="min-w-9 px-1 text-right text-label-medium text-outline tabular-nums max-md:hidden">
             {o.points > 0 ? `+${o.points}` : o.points}
             {counted && o.countPer === "count" ? " each" : ""}
           </span>

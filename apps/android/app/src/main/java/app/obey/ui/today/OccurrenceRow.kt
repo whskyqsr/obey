@@ -1,6 +1,5 @@
 package app.obey.ui.today
 
-import app.obey.ui.common.LocalFeatures
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -37,7 +36,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import app.obey.api.Occurrence
 import app.obey.api.OccurrenceStatus
 import app.obey.api.TaskStreak
-import app.obey.ui.common.StreakStrip
 import app.obey.ui.common.Diamond
 import app.obey.ui.common.DiamondState
 import androidx.compose.ui.semantics.contentDescription
@@ -47,7 +45,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.unit.dp
 import app.obey.ui.common.formatDue
-import app.obey.ui.common.signed
+import app.obey.ui.common.local
 
 /** Actions available on an occurrence row; null hides the action. */
 data class OccurrenceActions(
@@ -84,16 +82,18 @@ fun OccurrenceRow(
 ) {
     var menu by remember { mutableStateOf(false) }
     val done = occurrence.status == OccurrenceStatus.Completed || occurrence.status == OccurrenceStatus.Excused
-    val showPoints = LocalFeatures.current.points
+    // Today's time sits at the row's end, as in the mockups; other days keep the day in the line under the title.
+    val dueToday = app.obey.ui.common.parseInstant(occurrence.dueAt).local().toLocalDate() == java.time.LocalDate.now()
+    val endTime = dueToday && !occurrence.isStaying
     val place = app.obey.ui.location.LocalPlaces.current[occurrence.placeId]
     val supporting = buildList {
         if (occurrence.isCounted) add(occurrence.countLine)
         if (occurrence.isPlaced) app.obey.ui.location.placeLine(occurrence, place)?.let { add(it) }
         // While someone is staying, the clock that matters is the stay's, not the deadline.
-        if (!occurrence.isStaying) add(formatDue(occurrence.dueAt))
+        if (!occurrence.isStaying && !dueToday) add(formatDue(occurrence.dueAt))
+        if (occurrence.status == OccurrenceStatus.Pending && occurrence.diamondState() == DiamondState.Owed) add("Overdue")
         if (occurrence.rescheduled) add("moved")
         if (assigneeName != null) add(assigneeName)
-        if (showPoints && occurrence.points != 0) add("${signed(occurrence.points)} pts" + if (occurrence.isCounted && occurrence.countPer == "count") " each" else "")
         if (occurrence.status == OccurrenceStatus.Pending && occurrence.isRitual && occurrence.stepsDone.isNotEmpty()) add(occurrence.stepProgress)
         if (occurrence.status == OccurrenceStatus.Pending && actions.onComplete != null && !occurrence.isOpen()) add(occurrence.opensLabel())
         if (occurrence.waitingToSync) add("waiting to sync")
@@ -140,9 +140,9 @@ fun OccurrenceRow(
         headlineContent = {
             Text(occurrence.title, textDecoration = if (done && !occurrence.isCounted) TextDecoration.LineThrough else null)
         },
-        supportingContent = {
+        supportingContent = if (supporting.isEmpty() && occurrence.mood == null && occurrence.commentCount == 0) null else ({
             Column {
-                Text(supporting, color = if (occurrence.status == OccurrenceStatus.Missed || occurrence.countState() == app.obey.api.CountState.Over) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                if (supporting.isNotEmpty()) Text(supporting, color = if (occurrence.status == OccurrenceStatus.Missed || occurrence.countState() == app.obey.api.CountState.Over) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
                 occurrence.mood?.let { m ->
                     Row(Modifier.padding(top = 4.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                         Icon(app.obey.ui.common.moodIcon(m), null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -163,10 +163,18 @@ fun OccurrenceRow(
                         )
                     }
                 }
-                StreakStrip(streak, Modifier.padding(top = 6.dp))
             }
-        },
+        }),
         trailingContent = {
+          Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            if (endTime && actions.onExcuse == null && actions.onApprove == null) {
+                val owed = occurrence.diamondState() == DiamondState.Owed
+                Text(
+                    app.obey.ui.common.formatTime(occurrence.dueAt),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (owed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             if (actions.onExcuse != null || actions.onConfirmMiss != null) {
                 Row {
                     actions.onExcuse?.let { IconButton(onClick = it) { Icon(Icons.Outlined.RemoveCircleOutline, "Excuse: no penalty") } }
@@ -216,6 +224,7 @@ fun OccurrenceRow(
                     }
                 }
             }
+          }
         },
     )
 }
