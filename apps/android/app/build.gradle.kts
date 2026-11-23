@@ -18,17 +18,24 @@ val apiBaseUrl: String = providers.gradleProperty("obey.apiBaseUrl").getOrElse("
 // Where invite links point: the web app, which handles sign-in and accepting.
 val webUrl: String = providers.gradleProperty("obey.webUrl").getOrElse("https://app.fealty.me")
 
+// Release builds: the Play upload key comes from the environment (the release workflow writes it from repository
+// secrets), never from the repo. Without it, bundleRelease still builds an unsigned .aab.
+val uploadKeystore: String? = System.getenv("FEALTY_UPLOAD_KEYSTORE")?.takeIf { file(it).exists() }
+// Every Play upload needs a higher versionCode; the release workflow passes its run number.
+val releaseVersionCode: Int = providers.gradleProperty("fealty.versionCode").orNull?.toIntOrNull() ?: 1
+val releaseVersionName: String = providers.gradleProperty("fealty.versionName").getOrElse("0.1.0")
+
 android {
     namespace = "app.obey"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         // The Play Store id, fixed forever once published. Code stays in the app.obey namespace.
         applicationId = "me.fealty"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        targetSdk = 36
+        versionCode = releaseVersionCode
+        versionName = releaseVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
         buildConfigField("boolean", "FIREBASE_CONFIGURED", hasGoogleServices.toString())
@@ -43,6 +50,14 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
+        if (uploadKeystore != null) {
+            create("release") {
+                storeFile = file(uploadKeystore)
+                storePassword = System.getenv("FEALTY_UPLOAD_STORE_PASSWORD")
+                keyAlias = System.getenv("FEALTY_UPLOAD_KEY_ALIAS")
+                keyPassword = System.getenv("FEALTY_UPLOAD_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -55,6 +70,7 @@ android {
             manifestPlaceholders["usesCleartextTraffic"] = "true"
         }
         release {
+            if (uploadKeystore != null) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
