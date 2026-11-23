@@ -12,11 +12,11 @@ import { isPlaced } from "./Location";
 import { useQuickComplete } from "./TaskRow";
 import { Icon, IconButton, cx } from "./ui";
 
-const HOUR = 60 * 60_000;
-const URGENT = 15 * 60_000;
+export const HOUR = 60 * 60_000;
+export const URGENT = 15 * 60_000;
 
 /** Ticks once a second while mounted. */
-function useNow() {
+export function useNow() {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -37,13 +37,13 @@ function nextDeadline(list: Occurrence[], userId: string, isDom: boolean, now: n
     .sort((a, b) => a.dueAt.localeCompare(b.dueAt))[0];
 }
 
-const mmss = (ms: number) => {
+export const mmss = (ms: number) => {
   const s = Math.max(0, Math.ceil(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
 
 /** A live countdown on Today for anything due within the hour. It turns red in the last 15 minutes. */
-export function CountdownCard() {
+export function CountdownCard({ skip }: { skip?: string } = {}) {
   const { me, isDom, solo, rel, memberName } = useRel();
   const occ = useTodayOccurrences();
   const now = useNow();
@@ -52,7 +52,7 @@ export function CountdownCard() {
   const [running, setRunning] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
   const o = nextDeadline(occ.data ?? [], me.user.id, isDom, now);
-  if (!o) return null;
+  if (!o || o.id === skip) return null;
 
   const left = new Date(o.dueAt).getTime() - now;
   const urgent = left <= URGENT;

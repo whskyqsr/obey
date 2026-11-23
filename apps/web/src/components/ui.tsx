@@ -30,6 +30,29 @@ export function Icon({ name, filled, className, size }: { name: string; filled?:
   );
 }
 
+// ---------- The diamond: Letters' one shape, the checkbox and the "you are here" marker
+
+export type DiamondState = "open" | "done" | "owed" | "waiting" | "off";
+
+/** A diamond in the state of a task: open, done (filled ink), owed or missed (accent), waiting (half), off (muted). */
+export function Diamond({ state = "open", size = 14, className }: { state?: DiamondState; size?: number; className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cx(
+        "inline-block shrink-0 rotate-45 border-[1.5px]",
+        state === "open" && "border-on-surface",
+        state === "done" && "border-on-surface bg-on-surface",
+        state === "owed" && "border-primary bg-primary-container",
+        state === "waiting" && "border-on-surface bg-[linear-gradient(135deg,var(--md-on-surface)_50%,transparent_50%)]",
+        state === "off" && "border-outline",
+        className,
+      )}
+      style={{ width: size, height: size }}
+    />
+  );
+}
+
 // ---------- Buttons
 
 type Variant = "filled" | "tonal" | "outlined" | "text" | "elevated" | "danger";
