@@ -168,7 +168,7 @@ fun LocationScreen(onPlaces: () -> Unit, onCurfew: () -> Unit, vm: LocationViewM
     val context = LocalContext.current
     val setup by vm.setup.collectAsStateWithLifecycle()
     val watching by vm.watching.collectAsStateWithLifecycle()
-    val onCurfew by vm.onCurfew.collectAsStateWithLifecycle()
+    val underCurfew by vm.onCurfew.collectAsStateWithLifecycle()
     val curfew by vm.curfew.collectAsStateWithLifecycle()
     val othersWatching by vm.othersWatching.collectAsStateWithLifecycle()
     val places by vm.places.collectAsStateWithLifecycle()
@@ -193,7 +193,7 @@ fun LocationScreen(onPlaces: () -> Unit, onCurfew: () -> Unit, vm: LocationViewM
     val canManage = session?.canManage == true
     val curfewOn = curfew?.enabled == true
     // A sub (or switch, or someone on their own) carries the phone that checks in; a Dominant only does if a task or curfew names them.
-    val watched = session?.readOnly != true && (solo || me?.role != Role.Dominant || watching.isNotEmpty() || onCurfew)
+    val watched = session?.readOnly != true && (solo || me?.role != Role.Dominant || watching.isNotEmpty() || underCurfew)
     val watchedOthers = session?.partners.orEmpty().filter { it.role != Role.Dominant }
     val placeName = { o: app.obey.api.Occurrence -> places?.firstOrNull { it.id == o.placeId }?.name ?: "A place" }
 
@@ -302,7 +302,7 @@ fun LocationScreen(onPlaces: () -> Unit, onCurfew: () -> Unit, vm: LocationViewM
                 } else {
                     Text(
                         "Stops watching every place. Location tasks due while paused are excused" + (if (solo) "." else ", and $who is told you paused.") +
-                            if (onCurfew) " Curfew still counts: tap I'm home on Today instead." else "",
+                            if (underCurfew) " Curfew still counts: tap I'm home on Today instead." else "",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
