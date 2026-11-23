@@ -14,7 +14,7 @@ import { StreakStrip } from "./StreakStrip";
 import { useNoteAfter } from "./DecisionNote";
 import { CountRing, CountSheet, canCount, countLine, isCounted, readyToSend, useCountTap } from "./Count";
 import { CheckInButton, PlaceRing, canCheckIn, isPlaced, placeLine, useCheckIn, usePlaceLookup } from "./Location";
-import { Button, Icon, IconButton, cx, useSnackbar } from "./ui";
+import { Button, Diamond, Icon, IconButton, cx, useSnackbar } from "./ui";
 
 /** Where a row opens its task. Today's wide layout points it at the side panel instead of the task page. */
 export const RowLink = createContext<((taskId: string) => { to: string; params?: Record<string, string>; search?: Record<string, string>; current?: boolean }) | null>(null);
@@ -92,8 +92,8 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
     <div
       data-row
       className={cx(
-        "state-layer flex min-h-16 items-center gap-2 py-1 pr-2 pl-1 has-[a[data-card-link]:focus-visible]:outline-2 has-[a[data-card-link]:focus-visible]:-outline-offset-2 has-[a[data-card-link]:focus-visible]:outline-primary",
-        current ? "bg-secondary-container" : "bg-surface-container-low",
+        "state-layer flex min-h-16 items-center gap-2 py-1 pr-1 pl-0 has-[a[data-card-link]:focus-visible]:outline-2 has-[a[data-card-link]:focus-visible]:-outline-offset-2 has-[a[data-card-link]:focus-visible]:outline-primary",
+        current && "bg-surface-container-lowest",
       )}
     >
       <div className="relative z-10">
@@ -110,31 +110,20 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
           isRitual(o) ? (
             <IconButton icon="play_circle" label={`Start “${o.title}”`} data-action="done" className={missed ? "text-error" : "text-primary"} onClick={() => setRunning(true)} />
           ) : (
-            <IconButton
-              icon="radio_button_unchecked"
-              label={`Mark “${o.title}” done`}
+            <button
+              type="button"
+              aria-label={`Mark “${o.title}” done`}
+              title={`Mark “${o.title}” done`}
               data-action="done"
-              className={missed ? "text-error" : "text-on-surface-variant"}
+              className="state-layer group flex size-10 items-center justify-center rounded-full"
               onClick={() => (o.proofRequired || o.askMood || o.asksJournal ? setCompleting(true) : quickComplete(o))}
-            />
+            >
+              <Diamond state={missed ? "owed" : "open"} className="transition-colors group-hover:bg-on-surface/15" />
+            </button>
           )
         ) : (
-          <span className="flex size-10 items-center justify-center">
-            <Icon
-              name={
-                o.status === "completed"
-                  ? "check_circle"
-                  : o.status === "submitted"
-                    ? "hourglass_top"
-                    : o.status === "excused"
-                      ? "remove_circle_outline"
-                      : missed
-                        ? "error"
-                        : "radio_button_unchecked"
-              }
-              filled={o.status === "completed"}
-              className={o.status === "completed" ? "text-primary" : o.status === "submitted" ? "text-tertiary" : missed ? "text-error" : "text-outline"}
-            />
+          <span className="flex size-10 items-center justify-center" title={o.status === "submitted" ? "Waiting for approval" : undefined}>
+            <Diamond state={o.status === "completed" ? "done" : o.status === "submitted" ? "waiting" : o.status === "excused" ? "off" : missed ? "owed" : "off"} />
           </span>
         )}
       </div>
@@ -171,7 +160,7 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
           <IconButton icon="more_time" label={mine ? "More time" : "Reschedule"} data-action="more" onClick={() => setRescheduling(true)} />
         )}
         {features.points && o.points !== 0 && (
-          <span className="min-w-9 rounded-full bg-primary-container/70 px-2 py-0.5 text-center text-label-medium text-on-primary-container tabular-nums">
+          <span className="min-w-9 px-1 text-right text-label-medium text-outline tabular-nums">
             {o.points > 0 ? `+${o.points}` : o.points}
             {counted && o.countPer === "count" ? " each" : ""}
           </span>
@@ -185,9 +174,9 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
   );
 }
 
-/** Rows stacked into one rounded group. */
+/** Rows stacked as one list, divided by hairlines. */
 export function RowGroup({ children }: { children: ReactNode }) {
-  return <div className="flex flex-col gap-0.5 overflow-hidden rounded-lg">{children}</div>;
+  return <div className="flex flex-col divide-y divide-outline-variant border-y border-outline-variant">{children}</div>;
 }
 
 /** Approve / Send back for a submitted completion, decided in place. */

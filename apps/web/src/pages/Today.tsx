@@ -245,23 +245,28 @@ function Progress({ today: list, done, points }: { today: Occurrence[]; done: nu
   const open = list.filter((o) => o.status === "pending");
   const next = open.find((o) => new Date(o.dueAt).getTime() >= now);
   const left = open.reduce((sum, o) => sum + Math.max(0, o.points), 0);
-  const r = 22;
-  const c = 2 * Math.PI * r;
   const frac = list.length ? done / list.length : 0;
   return (
-    <div className="mx-4 mb-6 flex items-center gap-4 rounded-xl bg-primary-container p-4 text-on-primary-container md:mx-6">
-      <svg viewBox="0 0 56 56" className="size-14 shrink-0 -rotate-90" aria-hidden>
-        <circle cx="28" cy="28" r={r} fill="none" strokeWidth="6" className="stroke-on-primary-container/15" />
-        <circle cx="28" cy="28" r={r} fill="none" strokeWidth="6" strokeLinecap="round" className="stroke-primary" strokeDasharray={`${c * frac} ${c}`} />
-      </svg>
-      <div className="min-w-0">
-        <div className="text-title-large">{done === list.length ? "All done for today" : `${done} of ${list.length} done`}</div>
-        <div className="text-body-medium">
-          {[next ? `Next: ${next.title} ${fmtRelative(next.dueAt)}` : open.length ? `${open.length} still open` : null, points && left ? `${left} pts left today` : null]
-            .filter(Boolean)
-            .join(" · ")}
-        </div>
+    <div className="mx-4 mb-6 md:mx-6">
+      <div className="flex items-baseline justify-between gap-3">
+        <div className="font-serif text-[26px] leading-8 text-on-surface">{done === list.length ? "All done for today" : `${done} of ${list.length} done`}</div>
+        {points && left > 0 && <div className="shrink-0 text-body-small text-outline tabular-nums">{left} pts left</div>}
       </div>
+      {/* A thin line, not a ring: progress is a glance, not the point. */}
+      <div className="mt-2 h-0.5 bg-outline-variant" aria-hidden>
+        <div className="h-full bg-on-surface transition-[width]" style={{ width: `${frac * 100}%` }} />
+      </div>
+      {(next || open.length > 0) && (
+        <div className="mt-2 text-body-medium text-on-surface-variant">
+          {next ? (
+            <>
+              Next: <span className="text-on-surface">{next.title}</span> {fmtRelative(next.dueAt)}
+            </>
+          ) : (
+            `${open.length} still open`
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -271,8 +276,8 @@ function LaterDay({ day, items }: { day: string; items: Occurrence[] }) {
   const [open, setOpen] = useState(false);
   const label = day === addDays(today(), 1) ? "Tomorrow" : fmtDate(day, { weekday: "long", month: "short", day: "numeric" });
   return (
-    <div className="overflow-hidden rounded-lg bg-surface-container-low">
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="state-layer flex w-full items-center gap-3 px-4 py-3 text-left">
+    <div className="border-b border-outline-variant">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="state-layer flex w-full items-center gap-3 py-3 text-left">
         <div className="min-w-0 flex-1">
           <div className="text-title-medium text-on-surface">
             {label} · {items.length} {items.length === 1 ? "task" : "tasks"}
