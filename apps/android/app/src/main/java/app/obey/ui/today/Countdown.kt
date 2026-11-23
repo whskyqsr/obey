@@ -1,27 +1,27 @@
 package app.obey.ui.today
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.MoreTime
 import androidx.compose.material.icons.outlined.PlayArrow
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -85,37 +85,42 @@ fun CountdownCard(
     val c = MaterialTheme.colorScheme
     val (bg, fg, accent) = if (urgent) Triple(c.errorContainer, c.onErrorContainer, c.error) else Triple(c.tertiaryContainer, c.onTertiaryContainer, c.tertiary)
     Surface(color = bg, contentColor = fg, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(Icons.Filled.Timer, null, Modifier.padding(top = 2.dp))
-                Column(Modifier.weight(1f).clickable { onOpen(o) }) {
-                    Text(o.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(listOfNotNull(who(o), "due ${formatTime(o.dueAt)}").joinToString(" · "), style = MaterialTheme.typography.bodyMedium)
+        Box {
+            Row(
+                Modifier.padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(Icons.Filled.Timer, null)
+                Column(Modifier.weight(1f).padding(start = 4.dp).clickable { onOpen(o) }) {
+                    Text(o.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(listOfNotNull(who(o), "due ${formatTime(o.dueAt)}").joinToString(" · "), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Text(mmss(left), style = MaterialTheme.typography.displaySmall, modifier = Modifier.semantics { contentDescription = "${(left + 59_999) / 60_000} minutes left" })
+                Text(mmss(left), style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { contentDescription = "${(left + 59_999) / 60_000} minutes left" })
+                if (mine || isDom) {
+                    IconButton(onClick = { onMoreTime(o) }) {
+                        Icon(Icons.Outlined.MoreTime, if (mine) "More time" else "Reschedule")
+                    }
+                }
+                if (mine && o.isOpen()) {
+                    FilledIconButton(
+                        onClick = { onDone(o) },
+                        colors = if (urgent) IconButtonDefaults.filledIconButtonColors(containerColor = c.error, contentColor = c.onError) else IconButtonDefaults.filledIconButtonColors(),
+                    ) {
+                        Icon(if (o.isRitual) Icons.Outlined.PlayArrow else Icons.Outlined.Check, if (o.isRitual) "Start" else "Done")
+                    }
+                }
             }
+            // Time left, as a thin bar along the bottom edge.
             LinearProgressIndicator(
                 progress = { (left.toFloat() / HOUR).coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth().height(6.dp),
+                modifier = Modifier.fillMaxWidth().height(4.dp).align(Alignment.BottomCenter),
                 color = accent,
                 trackColor = fg.copy(alpha = 0.15f),
-                strokeCap = StrokeCap.Round,
+                strokeCap = StrokeCap.Butt,
+                gapSize = 0.dp,
                 drawStopIndicator = {},
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (mine && o.isOpen()) {
-                    Button(onClick = { onDone(o) }, colors = if (urgent) ButtonDefaults.buttonColors(containerColor = c.error, contentColor = c.onError) else ButtonDefaults.buttonColors()) {
-                        Icon(if (o.isRitual) Icons.Outlined.PlayArrow else Icons.Outlined.Check, null, Modifier.size(18.dp))
-                        Text(if (o.isRitual) "  Start" else "  Done")
-                    }
-                }
-                if (mine || isDom) {
-                    TextButton(onClick = { onMoreTime(o) }, colors = ButtonDefaults.textButtonColors(contentColor = fg)) {
-                        Icon(Icons.Outlined.MoreTime, null, Modifier.size(18.dp))
-                        Text(if (mine) "  More time" else "  Reschedule")
-                    }
-                }
-            }
         }
     }
 }
