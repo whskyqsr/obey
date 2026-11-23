@@ -31,6 +31,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -125,17 +126,15 @@ fun ProtocolsScreen(onOpen: (String) -> Unit, onNew: () -> Unit, onOpenSettings:
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 navigationIcon = { MenuButton() },
                 title = { app.obey.ui.common.PairedTitle("Protocols", if (onRules != null) "Rules" else null) { onRules?.invoke() } },
                 actions = {
                     IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.AssignmentLate, "Broken rules") }
+                    if (canManage) IconButton(onClick = onNew) { Icon(Icons.Outlined.Add, "New protocol") }
                     SafeWordAction()
                 },
             )
-        },
-        floatingActionButton = {
-            if (canManage) ExtendedFloatingActionButton(onClick = onNew, icon = { Icon(Icons.Outlined.Add, null) }, text = { Text("Protocol") })
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->

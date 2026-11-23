@@ -29,6 +29,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -106,19 +107,15 @@ fun ScenesScreen(onOpenSettings: () -> Unit, onOpen: (String) -> Unit, onAfterca
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 title = { Text("Scenes") },
                 navigationIcon = { MenuButton() },
                 actions = {
                     IconButton(onClick = onAftercare) { Icon(Icons.Outlined.VolunteerActivism, "Aftercare") }
+                    if (!session.readOnly) IconButton(onClick = { logging = true }) { Icon(Icons.Outlined.Add, "Log a scene") }
                     SafeWordAction()
                 },
             )
-        },
-        floatingActionButton = {
-            if (!session.readOnly) {
-                ExtendedFloatingActionButton(onClick = { logging = true }, icon = { Icon(Icons.Outlined.Add, null) }, text = { Text("Log a scene") })
-            }
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->

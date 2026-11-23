@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
@@ -72,8 +73,13 @@ fun SignInScreen(vm: SettingsViewModel = hiltViewModel()) {
                     .padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("Fealty", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
-                Text("Less upkeep. More of each other.", style = MaterialTheme.typography.bodyLarge)
+                Text("Fealty", style = MaterialTheme.typography.displaySmall.copy(fontSize = 64.sp, lineHeight = 64.sp))
+                Text(
+                    "Less upkeep.\nMore of each other.",
+                    style = MaterialTheme.typography.headlineMedium.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 24.dp),
+                )
 
                 if (vm.firebaseAvailable) {
                     Button(

@@ -42,6 +42,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
@@ -57,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import app.obey.ui.common.BackLink
 import app.obey.api.Consequence
 import app.obey.api.Curfew
 import app.obey.api.CurfewInput
@@ -154,9 +156,9 @@ fun CurfewScreen(onBack: () -> Unit, onPlaces: () -> Unit, vm: CurfewViewModel =
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 title = { Text("Curfew") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") } },
+                navigationIcon = { BackLink("Location", onBack) },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },

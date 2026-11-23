@@ -51,6 +51,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -65,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.obey.ui.common.BackLink
 import app.obey.api.LocationStatus
 import app.obey.api.Member
 import app.obey.api.Place
@@ -199,7 +201,7 @@ fun LocationScreen(onPlaces: () -> Unit, onCurfew: () -> Unit, vm: LocationViewM
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 title = { Text("Location") },
                 navigationIcon = { app.obey.ui.common.MenuButton() },
                 actions = { app.obey.ui.common.SafeWordAction() },
@@ -361,9 +363,9 @@ fun PlacesScreen(onBack: () -> Unit, vm: LocationViewModel = hiltViewModel()) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 title = { Text("Places") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") } },
+                navigationIcon = { BackLink("Location", onBack) },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },

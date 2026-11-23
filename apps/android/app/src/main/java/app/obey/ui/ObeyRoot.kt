@@ -342,7 +342,7 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
 
     // Phones: the switcher leads Today, Week and Us; the pages Us lists lead back to it. Tablets have the rail.
     val chipLead: @Composable () -> Unit = { DynamicSwitcherChip(switcher) }
-    val backLead: @Composable () -> Unit = { IconButton(onClick = { backToUs() }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Us") } }
+    val backLead: @Composable () -> Unit = { app.obey.ui.common.BackLink("Us") { backToUs() } }
     val lead: (@Composable () -> Unit)? = if (wide) null else if (onTab) chipLead else if (onSection) backLead else null
     val host: @Composable () -> Unit = {
         SafeCallFrame(safeVm, activeCall) {

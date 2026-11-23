@@ -67,6 +67,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
@@ -351,7 +352,7 @@ private fun AgreementContent(onOpenSettings: () -> Unit, onOpenNote: (String) ->
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 title = {
                     Column {
                         Text(title)
@@ -910,7 +911,7 @@ private fun AgreementEditor(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Scaffold(
             topBar = {
-                TopAppBar(
+                LargeTopAppBar(
                     title = { Text("Version ${start.number}") },
                     navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.Outlined.Close, "Close") } },
                     actions = {
