@@ -30,11 +30,12 @@ import { Button, Dialog, Icon, IconButton, Section, TextField, cx, useSnackbar }
 
 type Tone = "primary" | "secondary" | "tertiary" | "error" | "neutral";
 const TONE: Record<Tone, string> = {
-  primary: "bg-primary-container text-on-primary-container",
-  secondary: "bg-secondary-container text-on-secondary-container",
-  tertiary: "bg-tertiary-container text-on-tertiary-container",
-  error: "bg-error-container text-on-error-container",
-  neutral: "bg-surface-container-highest text-on-surface-variant",
+  // Letters: the icon carries the tone on its own, with no filled circle behind it.
+  primary: "text-primary",
+  secondary: "text-on-surface-variant",
+  tertiary: "text-on-surface-variant",
+  error: "text-error",
+  neutral: "text-on-surface-variant",
 };
 
 /** One row of the list: a kind of thing waiting, how many, and what they are once opened. A link row opens a page instead. */
@@ -351,7 +352,7 @@ export function TodayInbox() {
     });
   return (
     <Section title={`${isDom ? "Needs you" : "For you"} · ${total}`}>
-      <div className="flex flex-col gap-0.5 overflow-hidden rounded-lg">
+      <div className="flex flex-col divide-y divide-outline-variant border-y border-outline-variant">
         {groups.map((g) => (
           <GroupRow key={g.key} g={g} open={isOpen(g.key)} onToggle={() => toggle(g.key)} />
         ))}
@@ -363,7 +364,7 @@ export function TodayInbox() {
 function GroupRow({ g, open, onToggle }: { g: Group; open: boolean; onToggle(): void }) {
   const head = (
     <>
-      <span className={cx("flex size-10 shrink-0 items-center justify-center rounded-full", TONE[g.tone])}>
+      <span className={cx("flex size-8 shrink-0 items-center justify-center", TONE[g.tone])}>
         <Icon name={g.icon} size={22} />
       </span>
       <div className="min-w-0 flex-1">
@@ -374,24 +375,24 @@ function GroupRow({ g, open, onToggle }: { g: Group; open: boolean; onToggle(): 
   );
   if (g.to)
     return (
-      <Link to={g.to} className="state-layer flex min-h-16 items-center gap-4 bg-surface-container-low px-4 py-2">
+      <Link to={g.to} className="state-layer flex min-h-16 items-center gap-3 py-2 pr-2">
         {head}
         <Icon name="chevron_right" className="text-on-surface-variant" />
       </Link>
     );
   return (
-    <div className="bg-surface-container-low">
+    <div>
       <div className="flex min-h-16 items-center">
-        <button type="button" aria-expanded={open} onClick={onToggle} className="state-layer flex min-w-0 flex-1 items-center gap-4 self-stretch py-2 pr-4 pl-4 text-left">
+        <button type="button" aria-expanded={open} onClick={onToggle} className="state-layer flex min-w-0 flex-1 items-center gap-3 self-stretch py-2 pr-2 text-left">
           {head}
           {!open && <span className="rounded-full bg-primary px-2 py-0.5 text-label-medium text-on-primary tabular-nums">{g.count}</span>}
           <Icon name={open ? "expand_less" : "expand_more"} className="text-on-surface-variant" />
         </button>
       </div>
       {open && g.body && (
-        <div className="flex flex-col gap-2 px-2 pb-2">
+        <div className="flex flex-col gap-0 pb-3 md:pl-11 [&>*+*]:border-t [&>*+*]:border-outline-variant">
           {g.body}
-          {g.action && <div className="flex justify-end">{g.action}</div>}
+          {g.action && <div className="flex justify-end pt-3">{g.action}</div>}
         </div>
       )}
     </div>
@@ -423,7 +424,7 @@ function LibraryChangeRow({ c, onSeen }: { c: LibraryChange; onSeen(): void }) {
     </div>
   );
   return (
-    <div className="flex min-h-16 items-center gap-2 bg-surface-container py-2 pr-2 pl-4">
+    <div className="flex min-h-16 items-center gap-2 py-2">
       {c.verb === "removed" ? (
         text
       ) : c.kind === "protocols" ? (
@@ -448,7 +449,7 @@ function DelayRow({ d, onSeen }: { d: DelayUsed; onSeen(): void }) {
   const { memberName } = useRel();
   const one = d.items.length === 1 ? d.items[0]! : null;
   return (
-    <div className="flex min-h-16 items-center gap-2 bg-surface-container py-2 pr-2 pl-4">
+    <div className="flex min-h-16 items-center gap-2 py-2">
       <div className="min-w-0 flex-1">
         <div className="text-body-large text-on-surface">
           {one ? (
@@ -473,7 +474,7 @@ function DelayRow({ d, onSeen }: { d: DelayUsed; onSeen(): void }) {
 function PlanChangeRow({ e, onSeen }: { e: CalendarEvent; onSeen(): void }) {
   const { memberName } = useRel();
   return (
-    <div className="flex min-h-16 items-center gap-2 bg-surface-container py-2 pr-2 pl-4">
+    <div className="flex min-h-16 items-center gap-2 py-2">
       <div className="min-w-0 flex-1">
         <div className="text-body-large text-on-surface">
           {e.changedBy ? memberName(e.changedBy) : "Someone"} changed {e.title}

@@ -12,6 +12,7 @@ import { RoleSwapCard } from "../components/RoleSwap";
 import { ChastityToday } from "../components/Chastity";
 import { SoloCards } from "../components/Solo";
 import { CountdownCard } from "../components/Countdown";
+import { NextUp, pickNext } from "../components/NextUp";
 import { KitPrompt } from "./Kits";
 import { Button, Empty, ErrorBox, Fab, Icon, Loading, PageHeader, Section } from "../components/ui";
 import { addDays, fmtDate, fmtRelative, localDateOf, today } from "../lib/dates";
@@ -52,7 +53,9 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
 
   // The Dom's "Needs you" rows are taken out of the rest of today.
   const decided = new Set([...needs.review, ...needs.missed].map((o) => o.id));
-  const restOfToday = isDom ? groups.today.filter((o) => !decided.has(o.id)) : groups.today;
+  // Whoever has tasks of their own is led by the next one, which then leaves the list below.
+  const next = useMemo(() => (occ.data ? pickNext(groups.today, me.user.id) : undefined), [occ.data, groups.today, me.user.id]);
+  const restOfToday = (isDom ? groups.today.filter((o) => !decided.has(o.id)) : groups.today).filter((o) => o.id !== next?.id);
   const todays = groups.today.filter((o) => o.status !== "excused");
   const doneToday = todays.filter((o) => o.status === "completed" || o.status === "submitted").length;
   const partner = rel.members.find((m) => m.userId !== me.user.id);
@@ -80,13 +83,15 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
               .filter(Boolean)
               .join(" · ")}
           />
-          <CountdownCard />
+          {/* The Next block counts down on its own, so the separate countdown is only for what it doesn't cover. */}
+          <CountdownCard skip={next?.id} />
           <RoleSwapCard />
           <SoloCards />
           <ChastityToday />
           <CurfewStrip />
           <SceneCards />
-          {(solo || !isDom) && occ.data && todays.length > 0 && <Progress today={todays} done={doneToday} points={features.points} />}
+          {(solo || !isDom) && occ.data && todays.length > 0 && <Progress today={todays} done={doneToday} points={features.points} showNext={!next} />}
+          {next && <NextUp o={next} />}
           <KitPrompt />
           <TodayInbox />
           {occ.isLoading && <Loading />}
@@ -103,7 +108,7 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
                 </Section>
               )}
               <Section
-                title={isDom && needs.count > 0 ? "Rest of today" : "Today"}
+                title={next ? "Later today" : isDom && needs.count > 0 ? "Rest of today" : "Today"}
                 action={
                   myOpenToday.length > 1 ? (
                     <Button variant="text" icon="more_time" onClick={() => setDaySheet(true)}>
@@ -240,7 +245,7 @@ function ShortcutHints({ dom }: { dom: boolean }) {
 }
 
 /** "1 of 5 done", what's next and the points still on the table today. */
-function Progress({ today: list, done, points }: { today: Occurrence[]; done: number; points: boolean }) {
+function Progress({ today: list, done, points, showNext = true }: { today: Occurrence[]; done: number; points: boolean; showNext?: boolean }) {
   const now = Date.now();
   const open = list.filter((o) => o.status === "pending");
   const next = open.find((o) => new Date(o.dueAt).getTime() >= now);
@@ -256,7 +261,7 @@ function Progress({ today: list, done, points }: { today: Occurrence[]; done: nu
       <div className="mt-2 h-0.5 bg-outline-variant" aria-hidden>
         <div className="h-full bg-on-surface transition-[width]" style={{ width: `${frac * 100}%` }} />
       </div>
-      {(next || open.length > 0) && (
+      {showNext && (next || open.length > 0) && (
         <div className="mt-2 text-body-medium text-on-surface-variant">
           {next ? (
             <>
