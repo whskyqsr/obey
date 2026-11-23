@@ -38,6 +38,7 @@ export function MoodPicker({ value, onChange }: { value: number | null; onChange
 const RANGES = [
   { value: "7", label: "Week" },
   { value: "30", label: "Month" },
+  { value: "90", label: "3 months" },
   { value: "365", label: "Year" },
 ] as const;
 

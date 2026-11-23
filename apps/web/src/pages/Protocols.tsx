@@ -1,11 +1,10 @@
-import { Link } from "@tanstack/react-router";
 import { importPage } from "../lib/staleBuild";
 import { Suspense, lazy, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useLibrary, useReorder } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { SortableList } from "../components/SortableList";
-import { Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, cx, useSnackbar } from "../components/ui";
+import { Button, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, cx, useSnackbar } from "../components/ui";
 import { useRel } from "../lib/relationship";
 import { excerpt } from "./Notes";
 import { sortRules } from "./Rules";
@@ -39,9 +38,9 @@ export function ProtocolsPage() {
         title="Protocols"
         subtitle={`${protocols.length} protocol${protocols.length === 1 ? "" : "s"}`}
         actions={
-          <Link to="/rule-log" className="state-layer flex h-10 items-center gap-2 rounded-full border border-outline px-4 text-label-large text-primary">
-            <Icon name="history" size={18} /> Broken-rule log
-          </Link>
+          <Button variant="tonal" icon="history" onClick={() => void navigate({ to: "/rule-log" })}>
+            Broken rules
+          </Button>
         }
       />
       <ol className="flex flex-col gap-2 px-4 md:px-6">

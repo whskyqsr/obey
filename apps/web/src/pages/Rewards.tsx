@@ -62,7 +62,7 @@ export function RewardsPage() {
   return (
     <>
       <PageHeader
-        title="Rewards & points"
+        title="Rewards"
         actions={
           isDom && (
             <Button variant="tonal" icon="tune" onClick={() => setAdjusting(true)}>

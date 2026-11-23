@@ -125,7 +125,7 @@ class MoodViewModel @Inject constructor(private val api: ObeyApi, private val se
     }
 }
 
-private val RANGES = listOf(7 to "Week", 30 to "Month", 365 to "Year")
+private val RANGES = listOf(7 to "Week", 30 to "Month", 90 to "3 months", 365 to "Year")
 
 /**
  * Mood over time for one person: check-ins and journal moods as a line with a point per answer. Hidden, header

@@ -144,7 +144,7 @@ export function Fab({ icon, label, onClick, extended = true, className }: { icon
       onClick={onClick}
       aria-label={label}
       className={cx(
-        "state-layer fixed right-4 bottom-[calc(108px+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-3 rounded-lg bg-primary-container text-on-primary-container shadow-elev-3 md:right-8 md:bottom-8",
+        "state-layer fixed right-4 bottom-[calc(108px+env(safe-area-inset-bottom))] in-data-nobar:bottom-[calc(16px+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-3 rounded-lg bg-primary-container text-on-primary-container shadow-elev-3 md:right-8 md:bottom-8",
         extended ? "px-4 pr-5" : "w-14 justify-center",
         className,
       )}

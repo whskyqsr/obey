@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useDeleteLibraryItem, useLibrary, useReorder, useSaveLibraryItem } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { Rule } from "../api/types";
 import { ItemDialog, type FieldDef } from "../components/ItemDialog";
 import { SortableList } from "../components/SortableList";
-import { Chip, Empty, ErrorBox, Fab, Icon, Loading, PageHeader, useSnackbar } from "../components/ui";
+import { Button, Chip, Empty, ErrorBox, Fab, Icon, Loading, PageHeader, useSnackbar } from "../components/ui";
 import { useRel } from "../lib/relationship";
 import { useConfirm } from "../lib/useConfirm";
 
@@ -21,6 +21,7 @@ export const sortRules = <T extends { position: number; createdAt: string }>(rul
 
 export function RulesPage() {
   const { rel, isDom, features } = useRel();
+  const navigate = useNavigate();
   const snack = useSnackbar();
   const list = useLibrary(rel.id, "rules");
   const save = useSaveLibraryItem(rel.id, "rules");
@@ -49,9 +50,9 @@ export function RulesPage() {
         title="Rules"
         subtitle={`${rules.length} rule${rules.length === 1 ? "" : "s"}`}
         actions={
-          <Link to="/rule-log" className="state-layer flex h-10 items-center gap-2 rounded-full border border-outline px-4 text-label-large text-primary">
-            <Icon name="history" size={18} /> Broken-rule log
-          </Link>
+          <Button variant="tonal" icon="history" onClick={() => void navigate({ to: "/rule-log" })}>
+            Broken rules
+          </Button>
         }
       />
       {categories.length > 0 && (

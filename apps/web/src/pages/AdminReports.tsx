@@ -5,7 +5,7 @@ import { errorMessage } from "../api/client";
 import type { AdminReport } from "../api/types";
 import { fmtDateTime } from "../lib/dates";
 import { useBack } from "../lib/useBack";
-import { SubHeader, Button, Icon, IconButton, SegmentedButtons, Spinner, cx, useSnackbar } from "../components/ui";
+import { SubHeader, Button, Icon, SegmentedButtons, Spinner, cx, useSnackbar } from "../components/ui";
 
 const REASON: Record<AdminReport["reason"], string> = {
   minor: "Shows someone under 18",

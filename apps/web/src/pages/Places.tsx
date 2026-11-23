@@ -4,7 +4,7 @@ import type { Place } from "../api/types";
 import { useAskLocation, usePlaces } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { PlaceDialog } from "../components/PlaceMap";
-import { SubHeader, Button, Empty, ErrorBox, Icon, IconButton, Loading, useSnackbar } from "../components/ui";
+import { SubHeader, Button, Empty, ErrorBox, Fab, Icon, Loading, useSnackbar } from "../components/ui";
 import { useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
 import { LocationReadiness } from "./LocationPage";
@@ -62,13 +62,7 @@ export function PlacesPage() {
             ))}
           </ul>
         )}
-        {canEdit && (
-          <div>
-            <Button variant="tonal" icon="add_location_alt" onClick={() => setEditing({ place: null })}>
-              Add a place
-            </Button>
-          </div>
-        )}
+        {canEdit && <Fab icon="add_location_alt" label="Add a place" onClick={() => setEditing({ place: null })} />}
       </div>
       <PlaceDialog place={editing?.place ?? null} open={!!editing} onClose={() => setEditing(null)} />
     </div>

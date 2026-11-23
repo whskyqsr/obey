@@ -129,7 +129,7 @@ fun ProtocolsScreen(onOpen: (String) -> Unit, onNew: () -> Unit, onOpenSettings:
                 navigationIcon = { MenuButton() },
                 title = { Text("Protocols") },
                 actions = {
-                    IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.History, "Broken-rule log") }
+                    IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.History, "Broken rules") }
                     SafeWordAction()
                     SettingsAction(onOpenSettings)
                 },
