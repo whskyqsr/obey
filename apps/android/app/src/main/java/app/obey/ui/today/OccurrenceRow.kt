@@ -13,16 +13,12 @@ import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.AddComment
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.HourglassTop
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PlayCircle
-import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.TaskAlt
-import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -42,6 +38,10 @@ import app.obey.api.Occurrence
 import app.obey.api.OccurrenceStatus
 import app.obey.api.TaskStreak
 import app.obey.ui.common.StreakStrip
+import app.obey.ui.common.Diamond
+import app.obey.ui.common.DiamondState
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -115,16 +115,32 @@ fun OccurrenceRow(
                 CountRing(occurrence, actions.onCount, actions.onCountHold)
             } else {
             val canComplete = actions.onComplete != null && occurrence.status == OccurrenceStatus.Pending && occurrence.isOpen()
-            IconButton(onClick = { actions.onComplete?.invoke() }, enabled = canComplete) {
-                when (occurrence.status) {
-                    OccurrenceStatus.Completed -> Icon(Icons.Outlined.CheckCircle, "Completed", tint = MaterialTheme.colorScheme.primary)
-                    OccurrenceStatus.Submitted -> Icon(Icons.Outlined.HourglassTop, "Awaiting approval")
-                    OccurrenceStatus.Missed -> Icon(Icons.Outlined.ErrorOutline, "Missed", tint = MaterialTheme.colorScheme.error)
-                    else -> if (occurrence.isRitual) {
-                        Icon(Icons.Outlined.PlayCircle, "Start", tint = if (canComplete) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline)
-                    } else {
-                        Icon(Icons.Outlined.RadioButtonUnchecked, "Mark done")
+            IconButton(
+                onClick = { actions.onComplete?.invoke() },
+                enabled = canComplete,
+                modifier = Modifier.semantics {
+                    contentDescription = when (occurrence.status) {
+                        OccurrenceStatus.Completed -> "Completed"
+                        OccurrenceStatus.Submitted -> "Awaiting approval"
+                        OccurrenceStatus.Missed -> "Missed"
+                        OccurrenceStatus.Excused -> "Excused"
+                        else -> if (occurrence.isRitual) "Start" else "Mark done"
                     }
+                },
+            ) {
+                // A ritual still starts with play; everything else is the diamond.
+                if (occurrence.status == OccurrenceStatus.Pending && occurrence.isRitual) {
+                    Icon(Icons.Outlined.PlayCircle, null, tint = if (canComplete) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline)
+                } else {
+                    Diamond(
+                        when (occurrence.status) {
+                            OccurrenceStatus.Completed -> DiamondState.Done
+                            OccurrenceStatus.Submitted -> DiamondState.Waiting
+                            OccurrenceStatus.Missed -> DiamondState.Owed
+                            OccurrenceStatus.Excused -> DiamondState.Off
+                            else -> if (app.obey.ui.common.parseInstant(occurrence.dueAt).isBefore(java.time.Instant.now())) DiamondState.Owed else DiamondState.Open
+                        },
+                    )
                 }
             }
             }

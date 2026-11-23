@@ -170,7 +170,9 @@ fun TodayScreen(
                 val isDom = session?.canManage == true
                 val reviewIds = d.awaitingReview.map { it.id }.toSet()
                 val missIds = d.recentMisses.map { it.id }.toSet()
-                val restOfToday = if (isDom) d.today.filter { it.id !in reviewIds && it.id !in missIds } else d.today
+                // Whoever has tasks of their own is led by the next one, which then leaves the list below.
+                val next = pickNext(d.today, me)
+                val restOfToday = (if (isDom) d.today.filter { it.id !in reviewIds && it.id !in missIds } else d.today).filter { it.id != next?.id }
                 fun row(o: Occurrence, actions: OccurrenceActions = actionsFor(o)): @Composable () -> Unit = {
                     SwipeableRow(
                         o,
@@ -456,6 +458,7 @@ fun TodayScreen(
                                 onDone = { o -> if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) },
                                 onMoreTime = { o -> rescheduling = o },
                                 onOpen = { o -> onOpenTask(o.seriesId) },
+                                skip = next?.id,
                             )
                         }
                     }
@@ -507,14 +510,25 @@ fun TodayScreen(
                     }
                     if (!isDom || session?.solo == true) {
                         val counted = d.today.filter { it.status != OccurrenceStatus.Excused }
-                        if (counted.isNotEmpty()) item(key = "progress") { ProgressCard(counted) }
+                        if (counted.isNotEmpty()) item(key = "progress") { ProgressCard(counted, showNext = next == null) }
+                    }
+                    next?.let { o ->
+                        item(key = "next") {
+                            NextUp(
+                                o,
+                                by = if (!isDom) session?.partners?.firstOrNull()?.displayName else null,
+                                onDone = { if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) },
+                                onMoreTime = { rescheduling = o },
+                                onOpen = { onOpenTask(o.seriesId) },
+                            )
+                        }
                     }
                     if (inbox.isNotEmpty()) item(key = "inbox") { TodayInbox(if (isDom) "Needs you" else "For you", inbox, busy) }
                     if (d.overdue.isNotEmpty()) {
                         item(key = "h-over") { SectionHeader("Overdue") }
                         items(d.overdue, key = { "o-" + it.id }) { o -> row(o)() }
                     }
-                    item(key = "h-today") { SectionHeader(if (isDom && waiting > 0) "Rest of today" else "Today") }
+                    item(key = "h-today") { SectionHeader(if (next != null) "Later today" else if (isDom && waiting > 0) "Rest of today" else "Today") }
                     // Whole-day extension: the user's own open tasks for today, plus today's that already slipped.
                     // Tasks that already have a request waiting aren't offered again.
                     val asked = d.requests.flatten().map { it.occurrenceId }.toSet()

@@ -1,5 +1,7 @@
 package app.obey.ui.common
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,9 +24,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 @Composable
 fun LoadingBox(modifier: Modifier = Modifier) {
@@ -64,13 +68,53 @@ fun EmptyBox(title: String, body: String? = null, modifier: Modifier = Modifier,
     }
 }
 
+/** A section's eyebrow: small capitals in the muted ink, the same as the web's `.eyebrow`. */
 @Composable
 fun SectionHeader(text: String, modifier: Modifier = Modifier, horizontalPadding: Dp = 16.dp) {
     Text(
-        text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = modifier.padding(start = horizontalPadding, end = horizontalPadding, top = 20.dp, bottom = 8.dp),
+        text.uppercase(),
+        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.padding(start = horizontalPadding, end = horizontalPadding, top = 24.dp, bottom = 8.dp),
+    )
+}
+
+enum class DiamondState { Open, Done, Owed, Waiting, Off }
+
+/**
+ * The one shape: a small square turned 45 degrees. Open while it's to do, filled ink when done, oxblood when missed or
+ * owed, half filled while it waits for approval, muted when it no longer counts.
+ */
+@Composable
+fun Diamond(state: DiamondState, modifier: Modifier = Modifier, size: Dp = 14.dp) {
+    val c = MaterialTheme.colorScheme
+    val line = when (state) {
+        DiamondState.Owed -> c.primary
+        DiamondState.Off -> c.outline
+        else -> c.onSurface
+    }
+    val fill = when (state) {
+        DiamondState.Done -> c.onSurface
+        DiamondState.Owed -> c.primaryContainer
+        else -> androidx.compose.ui.graphics.Color.Transparent
+    }
+    Box(
+        modifier
+            .size(size)
+            .rotate(45f)
+            .background(fill)
+            .then(
+                if (state == DiamondState.Waiting) {
+                    Modifier.background(
+                        androidx.compose.ui.graphics.Brush.linearGradient(
+                            0f to c.onSurface, 0.5f to c.onSurface, 0.5f to androidx.compose.ui.graphics.Color.Transparent,
+                        ),
+                    )
+                } else {
+                    Modifier
+                },
+            )
+            .border(1.5.dp, line),
     )
 }
 

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.FactCheck
@@ -168,11 +169,12 @@ fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, on
                         val linked = if (showProtocols) protocols[r.id].orEmpty() else emptyList()
                         ListItem(
                             modifier = if (canManage) Modifier.clickable { editing = Editing(r) } else Modifier,
+                            // Numbered like clauses in a letter: i, ii, iii.
                             leadingContent = {
-                                Text("${index + 1}.", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                                Text(roman(index + 1), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(32.dp))
                             },
                             overlineContent = r.category?.takeIf { it.isNotBlank() }?.let { c -> { Text(c) } },
-                            headlineContent = { Text(r.title) },
+                            headlineContent = { Text(r.title, style = MaterialTheme.typography.titleLarge) },
                             supportingContent = if (r.bodyMd.isNotBlank() || linked.isNotEmpty()) {
                                 {
                                     Column {
@@ -180,10 +182,10 @@ fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, on
                                         if (linked.isNotEmpty()) {
                                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                                 linked.forEach { p ->
-                                                    AssistChip(
-                                                        onClick = { onOpenProtocol(p.id) },
-                                                        label = { Text(p.title) },
-                                                        leadingIcon = { Icon(Icons.Outlined.FactCheck, null, Modifier.size(AssistChipDefaults.IconSize)) },
+                                                    Text(
+                                                        "See protocol: ${p.title}",
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.padding(top = 4.dp).clickable { onOpenProtocol(p.id) },
                                                     )
                                                 }
                                             }
@@ -234,5 +236,14 @@ fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, on
                 }
             },
         )
+    }
+}
+
+/** 1 → i, 4 → iv, 12 → xii. */
+fun roman(n: Int): String {
+    val table = listOf(1000 to "m", 900 to "cm", 500 to "d", 400 to "cd", 100 to "c", 90 to "xc", 50 to "l", 40 to "xl", 10 to "x", 9 to "ix", 5 to "v", 4 to "iv", 1 to "i")
+    var left = n
+    return buildString {
+        for ((v, sym) in table) while (left >= v) { append(sym); left -= v }
     }
 }
