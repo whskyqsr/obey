@@ -398,7 +398,7 @@ private fun SafeCallFrame(vm: SafeCallViewModel, call: SafeCall?, content: @Comp
 
 /** The ink + that starts anything new: a rounded square raised through the bar's top line, in a notch of the page colour. */
 @Composable
-private fun NewButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun NewButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(modifier.background(MaterialTheme.colorScheme.surface, RoundedCornerShape(22.dp)).padding(6.dp)) {
         Surface(onClick = onClick, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.onSurface, contentColor = MaterialTheme.colorScheme.surface, modifier = Modifier.size(56.dp)) {
             Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Add, "New", Modifier.size(28.dp)) }
@@ -434,7 +434,7 @@ private fun TabBar(tabs: List<TopLevel>, selected: (TopLevel) -> Boolean, onClic
             }
         }
       }
-      if (onNew != null) NewButton(onNew, Modifier.align(Alignment.TopEnd).padding(end = 18.dp))
+      if (onNew != null) NewButton(Modifier.align(Alignment.TopEnd).padding(end = 18.dp), onClick = onNew)
     }
 }
 
