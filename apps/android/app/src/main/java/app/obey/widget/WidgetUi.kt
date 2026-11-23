@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
-import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
@@ -40,10 +39,10 @@ import app.obey.ui.theme.LightColors
 
 private val FealtyColors = ColorProviders(light = LightColors, dark = DarkColors)
 
-/** The app's colours: the wallpaper's on Android 12 and later, as in the app, and oxblood before that. */
+/** The app's colours: paper and ink, as in the app, on every Android version. */
 @Composable
 fun WidgetTheme(content: @Composable () -> Unit) {
-    GlanceTheme(colors = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) GlanceTheme.colors else FealtyColors, content = content)
+    GlanceTheme(colors = FealtyColors, content = content)
 }
 
 /** The rounded card every widget sits in; tapping anywhere not otherwise tappable opens the app on Today. */
