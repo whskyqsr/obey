@@ -126,7 +126,7 @@ export function DynamicSwitcher({
           {hero.people}
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-1">
-              <span className="truncate font-serif text-[30px] leading-9 text-on-surface">{hero.title}</span>
+              <span className="truncate font-serif text-[26px] leading-[30px] text-on-surface">{hero.title}</span>
               <Icon name={many ? "expand_more" : "chevron_right"} size={20} className="shrink-0 text-on-surface-variant" />
             </span>
             <span className="block text-body-small text-on-surface-variant">{hero.sub}</span>
