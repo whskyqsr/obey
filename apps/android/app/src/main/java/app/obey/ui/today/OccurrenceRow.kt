@@ -132,15 +132,7 @@ fun OccurrenceRow(
                 if (occurrence.status == OccurrenceStatus.Pending && occurrence.isRitual) {
                     Icon(Icons.Outlined.PlayCircle, null, tint = if (canComplete) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline)
                 } else {
-                    Diamond(
-                        when (occurrence.status) {
-                            OccurrenceStatus.Completed -> DiamondState.Done
-                            OccurrenceStatus.Submitted -> DiamondState.Waiting
-                            OccurrenceStatus.Missed -> DiamondState.Owed
-                            OccurrenceStatus.Excused -> DiamondState.Off
-                            else -> if (app.obey.ui.common.parseInstant(occurrence.dueAt).isBefore(java.time.Instant.now())) DiamondState.Owed else DiamondState.Open
-                        },
-                    )
+                    Diamond(occurrence.diamondState())
                 }
             }
             }
@@ -226,4 +218,13 @@ fun OccurrenceRow(
             }
         },
     )
+}
+
+/** How a task reads as a diamond: done, waiting on approval, owed (missed or overdue), excused, or still open. */
+fun Occurrence.diamondState(now: java.time.Instant = java.time.Instant.now()): DiamondState = when (status) {
+    OccurrenceStatus.Completed -> DiamondState.Done
+    OccurrenceStatus.Submitted -> DiamondState.Waiting
+    OccurrenceStatus.Missed -> DiamondState.Owed
+    OccurrenceStatus.Excused -> DiamondState.Off
+    else -> if (app.obey.ui.common.parseInstant(dueAt).isBefore(now)) DiamondState.Owed else DiamondState.Open
 }
