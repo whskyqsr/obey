@@ -1,6 +1,6 @@
 package app.obey.ui.protocols
 
-import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.AssignmentLate
 import androidx.compose.material.icons.outlined.FactCheck
 import app.obey.ui.notes.MarkdownPreview
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -110,7 +110,7 @@ class ProtocolsViewModel @Inject constructor(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProtocolsScreen(onOpen: (String) -> Unit, onNew: () -> Unit, onOpenSettings: () -> Unit, onOpenLog: () -> Unit, vm: ProtocolsViewModel = hiltViewModel()) {
+fun ProtocolsScreen(onOpen: (String) -> Unit, onNew: () -> Unit, onOpenSettings: () -> Unit, onOpenLog: () -> Unit, onRules: (() -> Unit)? = null, vm: ProtocolsViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -127,9 +127,9 @@ fun ProtocolsScreen(onOpen: (String) -> Unit, onNew: () -> Unit, onOpenSettings:
         topBar = {
             TopAppBar(
                 navigationIcon = { MenuButton() },
-                title = { Text("Protocols") },
+                title = { app.obey.ui.common.PairedTitle("Protocols", if (onRules != null) "Rules" else null) { onRules?.invoke() } },
                 actions = {
-                    IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.History, "Broken rules") }
+                    IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.AssignmentLate, "Broken rules") }
                     SafeWordAction()
                 },
             )

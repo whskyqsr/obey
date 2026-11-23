@@ -1,7 +1,7 @@
 package app.obey.ui.rules
 
 import androidx.compose.material3.IconButton
-import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.AssignmentLate
 import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -118,7 +118,7 @@ private data class Editing(val rule: Rule?)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, onOpenLog: () -> Unit, vm: RulesViewModel = hiltViewModel()) {
+fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, onOpenLog: () -> Unit, onProtocols: (() -> Unit)? = null, vm: RulesViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -137,9 +137,10 @@ fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, on
         topBar = {
             TopAppBar(
                 navigationIcon = { MenuButton() },
-                title = { Text("Rules") },
+                // Protocols are a tab inside Rules.
+                title = { app.obey.ui.common.PairedTitle("Rules", if (onProtocols != null) "Protocols" else null) { onProtocols?.invoke() } },
                 actions = {
-                    IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.History, "Broken rules") }
+                    IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.AssignmentLate, "Broken rules") }
                     SafeWordAction()
                 },
             )

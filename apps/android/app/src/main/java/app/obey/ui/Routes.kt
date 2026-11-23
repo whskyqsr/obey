@@ -51,3 +51,4 @@ import kotlinx.serialization.Serializable
 
 /** [protocolId] null = new protocol. */
 @Serializable data class ProtocolEditorRoute(val protocolId: String? = null)
+@Serializable data object UsRoute

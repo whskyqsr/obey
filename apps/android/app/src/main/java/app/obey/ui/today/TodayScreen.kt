@@ -15,7 +15,6 @@ import app.obey.ui.plans.planTone
 import app.obey.ui.plans.firstDay
 import app.obey.ui.plans.iso
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.EventBusy
@@ -30,7 +29,6 @@ import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -143,15 +141,7 @@ fun TodayScreen(
                 actions = { SafeWordAction() },
             )
         },
-        floatingActionButton = {
-            if (session?.canManage == true) {
-                ExtendedFloatingActionButton(
-                    onClick = onNewTask,
-                    icon = { Icon(Icons.Outlined.Add, null) },
-                    text = { Text("Task") },
-                )
-            }
-        },
+        // New tasks start from the + in the tab bar.
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         when (val s = state) {
