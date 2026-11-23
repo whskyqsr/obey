@@ -76,7 +76,7 @@ export function TasksPage() {
                   <span className={t.active ? "block truncate text-body-large text-on-surface" : "block truncate text-body-large text-on-surface-variant"}>{t.title}</span>
                   <span className="block truncate text-body-medium text-on-surface-variant">
                     {t.summary}
-                    {t.dueTime ? ` · ${fmtClock(t.dueTime)}` : ""}
+                    {t.dueTime ? ` at ${fmtClock(t.dueTime)}` : ""}
                     {!mine && others.length > 1 ? ` · ${memberName(t.assigneeId)}` : ""}
                   </span>
                 </span>
