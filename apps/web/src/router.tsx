@@ -10,7 +10,7 @@ import { CalendarPage } from "./pages/Calendar";
 import { ConsequencesPage } from "./pages/Consequences";
 import { DynamicPage } from "./pages/Dynamic";
 import { AdminReportsPage } from "./pages/AdminReports";
-import { NotesPage } from "./pages/Notes";
+import { NoteRoutePage, NotesPage } from "./pages/Notes";
 import { Onboarding } from "./pages/Onboarding";
 import { RewardsPage } from "./pages/Rewards";
 import { ProtocolsPage } from "./pages/Protocols";
@@ -162,11 +162,7 @@ const noteRoute = createRoute({
   path: "/notes/$noteId",
   component: function NoteRoute() {
     const { noteId } = noteRoute.useParams();
-    return (
-      <Suspense fallback={<Loading />}>
-        <NoteEditorPage noteId={noteId} kind="note" />
-      </Suspense>
-    );
+    return <NoteRoutePage noteId={noteId} />;
   },
 });
 

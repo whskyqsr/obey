@@ -1168,6 +1168,9 @@ describe("points, rewards and notes", () => {
     const entry = (await sub.post(`/relationships/${relId}/notes`, { kind: "journal", title: "Monday", bodyMd: "First draft" })).body;
     expect(entry.revisionCount).toBe(0);
     try {
+      // Saves while still writing it, just after it was made, are the same sitting as making it.
+      expect((await sub.patch(`/notes/${entry.id}`, { bodyMd: "First draft, more" })).body.revisionCount).toBe(0);
+      ctx.clock.now = new Date(ctx.clock.now.getTime() + 11 * 60_000);
       expect((await sub.patch(`/notes/${entry.id}`, { bodyMd: "Second draft" })).body.revisionCount).toBe(1);
       // Another save in the same sitting, and a change that leaves the text alone, add nothing.
       expect((await sub.patch(`/notes/${entry.id}`, { bodyMd: "Second draft, tidied" })).body.revisionCount).toBe(1);
@@ -1180,7 +1183,7 @@ describe("points, rewards and notes", () => {
     const history = (await dom.get(`/notes/${entry.id}/revisions`)).body;
     expect(history.map((r: { title: string; bodyMd: string }) => [r.title, r.bodyMd])).toEqual([
       ["Monday", "Second draft, tidied"],
-      ["Monday", "First draft"],
+      ["Monday", "First draft, more"],
     ]);
     expect(history[0]).toMatchObject({ noteId: entry.id, editorId: subId });
 

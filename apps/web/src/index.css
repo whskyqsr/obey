@@ -379,20 +379,55 @@ input[type="datetime-local"] {
   gap: 0.5rem;
   align-items: flex-start;
 }
+/* Letters: checklist boxes are the diamond, filled ink when done. */
 .prose-m3 ul[data-type="taskList"] li > label {
-  margin-top: 0.2rem;
+  display: flex;
+  align-items: center;
+  height: 1lh;
 }
 .prose-m3 ul[data-type="taskList"] li > label input {
-  accent-color: var(--md-primary);
-  width: 1.05rem;
-  height: 1.05rem;
+  appearance: none;
+  margin: 0 0.15em;
+  width: 0.62em;
+  height: 0.62em;
+  transform: rotate(45deg);
+  border: 1.5px solid var(--md-on-surface);
+  background: transparent;
+  cursor: pointer;
 }
-.prose-m3 ul[data-type="taskList"] li[data-checked="true"] > div {
-  text-decoration: line-through;
-  color: var(--md-on-surface-variant);
+.prose-m3 ul[data-type="taskList"] li > label input:checked {
+  background: var(--md-on-surface);
+}
+.prose-m3 ul[data-type="taskList"] li > label input:focus-visible {
+  outline: 2px solid var(--md-primary);
+  outline-offset: 2px;
 }
 .prose-m3 ul[data-type="taskList"] li > div {
   flex: 1;
+}
+/* A page of writing (notes): serif text, and small headings as the uppercase sans label from the mockups. */
+.prose-letters {
+  font-family: var(--font-serif);
+  font-size: 23px;
+  line-height: 1.45;
+}
+.prose-letters[contenteditable="true"] {
+  min-height: 40vh;
+}
+.prose-letters h3 {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-top: 1.2em;
+}
+.prose-letters ul[data-type="taskList"] {
+  padding-left: 0;
+}
+.prose-letters ul[data-type="taskList"] li {
+  gap: 0.3em;
 }
 .prose-m3 p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);

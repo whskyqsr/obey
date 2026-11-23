@@ -175,7 +175,12 @@ fun NotesScreen(
                             }
                         }
                         if (!journal) items(shown, key = { it.id }) { n ->
-                            NoteRow(n, author = vm.session?.let { if (n.authorId == it.userId) null else it.nameOf(n.authorId) }, onOpen = { onOpen(n.id) })
+                            NoteRow(
+                                n,
+                                author = vm.session?.let { if (n.authorId == it.userId) null else it.nameOf(n.authorId) },
+                                subName = vm.session?.let { s -> s.relationship?.members?.firstOrNull { it.role == app.obey.api.Role.Submissive && it.userId != s.userId }?.displayName },
+                                onOpen = { onOpen(n.id) },
+                            )
                         }
                         if (journal && shown.isNotEmpty()) item(key = "top") { androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant) }
                         if (journal) items(shown, key = { it.id }) { n ->
@@ -191,7 +196,7 @@ fun NotesScreen(
 
 /** A note on a hairline: its title in the serif, then whether it's shared and when it last changed. */
 @Composable
-private fun NoteRow(note: Note, author: String?, onOpen: () -> Unit) {
+private fun NoteRow(note: Note, author: String?, subName: String?, onOpen: () -> Unit) {
     Column(Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
         Row(Modifier.padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -202,7 +207,12 @@ private fun NoteRow(note: Note, author: String?, onOpen: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    listOfNotNull(if (note.visibility == NoteVisibility.Private) "Private" else "Shared", author, formatDateTime(note.updatedAt)).joinToString(" · "),
+                    listOfNotNull(
+                        if (note.visibility == NoteVisibility.Private) "Private" else "Shared",
+                        if (note.visibility == NoteVisibility.Shared && note.subCanEdit && author == null) subName?.let { "$it can edit" } else null,
+                        author,
+                        app.obey.ui.common.dayWord(note.updatedAt),
+                    ).joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

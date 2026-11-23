@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
-import androidx.compose.material.icons.outlined.CheckBox
-import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.FormatBold
 import androidx.compose.material.icons.outlined.FormatItalic
@@ -43,6 +41,12 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import app.obey.ui.common.Diamond
+import app.obey.ui.common.DiamondState
+import app.obey.ui.theme.InstrumentSerif
 import app.obey.markdown.LinePrefix
 import app.obey.markdown.MarkdownEdits
 import app.obey.markdown.MarkdownParser
@@ -110,8 +114,9 @@ fun MarkdownField(
     onChange: (TextFieldValue) -> Unit,
     modifier: Modifier = Modifier,
     placeholder: String = "Write something…",
+    textStyle: TextStyle = MaterialTheme.typography.bodyLarge,
 ) {
-    val style = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
+    val style = textStyle.copy(color = MaterialTheme.colorScheme.onSurface)
     BasicTextField(
         value = value,
         onValueChange = { onChange(handleMarkdownInput(value, it)) },
@@ -143,17 +148,19 @@ private fun annotated(spans: List<MdSpan>, codeBg: androidx.compose.ui.graphics.
 
 /** Rendered view of [markdown]. Tapping a checklist item calls [onToggleCheck] with its source line. */
 @Composable
-fun MarkdownPreview(markdown: String, onToggleCheck: ((Int) -> Unit)?, modifier: Modifier = Modifier) {
+fun MarkdownPreview(markdown: String, onToggleCheck: ((Int) -> Unit)?, modifier: Modifier = Modifier, letters: Boolean = false) {
     val codeBg = MaterialTheme.colorScheme.surfaceContainerHighest
-    val body: TextStyle = MaterialTheme.typography.bodyLarge
+    val body: TextStyle = if (letters) LettersBody else MaterialTheme.typography.bodyLarge
     Column(modifier) {
         MarkdownParser.parse(markdown).forEach { b ->
             when (b) {
                 is MdBlock.Heading -> Text(
-                    annotated(b.inline, codeBg),
-                    style = when (b.level) {
-                        1 -> MaterialTheme.typography.headlineSmall
-                        2 -> MaterialTheme.typography.titleLarge
+                    if (letters && b.level >= 3) AnnotatedString(b.inline.joinToString("") { it.text }.uppercase()) else annotated(b.inline, codeBg),
+                    style = when {
+                        // A page of writing (notes): small headings are the uppercase sans label from the mockups.
+                        letters && b.level >= 3 -> MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp)
+                        b.level == 1 -> MaterialTheme.typography.headlineSmall
+                        b.level == 2 -> MaterialTheme.typography.titleLarge
                         else -> MaterialTheme.typography.titleMedium
                     },
                     modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
@@ -174,17 +181,13 @@ fun MarkdownPreview(markdown: String, onToggleCheck: ((Int) -> Unit)?, modifier:
                         .padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(
-                        if (b.checked) Icons.Outlined.CheckBox else Icons.Outlined.CheckBoxOutlineBlank,
-                        contentDescription = if (b.checked) "Done" else "Not done",
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
+                    // Letters: the checkbox is the diamond, filled ink when done.
+                    Box(
+                        Modifier.padding(horizontal = 4.dp).semantics { contentDescription = if (b.checked) "Done" else "Not done" },
+                    ) { Diamond(if (b.checked) DiamondState.Done else DiamondState.Open, size = if (letters) 13.dp else 12.dp) }
                     Text(
                         annotated(b.inline, codeBg),
-                        style = body.copy(
-                            textDecoration = if (b.checked) TextDecoration.LineThrough else null,
-                            color = if (b.checked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                        ),
+                        style = body,
                         modifier = Modifier.padding(start = 8.dp),
                     )
                 }
@@ -201,3 +204,36 @@ fun MarkdownPreview(markdown: String, onToggleCheck: ((Int) -> Unit)?, modifier:
     }
 }
 
+
+/** Notes' writing: the serif, a little smaller than a title, with room between lines. */
+val LettersBody = TextStyle(fontFamily = InstrumentSerif, fontSize = 21.sp, lineHeight = 30.sp)
+
+/**
+ * The Letters toolbar for notes: the few things people use, along the bottom edge above the keyboard. Typing Markdown
+ * (1. , # , `code`) still works for the rest.
+ */
+@Composable
+fun LettersToolbar(value: TextFieldValue, onChange: (TextFieldValue) -> Unit, modifier: Modifier = Modifier) {
+    fun wrap(marker: String) {
+        val s = value.selection
+        onChange(MarkdownEdits.toggleInline(value.text, s.min, s.max, marker).toValue())
+    }
+    fun prefixLines(prefix: LinePrefix) {
+        val s = value.selection
+        onChange(MarkdownEdits.toggleLinePrefix(value.text, s.min, s.max, prefix).toValue())
+    }
+    val tint = MaterialTheme.colorScheme.onSurfaceVariant
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerLowest, modifier = modifier) {
+        Column {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween) {
+                IconButton(onClick = { wrap("**") }) { Icon(Icons.Outlined.FormatBold, "Bold", tint = tint) }
+                IconButton(onClick = { wrap("*") }) { Icon(Icons.Outlined.FormatItalic, "Italic", tint = tint) }
+                IconButton(onClick = { prefixLines(LinePrefix.Heading3) }) { Icon(Icons.Outlined.Title, "Heading", tint = tint) }
+                IconButton(onClick = { prefixLines(LinePrefix.Bullet) }) { Icon(Icons.AutoMirrored.Outlined.FormatListBulleted, "List", tint = tint) }
+                IconButton(onClick = { prefixLines(LinePrefix.Checklist) }) { Icon(Icons.Outlined.Checklist, "Checklist", tint = tint) }
+                IconButton(onClick = { prefixLines(LinePrefix.Quote) }) { Icon(Icons.Outlined.FormatQuote, "Quote", tint = tint) }
+            }
+        }
+    }
+}

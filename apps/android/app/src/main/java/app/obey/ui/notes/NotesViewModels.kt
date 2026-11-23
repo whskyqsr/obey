@@ -18,7 +18,15 @@ import app.obey.ui.common.Load
 import app.obey.ui.common.loadCatching
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import app.obey.api.userMessage
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -147,7 +155,62 @@ class NoteEditorViewModel @Inject constructor(
         }
     }
 
-    fun update(change: (NoteDraft) -> NoteDraft) = _draft.update(change)
+    fun update(change: (NoteDraft) -> NoteDraft) {
+        _draft.update(change)
+        // Notes are a page you write on, saved as you go; journal entries keep their Save button.
+        if (autosaves) scheduleSave()
+    }
+
+    enum class SaveState { Idle, Saving, Saved, Failed }
+    private val _saveState = MutableStateFlow(SaveState.Idle)
+    val saveState: StateFlow<SaveState> = _saveState.asStateFlow()
+    val autosaves: Boolean get() = _draft.value.kind == NoteKind.Note && canEdit
+    private var pending: Job? = null
+    private val saving = Mutex()
+
+    /** Changes wait a moment after the last keystroke, then go up one save at a time. */
+    private fun scheduleSave() {
+        pending?.cancel()
+        pending = viewModelScope.launch {
+            delay(800)
+            // Once a save has started it finishes, so a new note is never made twice.
+            withContext(NonCancellable) { saveNow() }
+        }
+    }
+
+    private suspend fun saveNow(): Unit = saving.withLock {
+        val d = _draft.value
+        // A new note isn't made until it has something in it.
+        if (d == savedDraft || (original == null && d.title.isBlank() && d.body.isBlank())) return@withLock
+        _saveState.value = SaveState.Saving
+        try {
+            val saved = original?.let { api.updateNote(it.id, d.toInput()) }
+                ?: api.createNote(sessions.requireRelationshipId(), d.toInput())
+            original = saved
+            savedDraft = d
+            _saveState.value = SaveState.Saved
+        } catch (c: CancellationException) {
+            throw c
+        } catch (t: Throwable) {
+            _saveState.value = SaveState.Failed
+            say(t.userMessage())
+        }
+        Unit
+    }
+
+    /** Leaving a note saves whatever is still waiting, then closes. */
+    fun leave() {
+        pending?.cancel()
+        viewModelScope.launch {
+            withContext(NonCancellable) { saveNow() }
+            if (_saveState.value != SaveState.Failed || !dirty) _closed.trySend(Unit)
+        }
+    }
+
+    /** When the saved note last changed, for its small print. */
+    val updatedAt: String? get() = original?.updatedAt
+    /** The submissive, for "Kitten can edit" under a note a Dominant opened up. */
+    val subMember: String? get() = sessions.session?.relationship?.members?.firstOrNull { it.role == app.obey.api.Role.Submissive && it.userId != sessions.session?.userId }?.displayName
 
     fun save(close: Boolean) {
         val d = _draft.value
@@ -174,6 +237,7 @@ class NoteEditorViewModel @Inject constructor(
     fun editorName(userId: String): String = sessions.session?.let { if (it.userId == userId) "you" else it.nameOf(userId) } ?: "someone"
 
     fun delete() {
+        pending?.cancel()
         val n = original ?: run { _closed.trySend(Unit); return }
         action {
             api.deleteNote(n.id)

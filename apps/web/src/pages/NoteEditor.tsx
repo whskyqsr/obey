@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useDeleteLibraryItem, useLibrary, useSaveLibraryItem } from "../api/hooks";
 import { errorMessage } from "../api/client";
@@ -6,8 +6,9 @@ import type { Note, NoteInput } from "../api/types";
 import { MarkdownEditor } from "../components/MarkdownEditor";
 import { NoteComments } from "../components/Comments";
 import { NoteHistory } from "../components/NoteHistory";
-import { Button, Chip, ErrorBox, Icon, IconButton, Loading, SegmentedButtons, Switch, useSnackbar } from "../components/ui";
+import { BackLink, Button, Chip, ErrorBox, Icon, IconButton, Loading, OverflowMenu, SegmentedButtons, Switch, useSnackbar } from "../components/ui";
 import { fmtDateTime } from "../lib/dates";
+import { dayWord } from "./Notes";
 import { MOODS } from "../components/Mood";
 import { useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
@@ -20,8 +21,242 @@ export function NoteEditorPage({ noteId, kind }: { noteId: string; kind: "note" 
   const note = notes.data?.find((n) => n.id === noteId);
   if (!isNew && notes.isLoading) return <Loading />;
   if (!isNew && notes.error) return <ErrorBox error={notes.error} onRetry={() => notes.refetch()} />;
-  if (!isNew && !note) return <ErrorBox error="That note doesn't exist any more." />;
-  return <Editor key={noteId} note={note} kind={note?.kind ?? kind} />;
+  if (!isNew && !note && !adopted.has(noteId)) return <ErrorBox error="That note doesn't exist any more." />;
+  const k = note?.kind ?? kind;
+  // Notes are a page you write on, saved as you go; journal entries keep their read-then-edit flow.
+  return k === "note" ? <NotePage key={adopted.get(noteId) ?? noteId} note={note} /> : <Editor key={noteId} note={note} kind={k} />;
+}
+
+/** A new note that got its id while being written keeps its editor (and cursor) when the address changes to that id. */
+const adopted = new Map<string, string>();
+
+const SAVE_AFTER_MS = 800;
+
+function NotePage({ note }: { note?: Note }) {
+  const { rel, me, isDom } = useRel();
+  const navigate = useNavigate();
+  const snack = useSnackbar();
+  const save = useSaveLibraryItem(rel.id, "notes");
+  const del = useDeleteLibraryItem(rel.id, "notes");
+  const [confirm, confirmEl] = useConfirm();
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const canEdit = !note || note.canEdit;
+  const isAuthor = !note || note.authorId === me.user.id;
+  const sub = rel.members.find((m) => m.role === "submissive");
+  const back = useBack(() => navigate({ to: "/notes" }));
+
+  const [form, setForm] = useState<NoteInput>(() => ({
+    kind: "note",
+    title: note?.title ?? "",
+    bodyMd: note?.bodyMd ?? "",
+    visibility: note?.visibility ?? "shared",
+    tags: note?.tags ?? [],
+    pinned: note?.pinned ?? false,
+    mood: null,
+    subCanEdit: note?.subCanEdit ?? false,
+  }));
+  // Saving as you go: changes wait a moment after the last keystroke, then go up one save at a time.
+  const id = useRef(note?.id);
+  const latest = useRef(form);
+  const dirty = useRef(false);
+  const inFlight = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle");
+
+  const flush = async () => {
+    clearTimeout(timer.current);
+    if (!dirty.current || inFlight.current) return;
+    const input = latest.current;
+    // A new note isn't made until it has something in it.
+    if (!id.current && !input.title.trim() && !input.bodyMd.trim()) return;
+    dirty.current = false;
+    inFlight.current = true;
+    setStatus("saving");
+    try {
+      const saved = await save.mutateAsync({ id: id.current, input: { ...input, title: input.title.trim() } });
+      if (!id.current && saved?.id) {
+        id.current = saved.id;
+        adopted.set(saved.id, "new");
+        void navigate({ to: "/notes/$noteId", params: { noteId: saved.id }, replace: true });
+      }
+      setStatus("saved");
+    } catch (e) {
+      dirty.current = true;
+      setStatus("failed");
+      snack(errorMessage(e));
+    } finally {
+      inFlight.current = false;
+    }
+    if (dirty.current) schedule();
+  };
+  const schedule = () => {
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => void flush(), SAVE_AFTER_MS);
+  };
+  const set = (patch: Partial<NoteInput>) => {
+    const cur = latest.current;
+    if ((Object.keys(patch) as (keyof NoteInput)[]).every((k) => JSON.stringify(patch[k]) === JSON.stringify(cur[k]))) return;
+    const next = { ...cur, ...patch };
+    latest.current = next;
+    setForm(next);
+    dirty.current = true;
+    schedule();
+  };
+  // Leaving the page saves whatever is still waiting.
+  const flushRef = useRef(flush);
+  flushRef.current = flush;
+  useEffect(() => () => void flushRef.current(), []);
+  useEffect(() => {
+    const onHide = () => void flushRef.current();
+    window.addEventListener("pagehide", onHide);
+    return () => window.removeEventListener("pagehide", onHide);
+  }, []);
+
+  const [tagging, setTagging] = useState(false);
+  const [tagDraft, setTagDraft] = useState("");
+  function addTag() {
+    const t = tagDraft.trim().replace(/^#/, "").slice(0, 40);
+    if (t && !form.tags.includes(t) && form.tags.length < 20) set({ tags: [...form.tags, t] });
+    setTagDraft("");
+  }
+
+  const other = isAuthor ? (sub && sub.userId !== me.user.id ? sub : undefined) : undefined;
+  const saved = status === "saving" ? "saving…" : status === "failed" ? "not saved yet" : status === "saved" ? "saved just now" : null;
+  const meta = [
+    form.visibility === "private" ? "Private" : "Shared",
+    form.visibility === "shared" && form.subCanEdit && other ? `${other.displayName} can edit` : null,
+    !isAuthor && canEdit ? "you can edit this" : null,
+    !isAuthor && !canEdit ? "read only" : null,
+    saved ?? (note ? `edited ${dayWord(note.updatedAt)}` : null),
+  ].filter(Boolean);
+
+  const menu = [
+    ...(isAuthor && note ? [{ label: form.pinned ? "Unpin" : "Pin to the top", icon: "push_pin", onClick: () => set({ pinned: !form.pinned }) }] : []),
+    ...(isAuthor
+      ? [
+          form.visibility === "shared"
+            ? { label: "Make private", icon: "lock", onClick: () => set({ visibility: "private", subCanEdit: false }) }
+            : { label: "Share", icon: "group", onClick: () => set({ visibility: "shared" }) },
+        ]
+      : []),
+    ...(isAuthor && isDom && sub && form.visibility === "shared"
+      ? [
+          form.subCanEdit
+            ? { label: `Stop ${sub.displayName} editing`, icon: "edit_off", onClick: () => set({ subCanEdit: false }) }
+            : { label: `Let ${sub.displayName} edit`, icon: "edit", onClick: () => set({ subCanEdit: true }) },
+        ]
+      : []),
+    ...(isAuthor && note
+      ? [
+          {
+            label: "Delete",
+            icon: "delete",
+            danger: true,
+            onClick: () =>
+              confirm("Delete this note?", () => {
+                clearTimeout(timer.current);
+                dirty.current = false;
+                del.mutate(note.id, {
+                  onSuccess: () => {
+                    snack("Note deleted");
+                    back();
+                  },
+                  onError: (e) => snack(errorMessage(e)),
+                });
+              }),
+          },
+        ]
+      : []),
+  ];
+
+  return (
+    <div className="flex flex-col pb-24 md:pb-10">
+      <header className="flex min-h-10 items-center gap-1 px-2 pt-3 md:px-4 md:pt-6 lg:hidden">
+        <div className="min-w-0 flex-1 pl-2">
+          <BackLink label="Notes" onClick={back} />
+        </div>
+        {note && note.revisionCount > 0 && <IconButton icon="history" label="Edit history" onClick={() => setHistoryOpen(true)} />}
+        {menu.length > 0 && <OverflowMenu items={menu} />}
+      </header>
+      <article className="flex flex-col px-4 pt-4 md:px-6 lg:px-16 lg:pt-10">
+        <div className="flex items-start gap-2">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            {form.tags.map((t) =>
+              tagging ? (
+                <Chip key={t} icon="close" onClick={() => set({ tags: form.tags.filter((x) => x !== t) })} className="h-10! px-4!">
+                  {t}
+                </Chip>
+              ) : (
+                <Chip key={t} className="h-10! px-4!">
+                  {t}
+                </Chip>
+              ),
+            )}
+            {canEdit &&
+              (tagging ? (
+                <input
+                  autoFocus
+                  value={tagDraft}
+                  onChange={(e) => setTagDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === ",") {
+                      e.preventDefault();
+                      addTag();
+                    } else if (e.key === "Escape") setTagging(false);
+                    else if (e.key === "Backspace" && !tagDraft && form.tags.length) set({ tags: form.tags.slice(0, -1) });
+                  }}
+                  onBlur={() => {
+                    addTag();
+                    setTagging(false);
+                  }}
+                  placeholder="New tag"
+                  aria-label="New tag"
+                  className="h-10 w-32 rounded-full border border-on-surface bg-transparent px-4 text-label-large text-on-surface outline-none placeholder:text-on-surface-variant/70"
+                />
+              ) : (
+                <button
+                  type="button"
+                  aria-label="Add a tag"
+                  title="Add a tag"
+                  onClick={() => setTagging(true)}
+                  className="state-layer flex h-10 w-12 items-center justify-center rounded-full border border-outline-variant text-on-surface-variant"
+                >
+                  <Icon name="add" size={20} />
+                </button>
+              ))}
+          </div>
+          {/* Wide screens: the list is beside the note, so the history and menu sit with it instead of a back line. */}
+          <div className="hidden items-center gap-1 lg:flex">
+            {note && note.revisionCount > 0 && <IconButton icon="history" label="Edit history" onClick={() => setHistoryOpen(true)} />}
+            {menu.length > 0 && <OverflowMenu items={menu} />}
+          </div>
+        </div>
+        <textarea
+          value={form.title}
+          onChange={(e) => set({ title: e.target.value.replace(/\n/g, " ") })}
+          onKeyDown={(e) => {
+            // Enter goes on to the text, as in the mockup's one-line title.
+            if (e.key !== "Enter") return;
+            e.preventDefault();
+            (e.currentTarget.closest("article")?.querySelector(".ProseMirror") as HTMLElement | null)?.focus();
+          }}
+          autoFocus={!note}
+          placeholder="Title"
+          maxLength={200}
+          rows={1}
+          readOnly={!canEdit}
+          aria-label="Title"
+          className="mt-4 field-sizing-content w-full resize-none bg-transparent font-serif text-[46px] leading-[1.1] tracking-[-0.01em] text-on-surface outline-none placeholder:text-on-surface-variant/50 md:text-[56px]"
+        />
+        <p className="mt-1 text-body-small text-on-surface-variant">{meta.join(" · ")}</p>
+        <div className="mt-3 md:mt-5">
+          <MarkdownEditor value={form.bodyMd} onChange={(bodyMd) => set({ bodyMd })} editable={canEdit} placeholder="Write something…" letters />
+        </div>
+      </article>
+      {note && <NoteHistory note={note} open={historyOpen} onClose={() => setHistoryOpen(false)} />}
+      {confirmEl}
+    </div>
+  );
 }
 
 function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
