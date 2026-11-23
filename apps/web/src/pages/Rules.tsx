@@ -49,9 +49,9 @@ export function RulesPage() {
       <PageHeader
         title="Rules"
         subtitle={`${rules.length} rule${rules.length === 1 ? "" : "s"}`}
+        actions={<RulesTabs current="rules" />}
         tools={<IconButton icon="assignment_late" label="Broken rules" onClick={() => void navigate({ to: "/rule-log" })} />}
       />
-      <RulesTabs current="rules" />
       {categories.length > 0 && (
         <div className="flex gap-2 overflow-x-auto px-4 pb-4 md:px-6">
           <Chip selected={!category} onClick={() => setCategory(null)}>
@@ -142,16 +142,14 @@ export function RulesTabs({ current }: { current: "rules" | "protocols" }) {
   const navigate = useNavigate();
   if (!features.rules || !features.protocols) return null;
   return (
-    <div className="px-4 pb-4 md:px-6">
-      <SegmentedButtons
-        value={current}
-        onChange={(v) => void navigate({ to: v === "rules" ? "/rules" : "/protocols" })}
-        options={[
-          { value: "rules", label: "Rules" },
-          { value: "protocols", label: "Protocols" },
-        ]}
-      />
-    </div>
+    <SegmentedButtons
+      value={current}
+      onChange={(v) => void navigate({ to: v === "rules" ? "/rules" : "/protocols" })}
+      options={[
+        { value: "rules", label: "Rules" },
+        { value: "protocols", label: "Protocols" },
+      ]}
+    />
   );
 }
 

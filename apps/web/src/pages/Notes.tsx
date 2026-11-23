@@ -4,7 +4,7 @@ import { useLibrary, useSaveLibraryItem } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { Note } from "../api/types";
 import { MOODS, MOOD_LABELS, MoodCard } from "../components/Mood";
-import { Chip, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, TextField, cx, useSnackbar } from "../components/ui";
+import { Chip, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, SegmentedButtons, TextField, cx, useSnackbar } from "../components/ui";
 import { fmtDate, fmtDateTime, localDateOf } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 
@@ -48,7 +48,7 @@ const COPY = {
 /** Notes and the journal share storage but are separate lists, told apart by `kind`. */
 export function NotesPage({ kind }: { kind: "note" | "journal" }) {
   const copy = COPY[kind];
-  const { rel, me, memberName, isDom } = useRel();
+  const { rel, me, memberName, isDom, features } = useRel();
   // Journal has its own feature switch; notes from a submissive are up to their Dominant.
   const canWrite = kind === "journal" || isDom || rel.subNotes;
   const navigate = useNavigate();
@@ -57,6 +57,7 @@ export function NotesPage({ kind }: { kind: "note" | "journal" }) {
   const save = useSaveLibraryItem(rel.id, "notes");
   const [q, setQ] = useState("");
   const [tag, setTag] = useState<string | null>(null);
+  const [searching, setSearching] = useState(false);
 
   const tags = useMemo(() => [...new Set((notes.data ?? []).filter((n) => n.kind === kind).flatMap((n) => n.tags))].sort(), [notes.data, kind]);
   const list = useMemo(() => {
@@ -75,15 +76,33 @@ export function NotesPage({ kind }: { kind: "note" | "journal" }) {
 
   return (
     <>
-      <PageHeader title={copy.title} subtitle={copy.subtitle} />
+      <PageHeader
+        title={copy.title}
+        actions={
+          features.journal ? (
+            <SegmentedButtons
+              value={kind}
+              onChange={(v) => void navigate({ to: v === "note" ? "/notes" : "/journal" })}
+              options={[
+                { value: "note", label: "Notes" },
+                { value: "journal", label: "Journal" },
+              ]}
+            />
+          ) : undefined
+        }
+        tools={<IconButton icon="search" label={copy.search} onClick={() => setSearching((v) => !v)} />}
+      />
       <div className="flex flex-col gap-3 px-4 pb-4 md:px-6">
+        {(searching || q) && <TextField autoFocus placeholder={copy.search} value={q} onChange={(e) => setQ(e.target.value)} aria-label={copy.search} type="search" />}
         {kind === "journal" && !q && !tag && <MoodCard />}
-        <TextField placeholder={copy.search} value={q} onChange={(e) => setQ(e.target.value)} aria-label={copy.search} type="search" />
         {tags.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-1">
+            <Chip selected={!tag} onClick={() => setTag(null)}>
+              All
+            </Chip>
             {tags.map((t) => (
               <Chip key={t} selected={tag === t} onClick={() => setTag(tag === t ? null : t)}>
-                #{t}
+                {t}
               </Chip>
             ))}
           </div>
@@ -93,7 +112,7 @@ export function NotesPage({ kind }: { kind: "note" | "journal" }) {
       {notes.error && <ErrorBox error={notes.error} onRetry={() => notes.refetch()} />}
       {notes.data && !list.length && (
         <div className="px-4 md:px-6">
-          <Empty icon={copy.icon} title={q || tag ? "Nothing matches" : copy.empty} body={q || tag ? undefined : canWrite ? "Start one with the button below." : undefined} />
+          <Empty icon={copy.icon} title={q || tag ? "Nothing matches" : copy.empty} body={q || tag ? undefined : canWrite ? "Start one with the + above." : undefined} />
         </div>
       )}
       {/* Letters: entries on hairlines like pages of a notebook, not cards. */}
@@ -126,7 +145,8 @@ export function NotesPage({ kind }: { kind: "note" | "journal" }) {
                       <span className="truncate font-serif text-[24px] leading-8 text-on-surface">{n.title || "Untitled"}</span>
                     </div>
                     <div className="text-body-small text-on-surface-variant">
-                      {memberName(n.authorId)} · {fmtDateTime(n.updatedAt)}
+                      {n.visibility === "private" ? "Private" : "Shared"}
+                      {n.authorId !== me.user.id ? ` · ${memberName(n.authorId)}` : ""} · {fmtDate(localDateOf(new Date(n.updatedAt)), { month: "short", day: "numeric" })}
                     </div>
                   </>
                 )}
@@ -142,7 +162,7 @@ export function NotesPage({ kind }: { kind: "note" | "journal" }) {
                 ))}
             </div>
             {kind === "journal" && n.title && n.title !== "Untitled" && <div className="pointer-events-none text-title-medium text-on-surface">{n.title}</div>}
-            {n.bodyMd && (
+            {kind === "journal" && n.bodyMd && (
               <p
                 className={cx(
                   "pointer-events-none line-clamp-4",
@@ -152,7 +172,7 @@ export function NotesPage({ kind }: { kind: "note" | "journal" }) {
                 {excerpt(n.bodyMd, 280)}
               </p>
             )}
-            {(n.tags.length > 0 || (kind === "journal" && n.commentCount > 0)) && (
+            {kind === "journal" && (n.tags.length > 0 || n.commentCount > 0) && (
               <div className="pointer-events-none flex flex-wrap items-center gap-2 text-label-medium text-on-surface-variant">
                 {n.tags.map((t) => (
                   <span key={t}>#{t}</span>

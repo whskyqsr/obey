@@ -6,103 +6,87 @@ import { errorMessage } from "../api/client";
 import type { Occurrence, Task } from "../api/types";
 import { CompleteDialog, isOverdue } from "../components/OccurrenceCard";
 import { RitualDialog, isRitual } from "../components/Ritual";
-import { Badge, Button, Chip, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, TextField, useSnackbar } from "../components/ui";
+import { Button, Chip, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, TextField, useSnackbar } from "../components/ui";
 import { useCurrentOccurrences } from "../lib/currentOccurrences";
-import { StreakStrip } from "../components/StreakStrip";
-import { fmtClock, fmtDate, localDateOf, today } from "../lib/dates";
+import { fmtClock, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 
+type Filter = "theirs" | "mine" | "paused" | null;
+
 export function TasksPage() {
-  const { rel, isDom, memberName, me, features } = useRel();
+  const { rel, isDom, memberName, me } = useRel();
   const tasks = useTasks(rel.id);
   const navigate = useNavigate();
   const [q, setQ] = useState("");
-  const [mineOnly, setMineOnly] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [filter, setFilter] = useState<Filter>(null);
   const { byTask } = useCurrentOccurrences();
   const [completing, setCompleting] = useState<Occurrence | null>(null);
   const drafts = (tasks.data ?? []).filter((t) => t.draft);
+  // A Dominant sees whose tasks they are; with one submissive the chip names them.
+  const others = rel.members.filter((m) => m.userId !== me.user.id);
+  const theirLabel = others.length === 1 ? `Assigned to ${others[0]!.displayName}` : "Assigned to others";
 
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return (tasks.data ?? [])
       .filter((t) => !t.draft)
       .filter((t) => !needle || t.title.toLowerCase().includes(needle) || t.summary.toLowerCase().includes(needle))
-      .filter((t) => !mineOnly || t.assigneeId === me.user.id)
+      .filter((t) => (filter === "mine" ? t.assigneeId === me.user.id : filter === "theirs" ? t.assigneeId !== me.user.id : filter === "paused" ? !t.active : true))
       .sort((a, b) => Number(b.active) - Number(a.active) || a.title.localeCompare(b.title));
-  }, [tasks.data, q, mineOnly, me.user.id]);
+  }, [tasks.data, q, filter, me.user.id]);
+  const chip = (f: Exclude<Filter, null>, label: string) => (
+    <Chip key={f} selected={filter === f} onClick={() => setFilter((v) => (v === f ? null : f))}>
+      {label}
+    </Chip>
+  );
 
   return (
     <>
-      <PageHeader
-        title="All tasks"
-        subtitle={isDom ? "Everything you've set, recurring or one-off." : "What's been set for you."}
-        actions={
-          isDom ? (
-            <Button variant="tonal" icon="widgets" onClick={() => navigate({ to: "/kits" })}>
-              Kits
-            </Button>
-          ) : undefined
-        }
-      />
-      <div className="flex flex-wrap items-center gap-2 px-4 pb-4 md:px-6">
-        <TextField placeholder="Search tasks" value={q} onChange={(e) => setQ(e.target.value)} className="min-w-0 flex-1" aria-label="Search tasks" />
-        <Chip selected={mineOnly} onClick={() => setMineOnly((v) => !v)}>
-          Assigned to me
-        </Chip>
+      <PageHeader title="All tasks" tools={<IconButton icon="search" label="Search tasks" onClick={() => setSearching((v) => !v)} />} />
+      <div className="flex flex-col gap-3 px-4 pb-2 md:px-6">
+        {(searching || q) && (
+          <TextField autoFocus placeholder="Search tasks" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search tasks" />
+        )}
+        <div className="flex flex-wrap gap-2">
+          {isDom && others.length > 0 && chip("theirs", theirLabel)}
+          {chip("mine", "Mine")}
+          {chip("paused", "Paused")}
+        </div>
       </div>
       {drafts.length > 0 && <KitReview drafts={drafts} />}
       {tasks.isLoading && <Loading />}
       {tasks.error && <ErrorBox error={tasks.error} onRetry={() => tasks.refetch()} />}
       {tasks.data && !list.length && (
         <div className="px-4 md:px-6">
-          <Empty
-            icon="checklist"
-            title={q ? "No matches" : "No tasks yet"}
-            body={isDom ? "Create one with the button below: daily rituals, chores, lines to write, anything." : "Your Dominant hasn't set any tasks yet."}
-          />
+          <Empty icon="checklist" title={q || filter ? "No matches" : "No tasks yet"} body={isDom ? "Start one with the + above." : "Nothing has been set for you yet."} />
         </div>
       )}
-      <div className="flex flex-col gap-2 px-4 md:px-6">
-        {list.map((t) => (
-          <div key={t.id} className="border border-outline-variant flex items-center gap-1 rounded-md pr-2">
-            <button
-              type="button"
-              onClick={() => navigate({ to: "/tasks/$taskId", params: { taskId: t.id } })}
-              className="state-layer flex min-w-0 flex-1 items-center gap-4 rounded-md p-4 text-left"
-            >
-              <div className="flex size-10 shrink-0 items-center justify-center text-on-surface-variant">
-                <Icon
-                  name={
-                    t.assignedConsequenceId
-                      ? "bolt"
-                      : t.steps.length
-                        ? "format_list_numbered"
-                        : t.schedule.rule
-                          ? t.schedule.anchor === "completion"
-                            ? "autorenew"
-                            : "event_repeat"
-                          : "event"
-                  }
-                />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-title-medium text-on-surface">{t.title}</div>
-                <div className="truncate text-body-medium text-on-surface-variant">
-                  {t.summary}
-                  {t.dueTime ? ` at ${fmtClock(t.dueTime)}` : ""} · {memberName(t.assigneeId)}
-                </div>
-                <StreakStrip taskId={t.id} className="mt-1.5" />
-              </div>
-              <div className="flex flex-col items-end gap-1">
-                {features.points && t.points !== 0 && <Badge>{t.points > 0 ? `+${t.points}` : t.points} pts</Badge>}
-                {!t.active && <Badge tone="neutral">Paused</Badge>}
-                {t.approvalRequired && <Icon name="verified" size={18} className="text-on-surface-variant" />}
-              </div>
-            </button>
-            <NowStatus occurrences={byTask.get(t.id) ?? []} mine={t.assigneeId === me.user.id} onComplete={setCompleting} />
-          </div>
-        ))}
-      </div>
+      <ul className="px-4 md:px-6">
+        {list.map((t) => {
+          const mine = t.assigneeId === me.user.id;
+          return (
+            <li key={t.id} className="flex items-center gap-2 border-b border-outline-variant">
+              <button
+                type="button"
+                onClick={() => navigate({ to: "/tasks/$taskId", params: { taskId: t.id } })}
+                className="state-layer flex min-w-0 flex-1 items-center gap-3 py-3.5 text-left"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className={t.active ? "block truncate text-body-large text-on-surface" : "block truncate text-body-large text-on-surface-variant"}>{t.title}</span>
+                  <span className="block truncate text-body-medium text-on-surface-variant">
+                    {t.summary}
+                    {t.dueTime ? ` at ${fmtClock(t.dueTime)}` : ""}
+                    {!mine && others.length > 1 ? ` · ${memberName(t.assigneeId)}` : ""}
+                  </span>
+                </span>
+                {!t.active && <span className="shrink-0 text-body-small text-on-surface-variant">paused</span>}
+              </button>
+              <NowStatus occurrences={byTask.get(t.id) ?? []} mine={mine} onComplete={setCompleting} />
+            </li>
+          );
+        })}
+      </ul>
       {completing && !isRitual(completing) && <CompleteDialog o={completing} open onClose={() => setCompleting(null)} />}
       {completing && isRitual(completing) && <RitualDialog o={completing} open onClose={() => setCompleting(null)} />}
       {isDom && <Fab icon="add" label="New task" onClick={() => navigate({ to: "/tasks/$taskId", params: { taskId: "new" } })} />}
@@ -176,11 +160,6 @@ function NowStatus({ occurrences, mine, onComplete }: { occurrences: Occurrence[
   const todays = occurrences.find((o) => localDateOf(new Date(o.dueAt)) === t);
   if (todays?.status === "completed") return <Icon name="check_circle" filled className="m-2 text-primary" />;
   if (occurrences.some((o) => o.status === "submitted")) return <Icon name="hourglass_top" className="m-2 text-tertiary" />;
-  if (open) return <Icon name="radio_button_unchecked" className={isOverdue(open) ? "m-2 text-error" : "m-2 text-on-surface-variant"} />;
-  const next = occurrences.find((o) => o.status === "pending");
-  return next ? (
-    <span className="w-10 text-center text-label-small text-on-surface-variant">{fmtDate(localDateOf(new Date(next.dueAt)), { weekday: "short" })}</span>
-  ) : (
-    <span className="w-10" />
-  );
+  if (open && isOverdue(open)) return <span className="shrink-0 text-body-small text-error">overdue</span>;
+  return null;
 }

@@ -30,6 +30,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -50,8 +54,11 @@ private val ORDER = listOf(
 /** Us: who's in the dynamic, then everything the Today and Week tabs don't cover, in two columns. Settings is the gear. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun UsScreen(items: List<UsItem>, switcher: SwitcherActions, onDynamic: () -> Unit, onSettings: () -> Unit, onInvite: (() -> Unit)?) {
+fun UsScreen(items: List<UsItem>, switcher: SwitcherActions, onDynamic: () -> Unit, onSettings: () -> Unit, onInvite: (() -> Unit)?, vm: UsViewModel = hiltViewModel()) {
     val safeWord = LocalSafeWord.current
+    val counts by vm.counts.collectAsStateWithLifecycle()
+    val labels = items.map { it.label }.toSet()
+    LaunchedEffect(labels, switcher.session.relationship?.id) { vm.refresh(labels) }
     val sorted = items.sortedBy { ORDER.indexOf(it.label).let { i -> if (i < 0) ORDER.size else i } }
     Scaffold(
         topBar = {
@@ -94,7 +101,7 @@ fun UsScreen(items: List<UsItem>, switcher: SwitcherActions, onDynamic: () -> Un
             Spacer(Modifier.height(8.dp))
             sorted.chunked(2).forEach { pair ->
                 Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    pair.forEach { item -> Cell(item, Modifier.weight(1f)) }
+                    pair.forEach { item -> Cell(item, counts[item.label], Modifier.weight(1f)) }
                     if (pair.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
@@ -114,7 +121,7 @@ fun UsScreen(items: List<UsItem>, switcher: SwitcherActions, onDynamic: () -> Un
 }
 
 @Composable
-private fun Cell(item: UsItem, modifier: Modifier) {
+private fun Cell(item: UsItem, count: String?, modifier: Modifier) {
     Column(modifier) {
         Row(
             Modifier.fillMaxWidth().height(48.dp).clickable(onClick = item.onClick),
@@ -124,10 +131,12 @@ private fun Cell(item: UsItem, modifier: Modifier) {
             Icon(item.icon, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 item.label,
-                style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 24.sp),
+                style = MaterialTheme.typography.titleLarge.copy(fontSize = 19.sp, lineHeight = 24.sp),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
+            if (count != null) Text(count, style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }

@@ -1,6 +1,9 @@
 package app.obey.ui.tasks
 
 import app.obey.ui.common.LocalFeatures
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
@@ -140,7 +143,7 @@ class TaskListViewModel @Inject constructor(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun TaskListScreen(
     onOpen: (String) -> Unit,
@@ -157,6 +160,7 @@ fun TaskListScreen(
     MessageEffect(message, snackbar, vm::messageShown)
     var running by remember { mutableStateOf<Occurrence?>(null) }
     var noting by remember { mutableStateOf<Occurrence?>(null) }
+    var filter by remember { mutableStateOf<String?>(null) }
     // Reload when coming back from the editor.
     LifecycleResumeEffect(Unit) {
         vm.refresh()
@@ -168,7 +172,6 @@ fun TaskListScreen(
                 navigationIcon = { MenuButton() },
                 title = { Text("All tasks") },
                 actions = {
-                    if (vm.session?.canManage == true && vm.session?.readOnly != true) IconButton(onClick = onKits) { Icon(Icons.Outlined.Widgets, "Kits") }
                     if (vm.session?.canManage == true) IconButton(onClick = onNew) { Icon(Icons.Outlined.Add, "New task") }
                     SafeWordAction()
                 },
@@ -183,30 +186,53 @@ fun TaskListScreen(
                 val (drafts, tasks) = s.value.partition { it.draft }
                 if (drafts.isNotEmpty()) item(key = "kit-review") { KitReview(drafts, vm.session, onOpen, onSend = vm::sendDrafts, onDrop = vm::dropDraft) }
                 if (tasks.isEmpty() && drafts.isEmpty()) item { EmptyBox("No tasks yet", "Create one with the + button.", icon = Icons.Outlined.Checklist) }
-                items(tasks, key = { it.id }) { t ->
-                    val who = vm.session?.nameOf(t.assigneeId)
-                    ListItem(
-                        modifier = Modifier.clickable { onOpen(t.id) },
-                        headlineContent = { Text(t.title) },
-                        supportingContent = {
-                            Column {
+                val me = vm.session?.userId
+                val others = vm.session?.partners.orEmpty()
+                val shown = tasks.filter {
+                    when (filter) {
+                        "mine" -> it.assigneeId == me
+                        "theirs" -> it.assigneeId != me
+                        "paused" -> !it.active
+                        else -> true
+                    }
+                }
+                item(key = "filters") {
+                    androidx.compose.foundation.layout.FlowRow(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        val chips = buildList {
+                            if (vm.session?.canManage == true && others.isNotEmpty()) add("theirs" to if (others.size == 1) "Assigned to ${others[0].displayName}" else "Assigned to others")
+                            add("mine" to "Mine")
+                            add("paused" to "Paused")
+                        }
+                        chips.forEach { (key, label) ->
+                            androidx.compose.material3.FilterChip(selected = filter == key, onClick = { filter = if (filter == key) null else key }, label = { Text(label) })
+                        }
+                    }
+                }
+                if (shown.isEmpty() && tasks.isNotEmpty()) item { EmptyBox("No matches", null, icon = Icons.Outlined.Checklist) }
+                items(shown, key = { it.id }) { t ->
+                    val who = if (others.size > 1 && t.assigneeId != me) vm.session?.nameOf(t.assigneeId) else null
+                    Column(Modifier.padding(horizontal = 16.dp)) {
+                        Row(
+                            Modifier.fillMaxWidth().clickable { onOpen(t.id) }.padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(t.title, style = MaterialTheme.typography.bodyLarge, color = if (t.active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(
-                                    listOfNotNull(
-                                        if (t.assignedConsequenceId != null) "Consequence" else null,
-                                        t.summary,
-                                        t.dueTime?.let { "at ${formatClock(it)}" },
-                                        who,
-                                        if (LocalFeatures.current.points && t.points != 0) "${signed(t.points)} pts" else null,
-                                        if (!t.active) "paused" else null,
-                                    ).joinToString(" · "),
+                                    listOfNotNull(t.summary, t.dueTime?.let { formatClock(it) }, who).joinToString(" · "),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                                StreakStrip(streaks[t.id], Modifier.padding(top = 6.dp))
                             }
-                        },
-                        trailingContent = {
-                            NowStatus(current[t.id].orEmpty(), mine = t.assigneeId == vm.session?.userId, onComplete = { o -> if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) }, onCount = { o -> if (o.readyToSend) noting = o else vm.count(o, by = 1) { noting = it } })
-                        },
-                    )
+                            if (!t.active) Text("paused", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            NowStatus(current[t.id].orEmpty(), mine = t.assigneeId == me, onComplete = { o -> if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) }, onCount = { o -> if (o.readyToSend) noting = o else vm.count(o, by = 1) { noting = it } })
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    }
                 }
             }
         }
@@ -269,9 +295,7 @@ private fun NowStatus(occurrences: List<Occurrence>, mine: Boolean, onComplete: 
         occurrences.any { day(it) == today && it.status == OccurrenceStatus.Completed } ->
             Icon(Icons.Filled.CheckCircle, "Done today", tint = MaterialTheme.colorScheme.primary)
         occurrences.any { it.status == OccurrenceStatus.Submitted } -> Icon(Icons.Outlined.HourglassTop, "Awaiting approval")
-        open != null -> Icon(Icons.Outlined.RadioButtonUnchecked, "Due", tint = tint)
-        else -> occurrences.firstOrNull { it.status == OccurrenceStatus.Pending }?.let { next ->
-            Text(day(next).format(DateTimeFormatter.ofPattern("EEE")), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        open != null && overdue(open) -> Text("overdue", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        else -> Unit
     }
 }

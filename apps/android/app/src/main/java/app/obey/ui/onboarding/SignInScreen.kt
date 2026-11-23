@@ -45,7 +45,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.obey.ui.common.MessageEffect
 import app.obey.ui.settings.SettingsViewModel
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.launch
 
@@ -158,10 +158,9 @@ private suspend fun googleSignIn(context: Context, vm: SettingsViewModel) {
         vm.reportError("Google sign-in needs the web client id from google-services.json")
         return
     }
-    val option = GetGoogleIdOption.Builder()
-        .setFilterByAuthorizedAccounts(false)
-        .setServerClientId(clientId)
-        .build()
+    // The button flow: always shows Google's account picker (and lets someone add an account), unlike the
+    // one-tap sheet, which answers "No credentials available" when it has nothing to offer or is cooling down.
+    val option = GetSignInWithGoogleOption.Builder(clientId).build()
     val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
     try {
         val result = CredentialManager.create(context).getCredential(context, request)

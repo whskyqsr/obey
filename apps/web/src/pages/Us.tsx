@@ -6,6 +6,7 @@ import { DynamicSwitcher } from "../components/DynamicSwitcher";
 import { IconButton, Icon, cx } from "../components/ui";
 import { fmtDate, localDateOf } from "../lib/dates";
 import { useMenu } from "../lib/menu";
+import { useTodayOccurrences } from "../lib/today";
 import { ROLE_LABEL, isCollared, useRel } from "../lib/relationship";
 import { useDynamicTitle } from "./Dynamic";
 
@@ -17,8 +18,8 @@ function Cell({ d, count }: { d: Dest; count?: string }) {
     <li className="min-w-0">
       <Link to={d.to} className="state-layer flex h-12 items-center gap-3 border-b border-outline-variant outline-none">
         <Icon name={d.icon} size={20} className="shrink-0 text-on-surface-variant" />
-        <span className="min-w-0 flex-1 truncate font-serif text-[21px] leading-7 text-on-surface">{d.label}</span>
-        {count && <span className="shrink-0 text-body-small text-on-surface-variant">{count}</span>}
+        <span className="min-w-0 flex-1 truncate font-serif text-[19px] leading-7 text-on-surface">{d.label}</span>
+        {count && <span className="shrink-0 text-[11px] leading-4 text-on-surface-variant">{count}</span>}
       </Link>
     </li>
   );
@@ -33,15 +34,19 @@ function useCounts(sections: Dest[]) {
   const balances = useBalances(rel.id);
   const agreement = useAgreement(rel.id, has("/agreement"));
   const chastity = useChastity(rel.id, has("/chastity"));
+  const occ = useTodayOccurrences();
   // Whose points: your own, or for a dominant, the submissive's.
   const sub = isDom ? rel.members.find((m) => m.role === "submissive" && m.userId !== me.user.id) : null;
   const points = balances.data?.find((b) => b.userId === (sub?.userId ?? me.user.id))?.balance;
   const lock = chastity.data?.open[0];
+  const whose = sub?.userId ?? me.user.id;
+  const owed = (occ.data ?? []).filter((o) => o.consequence && o.assigneeId === whose && (o.status === "pending" || o.status === "missed")).length;
   const current = agreement.data?.current;
   return {
     "/rules": rules.data ? String(rules.data.length) : undefined,
     "/notes": notes.data ? String(notes.data.length) : undefined,
     "/rewards": points !== undefined ? `${points} pts` : undefined,
+    "/consequences": owed > 0 ? `${owed} owed` : undefined,
     "/agreement": current ? `v${current.number}` : agreement.data?.proposal ? "proposed" : undefined,
     "/chastity": lock ? ({ active: "locked", break: "on a break", pending: "starting" } as Record<string, string>)[lock.status] : undefined,
   } as Record<string, string | undefined>;
@@ -116,3 +121,4 @@ function rank(to: string) {
   const i = ORDER.indexOf(to);
   return i < 0 ? ORDER.length : i;
 }
+

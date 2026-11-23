@@ -1,6 +1,8 @@
 package app.obey.ui.kits
 
 import android.content.Intent
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -321,43 +323,28 @@ fun shareCodeFrom(text: String): String? =
 
 @Composable
 private fun KitCard(icon: ImageVector, title: String, description: String, items: List<KitItem>, shared: Boolean, onClick: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    val titles = items.map { if (it.kind == "reward") "Reward: ${it.title}" else it.title }
-    OutlinedCard(onClick = onClick, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp).fillMaxWidth()) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
-            Surface(color = colors.secondaryContainer, shape = MaterialTheme.shapes.large, modifier = Modifier.size(48.dp)) {
-                Box(contentAlignment = Alignment.Center) { Icon(icon, null, tint = colors.onSecondaryContainer) }
-            }
-            Spacer(Modifier.width(16.dp))
+    // A kit on a hairline, as in the mockups: its name in the serif and what's in it by kind.
+    val kinds = listOf("task" to "task", "rule" to "rule", "protocol" to "protocol", "reward" to "reward", "consequence" to "consequence")
+    val counts = kinds.mapNotNull { (k, word) -> items.count { it.kind == k }.takeIf { it > 0 }?.let { n -> "$n $word${if (n == 1) "" else "s"}" } }
+    Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().clickable(onClick = onClick)) {
+        Row(Modifier.padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f, fill = false))
-                    if (shared) {
-                        Spacer(Modifier.width(8.dp))
-                        Surface(color = colors.tertiaryContainer, shape = MaterialTheme.shapes.extraSmall) {
-                            Row(Modifier.padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Outlined.Link, null, Modifier.size(14.dp), tint = colors.onTertiaryContainer)
-                                Spacer(Modifier.width(4.dp))
-                                Text("Shared", style = MaterialTheme.typography.labelMedium, color = colors.onTertiaryContainer)
-                            }
-                        }
-                    }
-                }
-                if (description.isNotBlank()) Text(description, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-                Spacer(Modifier.height(8.dp))
+                Text(title, style = MaterialTheme.typography.headlineSmall.copy(fontSize = 24.sp, lineHeight = 30.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    titles.take(4).joinToString(" · ") + if (titles.size > 4) " · ${titles.size - 4} more" else "",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = colors.onSurfaceVariant,
+                    (counts + listOfNotNull(if (shared) "shared by link" else null)).joinToString(" · "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            Text(if (shared) "Shared" else "Open", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         }
+        androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
 @Composable
 private fun SectionLabel(text: String) {
-    Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 20.dp, end = 16.dp, top = 16.dp, bottom = 4.dp))
+    Text(text.uppercase(), style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.5.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp))
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -385,7 +372,11 @@ fun KitsScreen(
             LargeTopAppBar(
                 title = { Text("Kits") },
                 navigationIcon = { app.obey.ui.common.MenuButton() },
-                actions = { app.obey.ui.common.SafeWordAction() },
+                actions = {
+                    IconButton(onClick = { adding = true }) { Icon(Icons.Outlined.Link, "Add from a link or code") }
+                    IconButton(onClick = onNewKit) { Icon(Icons.Outlined.Add, "New kit") }
+                    app.obey.ui.common.SafeWordAction()
+                },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -397,20 +388,12 @@ fun KitsScreen(
                 val kits = usable(s.value)
                 val own = (mine as? Load.Ready)?.value.orEmpty()
                 LazyColumn(Modifier.padding(padding).fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
-                    item(key = "intro") {
-                        Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(onClick = onNewKit) { Icon(Icons.Outlined.Add, null); Text("  New kit") }
-                                OutlinedButton(onClick = { adding = true }) { Icon(Icons.Outlined.Download, null); Text("  Add from a link") }
-                            }
-                        }
-                    }
-                    if (own.isNotEmpty()) {
-                        item(key = "mine") { SectionLabel("Your kits") }
-                        items(own, key = { it.id }) { k -> KitCard(Icons.Outlined.Widgets, k.title, k.description, k.items, k.shareCode != null) { onOpenKit(k.id) } }
-                    }
                     item(key = "starter") { SectionLabel("Starter kits") }
                     items(kits, key = { it.id }) { k -> KitCard(kitIcon(k.icon), k.title, k.description, k.items, false) { open = k } }
+                    if (own.isNotEmpty()) {
+                        item(key = "mine") { SectionLabel("Yours") }
+                        items(own, key = { it.id }) { k -> KitCard(Icons.Outlined.Widgets, k.title, k.description, k.items, k.shareCode != null) { onOpenKit(k.id) } }
+                    }
                 }
             }
         }
