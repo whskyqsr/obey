@@ -380,12 +380,15 @@ export function Chip({
   onClick,
   icon,
   className,
+  plain,
 }: {
   children: ReactNode;
   selected?: boolean;
   onClick?: () => void;
   icon?: string;
   className?: string;
+  /** A filter pill: the ink border alone marks the chosen one, no tick. */
+  plain?: boolean;
 }) {
   const Comp = onClick ? "button" : "span";
   return (
@@ -402,7 +405,7 @@ export function Chip({
         className,
       )}
     >
-      {selected && onClick ? (
+      {selected && onClick && !plain ? (
         <Icon name="check" size={18} />
       ) : icon ? (
         <Icon name={icon} size={18} />

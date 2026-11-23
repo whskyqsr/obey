@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useAddRuleLog, useDeleteRuleLog, useLibrary, useRuleLog } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { useOpenOnNew } from "../lib/newParam";
-import { sortRules } from "./Rules";
-import { Avatar } from "../components/Avatar";
-import { SubHeader, Button, Chip, Dialog, Empty, ErrorBox, Fab, Icon, IconButton, Loading, Select, Switch, TextArea, TextField, useSnackbar } from "../components/ui";
+import { roman, sortRules } from "./Rules";
+import type { RuleLogEntry } from "../api/types";
+import { useTodayOccurrences } from "../lib/today";
+import { SubHeader, Button, Chip, Dialog, Empty, ErrorBox, IconButton, Loading, Select, Switch, TextArea, TextField, useSnackbar } from "../components/ui";
 import { fmtDate, today } from "../lib/dates";
 import { useReadOnly, useRel } from "../lib/relationship";
 import { useConfirm } from "../lib/useConfirm";
@@ -25,89 +26,155 @@ const addDays = (d: string, n: number) => {
 export function RuleLogPage() {
   const { rel, me, isDom, partners, features, memberName } = useRel();
   const readOnly = useReadOnly();
-  const snack = useSnackbar();
   const log = useRuleLog(rel.id);
-  const del = useDeleteRuleLog(rel.id);
+  const occ = useTodayOccurrences();
   const [who, setWho] = useState<string | null>(null);
+  const [kind, setKind] = useState<"all" | "rules" | "protocols">("all");
+  const [open, setOpen] = useState<RuleLogEntry | null>(null);
   const navigate = useNavigate();
   const back = useBack(() => navigate({ to: features.rules ? "/rules" : "/protocols" }));
   const [adding, setAdding] = useState(false);
   useOpenOnNew(() => setAdding(true), !readOnly);
-  const [confirm, confirmEl] = useConfirm();
-  const name = (id: string) => (id === me.user.id ? "You" : memberName(id));
+  const name = (id: string) => (id === me.user.id ? "you" : memberName(id));
   const people = useMemo(() => [...new Set((log.data ?? []).map((e) => e.subjectId))], [log.data]);
-  const shown = (log.data ?? []).filter((e) => !who || e.subjectId === who);
+  const shown = (log.data ?? []).filter(
+    (e) => (!who || e.subjectId === who) && (kind === "all" || (kind === "protocols") === !!e.protocolId),
+  );
+  // What came of each one, from the consequence it was given.
+  const byTask = new Map((occ.data ?? []).map((o) => [o.seriesId, o]));
+  const outcome = (e: RuleLogEntry) => {
+    if (!e.consequenceTaskId) return "none";
+    const o = byTask.get(e.consequenceTaskId);
+    if (!o) return "consequence given";
+    const state =
+      o.status === "completed"
+        ? "done"
+        : o.status === "submitted"
+          ? null
+          : o.status === "missed"
+            ? "not done"
+            : o.status === "excused"
+              ? "excused"
+              : o.status === "cancelled"
+                ? "called off"
+                : "owed";
+    if (!state) return isDom ? "needs your approval" : "sent for approval";
+    return `${o.title.toLowerCase()} · ${state}`;
+  };
+  const filters = features.rules && features.protocols;
 
   if (!features.rules && !features.protocols) return <Empty icon="gavel" title="Rules and protocols are off" body="Turn one of them on in Your dynamic to keep a log." />;
 
   return (
     <>
-      <SubHeader title="Broken rules" back="Rules" onBack={back} />
-      {!!log.data?.length && <p className="px-4 pb-3 text-body-medium text-on-surface-variant md:px-6">{log.data.length} logged</p>}
-      {people.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto px-4 pb-4 md:px-6">
-          <Chip selected={!who} onClick={() => setWho(null)}>
+      <SubHeader
+        title="Broken rules"
+        back="Rules"
+        onBack={back}
+        actions={!readOnly && <IconButton icon="add" label={isDom ? "Log a broken rule" : "Own up to one"} onClick={() => setAdding(true)} />}
+      />
+      {(filters || people.length > 1) && !!log.data?.length && (
+        <div className="flex gap-2 overflow-x-auto px-4 pb-2 md:px-6">
+          <Chip plain className="h-10 px-5" selected={kind === "all" && !who} onClick={() => (setKind("all"), setWho(null))}>
             Everyone
           </Chip>
-          {people.map((id) => (
-            <Chip key={id} selected={who === id} onClick={() => setWho(who === id ? null : id)}>
-              {name(id)}
-            </Chip>
-          ))}
+          {filters && (
+            <>
+              <Chip plain className="h-10 px-5" selected={kind === "rules"} onClick={() => setKind(kind === "rules" ? "all" : "rules")}>
+                Rules
+              </Chip>
+              <Chip plain className="h-10 px-5" selected={kind === "protocols"} onClick={() => setKind(kind === "protocols" ? "all" : "protocols")}>
+                Protocols
+              </Chip>
+            </>
+          )}
+          {people.length > 1 &&
+            people.map((id) => (
+              <Chip plain className="h-10 px-5" key={id} selected={who === id} onClick={() => setWho(who === id ? null : id)}>
+                {id === me.user.id ? "You" : memberName(id)}
+              </Chip>
+            ))}
         </div>
       )}
-      <ul className="flex flex-col gap-2 px-4 pb-24 md:px-6">
+      <ul className="flex flex-col divide-y divide-outline-variant px-4 pb-24 md:px-6">
         {log.isLoading && <Loading />}
         {log.error && <ErrorBox error={log.error} onRetry={() => log.refetch()} />}
-        {log.data && !log.data.length && (
-          <Empty
-            icon="gavel"
-            title="Nothing logged"
-            body={isDom ? "When a rule or protocol is broken, log it here, with a consequence if you like." : "If you break a rule or protocol, you can own up to it here."}
-          />
-        )}
-        {shown.map((e) => {
-          const m = rel.members.find((x) => x.userId === e.subjectId);
-          const canRemove = !readOnly && (e.loggedBy === me.user.id || isDom);
-          return (
-            <li key={e.id} className="border border-outline-variant flex items-start gap-3 rounded-md p-3">
-              <Avatar userId={e.subjectId} name={m?.displayName ?? "?"} version={m?.avatarVersion ?? null} size={32} />
+        {log.data && !log.data.length && <Empty icon="gavel" title="Nothing logged" />}
+        {log.data && !!log.data.length && !shown.length && <p className="py-6 text-body-medium text-on-surface-variant">Nothing logged here.</p>}
+        {shown.map((e) => (
+          <li key={e.id}>
+            <button type="button" onClick={() => setOpen(e)} className="state-layer flex w-full items-start gap-3 py-4 text-left">
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 text-title-medium text-on-surface">
-                  <Icon name={e.protocolId || (!e.ruleId && !e.title) ? "fact_check" : "gavel"} size={18} className="text-on-surface-variant" />
-                  <span className="min-w-0 truncate">{e.title}</span>
+                <div className="font-serif text-[26px] leading-tight text-on-surface">{e.title}</div>
+                <div className="mt-1 text-body-medium text-on-surface-variant">
+                  {people.length > 1 && e.loggedBy !== e.subjectId && `${e.subjectId === me.user.id ? "You" : memberName(e.subjectId)} · `}
+                  {fmtDate(e.occurredOn)} · {e.loggedBy === e.subjectId ? (e.subjectId === me.user.id ? "you owned up" : `${memberName(e.subjectId)} owned up`) : `logged by ${name(e.loggedBy)}`}
                 </div>
-                <div className="text-label-medium text-on-surface-variant">
-                  {name(e.subjectId)} · {fmtDate(e.occurredOn)} · {e.loggedBy === e.subjectId ? "owned up" : `logged by ${name(e.loggedBy)}`}
-                </div>
-                {e.note && <div className="mt-1 text-body-medium whitespace-pre-wrap text-on-surface-variant">{e.note}</div>}
-                {e.consequenceTaskId && (
-                  <Link
-                    to="/tasks/$taskId"
-                    params={{ taskId: e.consequenceTaskId }}
-                    className="state-layer mt-2 inline-flex h-8 items-center gap-1.5 rounded-sm border border-outline-variant px-3 text-label-large text-on-surface-variant"
-                  >
-                    <Icon name="bolt" size={18} /> Consequence given
-                  </Link>
-                )}
+                {e.note && <div className="mt-2 font-serif text-[22px] leading-snug whitespace-pre-wrap text-on-surface-variant italic">“{e.note}”</div>}
               </div>
-              {canRemove && (
-                <IconButton
-                  icon="delete"
-                  label="Remove from log"
-                  onClick={() => confirm(`Remove “${e.title}” from the log?`, () => del.mutate(e.id, { onError: (err) => snack(errorMessage(err)) }))}
-                />
-              )}
-            </li>
-          );
-        })}
+              <span className="shrink-0 pt-1.5 text-right text-body-small text-on-surface-variant">{outcome(e)}</span>
+            </button>
+          </li>
+        ))}
       </ul>
-      {!readOnly && <Fab icon="add" label={isDom ? "Log a broken rule" : "Own up to one"} onClick={() => setAdding(true)} />}
       <LogDialog
         open={adding}
         onClose={() => setAdding(false)}
         defaultSubject={isDom ? ((partners.find((p) => p.role === "submissive") ?? partners[0])?.userId ?? me.user.id) : me.user.id}
       />
+      {open && <EntryDialog entry={open} outcome={outcome(open)} onClose={() => setOpen(null)} />}
+    </>
+  );
+}
+
+/** One entry: who, when, the note, a way to the consequence, and taking it off the log. */
+function EntryDialog({ entry: e, outcome, onClose }: { entry: RuleLogEntry; outcome: string; onClose(): void }) {
+  const { rel, me, isDom, memberName } = useRel();
+  const readOnly = useReadOnly();
+  const snack = useSnackbar();
+  const del = useDeleteRuleLog(rel.id);
+  const navigate = useNavigate();
+  const [confirm, confirmEl] = useConfirm();
+  const canRemove = !readOnly && (e.loggedBy === me.user.id || isDom);
+  const who = e.subjectId === me.user.id ? "You" : memberName(e.subjectId);
+  return (
+    <>
+      <Dialog
+        open
+        onClose={onClose}
+        title={e.title}
+        actions={
+          <>
+            {canRemove && (
+              <Button
+                variant="text"
+                className="mr-auto text-error"
+                onClick={() =>
+                  confirm(`Remove “${e.title}” from the log?`, () => del.mutate(e.id, { onSuccess: onClose, onError: (err) => snack(errorMessage(err)) }))
+                }
+              >
+                Remove
+              </Button>
+            )}
+            {e.consequenceTaskId && (
+              <Button variant="outlined" onClick={() => void navigate({ to: "/tasks/$taskId", params: { taskId: e.consequenceTaskId! } })}>
+                See the consequence
+              </Button>
+            )}
+            {!canRemove && !e.consequenceTaskId && (
+              <Button variant="text" onClick={onClose}>
+                Close
+              </Button>
+            )}
+          </>
+        }
+      >
+        <p>
+          {who} · {fmtDate(e.occurredOn)} · {e.loggedBy === e.subjectId ? "owned up" : `logged by ${e.loggedBy === me.user.id ? "you" : memberName(e.loggedBy)}`}
+        </p>
+        <p className="mt-1">{outcome === "none" ? "No consequence" : outcome === "needs your approval" || outcome === "sent for approval" ? `Consequence ${outcome}` : `Consequence: ${outcome}`}</p>
+        {e.note && <p className="mt-3 font-serif text-[22px] leading-snug whitespace-pre-wrap text-on-surface italic">“{e.note}”</p>}
+      </Dialog>
       {confirmEl}
     </>
   );
@@ -154,16 +221,11 @@ function LogDialog({ open, onClose, defaultSubject }: { open: boolean; onClose()
     <Dialog
       open={open}
       onClose={close}
-      title={isDom ? "Log a broken rule" : "Own up to a broken rule"}
+      title={<span className="text-[34px] leading-tight">{isDom ? "Log a broken rule" : "Own up to one"}</span>}
       actions={
-        <>
-          <Button variant="text" onClick={close}>
-            Cancel
-          </Button>
-          <Button disabled={!what || add.isPending} onClick={submit}>
-            Log it
-          </Button>
-        </>
+        <Button className="h-14! w-full" disabled={!what || add.isPending} onClick={submit}>
+          Log it
+        </Button>
       }
     >
       <div className="flex flex-col gap-4">
@@ -184,7 +246,7 @@ function LogDialog({ open, onClose, defaultSubject }: { open: boolean; onClose()
             <optgroup label="Rules">
               {sortRules(rules.data).map((r, i) => (
                 <option key={r.id} value={`r:${r.id}`}>
-                  {i + 1}. {r.title}
+                  {roman(i + 1)}. {r.title}
                 </option>
               ))}
             </optgroup>
