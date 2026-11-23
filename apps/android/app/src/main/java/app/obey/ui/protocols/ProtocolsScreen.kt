@@ -1,5 +1,11 @@
 package app.obey.ui.protocols
 
+import app.obey.ui.rules.roman
+import androidx.compose.ui.unit.sp
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.outlined.AssignmentLate
 import androidx.compose.material.icons.outlined.FactCheck
 import app.obey.ui.notes.MarkdownPreview
@@ -26,12 +32,10 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -126,9 +130,9 @@ fun ProtocolsScreen(onOpen: (String) -> Unit, onNew: () -> Unit, onOpenSettings:
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 navigationIcon = { MenuButton() },
-                title = { app.obey.ui.common.PairedTitle("Protocols", if (onRules != null) "Rules" else null) { onRules?.invoke() } },
+                title = {},
                 actions = {
                     IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.AssignmentLate, "Broken rules") }
                     if (canManage) IconButton(onClick = onNew) { Icon(Icons.Outlined.Add, "New protocol") }
@@ -138,54 +142,58 @@ fun ProtocolsScreen(onOpen: (String) -> Unit, onNew: () -> Unit, onOpenSettings:
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
+      Column(Modifier.padding(padding).fillMaxSize()) {
+        app.obey.ui.common.TitleWithToggle("Protocols", listOf("Rules", "Protocols"), 1, { onRules?.invoke() }, showToggle = onRules != null)
         when (val s = state) {
-            Load.Loading -> LoadingBox(Modifier.padding(padding))
-            is Load.Failed -> ErrorBox(s.message, vm::refresh, Modifier.padding(padding))
+            Load.Loading -> LoadingBox()
+            is Load.Failed -> ErrorBox(s.message, vm::refresh)
             is Load.Ready -> {
                 val rules = if (showRules) s.value.rules else emptyList()
                 if (s.value.protocols.isEmpty()) {
-                    EmptyBox("No protocols yet", if (canManage) "Spell out exactly what's expected, and when and how it's done." else null, Modifier.padding(padding), icon = Icons.Outlined.FactCheck)
+                    EmptyBox("No protocols yet", if (canManage) "Spell out exactly what's expected, and when and how it's done." else null, icon = Icons.Outlined.FactCheck)
                 } else {
                     ReorderableList(
                         items = s.value.protocols,
                         key = { it.id },
                         enabled = canManage,
                         onReorder = vm::reorder,
-                        modifier = Modifier.padding(padding).fillMaxSize(),
+                        modifier = Modifier.fillMaxSize(),
                     ) { p, _, handle ->
                         val ruleIndex = rules.indexOfFirst { it.id == p.ruleId }
-                        ListItem(
-                            modifier = Modifier.clickable { onOpen(p.id) },
-                            overlineContent = if (ruleIndex >= 0) {
-                                { Text("Rule ${ruleIndex + 1}: ${rules[ruleIndex].title}", maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                            } else null,
-                            headlineContent = { Text(p.title) },
-                            supportingContent = if (p.bodyMd.isNotBlank()) {
-                                {
-                                    val open = p.id in expanded
-                                    MarkdownPreview(
-                                        markdown = p.bodyMd,
-                                        onToggleCheck = null,
-                                        modifier = if (open || !p.isLong) Modifier else Modifier.heightIn(max = 120.dp).clipToBounds().fadeOut(),
+                        val open = p.id in expanded
+                        val c = MaterialTheme.colorScheme
+                        // Letters: a hairline row with the drag handle on the left, the title in serif and its rule
+                        // beneath; the text itself runs the full width below, so it isn't squeezed between columns.
+                        Column(Modifier.fillMaxWidth().clickable { onOpen(p.id) }.padding(horizontal = 16.dp)) {
+                            Row(Modifier.padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                handle?.invoke()
+                                Column(Modifier.weight(1f).padding(start = if (handle != null) 4.dp else 0.dp)) {
+                                    Text(p.title, style = MaterialTheme.typography.titleLarge.copy(fontSize = 26.sp, lineHeight = 30.sp))
+                                    if (ruleIndex >= 0) Text(
+                                        "Rule ${roman(ruleIndex + 1)} · ${rules[ruleIndex].title}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = c.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
                                     )
                                 }
-                            } else null,
-                            trailingContent = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (p.isLong) {
-                                        val open = p.id in expanded
-                                        IconButton(onClick = { expanded = if (open) expanded - p.id else expanded + p.id }) {
-                                            Icon(if (open) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, if (open) "Show less" else "Show more")
-                                        }
-                                    }
-                                    handle?.invoke()
+                                if (p.isLong) IconButton(onClick = { expanded = if (open) expanded - p.id else expanded + p.id }) {
+                                    Icon(if (open) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, if (open) "Show less" else "Show more", tint = c.onSurfaceVariant)
                                 }
-                            },
-                        )
+                            }
+                            if (p.bodyMd.isNotBlank()) MarkdownPreview(
+                                markdown = p.bodyMd,
+                                onToggleCheck = null,
+                                modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
+                                    .then(if (open || !p.isLong) Modifier else Modifier.heightIn(max = 120.dp).clipToBounds().fadeOut()),
+                            )
+                            HorizontalDivider(Modifier.padding(top = 14.dp), color = c.outlineVariant)
+                        }
                     }
                 }
             }
         }
+      }
     }
 }
 

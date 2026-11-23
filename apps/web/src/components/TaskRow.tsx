@@ -13,7 +13,7 @@ import { StreakStrip } from "./StreakStrip";
 import { useNoteAfter } from "./DecisionNote";
 import { CountRing, CountSheet, canCount, countLine, isCounted, readyToSend, useCountTap } from "./Count";
 import { CheckInButton, PlaceRing, canCheckIn, isPlaced, placeLine, useCheckIn, usePlaceLookup } from "./Location";
-import { Diamond, Icon, IconButton, cx, useSnackbar } from "./ui";
+import { Button, Diamond, Icon, IconButton, cx, useSnackbar } from "./ui";
 
 /** Where a row opens its task. Today's wide layout points it at the side panel instead of the task page. */
 export const RowLink = createContext<((taskId: string) => { to: string; params?: Record<string, string>; search?: Record<string, string>; current?: boolean }) | null>(null);
@@ -229,5 +229,80 @@ export function MissActions({ o }: { o: Occurrence }) {
         onClick={() => confirm.mutate(o.id, { onSuccess: () => noteAfter("Kept as missed", target("keeping as missed")), onError: (e) => snack(errorMessage(e)) })}
       />
     </>
+  );
+}
+
+/** When a missed task was due, in words: "at 9:00 PM", "yesterday at 9:00 PM", or "Sat, Nov 21 at 9:00 PM". */
+function missedWhen(o: Occurrence) {
+  const d = localDateOf(new Date(o.dueAt));
+  const t = today();
+  const yesterday = localDateOf(new Date(new Date(`${t}T12:00:00`).getTime() - 86_400_000));
+  const day = d === t ? "" : d === yesterday ? "yesterday " : `${fmtDate(d)} `;
+  return isAllDayDue(o.dueAt) ? (d === t ? "today" : d === yesterday ? "yesterday" : fmtDate(d)) : `${day}at ${fmtTime(o.dueAt)}`;
+}
+
+/**
+ * A Dominant's call on a miss, as a card in a sentence: "Kitten missed Hydration yesterday at 10 PM. That costs no phone
+ * at dinner." Keep it missed (the consequence stands), excuse it (no penalty, streak intact), or drop only the consequence.
+ */
+export function MissCard({ o }: { o: Occurrence }) {
+  const { rel, memberName } = useRel();
+  const snack = useSnackbar();
+  const edit = useEditOccurrence(rel.id);
+  const confirm = useConfirmMiss(rel.id);
+  const drop = useDropConsequence(rel.id);
+  const noteAfter = useNoteAfter();
+  const who = memberName(o.assigneeId);
+  const target = (about: string) => ({ relId: rel.id, occurrenceId: o.id, to: who, about: `${about} “${o.title}”` });
+  const busy = edit.isPending || confirm.isPending || drop.isPending;
+  return (
+    <article className="flex flex-col gap-3">
+      <p className="text-body-large text-on-surface">
+        {who} missed{" "}
+        <Link to="/tasks/$taskId" params={{ taskId: o.seriesId }} className="font-medium hover:underline">
+          {o.title}
+        </Link>{" "}
+        {missedWhen(o)}.
+        {o.missConsequence && (
+          <>
+            {" "}
+            That costs <em>{o.missConsequence}</em>.
+          </>
+        )}
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          busy={confirm.isPending}
+          disabled={busy}
+          onClick={() => confirm.mutate(o.id, { onSuccess: () => noteAfter("Kept as missed", target("keeping as missed")), onError: (e) => snack(errorMessage(e)) })}
+        >
+          Keep as missed
+        </Button>
+        <Button
+          variant="outlined"
+          disabled={busy}
+          onClick={() =>
+            edit.mutate({ id: o.id, change: { status: "excused" } }, { onSuccess: () => noteAfter("Excused", target("excusing")), onError: (e) => snack(errorMessage(e)) })
+          }
+        >
+          Excuse
+        </Button>
+      </div>
+      {o.missConsequence && (
+        <button
+          type="button"
+          disabled={busy}
+          className="self-start text-label-large text-primary hover:underline disabled:opacity-50"
+          onClick={() =>
+            drop.mutate(o.id, {
+              onSuccess: () => noteAfter(`Dropped “${o.missConsequence}”`, target(`dropping “${o.missConsequence}” for`)),
+              onError: (e) => snack(errorMessage(e)),
+            })
+          }
+        >
+          Drop the consequence only
+        </button>
+      )}
+    </article>
   );
 }

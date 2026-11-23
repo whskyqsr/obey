@@ -7,7 +7,7 @@ import { SortableList } from "../components/SortableList";
 import { Button, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, cx, useSnackbar } from "../components/ui";
 import { useRel } from "../lib/relationship";
 import { excerpt } from "./Notes";
-import { RulesTabs, sortRules } from "./Rules";
+import { RulesTabs, roman, sortRules } from "./Rules";
 
 // TipTap is heavy; load it the first time a protocol is expanded.
 const MarkdownEditor = lazy(importPage(() => import("../components/MarkdownEditor").then((m) => ({ default: m.MarkdownEditor }))));
@@ -24,7 +24,7 @@ export function ProtocolsPage() {
   const rules = useMemo(() => (features.rules ? sortRules(rulesQ.data ?? []) : []), [rulesQ.data, features.rules]);
   const ruleLabel = (id: string | null) => {
     const i = rules.findIndex((r) => r.id === id);
-    return i < 0 ? null : `Rule ${i + 1}: ${rules[i]!.title}`;
+    return i < 0 ? null : `Rule ${roman(i + 1)} · ${rules[i]!.title}`;
   };
   const open = (protocolId: string) => navigate({ to: "/protocols/$protocolId", params: { protocolId } });
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -40,7 +40,7 @@ export function ProtocolsPage() {
         actions={<RulesTabs current="protocols" />}
         tools={<IconButton icon="assignment_late" label="Broken rules" onClick={() => void navigate({ to: "/rule-log" })} />}
       />
-      <ol className="flex flex-col gap-2 px-4 md:px-6">
+      <ol className="mx-4 flex flex-col border-t border-outline-variant md:mx-6">
         {list.isLoading && <Loading />}
         {list.error && <ErrorBox error={list.error} onRetry={() => list.refetch()} />}
         {list.data && !list.data.length && (
@@ -51,31 +51,30 @@ export function ProtocolsPage() {
             const rule = ruleLabel(p.ruleId);
             const isOpen = expanded.has(p.id);
             return (
-              <div className="border border-outline-variant flex items-start gap-1 rounded-md py-2 pr-2 pl-1">
-                {handle ?? <span className="w-3" />}
-                {/* The whole card opens the protocol; only the chevron stays on the list. */}
-                <div className="relative min-w-0 flex-1 p-2">
-                  <button type="button" className="state-layer absolute inset-0 rounded-sm" aria-label={`Open ${p.title}`} onClick={() => open(p.id)} />
-                  <div className="pointer-events-none flex flex-col gap-1">
-                    <span className="text-title-medium text-on-surface">{p.title}</span>
-                    {rule && (
-                      <span className="flex items-center gap-1 text-label-medium text-primary">
-                        <Icon name="gavel" size={16} /> {rule}
-                      </span>
-                    )}
-                    {p.bodyMd && (
-                      <Clamp open={isOpen} onOverflow={(cut) => setOverflowing((s) => (cut === s.has(p.id) ? s : toggled(s, p.id)))}>
-                        <Suspense fallback={<span className="line-clamp-3 text-body-medium text-on-surface-variant">{excerpt(p.bodyMd, 240)}</span>}>
-                          <MarkdownEditor value={p.bodyMd} onChange={() => {}} editable={false} bare />
-                        </Suspense>
-                      </Clamp>
-                    )}
+              // Letters: a hairline row, handle on the left, the title in serif with its rule beneath. The text runs
+              // the full width below, so it isn't squeezed between the handle and the chevron.
+              <div className="relative border-b border-outline-variant py-3">
+                <button type="button" className="state-layer absolute inset-0" aria-label={`Open ${p.title}`} onClick={() => open(p.id)} />
+                <div className="pointer-events-none relative flex items-center gap-1">
+                  {handle && <span className="pointer-events-auto">{handle}</span>}
+                  <div className="min-w-0 flex-1 py-1">
+                    <span className="block font-serif text-[26px] leading-[30px] text-on-surface">{p.title}</span>
+                    {rule && <span className="block truncate text-body-medium text-on-surface-variant">{rule}</span>}
                   </div>
+                  {(overflowing.has(p.id) || isOpen) && (
+                    <span className="pointer-events-auto">
+                      <IconButton icon={isOpen ? "expand_less" : "expand_more"} label={isOpen ? "Show less" : "Show more"} aria-expanded={isOpen} onClick={() => toggle(p.id)} />
+                    </span>
+                  )}
                 </div>
-                {overflowing.has(p.id) || isOpen ? (
-                  <IconButton icon={isOpen ? "expand_less" : "expand_more"} label={isOpen ? "Show less" : "Show more"} aria-expanded={isOpen} onClick={() => toggle(p.id)} />
-                ) : (
-                  <span className="w-10" />
+                {p.bodyMd && (
+                  <div className="pointer-events-none relative mt-1">
+                    <Clamp open={isOpen} onOverflow={(cut) => setOverflowing((s) => (cut === s.has(p.id) ? s : toggled(s, p.id)))}>
+                      <Suspense fallback={<span className="line-clamp-3 text-body-medium text-on-surface-variant">{excerpt(p.bodyMd, 240)}</span>}>
+                        <MarkdownEditor value={p.bodyMd} onChange={() => {}} editable={false} bare />
+                      </Suspense>
+                    </Clamp>
+                  </div>
                 )}
               </div>
             );

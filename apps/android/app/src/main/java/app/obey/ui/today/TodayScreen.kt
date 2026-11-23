@@ -224,6 +224,20 @@ fun TodayScreen(
                             subtitle = d.awaitingReview.joinToString(", ") { it.title },
                             count = d.awaitingReview.size,
                             action = if (d.awaitingReview.size > 1) "Approve all" to { vm.approveAll(d.awaitingReview) } else null,
+                            cards = d.awaitingReview.map { o ->
+                                o.id to @Composable {
+                                    ReviewCard(
+                                        o,
+                                        who = session?.nameOf(o.assigneeId) ?: "They",
+                                        busy = busy,
+                                        onApprove = { vm.review(o, true) },
+                                        onSendBack = { sendingBack = o },
+                                        onAddWord = { commenting = o },
+                                        onOpen = { onOpenTask(o.seriesId) },
+                                        padded = false,
+                                    )
+                                }
+                            },
                             body = {
                                 InboxRows {
                                     d.awaitingReview.forEach { o ->
@@ -252,6 +266,19 @@ fun TodayScreen(
                                 o.title + if (parseInstant(o.dueAt).local().toLocalDate() != LocalDate.now()) ", yesterday" else ""
                             },
                             count = d.recentMisses.size,
+                            cards = d.recentMisses.map { o ->
+                                o.id to @Composable {
+                                    MissCard(
+                                        o,
+                                        who = session?.nameOf(o.assigneeId) ?: "They",
+                                        busy = busy,
+                                        onKeep = { vm.confirmMiss(o) },
+                                        onExcuse = { vm.excuse(o) },
+                                        onDropConsequence = if (o.missConsequence != null) ({ vm.dropConsequence(o) }) else null,
+                                        onOpen = { onOpenTask(o.seriesId) },
+                                    )
+                                }
+                            },
                             body = {
                                 InboxRows {
                                     d.recentMisses.forEach { o ->

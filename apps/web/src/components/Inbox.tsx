@@ -1,5 +1,5 @@
 import { ReviewCard } from "./ReviewCard";
-import { useMemo, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   useAgreement,
@@ -26,7 +26,7 @@ import { useNoteAfter } from "./DecisionNote";
 import { EventDialog, eventOn, eventWhen } from "./EventDialog";
 import { MOOD_LABELS } from "./Mood";
 import { MoodRow, RedemptionRow, SceneCheckRow } from "./NeedsYou";
-import { MissActions, RowGroup, TaskRow } from "./TaskRow";
+import { MissActions, MissCard, RowGroup, TaskRow } from "./TaskRow";
 import { Button, Dialog, Icon, IconButton, Section, TextField, cx, useSnackbar } from "./ui";
 
 type Tone = "primary" | "secondary" | "tertiary" | "error" | "neutral";
@@ -40,7 +40,8 @@ const TONE: Record<Tone, string> = {
 };
 
 /** One row of the list: a kind of thing waiting, how many, and what they are once opened. A link row opens a page instead. */
-type Group = { key: string; icon: string; tone: Tone; title: string; sub: string; count: number; action?: ReactNode; body?: ReactNode; to?: string };
+/** [cards]: for a Dominant, one card per item instead of [body]'s rows (the mockup's sentence cards). */
+type Group = { key: string; icon: string; tone: Tone; title: string; sub: string; count: number; action?: ReactNode; body?: ReactNode; cards?: ReactNode[]; to?: string };
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const names = (list: string[]) => list.join(", ");
@@ -115,12 +116,13 @@ export function TodayInbox() {
           </Button>
         ) : undefined,
       body: (
-        <div className="flex flex-col divide-y divide-outline-variant">
+        <div className="flex flex-col divide-y divide-outline-variant [&>*]:py-4">
           {list.map((o) => (
             <ReviewCard key={o.id} o={o} />
           ))}
         </div>
       ),
+      cards: list.map((o) => <ReviewCard key={o.id} o={o} />),
     });
   }
   if (isDom && needs.missed.length) {
@@ -139,6 +141,7 @@ export function TodayInbox() {
           ))}
         </RowGroup>
       ),
+      cards: list.map((o) => <MissCard key={o.id} o={o} />),
     });
   }
   const curfewClashes = isDom && features.location ? (curfew.data?.clashes ?? []) : [];
@@ -356,7 +359,16 @@ export function TodayInbox() {
     return (
       <section aria-label={`Needs you · ${total}`} className="flex flex-col gap-3 px-4 pb-6 md:px-6">
         {groups.map((g) =>
-          g.body && !g.to ? (
+          g.cards ? (
+            <Fragment key={g.key}>
+              {g.cards.map((c, i) => (
+                <div key={i} className="rounded-lg border border-outline-variant bg-surface-container-lowest p-4">
+                  {c}
+                </div>
+              ))}
+              {g.action && <div className="-mt-1 flex justify-end">{g.action}</div>}
+            </Fragment>
+          ) : g.body && !g.to ? (
             <div key={g.key} className="rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-1 [&>*+*]:border-t [&>*+*]:border-outline-variant">
               {g.body}
               {g.action && <div className="flex justify-end py-3">{g.action}</div>}

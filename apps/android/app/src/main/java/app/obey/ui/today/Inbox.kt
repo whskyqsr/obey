@@ -58,6 +58,8 @@ data class InboxGroup(
     val action: Pair<String, () -> Unit>? = null,
     val onOpen: (() -> Unit)? = null,
     val body: (@Composable () -> Unit)? = null,
+    /** For a Dominant, one card per item (keyed) instead of [body]'s rows: the mockup's sentence cards. */
+    val cards: List<Pair<String, @Composable () -> Unit>>? = null,
 )
 
 internal fun plural(n: Int, one: String, many: String = one + "s") = "$n ${if (n == 1) one else many}"
@@ -85,6 +87,24 @@ fun NeedsYouCards(groups: List<InboxGroup>, busy: Boolean) {
     val c = MaterialTheme.colorScheme
     Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         groups.forEach { g ->
+            if (g.cards != null) {
+                g.cards.forEach { (k, card) ->
+                    key(g.key, k) {
+                        Surface(
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                            color = c.surfaceContainerLowest,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { androidx.compose.foundation.layout.Box(Modifier.padding(16.dp)) { card() } }
+                    }
+                }
+                g.action?.let { (label, run) ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        OutlinedButton(onClick = run, enabled = !busy) { Text(label) }
+                    }
+                }
+                return@forEach
+            }
             key(g.key) {
                 Surface(
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
