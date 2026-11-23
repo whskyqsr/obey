@@ -22,17 +22,18 @@ export function ReviewCard({ o }: { o: Occurrence }) {
   const [replying, setReplying] = useState(false);
   const who = memberName(o.assigneeId);
   const sent = [o.photoCount > 0 ? (o.photoCount === 1 ? "a photo" : `${o.photoCount} photos`) : null, o.noteMd ? "a note" : null].filter(Boolean);
-  const when = o.completedAt ? (localDateOf(new Date(o.completedAt)) === today() ? fmtTime(o.completedAt) : fmtDateTime(o.completedAt)) : null;
+  // Only worth saying when it wasn't today; the mockup's card is just the sentence.
+  const when = o.completedAt && localDateOf(new Date(o.completedAt)) !== today() ? fmtDateTime(o.completedAt) : null;
 
   return (
-    <article className="flex flex-col gap-3 py-4">
+    <article className="flex flex-col gap-3">
       <p className="text-body-large text-on-surface">
         {who} finished{" "}
         <Link to="/tasks/$taskId" params={{ taskId: o.seriesId }} className="font-medium hover:underline">
           {o.title}
         </Link>
         {sent.length ? ` and sent ${sent.join(" and ")}` : ""}.
-        {when && <span className="text-body-medium text-on-surface-variant"> {when}</span>}
+        {when && <span className="text-body-medium whitespace-nowrap text-on-surface-variant"> {when}</span>}
       </p>
       <ProofPhotos o={o} />
       {o.noteMd && <blockquote className="font-serif text-[22px] leading-7 text-on-surface-variant italic">“{o.noteMd.trim()}”</blockquote>}
@@ -47,7 +48,7 @@ export function ReviewCard({ o }: { o: Occurrence }) {
         <Button variant="outlined" disabled={review.isPending} onClick={() => setSendingBack(true)}>
           Send back
         </Button>
-        <Button variant="text" className="ml-auto" onClick={() => setReplying(true)}>
+        <Button variant="text" className="-mr-2 ml-auto px-2!" onClick={() => setReplying(true)}>
           Add a word
         </Button>
       </div>

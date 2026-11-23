@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.MoreTime
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -86,29 +85,41 @@ fun CountdownCard(
     val urgent = left <= URGENT
     val mine = o.assigneeId == me
     val c = MaterialTheme.colorScheme
-    val (bg, fg, accent) = if (urgent) Triple(c.errorContainer, c.onErrorContainer, c.error) else Triple(c.tertiaryContainer, c.onTertiaryContainer, c.tertiary)
-    Surface(color = bg, contentColor = fg, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+    // Letters: paper with an oxblood hairline and a "Due in" eyebrow, the time in serif; red only when it's close.
+    val accent = if (urgent) c.error else c.primary
+    Surface(
+        color = c.surfaceContainerLowest,
+        contentColor = c.onSurface,
+        shape = RoundedCornerShape(12.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, accent),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+    ) {
         Box {
             Row(
                 Modifier.padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Icon(Icons.Filled.Timer, null)
-                Column(Modifier.weight(1f).padding(start = 4.dp).clickable { onOpen(o) }) {
-                    Text(o.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(listOfNotNull(who(o), "due ${formatTime(o.dueAt)}").joinToString(" · "), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Column(Modifier.weight(1f).clickable { onOpen(o) }) {
+                    Text("DUE IN", style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.5.sp), color = accent)
+                    Text(o.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(listOfNotNull(who(o), formatTime(o.dueAt)).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Text(mmss(left), style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { contentDescription = "${(left + 59_999) / 60_000} minutes left" })
+                Text(
+                    mmss(left),
+                    style = MaterialTheme.typography.displaySmall.copy(fontSize = 34.sp, lineHeight = 36.sp),
+                    color = if (urgent) c.error else c.onSurface,
+                    modifier = Modifier.semantics { contentDescription = "${(left + 59_999) / 60_000} minutes left" },
+                )
                 if (mine || isDom) {
                     IconButton(onClick = { onMoreTime(o) }) {
-                        Icon(Icons.Outlined.MoreTime, if (mine) "More time" else "Reschedule")
+                        Icon(Icons.Outlined.MoreTime, if (mine) "More time" else "Reschedule", tint = c.onSurfaceVariant)
                     }
                 }
                 if (mine && o.isOpen()) {
                     FilledIconButton(
                         onClick = { onDone(o) },
-                        colors = if (urgent) IconButtonDefaults.filledIconButtonColors(containerColor = c.error, contentColor = c.onError) else IconButtonDefaults.filledIconButtonColors(),
+                        colors = if (urgent) IconButtonDefaults.filledIconButtonColors(containerColor = c.error, contentColor = c.onError) else IconButtonDefaults.filledIconButtonColors(containerColor = c.onSurface, contentColor = c.surface),
                     ) {
                         Icon(if (o.isRitual) Icons.Outlined.PlayArrow else Icons.Outlined.Check, if (o.isRitual) "Start" else "Done")
                     }
@@ -117,9 +128,9 @@ fun CountdownCard(
             // Time left, as a thin bar along the bottom edge.
             LinearProgressIndicator(
                 progress = { (left.toFloat() / HOUR).coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth().height(4.dp).align(Alignment.BottomCenter),
+                modifier = Modifier.fillMaxWidth().height(3.dp).align(Alignment.BottomCenter),
                 color = accent,
-                trackColor = fg.copy(alpha = 0.15f),
+                trackColor = androidx.compose.ui.graphics.Color.Transparent,
                 strokeCap = StrokeCap.Butt,
                 gapSize = 0.dp,
                 drawStopIndicator = {},

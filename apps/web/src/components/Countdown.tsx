@@ -10,7 +10,7 @@ import { RescheduleSheet } from "./RescheduleSheet";
 import { isCounted } from "./Count";
 import { isPlaced } from "./Location";
 import { useQuickComplete } from "./TaskRow";
-import { Icon, IconButton, cx } from "./ui";
+import { IconButton, cx } from "./ui";
 
 export const HOUR = 60 * 60_000;
 export const URGENT = 15 * 60_000;
@@ -65,20 +65,21 @@ export function CountdownCard({ skip }: { skip?: string } = {}) {
     <section
       aria-label={`Countdown: ${o.title}`}
       className={cx(
-        "relative mx-4 mb-4 flex items-center gap-3 overflow-hidden rounded-xl py-2.5 pr-2 pl-4 md:mx-6",
-        urgent ? "bg-error-container text-on-error-container" : "bg-tertiary-container text-on-tertiary-container",
+        // Letters: paper with an oxblood hairline and a "Due in" eyebrow, the time in serif; red only when it's close.
+        "relative mx-4 mb-4 flex items-center gap-3 overflow-hidden rounded-lg border bg-surface-container-lowest py-2.5 pr-2 pl-4 text-on-surface md:mx-6",
+        urgent ? "border-error" : "border-primary",
       )}
     >
-      <Icon name="timer" filled className="shrink-0" />
       <Link to="/tasks/$taskId" params={{ taskId: o.seriesId }} className="min-w-0 flex-1 hover:underline">
-        <div className="truncate text-title-small">{o.title}</div>
-        <div className="truncate text-body-small">{[who, `due ${fmtTime(o.dueAt)}`].filter(Boolean).join(" · ")}</div>
+        <div className={cx("eyebrow", urgent ? "text-error" : "text-primary")}>Due in</div>
+        <div className="truncate text-body-large">{o.title}</div>
+        <div className="truncate text-body-small text-on-surface-variant">{[who, fmtTime(o.dueAt)].filter(Boolean).join(" · ")}</div>
       </Link>
-      <div className="text-title-large tabular-nums" role="timer" aria-live="off">
+      <div className={cx("font-serif text-[34px] leading-9 tabular-nums", urgent && "text-error")} role="timer" aria-live="off">
         {mmss(left)}
       </div>
       {(mine || isDom) && (
-        <IconButton icon="more_time" label={mine ? "More time" : "Reschedule"} onClick={() => setRescheduling(true)} className="text-current!" />
+        <IconButton icon="more_time" label={mine ? "More time" : "Reschedule"} onClick={() => setRescheduling(true)} className="text-on-surface-variant!" />
       )}
       {mine && isOpen(o, now) && (
         <IconButton
@@ -90,8 +91,8 @@ export function CountdownCard({ skip }: { skip?: string } = {}) {
         />
       )}
       {/* Time left, as a thin bar along the bottom edge. */}
-      <div className="absolute inset-x-0 bottom-0 h-1 bg-current/15" aria-hidden>
-        <div className={cx("h-full transition-[width] duration-1000 ease-linear", urgent ? "bg-error" : "bg-tertiary")} style={{ width: `${(left / HOUR) * 100}%` }} />
+      <div className="absolute inset-x-0 bottom-0 h-[3px]" aria-hidden>
+        <div className={cx("h-full transition-[width] duration-1000 ease-linear", urgent ? "bg-error" : "bg-primary")} style={{ width: `${(left / HOUR) * 100}%` }} />
       </div>
       <RescheduleSheet occurrence={o} open={rescheduling} onClose={() => setRescheduling(false)} />
       {completing && <CompleteDialog o={o} open onClose={() => setCompleting(false)} />}
