@@ -6,7 +6,7 @@ import { EventDialog, eventOn } from "../components/EventDialog";
 import { MonthWeeks, WeekGrid, inTopStrip } from "../components/WeekGrid";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { OccurrenceCard, isOverdue } from "../components/OccurrenceCard";
-import { Button, Dialog, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, cx } from "../components/ui";
+import { Button, Diamond, Dialog, type DiamondState, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, cx } from "../components/ui";
 import { useOpenOnNew } from "../lib/newParam";
 import { addDays, addMonths, daysBetween, fmtDate, fmtMonth, fmtTime, localDateOf, monthGrid, startOfWeek, today } from "../lib/dates";
 import { storage } from "../lib/storage";
@@ -237,34 +237,48 @@ export function CalendarPage() {
           fab={isDom}
         />
       ) : (
-        <div className="grid gap-3 px-4 md:grid-cols-7 md:gap-2 md:px-6">
+        // Letters: one hairline row per day, a diamond for each task, and a word on how it went. Tap a day to open it.
+        <div className="mx-4 border-t border-outline-variant md:mx-6">
           {days.map((d) => {
             const items = byDay.get(d) ?? [];
             // Like any calendar: all-day and multi-day plans head the day.
             const dayEvents = eventsOn(d).sort((a, b) => Number(inTopStrip(b)) - Number(inTopStrip(a)) || a.startsAt.localeCompare(b.startsAt));
-            // On a phone an empty day is a thin row rather than a whole card.
-            const empty = !items.length && !dayEvents.length && !occ.isLoading;
+            const open = d === selected;
             return (
-              <div key={d} className={cx("rounded-lg md:min-h-64 md:p-2", empty ? "px-2 py-1" : "p-2", d === t ? "bg-secondary-container/60" : "bg-surface-container-low")}>
-                <div className={cx("flex items-baseline gap-2 px-1 md:mb-2 md:flex-col md:gap-0", !empty && "mb-2")}>
-                  <span className="text-label-medium text-on-surface-variant">{fmtDate(d, { weekday: "short" })}</span>
-                  <span className={cx(empty ? "text-title-medium md:text-title-large" : "text-title-large", d === t ? "text-primary" : "text-on-surface")}>
-                    {Number(d.slice(8))}
+              <div key={d} className={cx("border-b border-outline-variant", d === t && "-mx-4 border-l-2 border-l-primary bg-surface-container-lowest px-[14px] md:-mx-6 md:px-[22px]")}>
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  onClick={() => setSelected(open ? "" : d)}
+                  className="state-layer flex min-h-[68px] w-full items-center gap-4 py-2 text-left"
+                >
+                  <span className="flex w-10 shrink-0 flex-col">
+                    <span className="text-label-medium text-on-surface-variant">{fmtDate(d, { weekday: "short" })}</span>
+                    <span className={cx("font-serif text-[28px] leading-7", d === t ? "text-primary" : "text-on-surface")}>{Number(d.slice(8))}</span>
                   </span>
-                  {empty && <span className="text-body-small text-on-surface-variant/70 md:hidden">Nothing scheduled</span>}
-                </div>
-                <div className="flex flex-col gap-1">
-                  {dayEvents.map((e) => (
-                    <EventItem key={e.id} e={e} onOpen={() => setPlan(e)} />
-                  ))}
-                  {items.map((o) => (
-                    <WeekItem key={o.id} o={o} clash={clashing.has(o.id)} onOpen={() => setDetailId(o.id)} />
-                  ))}
-                  {empty && <span className="hidden px-1 text-body-small text-on-surface-variant/70 md:block">—</span>}
-                </div>
+                  <span className="flex min-w-0 flex-1 flex-wrap items-center gap-3" aria-hidden>
+                    {items.map((o) => (
+                      <Diamond key={o.id} state={dayState(o)} size={16} />
+                    ))}
+                  </span>
+                  <span className={cx("shrink-0 text-body-medium", items.some((o) => dayState(o) === "owed") ? "text-error" : "text-on-surface-variant")}>
+                    {daySummary(items, dayEvents, d, t, occ.isLoading)}
+                  </span>
+                </button>
+                {open && (items.length > 0 || dayEvents.length > 0) && (
+                  <div className="flex flex-col gap-1 pb-3 pl-14">
+                    {dayEvents.map((e) => (
+                      <EventItem key={e.id} e={e} onOpen={() => setPlan(e)} />
+                    ))}
+                    {items.map((o) => (
+                      <WeekItem key={o.id} o={o} clash={clashing.has(o.id)} onOpen={() => setDetailId(o.id)} />
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
+          <p className="py-4 text-body-medium text-on-surface-variant">Tap a day to see it, and a task to open it.</p>
         </div>
       )}
       <Dialog
@@ -308,9 +322,31 @@ function EventItem({ e, onOpen, large }: { e: CalendarEvent; onOpen(): void; lar
   );
 }
 
+/** A task's diamond in the week: filled when done, oxblood when missed, a hollow one while it's still to do. */
+function dayState(o: Occurrence): DiamondState {
+  if (o.status === "completed") return "done";
+  if (o.status === "missed" || isOverdue(o)) return "owed";
+  if (o.status === "submitted") return "waiting";
+  if (o.status === "excused") return "off";
+  return "open";
+}
+
+/** "1 missed", "all done", "2 of 6", or the day's plan when there's nothing to count yet. */
+function daySummary(items: Occurrence[], events: CalendarEvent[], d: string, t: string, loading: boolean) {
+  if (loading) return "";
+  const missed = items.filter((o) => dayState(o) === "owed").length;
+  const done = items.filter((o) => o.status === "completed" || o.status === "excused").length;
+  const plan = events[0] ? `${events[0].title}${events[0].allDay ? "" : ` ${fmtTime(events[0].startsAt)}`}` : null;
+  if (!items.length) return plan ?? "Off day";
+  if (missed) return `${missed} missed`;
+  if (done === items.length) return "all done";
+  if (d === t) return `${done} of ${items.length}`;
+  return plan ?? (d < t ? `${done} of ${items.length}` : "");
+}
+
 function WeekItem({ o, clash, onOpen }: { o: Occurrence; clash?: boolean; onOpen(): void }) {
   return (
-    <button type="button" onClick={onOpen} className="state-layer flex w-full items-start gap-2 rounded-sm bg-surface px-2 py-1.5 text-left">
+    <button type="button" onClick={onOpen} className="state-layer flex w-full items-start gap-2 rounded-sm px-2 py-1.5 text-left">
       <span className={cx("mt-1.5 size-2 shrink-0 rounded-full", dotClass(o))} />
       <span className="min-w-0 flex-1">
         <span className={cx("line-clamp-2 block text-label-large break-words text-on-surface", o.status === "completed" && "line-through opacity-70")}>{o.title}</span>

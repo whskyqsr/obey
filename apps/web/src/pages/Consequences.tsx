@@ -3,7 +3,7 @@ import { useAssignConsequence, useDeleteLibraryItem, useLibrary, useSaveLibraryI
 import { errorMessage } from "../api/client";
 import type { Consequence } from "../api/types";
 import { ItemDialog, type FieldDef } from "../components/ItemDialog";
-import { Button, Dialog, Empty, ErrorBox, Fab, Icon, Loading, PageHeader, Select, Switch, TextArea, TextField, useSnackbar } from "../components/ui";
+import { Button, Dialog, Empty, ErrorBox, Fab, Icon, Loading, cx, PageHeader, Select, Switch, TextArea, TextField, useSnackbar } from "../components/ui";
 import { LOCK_TIME_OPTIONS, fmtMinutes } from "../components/Chastity";
 import { browserTimeZone, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
@@ -46,25 +46,26 @@ export function ConsequencesPage() {
   return (
     <>
       <PageHeader title="Consequences" subtitle="Attach one to a task for when it's missed, or hand one out on its own." />
-      <div className="flex flex-col gap-2 px-4 md:px-6">
+      <div className="mx-4 flex flex-col divide-y divide-outline-variant border-y border-outline-variant md:mx-6">
         {list.isLoading && <Loading />}
         {list.error && <ErrorBox error={list.error} onRetry={() => list.refetch()} />}
         {list.data && !list.data.length && <Empty icon="bolt" title="No consequences yet" />}
         {sorted.map((c) => (
-          <div key={c.id} className="flex items-start gap-1 rounded-md bg-surface-container-low pr-2">
+          <div key={c.id} className="flex items-center gap-2">
             <button
               type="button"
               disabled={!isDom}
               onClick={() => setEditing(c)}
-              className="state-layer flex min-w-0 flex-1 items-start gap-4 rounded-md p-4 text-left disabled:cursor-default"
+              className="state-layer flex min-w-0 flex-1 items-start gap-4 py-3 text-left disabled:cursor-default"
             >
-              <div className="flex shrink-0 gap-0.5 pt-1 text-error" aria-label={`Severity ${c.severity}`}>
-                {Array.from({ length: 5 }, (_, i) => (
-                  <Icon key={i} name="bolt" size={16} filled={i < c.severity} className={i < c.severity ? "" : "opacity-25"} />
-                ))}
-              </div>
               <div className="min-w-0 flex-1">
-                <div className="text-title-medium text-on-surface">{c.title}</div>
+                <div className="text-body-large text-on-surface">{c.title}</div>
+                {/* Severity as five small diamonds, filled up to how heavy it is. */}
+                <div className="mt-1 flex gap-1" role="img" aria-label={`Severity ${c.severity} of 5`}>
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <span key={i} className={cx("inline-block size-2 rotate-45 border border-primary", i < c.severity ? "bg-primary" : "opacity-40")} />
+                  ))}
+                </div>
                 {c.bodyMd && <div className="mt-1 text-body-medium whitespace-pre-wrap text-on-surface-variant">{c.bodyMd}</div>}
                 {c.lockMinutes && (
                   <div className="mt-1 flex items-center gap-1 text-body-small text-on-surface-variant">
@@ -75,7 +76,7 @@ export function ConsequencesPage() {
               </div>
             </button>
             {isDom && (
-              <Button variant="tonal" icon="assignment_late" className="mt-3" onClick={() => setAssigning(c)}>
+              <Button variant="text" onClick={() => setAssigning(c)}>
                 Assign
               </Button>
             )}
