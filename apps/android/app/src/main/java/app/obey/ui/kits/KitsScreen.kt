@@ -49,7 +49,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -322,7 +321,7 @@ fun shareCodeFrom(text: String): String? =
 private fun KitCard(icon: ImageVector, title: String, description: String, items: List<KitItem>, shared: Boolean, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val titles = items.map { if (it.kind == "reward") "Reward: ${it.title}" else it.title }
-    ElevatedCard(onClick = onClick, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp).fillMaxWidth()) {
+    OutlinedCard(onClick = onClick, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp).fillMaxWidth()) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
             Surface(color = colors.secondaryContainer, shape = MaterialTheme.shapes.large, modifier = Modifier.size(48.dp)) {
                 Box(contentAlignment = Alignment.Center) { Icon(icon, null, tint = colors.onSecondaryContainer) }
@@ -513,7 +512,7 @@ internal fun KitSheet(title: String, description: String, kitItems: List<KitItem
 @Composable
 private fun ItemList(items: List<KitItem>) {
     val colors = MaterialTheme.colorScheme
-    Surface(color = colors.surfaceContainerLow, shape = MaterialTheme.shapes.large, modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, colors.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
         Column {
             items.forEachIndexed { n, i ->
                 if (n > 0) HorizontalDivider(color = colors.surfaceContainerHighest)

@@ -59,7 +59,7 @@ fun SceneCards(data: TodayScenes, session: Session, busy: Boolean, onAftercareDo
     val c = MaterialTheme.colorScheme
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (fresh != null && theirs.isNotEmpty()) {
-            Surface(color = c.tertiaryContainer, contentColor = c.onTertiaryContainer, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
+            Surface(color = androidx.compose.ui.graphics.Color.Transparent, contentColor = c.onSurface, border = androidx.compose.foundation.BorderStroke(1.dp, c.primary), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     theirs.forEach { p ->
                         Text("Aftercare for ${session.nameOf(p.userId)}", style = MaterialTheme.typography.titleMedium)
@@ -76,7 +76,7 @@ fun SceneCards(data: TodayScenes, session: Session, busy: Boolean, onAftercareDo
             }
         }
         if (check != null) {
-            Surface(color = c.surfaceContainerHigh, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
+            Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Column {
                         Text("How are you feeling after ${whenWas(check)}?", style = MaterialTheme.typography.titleMedium)

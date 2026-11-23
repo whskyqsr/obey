@@ -126,7 +126,7 @@ private fun TimeChoices(options: List<Pair<String, Instant>>, value: Instant?, a
 
 @Composable
 private fun Summary(icon: ImageVector, title: String, body: String) {
-    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(12.dp))
@@ -185,7 +185,7 @@ fun MoreTimeSheet(night: CurfewNight, who: String, busy: Boolean, onDismiss: () 
 @Composable
 fun CurfewAskCard(request: CurfewRequest, name: String, onApprove: () -> Unit, onChange: () -> Unit, onDecline: () -> Unit) {
     val c = MaterialTheme.colorScheme
-    Surface(color = c.secondaryContainer, contentColor = c.onSecondaryContainer, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, contentColor = c.onSurface, border = androidx.compose.foundation.BorderStroke(1.dp, c.primary), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("$name asks to be home by ${formatTime(request.untilAt)} ${nightLabel(request.fromDueAt)}", style = MaterialTheme.typography.titleMedium)
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -270,7 +270,7 @@ fun PlanEndSheet(clash: CurfewClash, to: String, busy: Boolean, onDismiss: () ->
 @Composable
 fun PlanChangeCard(event: CalendarEvent, name: String, onSeen: () -> Unit) {
     val c = MaterialTheme.colorScheme
-    Surface(color = c.surfaceContainerHigh, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp)) {
             Icon(Icons.Outlined.Event, null, tint = c.primary, modifier = Modifier.padding(top = 2.dp))
             Spacer(Modifier.width(16.dp))

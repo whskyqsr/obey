@@ -79,7 +79,7 @@ private fun EventRow(e: ChastityEvent, wearer: String) {
 private fun PastLock(l: ChastityLock, session: Session) {
     val length = if (l.startedAt != null && l.endedAt != null) fmtSpan((parseInstant(l.endedAt).toEpochMilli() - parseInstant(l.startedAt).toEpochMilli()) / 60_000) else null
     ListItem(
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
         leadingContent = { Icon(if (l.status == "ended") Icons.Outlined.LockOpen else Icons.Outlined.Block, null) },
         headlineContent = { Text(session.nameOf(l.wearerId) + (length?.let { ", $it" } ?: if (l.status == "declined") ", declined" else ", not started")) },
         supportingContent = {

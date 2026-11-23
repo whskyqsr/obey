@@ -308,7 +308,7 @@ fun LimitsScreen(onEdit: () -> Unit, vm: LimitsViewModel = hiltViewModel()) {
                     val l = s.value
                     if (mine == null) return@Column
                     if (mine.finishedAt == null) {
-                        Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(24.dp)) {
+                        Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary), shape = MaterialTheme.shapes.medium) {
                             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(if (mine.rated > 0) "You've rated ${mine.rated} of ${l.items.size}" else "Fill in your limits", style = MaterialTheme.typography.titleMedium)
                                 Text(
@@ -381,7 +381,7 @@ private val dayFmt = DateTimeFormatter.ofPattern("MMM d")
 private fun Person(list: LimitList, member: Member, person: LimitPerson, onChart: () -> Unit) {
     val answers = person.answers.orEmpty()
     fun pick(r: Rating) = list.items.filter { answers[it.key]?.rating == r.key }
-    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(24.dp)) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer), contentAlignment = Alignment.Center) {
@@ -401,7 +401,7 @@ private fun Person(list: LimitList, member: Member, person: LimitPerson, onChart
             Pills(Icons.Filled.Favorite, Rating.Love, "Loves", pick(Rating.Love))
         }
     }
-    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(24.dp)) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Everything", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
@@ -499,7 +499,7 @@ private fun Chart(list: LimitList, people: List<Member>, onShare: () -> Unit) {
     byCategory(list.items).forEach { (category, items) ->
         val shown = items.filter { i -> people.any { answersOf(it)[i.key]?.rating != null } }
         if (shown.isNotEmpty()) {
-            Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(24.dp)) {
+            Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(category, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
@@ -516,7 +516,7 @@ private fun Chart(list: LimitList, people: List<Member>, onShare: () -> Unit) {
         }
     }
     val notes = people.flatMap { m -> list.items.filter { !answersOf(m)[it.key]?.note.isNullOrEmpty() }.map { Triple(it, m.displayName.takeIf { people.size > 1 }, answersOf(m)[it.key]!!.note) } }
-    if (notes.isNotEmpty()) Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(24.dp)) { Box(Modifier.fillMaxWidth().padding(16.dp)) { Notes(notes) } }
+    if (notes.isNotEmpty()) Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium) { Box(Modifier.fillMaxWidth().padding(16.dp)) { Notes(notes) } }
 }
 
 /** Filling in your own answers, one category at a time. */
@@ -596,7 +596,7 @@ fun LimitsEditScreen(onClose: () -> Unit, vm: LimitsViewModel = hiltViewModel())
                 is Load.Failed -> ErrorBox(s.message, { vm.load() })
                 is Load.Ready -> {
                     if (groups.isEmpty()) return@Column
-                    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(24.dp)) {
+                    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium) {
                         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Legend()
                             Text(

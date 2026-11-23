@@ -263,7 +263,9 @@ fun MonthReviewScreen(onOpenSettings: () -> Unit, onOpenStats: (month: String, w
 
 @Composable
 private fun Card(color: Color = MaterialTheme.colorScheme.surfaceContainerLow, content: @Composable () -> Unit) {
-    Surface(color = color, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
+    // Letters: a hairline box on paper; a highlighted card gets an oxblood rule instead of a fill.
+    val highlight = color != MaterialTheme.colorScheme.surfaceContainerLow
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, shape = MaterialTheme.shapes.medium, border = androidx.compose.foundation.BorderStroke(1.dp, if (highlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { content() }
     }
 }
@@ -397,7 +399,7 @@ private fun ProgressCard(s: MonthSummary, session: Session, onOpenStats: (String
         return
     }
     val stats = LocalFeatures.current.stats
-    Surface(color = colors.surfaceContainerLow, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, shape = MaterialTheme.shapes.medium, border = androidx.compose.foundation.BorderStroke(1.dp, colors.outlineVariant), modifier = Modifier.fillMaxWidth()) {
         Column {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row {
@@ -641,7 +643,7 @@ private fun NextFocus(month: String, focus: MonthFocus?, tasks: List<Task>, busy
 private fun PastMonths(past: List<PastMonth>, selected: String, current: String, onOpen: (String) -> Unit) {
     val colors = MaterialTheme.colorScheme
     Text("Past months", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 4.dp))
-    Surface(color = colors.surfaceContainerLow, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, shape = MaterialTheme.shapes.medium, border = androidx.compose.foundation.BorderStroke(1.dp, colors.outlineVariant), modifier = Modifier.fillMaxWidth()) {
         Column {
             past.forEachIndexed { i, p ->
                 if (i > 0) HorizontalDivider(color = colors.surfaceContainerHighest)

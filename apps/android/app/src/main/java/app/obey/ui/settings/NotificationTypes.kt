@@ -40,7 +40,7 @@ fun NotificationTypes(
 ) {
     val colors = MaterialTheme.colorScheme
     val points = LocalFeatures.current.points
-    Surface(color = colors.surfaceContainerLow, shape = MaterialTheme.shapes.large, modifier = Modifier.padding(horizontal = 16.dp).padding(top = 8.dp).fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, colors.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.padding(horizontal = 16.dp).padding(top = 8.dp).fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             TYPES.filter { !it.needsPoints || points }.forEach { t ->
                 Row(verticalAlignment = Alignment.CenterVertically) {

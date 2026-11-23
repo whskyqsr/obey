@@ -769,7 +769,7 @@ private fun Fold(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     var open by rememberSaveable { mutableStateOf(initiallyOpen) }
-    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
         Column {
             Row(
                 Modifier

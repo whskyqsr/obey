@@ -145,7 +145,7 @@ fun RoleSwapCard(session: Session, vm: RoleSwapViewModel = hiltViewModel()) {
             mine == Role.Submissive -> " Your tasks pause until then."
             else -> " $otherName's tasks pause until then."
         }
-        Surface(color = c.secondaryContainer, contentColor = c.onSecondaryContainer, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+        Surface(color = androidx.compose.ui.graphics.Color.Transparent, contentColor = c.onSurface, border = androidx.compose.foundation.BorderStroke(1.dp, c.primary), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("$otherName asked to swap roles", style = MaterialTheme.typography.titleMedium)
                 Text("You'd be the ${(mine ?: Role.Submissive).flipped().label} $until.$pauses", style = MaterialTheme.typography.bodyMedium)
@@ -172,7 +172,7 @@ fun RoleSwapCard(session: Session, vm: RoleSwapViewModel = hiltViewModel()) {
             if (!swap.pauseTasks) null else if (mine == Role.Dominant) "your own tasks are paused" else "$otherName's tasks are paused",
         ).joinToString(" · ")
     }
-    Surface(color = c.tertiaryContainer, contentColor = c.onTertiaryContainer, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, contentColor = c.onSurface, border = androidx.compose.foundation.BorderStroke(1.dp, c.primary), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
         Row(Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.SwapHoriz, null)
             Spacer(Modifier.width(12.dp))
