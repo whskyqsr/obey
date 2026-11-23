@@ -290,9 +290,10 @@ private fun LockUp(l: ChastityLock, keyholder: String, relock: Boolean, busy: Bo
 private fun Card(container: Boolean = false, content: @Composable () -> Unit) {
     val c = MaterialTheme.colorScheme
     Surface(
-        color = if (container) c.secondaryContainer else c.surfaceContainerLow,
-        contentColor = if (container) c.onSecondaryContainer else c.onSurface,
-        shape = RoundedCornerShape(24.dp),
+        color = androidx.compose.ui.graphics.Color.Transparent,
+        contentColor = c.onSurface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (container) c.primary else c.outlineVariant),
+        shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { content() }

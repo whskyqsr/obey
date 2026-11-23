@@ -70,7 +70,7 @@ fun TaskHistorySection(history: List<HistoryEntry>, onEdit: ((HistoryEntry, Occu
     history.forEach { h ->
         ListItem(
             modifier = if (onEdit != null && h.status != OccurrenceStatus.Cancelled) Modifier.clickable { editing = h } else Modifier,
-            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+            colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
             headlineContent = { Text(formatDate(LocalDate.parse(h.originalDate))) },
             supportingContent = {
                 Text(

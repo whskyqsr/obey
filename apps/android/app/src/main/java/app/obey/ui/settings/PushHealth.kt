@@ -149,7 +149,7 @@ fun PushHealthSection(vm: PushHealthViewModel = hiltViewModel()) {
         else -> null
     }
 
-    Surface(color = colors.surfaceContainerLow, shape = MaterialTheme.shapes.large, modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, colors.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.Top) {
                 Icon(

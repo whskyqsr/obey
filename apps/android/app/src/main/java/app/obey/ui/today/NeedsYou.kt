@@ -53,7 +53,7 @@ import java.time.LocalDate
 fun MoodRow(o: Occurrence, name: String, onSeen: () -> Unit, onReply: () -> Unit) {
     val mood = o.mood ?: return
     ListItem(
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
         leadingContent = { Icon(moodIcon(mood, filled = true), null, tint = MaterialTheme.colorScheme.tertiary) },
         headlineContent = { Text("$name checked in feeling ${moodLabel(mood).lowercase()}") },
         supportingContent = {
@@ -75,7 +75,7 @@ fun MoodRow(o: Occurrence, name: String, onSeen: () -> Unit, onReply: () -> Unit
 @Composable
 fun SceneCheckRow(scene: app.obey.api.Scene, c: app.obey.api.SceneCheck, name: String, onSeen: () -> Unit, onReply: () -> Unit) {
     ListItem(
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
         leadingContent = { Icon(moodIcon(c.mood, filled = true), null, tint = MaterialTheme.colorScheme.tertiary) },
         headlineContent = { Text("$name feels ${moodLabel(c.mood).lowercase()} after ${scene.title.ifBlank { null }?.let { "“$it”" } ?: "the scene"}") },
         supportingContent = {
@@ -97,7 +97,7 @@ fun SceneCheckRow(scene: app.obey.api.Scene, c: app.obey.api.SceneCheck, name: S
 @Composable
 fun RedemptionRow(e: LedgerEntry, name: String, onRedeemed: () -> Unit) {
     ListItem(
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
         leadingContent = { Icon(Icons.Outlined.Redeem, null, tint = MaterialTheme.colorScheme.primary) },
         headlineContent = { Text(e.note) },
         supportingContent = { Text("$name spent ${-e.delta} pts${e.consequenceTitle?.let { " to get out of $it" } ?: ""} · ${ago(e.createdAt)}") },
@@ -137,7 +137,7 @@ internal fun dayAndTime(iso: String) =
 fun DelayCard(d: DelayUsed, name: String, onSeen: () -> Unit) {
     val c = MaterialTheme.colorScheme
     val one = d.items.singleOrNull()
-    Surface(color = c.surfaceContainerHigh, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp)) {
             Icon(Icons.Outlined.MoreTime, null, tint = c.primary, modifier = Modifier.padding(top = 2.dp))
             Spacer(Modifier.width(16.dp))

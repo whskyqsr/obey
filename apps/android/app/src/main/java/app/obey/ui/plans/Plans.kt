@@ -649,7 +649,7 @@ private fun Clashes(items: List<Occurrence>, plan: ClashPlan, form: ClashForm, s
         }
         items.forEach { o ->
             val mine = o.assigneeId == session.userId
-            Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(12.dp)) {
+            Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium) {
                 Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Column {
                         Text(o.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -691,7 +691,7 @@ private fun Clashes(items: List<Occurrence>, plan: ClashPlan, form: ClashForm, s
 @Composable
 private fun WaitingOn(who: String, r: app.obey.api.CurfewRequest) {
     val night = parseInstant(r.fromDueAt).minusSeconds(12 * 3600).local().format(java.time.format.DateTimeFormatter.ofPattern("EEEE"))
-    Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.HourglassTop, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.width(12.dp))
@@ -709,7 +709,7 @@ private fun WaitingOn(who: String, r: app.obey.api.CurfewRequest) {
 
 @Composable
 private fun EndsAtCurfew(dueAt: String) {
-    Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
             Icon(Icons.Outlined.Bedtime, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.width(12.dp))

@@ -20,7 +20,7 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
@@ -164,7 +164,7 @@ fun NotesScreen(
 
 @Composable
 private fun NoteCard(note: Note, author: String?, onOpen: () -> Unit, onToggleCheck: ((Int) -> Unit)?) {
-    ElevatedCard(Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
+    OutlinedCard(Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(

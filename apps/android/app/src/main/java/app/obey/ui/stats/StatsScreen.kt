@@ -208,7 +208,7 @@ fun StatsScreen(onOpenSettings: () -> Unit, onOpenTask: (String) -> Unit, onOpen
 @Composable
 private fun ReviewOpen(m: MonthSummary, onOpen: () -> Unit) {
     val colors = MaterialTheme.colorScheme
-    Surface(color = colors.secondaryContainer, contentColor = colors.onSecondaryContainer, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, contentColor = colors.onSurface, border = androidx.compose.foundation.BorderStroke(1.dp, colors.primary), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Icon(Icons.Outlined.Flag, null)
@@ -228,7 +228,7 @@ private fun ReviewOpen(m: MonthSummary, onOpen: () -> Unit) {
 
 @Composable
 private fun StatsCard(title: String? = null, flush: Boolean = false, content: @Composable () -> Unit) {
-    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(if (flush) PaddingFlush else PaddingFull), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             title?.let { Text(it, style = MaterialTheme.typography.titleMedium, modifier = if (flush) Modifier.padding(horizontal = 16.dp) else Modifier) }
             content()

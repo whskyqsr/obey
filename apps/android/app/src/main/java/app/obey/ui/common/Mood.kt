@@ -149,7 +149,7 @@ fun MoodCard(modifier: Modifier = Modifier, header: (@Composable () -> Unit)? = 
     val colors = MaterialTheme.colorScheme
 
     header?.invoke()
-    Surface(color = colors.surfaceContainerLow, shape = MaterialTheme.shapes.large, modifier = modifier.fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, colors.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (people.size > 1) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

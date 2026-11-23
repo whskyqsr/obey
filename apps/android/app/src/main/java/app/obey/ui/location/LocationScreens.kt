@@ -81,7 +81,7 @@ import java.time.ZoneId
 
 @Composable
 private fun StatusCard(icon: ImageVector, ok: Boolean, title: String, body: String, content: @Composable () -> Unit = {}) {
-    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Icon(icon, null, tint = if (ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
@@ -147,7 +147,7 @@ fun LocationSetupPrompt(onOpen: () -> Unit) {
 @Composable
 private fun Step(done: Boolean, title: String, body: String, action: String?, onAction: () -> Unit) {
     ListItem(
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
         leadingContent = {
             Icon(
                 if (done) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
@@ -212,11 +212,11 @@ fun LocationScreen(onPlaces: () -> Unit, onCurfew: () -> Unit, vm: LocationViewM
                 Modifier.widthIn(max = 640.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.large) {
+                Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium) {
                     Column {
                         ListItem(
                             modifier = Modifier.clickable(onClick = onPlaces),
-                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                            colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
                             leadingContent = { Icon(Icons.Outlined.LocationOn, null) },
                             headlineContent = { Text("Places") },
                             supportingContent = { Text(if (canManage) "Where location tasks can send someone" else "The places location tasks use") },
@@ -225,7 +225,7 @@ fun LocationScreen(onPlaces: () -> Unit, onCurfew: () -> Unit, vm: LocationViewM
                         if (canManage || curfewOn) {
                             ListItem(
                                 modifier = Modifier.clickable(onClick = onCurfew),
-                                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                                colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
                                 leadingContent = { Icon(Icons.Outlined.Bedtime, null) },
                                 headlineContent = { Text("Curfew") },
                                 supportingContent = { Text(curfew?.takeIf { it.enabled }?.let { describeCurfew(it) } ?: "Off") },
@@ -256,7 +256,7 @@ fun LocationScreen(onPlaces: () -> Unit, onCurfew: () -> Unit, vm: LocationViewM
                         "Location tasks check in on their own when you get there. Fealty watches only the places your tasks name, " +
                             "including while it's closed, and sends only when you arrive or leave. Never where you are otherwise.",
                     )
-                    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.large) {
+                    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium) {
                         Column {
                             Step(
                                 setup.precise,
@@ -329,11 +329,11 @@ private fun WatchList(items: List<app.obey.api.Occurrence>, placeName: (app.obey
         Text("No location tasks left today.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         return
     }
-    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.large) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium) {
         Column {
             items.forEach { o ->
                 ListItem(
-                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
                     leadingContent = { Icon(Icons.Outlined.LocationOn, null, tint = MaterialTheme.colorScheme.primary) },
                     headlineContent = { Text(placeName(o)) },
                     supportingContent = {
@@ -378,12 +378,12 @@ fun PlacesScreen(onBack: () -> Unit, vm: LocationViewModel = hiltViewModel()) {
                 if (list != null && list.isEmpty()) {
                     EmptyBox("No places yet", if (canEdit) "Save the places tasks can ask for: the gym, work, home." else "Places a Dominant saves for location tasks show here.", icon = Icons.Outlined.LocationOn)
                 } else if (list != null) {
-                    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.large) {
+                    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium) {
                         Column {
                             list.forEach { p ->
                                 ListItem(
                                     modifier = if (canEdit) Modifier.clickable { editing = true to p } else Modifier,
-                                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                                    colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
                                     leadingContent = { Icon(Icons.Outlined.LocationOn, null, tint = MaterialTheme.colorScheme.primary) },
                                     headlineContent = { Text(p.name) },
                                     supportingContent = {

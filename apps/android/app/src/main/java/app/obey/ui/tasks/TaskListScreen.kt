@@ -222,9 +222,10 @@ private fun KitReview(drafts: List<Task>, session: Session?, onOpen: (String) ->
     val who = drafts.map { session?.nameOf(it.assigneeId) ?: "them" }.distinct().joinToString(" and ")
     val c = MaterialTheme.colorScheme
     Surface(
-        color = c.tertiaryContainer,
-        contentColor = c.onTertiaryContainer,
-        shape = RoundedCornerShape(24.dp),
+        color = androidx.compose.ui.graphics.Color.Transparent,
+        contentColor = c.onSurface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, c.primary),
+        shape = MaterialTheme.shapes.medium,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

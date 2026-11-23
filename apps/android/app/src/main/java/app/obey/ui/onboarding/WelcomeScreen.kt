@@ -181,7 +181,7 @@ private fun FeaturesStep(session: Session, vm: SettingsViewModel) {
         Column(Modifier.padding(vertical = 4.dp)) {
             featureRows.forEach { (label, help, get, set) ->
                 ListItem(
-                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
                     headlineContent = { Text(label) },
                     supportingContent = { Text(help) },
                     trailingContent = {

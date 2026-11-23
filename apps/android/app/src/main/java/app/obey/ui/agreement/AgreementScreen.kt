@@ -492,7 +492,7 @@ private fun Main(
 @Composable
 private fun EmptyCard(readOnly: Boolean, onTemplate: () -> Unit, onBlank: () -> Unit) {
     val c = MaterialTheme.colorScheme
-    Surface(color = c.surfaceContainerLow, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Icon(Icons.Outlined.Handshake, null, Modifier.size(32.dp), tint = c.primary)
             Text("Write down what you've agreed", style = MaterialTheme.typography.headlineSmall)
@@ -517,7 +517,7 @@ private fun DriftBanner(a: Agreement, session: Session, onPropose: () -> Unit) {
     val everyone = if (session.partners.size > 1) "all" else "both"
     fun titles(verb: String) = a.drift.filter { it.verb == verb }.joinToString(", ") { it.title }
     val c = MaterialTheme.colorScheme
-    Surface(color = c.secondaryContainer, contentColor = c.onSecondaryContainer, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, contentColor = c.onSurface, border = androidx.compose.foundation.BorderStroke(1.dp, c.primary), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.PublishedWithChanges, null)
@@ -563,7 +563,7 @@ private fun ProposalBanner(p: AgreementVersion, session: Session, onRead: () -> 
         else -> null
     }
     val c = MaterialTheme.colorScheme
-    Surface(color = c.secondaryContainer, contentColor = c.onSecondaryContainer, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, contentColor = c.onSurface, border = androidx.compose.foundation.BorderStroke(1.dp, c.primary), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             sub?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
@@ -634,7 +634,7 @@ private fun Review(
 private fun NoteBanner(heading: String?, note: String?) {
     if (heading == null && note == null) return
     val c = MaterialTheme.colorScheme
-    Surface(color = c.tertiaryContainer, contentColor = c.onTertiaryContainer, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, contentColor = c.onSurface, border = androidx.compose.foundation.BorderStroke(1.dp, c.primary), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             heading?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
             note?.let { Text(it, style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic) }
@@ -670,7 +670,7 @@ private fun PageCard(v: AgreementVersion, marked: Boolean, onlyChanged: Boolean,
     var showAll by rememberSaveable(v.id) { mutableStateOf(false) }
     val unchanged = v.sections.count { it.change == "same" }
     val sections = if (onlyChanged && !showAll) v.sections.filter { it.change != "same" } else v.sections
-    Surface(color = c.surfaceContainerLow, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             sections.forEach { s -> key(s.id) { SectionView(s, marked, prevNumber, onOpenNote) } }
             if (marked) {
@@ -793,7 +793,7 @@ private fun Signatures(v: AgreementVersion, session: Session) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         members.forEach { m ->
             val sig = v.agreements.firstOrNull { it.userId == m.userId }
-            Surface(color = c.surfaceContainerHigh, shape = MaterialTheme.shapes.large, modifier = Modifier.weight(1f)) {
+            Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.weight(1f)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Agreed by", style = MaterialTheme.typography.labelMedium, color = c.onSurfaceVariant)
                     if (sig != null) {
@@ -816,7 +816,7 @@ private fun VersionList(a: Agreement, session: Session, onOpen: (String) -> Unit
         return
     }
     val everyone = if ((session.relationship?.members?.size ?: 0) > 2) "everyone" else "both"
-    Surface(color = c.surfaceContainerLow, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
         Column {
             a.versions.forEach { s -> key(s.id) { VersionRow(s, a, session, everyone) { onOpen(s.id) } } }
         }

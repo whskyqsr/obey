@@ -144,7 +144,7 @@ fun RitualSheet(o: Occurrence, onDismiss: () -> Unit, onNeedsProof: ((Occurrence
                 Text("This one ${o.opensLabel()}.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
                 Spacer(Modifier.height(12.dp))
             }
-            Surface(color = colors.primaryContainer, contentColor = colors.onPrimaryContainer, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
+            Surface(color = androidx.compose.ui.graphics.Color.Transparent, contentColor = colors.onSurface, border = androidx.compose.foundation.BorderStroke(1.dp, colors.primary), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
                 if (current != null) {
                     Column(Modifier.padding(horizontal = 20.dp, vertical = 24.dp)) {
                         Text("Step ${index + 1}", style = MaterialTheme.typography.labelLarge)

@@ -145,7 +145,7 @@ fun RecurrencePicker(
             }
         }
 
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+        Card(colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.Transparent), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
             Row(Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.EventRepeat, contentDescription = null)
                 Text(

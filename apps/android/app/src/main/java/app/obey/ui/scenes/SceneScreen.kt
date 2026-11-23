@@ -198,7 +198,7 @@ private fun SceneBody(s: Scene, session: Session, vm: SceneViewModel, busy: Bool
     mine?.let { SideView(it, session, vm.avatars) }
     s.sides.filter { it.userId != me }.forEach { SideView(it, session, vm.avatars) }
     if (mine == null && othersShared.isNotEmpty()) {
-        Surface(color = c.surfaceContainer, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
+        Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
             Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Lock, null, tint = c.onSurfaceVariant)
                 Spacer(Modifier.width(12.dp))
