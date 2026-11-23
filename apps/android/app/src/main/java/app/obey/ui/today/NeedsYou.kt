@@ -24,7 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -120,7 +120,7 @@ fun RedeemedDialog(e: LedgerEntry, name: String, busy: Boolean, onDismiss: () ->
                         (e.consequenceTitle?.let { " $it is excused then, with no penalty." } ?: ""),
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                OutlinedTextField(note, { note = it.take(500) }, label = { Text("Note to $name (optional)") }, modifier = Modifier.fillMaxWidth())
+                LettersField(note, { note = it.take(500) }, label = { Text("Note to $name (optional)") }, modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = { Button(onClick = { onConfirm(note.trim().ifEmpty { null }) }, enabled = !busy) { Text("Redeemed") } },
@@ -166,7 +166,7 @@ fun TellHomeDialog(who: String, busy: Boolean, onDismiss: () -> Unit, onSend: (S
         title = { Text("Tell $who you're home") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                OutlinedTextField(note, { note = it.take(280) }, label = { Text("Add a line (optional)") }, modifier = Modifier.fillMaxWidth())
+                LettersField(note, { note = it.take(280) }, label = { Text("Add a line (optional)") }, modifier = Modifier.fillMaxWidth())
                 Text(
                     "$who gets a notification that you're home. Your line goes with it when $who has details turned on, and it starts tonight's comments.",
                     style = MaterialTheme.typography.bodySmall,

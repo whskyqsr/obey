@@ -13,7 +13,7 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -58,7 +58,7 @@ fun AssignConsequenceDialog(consequence: Consequence, assigneeId: String, chasti
         title = { Text("Assign “${consequence.title}”") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(reason, { reason = it.take(2000) }, label = { Text("Reason (optional)") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+                LettersField(reason, { reason = it.take(2000) }, label = { Text("Reason (optional)") }, minLines = 2, modifier = Modifier.fillMaxWidth())
                 if (lockTime != null) {
                     Text("This adds ${app.obey.ui.chastity.fmtMinutes(lockTime)} to their lock straight away. It needs a running lock with an end time.")
                 } else {

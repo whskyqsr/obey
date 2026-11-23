@@ -25,7 +25,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -212,9 +212,9 @@ fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, on
             title = { Text(if (existing == null) "New rule" else "Edit rule") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(title, { title = it.take(200) }, label = { Text("Rule") })
-                    OutlinedTextField(body, { body = it.take(5000) }, label = { Text("Details (optional)") }, minLines = 2)
-                    OutlinedTextField(category, { category = it.take(60) }, label = { Text("Category (optional)") }, singleLine = true)
+                    LettersField(title, { title = it.take(200) }, label = { Text("Rule") })
+                    LettersField(body, { body = it.take(5000) }, label = { Text("Details (optional)") }, minLines = 2)
+                    LettersField(category, { category = it.take(60) }, label = { Text("Category (optional)") }, singleLine = true)
                 }
             },
             confirmButton = {

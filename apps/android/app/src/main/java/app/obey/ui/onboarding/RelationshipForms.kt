@@ -7,7 +7,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -48,7 +48,7 @@ fun CreateRelationshipForm(busy: Boolean, onCreate: (String, Role) -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
     var role by rememberSaveable { mutableStateOf(Role.Dominant) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedTextField(
+        LettersField(
             value = name,
             onValueChange = { name = it.take(80) },
             label = { Text("Name (optional)") },
@@ -70,7 +70,7 @@ fun JoinRelationshipForm(busy: Boolean, onJoin: (String, Role) -> Unit) {
     var code by rememberSaveable { mutableStateOf("") }
     var role by rememberSaveable { mutableStateOf(Role.Submissive) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedTextField(
+        LettersField(
             value = code,
             onValueChange = { code = it.trim().take(200) },
             label = { Text("Invite link or code") },

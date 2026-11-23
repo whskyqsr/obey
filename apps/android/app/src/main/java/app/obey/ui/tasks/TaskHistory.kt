@@ -16,7 +16,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -119,7 +119,7 @@ private fun EditHistoryDialog(entry: HistoryEntry, onDismiss: () -> Unit, onSave
                         }
                     }
                 }
-                OutlinedTextField(value = note, onValueChange = { note = it.take(5000) }, label = { Text("Note") }, modifier = Modifier.fillMaxWidth())
+                LettersField(value = note, onValueChange = { note = it.take(5000) }, label = { Text("Note") }, modifier = Modifier.fillMaxWidth())
                 if (LocalFeatures.current.points) {
                     Text(
                         "Points follow the status: done earns the task's points, missed costs its penalty, excused is neither.",

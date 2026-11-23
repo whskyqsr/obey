@@ -15,7 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -77,7 +77,7 @@ fun DoneDialog(o: Occurrence, onDismiss: () -> Unit, sendTo: String? = null, onD
                             Text(prompt.trim(), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 12.dp))
                         }
                     }
-                    OutlinedTextField(
+                    LettersField(
                         value = entry,
                         onValueChange = { entry = it.take(100_000) },
                         label = { Text("Your entry") },
@@ -95,7 +95,7 @@ fun DoneDialog(o: Occurrence, onDismiss: () -> Unit, sendTo: String? = null, onD
                         Text("This one needs proof: add a photo, a note, or both.", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
                     }
                     ProofPhotos(o.id, canAdd = true, modifier = Modifier.padding(top = 12.dp))
-                    OutlinedTextField(
+                    LettersField(
                         value = note,
                         onValueChange = { note = it.take(5000) },
                         label = { Text(if (o.proofRequired) "Note" else if (o.askMood) "Anything to add? (optional)" else "Note for your partner") },

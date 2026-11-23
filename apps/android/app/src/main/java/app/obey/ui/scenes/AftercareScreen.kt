@@ -23,7 +23,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -169,7 +169,7 @@ private fun PlanSheet(plan: AftercarePlan, busy: Boolean, onDismiss: () -> Unit,
             Icon(Icons.Outlined.VolunteerActivism, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("Your aftercare", style = MaterialTheme.typography.headlineSmall)
             AftercarePicker(needs) { needs = it }
-            OutlinedTextField(note, { note = it.take(1000) }, label = { Text("Anything else (optional)") }, minLines = 3, modifier = Modifier.fillMaxWidth())
+            LettersField(note, { note = it.take(1000) }, label = { Text("Anything else (optional)") }, minLines = 3, modifier = Modifier.fillMaxWidth())
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
                 TextButton(onClick = onDismiss) { Text("Cancel") }
                 Button(onClick = { onSave(AftercarePlanInput(needs, note.trim())) }, enabled = !busy) { Text("Save") }

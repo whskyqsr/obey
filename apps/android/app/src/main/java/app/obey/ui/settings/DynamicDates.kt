@@ -15,7 +15,7 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -90,7 +90,7 @@ fun DynamicDateDialog(value: DynamicDate, onDismiss: () -> Unit, onSave: (Dynami
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     DATE_PRESETS.forEach { p -> FilterChip(selected = label == p, onClick = { label = p }, label = { Text(p) }) }
                 }
-                OutlinedTextField(value = label, onValueChange = { label = it.take(40) }, label = { Text("Name") }, singleLine = true)
+                LettersField(value = label, onValueChange = { label = it.take(40) }, label = { Text("Name") }, singleLine = true)
                 OutlinedButton(onClick = { picking = true }) { Text(parsed?.let { formatDate(it) } ?: "Choose the date") }
             }
         },

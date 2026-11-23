@@ -25,7 +25,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -230,9 +230,9 @@ private fun YourSide(to: String, busy: Boolean, onShare: (SceneSideInput) -> Uni
             Text("How do you feel about it now?", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         MoodPicker(mood, { mood = it })
-        OutlinedTextField(worked, { worked = it.take(2000) }, label = { Text("What worked") }, minLines = 2, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(change, { change = it.take(2000) }, label = { Text("What to change next time") }, minLines = 2, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(need, { need = it.take(2000) }, label = { Text("Anything you still need (optional)") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+        LettersField(worked, { worked = it.take(2000) }, label = { Text("What worked") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+        LettersField(change, { change = it.take(2000) }, label = { Text("What to change next time") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+        LettersField(need, { need = it.take(2000) }, label = { Text("Anything you still need (optional)") }, minLines = 2, modifier = Modifier.fillMaxWidth())
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             Button(
                 onClick = { mood?.let { onShare(SceneSideInput(it, worked.trim(), change.trim(), need.trim())) } },

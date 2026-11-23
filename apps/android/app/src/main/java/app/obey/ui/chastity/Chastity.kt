@@ -36,7 +36,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -453,7 +453,7 @@ private fun TimeDialog(sign: Int, onDismiss: () -> Unit, onSave: (Int, String) -
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(60, 360, 1440, 4320).forEach { m -> FilterChip(selected = minutes == m, onClick = { minutes = m }, label = { Text(fmtMinutes(m)) }) }
                 }
-                OutlinedTextField(note, { note = it.take(500) }, label = { Text("Why (optional)") }, singleLine = true)
+                LettersField(note, { note = it.take(500) }, label = { Text("Why (optional)") }, singleLine = true)
             }
         },
         confirmButton = { Button(onClick = { onSave(sign * minutes, note) }) { Text("${if (sign > 0) "Add" else "Take off"} ${fmtMinutes(minutes)}") } },
@@ -502,7 +502,7 @@ private fun AskDialog(kind: String, l: ChastityLock, keyholder: String, onDismis
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
-                OutlinedTextField(note, { note = it.take(500) }, label = { Text("Tell $keyholder why (optional)") })
+                LettersField(note, { note = it.take(500) }, label = { Text("Tell $keyholder why (optional)") })
             }
         },
         confirmButton = { Button(onClick = { onAsk(if (isBreak) minutes else null, note) }) { Text("Ask $keyholder") } },

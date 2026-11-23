@@ -20,7 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -127,7 +127,7 @@ fun RescheduleSheet(
                 Icon(Icons.Outlined.CalendarMonth, contentDescription = null)
                 Text("  Pick a new date and time")
             }
-            OutlinedTextField(
+            LettersField(
                 value = reason,
                 onValueChange = { reason = it.take(1000) },
                 label = { Text("Reason (optional)") },

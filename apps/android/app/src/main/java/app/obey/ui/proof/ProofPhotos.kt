@@ -35,7 +35,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -217,7 +217,7 @@ fun ReportDialog(photo: Boolean, onDismiss: () -> Unit, onSubmit: (ReportReason,
                         Text(r.label)
                     }
                 }
-                OutlinedTextField(
+                LettersField(
                     value = details,
                     onValueChange = { details = it.take(1000) },
                     label = { Text("Anything else (optional)") },

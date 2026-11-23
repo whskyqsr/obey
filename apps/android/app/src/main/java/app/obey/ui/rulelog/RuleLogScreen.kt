@@ -1,6 +1,14 @@
 package app.obey.ui.rulelog
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,13 +29,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowDropDown
-import androidx.compose.material.icons.outlined.Bolt
-import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.FactCheck
 import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -35,16 +38,14 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -108,12 +109,19 @@ class RuleLogViewModel @Inject constructor(private val api: ObeyApi, private val
     val state: StateFlow<Load<List<RuleLogEntry>>> = _state.asStateFlow()
     private val _choices = MutableStateFlow(LogChoices())
     val choices: StateFlow<LogChoices> = _choices.asStateFlow()
+    /** Recent occurrences by their task, to say what came of each entry's consequence. */
+    private val _outcomes = MutableStateFlow<Map<String, app.obey.api.Occurrence>>(emptyMap())
+    val outcomes: StateFlow<Map<String, app.obey.api.Occurrence>> = _outcomes.asStateFlow()
     val session: Session? get() = sessions.session
 
     fun refresh() {
         viewModelScope.launch {
             if (_state.value !is Load.Ready) _state.value = Load.Loading
             _state.value = loadCatching { api.ruleLog(sessions.requireRelationshipId()) }
+            val today = LocalDate.now()
+            _outcomes.value = runCatching {
+                api.occurrences(sessions.requireRelationshipId(), today.minusDays(30).toString(), today.plusDays(7).toString())
+            }.getOrDefault(emptyList()).associateBy { it.seriesId }
         }
     }
 
@@ -157,8 +165,25 @@ fun RuleLogScreen(onBack: () -> Unit, onOpenTask: (String) -> Unit, vm: RuleLogV
     var adding by remember { mutableStateOf(false) }
     var removing by remember { mutableStateOf<RuleLogEntry?>(null) }
     var who by remember { mutableStateOf<String?>(null) }
+    var kind by remember { mutableStateOf("all") }
+    var open by remember { mutableStateOf<RuleLogEntry?>(null) }
+    val outcomes by vm.outcomes.collectAsStateWithLifecycle()
+    val features = LocalFeatures.current
     val colors = MaterialTheme.colorScheme
     fun name(id: String) = if (id == me) "You" else session?.nameOf(id) ?: "Someone"
+    fun outcome(e: RuleLogEntry): String {
+        val taskId = e.consequenceTaskId ?: return "none"
+        val o = outcomes[taskId] ?: return "consequence given"
+        val state = when (o.status) {
+            app.obey.api.OccurrenceStatus.Completed -> "done"
+            app.obey.api.OccurrenceStatus.Submitted -> return if (isDom) "needs your approval" else "sent for approval"
+            app.obey.api.OccurrenceStatus.Missed -> "not done"
+            app.obey.api.OccurrenceStatus.Excused -> "excused"
+            app.obey.api.OccurrenceStatus.Cancelled -> "called off"
+            app.obey.api.OccurrenceStatus.Pending -> "owed"
+        }
+        return "${o.title.lowercase()} · $state"
+    }
 
     Scaffold(
         topBar = {
@@ -178,54 +203,95 @@ fun RuleLogScreen(onBack: () -> Unit, onOpenTask: (String) -> Unit, vm: RuleLogV
             is Load.Ready -> if (s.value.isEmpty()) {
                 EmptyBox(
                     "Nothing logged",
-                    if (isDom) "When a rule or protocol is broken, log it here, with a consequence if you like." else "If you break a rule or protocol, you can own up to it here.",
+                    null,
                     Modifier.padding(padding),
                     icon = Icons.Outlined.Gavel,
                 )
             } else {
                 val people = s.value.map { it.subjectId }.distinct()
-                val shown = s.value.filter { who == null || it.subjectId == who }
+                val filters = features.rules && features.protocols
+                val shown = s.value.filter { (who == null || it.subjectId == who) && (kind == "all" || (kind == "protocols") == (it.protocolId != null)) }
                 LazyColumn(Modifier.padding(padding).fillMaxSize(), contentPadding = PaddingValues(bottom = 96.dp)) {
-                    if (people.size > 1) item(key = "who") {
+                    if (filters || people.size > 1) item(key = "filters") {
                         Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(selected = who == null, onClick = { who = null }, label = { Text("Everyone") })
-                            people.forEach { id -> FilterChip(selected = who == id, onClick = { who = if (who == id) null else id }, label = { Text(name(id)) }) }
+                            Pill("Everyone", kind == "all" && who == null) { kind = "all"; who = null }
+                            if (filters) {
+                                Pill("Rules", kind == "rules") { kind = if (kind == "rules") "all" else "rules" }
+                                Pill("Protocols", kind == "protocols") { kind = if (kind == "protocols") "all" else "protocols" }
+                            }
+                            if (people.size > 1) people.forEach { id -> Pill(name(id), who == id) { who = if (who == id) null else id } }
                         }
                     }
-                    item(key = "count") {
-                        Text("${s.value.size} logged", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                    if (shown.isEmpty()) item(key = "none") {
+                        Text("Nothing logged here.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.padding(16.dp))
                     }
                     items(shown, key = { it.id }) { e ->
-                        Surface(color = colors.surfaceContainerLow, shape = MaterialTheme.shapes.medium, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth()) {
-                            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
-                                Icon(if (e.protocolId != null) Icons.Outlined.FactCheck else Icons.Outlined.Gavel, null, tint = colors.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
-                                Spacer(Modifier.width(12.dp))
+                        Column(Modifier.fillMaxWidth().clickable { open = e }.padding(horizontal = 16.dp)) {
+                            Row(Modifier.padding(vertical = 14.dp), verticalAlignment = Alignment.Top) {
                                 Column(Modifier.weight(1f)) {
-                                    Text(e.title, style = MaterialTheme.typography.titleMedium)
-                                    val by = if (e.loggedBy == e.subjectId) "owned up" else "logged by ${name(e.loggedBy)}"
-                                    val day = runCatching { LocalDate.parse(e.occurredOn).format(dateLabel) }.getOrDefault(e.occurredOn)
-                                    Text("${name(e.subjectId)} · $day · $by", style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
-                                    if (e.note.isNotBlank()) {
-                                        Spacer(Modifier.height(4.dp))
-                                        Text(e.note, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                                    Text(e.title, style = MaterialTheme.typography.titleLarge)
+                                    val by = when {
+                                        e.loggedBy != e.subjectId -> "logged by ${name(e.loggedBy).replaceFirstChar { if (e.loggedBy == me) it.lowercaseChar() else it }}"
+                                        e.subjectId == me -> "you owned up"
+                                        else -> "${name(e.subjectId)} owned up"
                                     }
-                                    e.consequenceTaskId?.let { taskId ->
-                                        AssistChip(
-                                            onClick = { onOpenTask(taskId) },
-                                            label = { Text("Consequence given") },
-                                            leadingIcon = { Icon(Icons.Outlined.Bolt, null, Modifier.size(AssistChipDefaults.IconSize)) },
+                                    val day = runCatching { LocalDate.parse(e.occurredOn).format(dateLabel) }.getOrDefault(e.occurredOn)
+                                    val whose = if (people.size > 1 && e.loggedBy != e.subjectId) "${name(e.subjectId)} · " else ""
+                                    Text("$whose$day · $by", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
+                                    if (e.note.isNotBlank()) {
+                                        Text(
+                                            "\u201C${e.note}\u201D",
+                                            style = MaterialTheme.typography.titleLarge.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, fontSize = 21.sp, lineHeight = 26.sp),
+                                            color = colors.onSurfaceVariant,
+                                            modifier = Modifier.padding(top = 8.dp),
                                         )
                                     }
                                 }
-                                if (!readOnly && (e.loggedBy == me || isDom)) {
-                                    IconButton(onClick = { removing = e }) { Icon(Icons.Outlined.DeleteOutline, "Remove from log") }
-                                }
+                                Text(outcome(e), style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant, modifier = Modifier.padding(start = 12.dp, top = 6.dp))
                             }
+                            HorizontalDivider(color = colors.outlineVariant)
                         }
                     }
                 }
             }
         }
+    }
+
+    open?.let { e ->
+        val canRemove = !readOnly && (e.loggedBy == me || isDom)
+        val result = outcome(e)
+        AlertDialog(
+            onDismissRequest = { open = null },
+            title = { Text(e.title) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    val day = runCatching { LocalDate.parse(e.occurredOn).format(dateLabel) }.getOrDefault(e.occurredOn)
+                    Text("${name(e.subjectId)} · $day · ${if (e.loggedBy == e.subjectId) "owned up" else "logged by ${name(e.loggedBy)}"}")
+                    Text(
+                        when (result) {
+                            "none" -> "No consequence"
+                            "needs your approval", "sent for approval" -> "Consequence $result"
+                            else -> "Consequence: $result"
+                        },
+                    )
+                    if (e.note.isNotBlank()) {
+                        Text(
+                            "\u201C${e.note}\u201D",
+                            style = MaterialTheme.typography.titleLarge.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, fontSize = 21.sp, lineHeight = 26.sp),
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                val taskId = e.consequenceTaskId
+                if (taskId != null) OutlinedButton(onClick = { open = null; onOpenTask(taskId) }) { Text("See the consequence") }
+                else TextButton(onClick = { open = null }) { Text("Close") }
+            },
+            dismissButton = {
+                if (canRemove) TextButton(onClick = { open = null; removing = e }) { Text("Remove", color = colors.error) }
+            },
+        )
     }
 
     removing?.let { e ->
@@ -242,7 +308,7 @@ fun RuleLogScreen(onBack: () -> Unit, onOpenTask: (String) -> Unit, vm: RuleLogV
 
 private sealed interface Broken {
     val label: String
-    data class R(val rule: Rule, val number: Int) : Broken { override val label get() = "$number. ${rule.title}" }
+    data class R(val rule: Rule, val number: Int) : Broken { override val label get() = "${app.obey.ui.rules.roman(number)}. ${rule.title}" }
     data class P(val protocol: Protocol) : Broken { override val label get() = protocol.title }
 }
 
@@ -271,7 +337,7 @@ private fun LogDialog(vm: RuleLogViewModel, session: Session, onDismiss: () -> U
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (isDom) "Log a broken rule" else "Own up to a broken rule") },
+        title = { Text(if (isDom) "Log a broken rule" else "Own up to one", style = MaterialTheme.typography.headlineMedium) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (isDom) {
@@ -279,7 +345,7 @@ private fun LogDialog(vm: RuleLogViewModel, session: Session, onDismiss: () -> U
                 }
                 Picker("What was broken", broken?.label ?: "Pick a rule or protocol", options.map { it.label to it }) { broken = it }
                 OutlinedButton(onClick = { picking = "on" }) { Text("When: ${on.format(dateLabel)}") }
-                OutlinedTextField(note, { note = it.take(2000) }, label = { Text("Note (optional)") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+                LettersField(note, { note = it.take(2000) }, label = { Text("Note (optional)") }, minLines = 2, modifier = Modifier.fillMaxWidth())
                 if (isDom && features.consequences && subject != me) {
                     Picker("Consequence (optional)", consequence?.title ?: "None", listOf<Pair<String, Consequence?>>("None" to null) + choices.consequences.map { it.title to it }) { consequence = it }
                     if (consequence != null) {
@@ -348,20 +414,39 @@ private fun LogDialog(vm: RuleLogViewModel, session: Session, onDismiss: () -> U
     }
 }
 
-/** A labelled button that opens a menu of [options]. */
+/** A filter pill: an ink border marks the chosen one. */
+@Composable
+private fun Pill(label: String, selected: Boolean, onClick: () -> Unit) {
+    val c = MaterialTheme.colorScheme
+    Text(
+        label,
+        style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp),
+        color = if (selected) c.onSurface else c.onSurfaceVariant,
+        modifier = Modifier
+            .clip(CircleShape)
+            .border(1.dp, if (selected) c.onSurface else c.outlineVariant, CircleShape)
+            .background(if (selected) c.surfaceContainerLowest else c.surfaceContainerLow)
+            .selectable(selected = selected, role = androidx.compose.ui.semantics.Role.Tab, onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 10.dp),
+    )
+}
+
+/** A field-style row (label, value, hairline) that opens a menu of [options]. */
 @Composable
 private fun <T> Picker(label: String, value: String, options: List<Pair<String, T>>, onPick: (T) -> Unit) {
     var open by remember { mutableStateOf(false) }
+    val c = MaterialTheme.colorScheme
     Column {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
         Box {
-            OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(value, Modifier.weight(1f), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                Icon(Icons.Outlined.ArrowDropDown, null)
+            Row(Modifier.fillMaxWidth().clickable { open = true }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(value, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                Icon(Icons.Outlined.ArrowDropDown, null, tint = c.onSurfaceVariant)
             }
             DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                 options.forEach { (text, v) -> DropdownMenuItem(text = { Text(text) }, onClick = { onPick(v); open = false }) }
             }
         }
+        HorizontalDivider(color = c.outlineVariant)
     }
 }

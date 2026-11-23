@@ -54,7 +54,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -662,7 +662,7 @@ fun LimitsEditScreen(onClose: () -> Unit, vm: LimitsViewModel = hiltViewModel())
         AlertDialog(
             onDismissRequest = { noting = null },
             title = { Text(item.title) },
-            text = { OutlinedTextField(note, { note = it.take(500) }, label = { Text("Note") }, placeholder = { Text("Only soft ones, and not for long") }, modifier = Modifier.fillMaxWidth()) },
+            text = { LettersField(note, { note = it.take(500) }, label = { Text("Note") }, placeholder = { Text("Only soft ones, and not for long") }, modifier = Modifier.fillMaxWidth()) },
             confirmButton = { Button(onClick = { vm.answer(item, answers[item.key]?.rating, note.trim()); noting = null }) { Text("Save") } },
             dismissButton = { TextButton(onClick = { noting = null }) { Text("Cancel") } },
         )
@@ -676,9 +676,9 @@ fun LimitsEditScreen(onClose: () -> Unit, vm: LimitsViewModel = hiltViewModel())
             title = { Text("Add your own") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(title, { title = it.take(80) }, label = { Text("What") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    LettersField(title, { title = it.take(80) }, label = { Text("What") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     ExposedDropdownMenuBox(expanded = open, onExpandedChange = { open = it }) {
-                        OutlinedTextField(
+                        LettersField(
                             category,
                             {},
                             readOnly = true,

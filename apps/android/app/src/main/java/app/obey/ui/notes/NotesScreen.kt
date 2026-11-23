@@ -30,7 +30,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -127,7 +127,7 @@ fun NotesScreen(
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             if (searching) {
-                OutlinedTextField(
+                LettersField(
                     value = query,
                     onValueChange = { query = it },
                     placeholder = { Text(if (journal) "Search entries and tags" else "Search notes and tags") },

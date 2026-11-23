@@ -21,7 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -153,7 +153,7 @@ private fun CommentRow(c: Comment, author: String, onDelete: (() -> Unit)?, busy
 @Composable
 private fun CommentComposer(text: String, onText: (String) -> Unit, enabled: Boolean, onSend: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(
+        LettersField(
             value = text,
             onValueChange = { if (it.length <= 2000) onText(it) },
             label = { Text("Add a comment") },
@@ -210,7 +210,7 @@ fun SendBackDialog(occurrence: Occurrence, onDismiss: () -> Unit, onConfirm: (co
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("\"${occurrence.title}\" goes back to the to-do list to be done again.")
-                OutlinedTextField(
+                LettersField(
                     value = text,
                     onValueChange = { if (it.length <= 2000) text = it },
                     label = { Text("What needs fixing? (optional)") },
