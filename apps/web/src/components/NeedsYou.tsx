@@ -133,7 +133,7 @@ export function RedemptionRow({ e }: { e: LedgerEntry }) {
   );
 }
 
-function RedeemedDialog({ e, onClose }: { e: LedgerEntry; onClose(): void }) {
+export function RedeemedDialog({ e, onClose }: { e: LedgerEntry; onClose(): void }) {
   const { rel, memberName } = useRel();
   const snack = useSnackbar();
   const mark = useMarkRedeemed(rel.id);

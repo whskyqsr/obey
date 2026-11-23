@@ -157,7 +157,7 @@ export function NotesPage({ kind, selected }: { kind: "note" | "journal"; select
     // The open note: the one in the address, else the top of the list (or a blank one to write in when there are none).
     const current = selected ?? list[0]?.id ?? (canWrite && notes.data && !q && !tag ? "new" : undefined);
     return (
-      <div className="flex min-h-dvh">
+      <div className="-mb-10 flex min-h-dvh">
         <section className="sticky top-0 flex h-dvh w-[340px] shrink-0 flex-col overflow-y-auto border-r border-outline-variant px-6 pt-6 pb-6">
           <div className="flex items-center gap-2">
             <h1 className="min-w-0 flex-1 text-display-small text-on-surface">{copy.title}</h1>
