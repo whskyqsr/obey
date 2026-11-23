@@ -27,7 +27,7 @@ export function excerpt(md: string, max = 160): string {
 const COPY = {
   note: {
     title: "Notes",
-    subtitle: "Limits, aftercare plans and anything else worth writing down.",
+    subtitle: "Plans, ideas, lists and anything else worth writing down.",
     search: "Search notes",
     empty: "No notes yet",
     icon: "sticky_note_2",

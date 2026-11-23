@@ -33,6 +33,12 @@ const KIND_ICON: Record<LedgerEntry["kind"], string> = {
   delay: "schedule",
 };
 
+/** Everyone in the dynamic gets a balance, 0 until their first points; anyone else with points (say, someone who left) keeps theirs. */
+function withEveryMember(balances: { userId: string; balance: number }[], members: { userId: string }[]) {
+  const listed = new Set(balances.map((b) => b.userId));
+  return [...balances, ...members.filter((m) => !listed.has(m.userId)).map((m) => ({ userId: m.userId, balance: 0 }))];
+}
+
 export function RewardsPage() {
   const { rel, me, isDom, solo, memberName, features } = useRel();
   const snack = useSnackbar();
@@ -69,7 +75,7 @@ export function RewardsPage() {
       <Section title="Balances">
         {balances.error && <ErrorBox error={balances.error} />}
         <div className="flex flex-wrap gap-3">
-          {balances.data?.map((b) => {
+          {balances.data && withEveryMember(balances.data, rel.members).map((b) => {
             // The earner's balance is the headline: the sub's, or yours when you're the one earning.
             const earner = rel.members.find((m) => m.userId === b.userId)?.role === "submissive" || (b.userId === me.user.id && (solo || !isDom));
             const next = rewards.data?.filter((r) => r.cost > b.balance).sort((a, z) => a.cost - z.cost)[0];

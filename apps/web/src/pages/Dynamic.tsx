@@ -120,7 +120,11 @@ export function useDynamicTitle() {
   return names.length > 1 ? `${names.slice(0, -1).join(", ")} & ${names.at(-1)}` : `${names[0]} (waiting for a partner)`;
 }
 
-const Label = ({ children }: { children: ReactNode }) => <h2 className="px-1 pt-6 pb-2 text-title-small text-primary">{children}</h2>;
+const Label = ({ children, id }: { children: ReactNode; id?: string }) => (
+  <h2 id={id} className="scroll-mt-4 px-1 pt-6 pb-2 text-title-small text-primary">
+    {children}
+  </h2>
+);
 const Group = ({ children }: { children: ReactNode }) => <div className="overflow-hidden rounded-lg bg-surface-container-low">{children}</div>;
 
 function Row({
@@ -369,7 +373,7 @@ export function DynamicPage() {
           </div>
         </Group>
 
-        <Label>Features</Label>
+        <Label id="features">Features</Label>
         <Group>
           <div className="px-4 py-1">
             {FEATURE_ROWS.map((f) => (

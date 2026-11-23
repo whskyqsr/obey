@@ -3,7 +3,7 @@ import { importPage } from "./lib/staleBuild";
 import { createRootRoute, createRoute, createRouter, useNavigate } from "@tanstack/react-router";
 import { AppShell } from "./components/AppShell";
 import type { Features } from "./api/types";
-import { Empty, ErrorBox, Loading, PageHeader } from "./components/ui";
+import { Button, Empty, ErrorBox, Loading, PageHeader } from "./components/ui";
 import { useRel } from "./lib/relationship";
 import { startWelcome, useWelcome } from "./lib/welcome";
 import { CalendarPage } from "./pages/Calendar";
@@ -115,10 +115,20 @@ const taskHistoryRoute = createRoute({
 /** Shows a page only while its feature is on, so an old link doesn't open a switched-off area. */
 function Gate({ feature, children }: { feature: keyof Features; children: React.ReactNode }) {
   const { features } = useRel();
+  const navigate = useNavigate();
   if (features[feature]) return <>{children}</>;
   return (
     <div className="p-4 md:p-6">
-      <Empty icon="toggle_off" title="This is switched off" body="A Dominant can turn it back on in Settings, under Features." />
+      <Empty
+        icon="toggle_off"
+        title="This is switched off"
+        body="It can be turned back on from Your dynamic, under Features."
+        action={
+          <Button variant="tonal" icon="favorite" onClick={() => void navigate({ to: "/dynamic", hash: "features" })}>
+            Open Your dynamic
+          </Button>
+        }
+      />
     </div>
   );
 }

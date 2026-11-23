@@ -141,7 +141,7 @@ fun NotesScreen(
                                 when {
                                     q.isNotEmpty() -> EmptyBox("Nothing matches")
                                     journal -> EmptyBox("No entries yet", "Write about your day, and how you felt.")
-                                    else -> EmptyBox("No notes yet", "Limits, aftercare plans, anything worth keeping. Notes support headings, lists and checklists.")
+                                    else -> EmptyBox("No notes yet", "Plans, ideas, anything worth keeping. Notes support headings, lists and checklists.")
                                 }
                             }
                         }
