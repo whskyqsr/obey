@@ -29,7 +29,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -169,7 +169,7 @@ fun MoreTimeSheet(night: CurfewNight, who: String, busy: Boolean, onDismiss: () 
             Button(onClick = { until?.let { onAsk(it.iso(), reason.trim().ifEmpty { null }) } }, enabled = until != null && !busy) { Text("Ask $who") }
         },
     ) {
-        OutlinedTextField(reason, { reason = it.take(280) }, label = { Text("Tell $who why (optional)") }, modifier = Modifier.fillMaxWidth())
+        LettersField(reason, { reason = it.take(280) }, label = { Text("Tell $who why (optional)") }, modifier = Modifier.fillMaxWidth())
         Text("Curfew is $dueLabel. Ask $who to make it:", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         TimeChoices(options, until, due, end) { until = it }
         until?.let { Summary(Icons.Filled.Home, "Home by ${formatTime(it.iso())} tonight", "Still in until ${formatTime(night.endsAt)}") }
@@ -227,7 +227,7 @@ fun ApproveOtherTimeSheet(request: CurfewRequest, name: String, busy: Boolean, o
     ) {
         TimeChoices(options, until, from, null) { until = it }
         until?.let { Summary(Icons.Filled.Home, "Home by ${formatTime(it.iso())}", "$name asked for ${formatTime(request.untilAt)}") }
-        OutlinedTextField(note, { note = it.take(1000) }, label = { Text("Note to $name (optional)") }, modifier = Modifier.fillMaxWidth())
+        LettersField(note, { note = it.take(1000) }, label = { Text("Note to $name (optional)") }, modifier = Modifier.fillMaxWidth())
     }
 }
 
@@ -256,7 +256,7 @@ fun PlanEndSheet(clash: CurfewClash, to: String, busy: Boolean, onDismiss: () ->
         endsAt?.let {
             Summary(Icons.Outlined.Event, "${starts.local().format(planDay)}, ${formatTime(clash.eventStartsAt)} – ${formatTime(it.iso())}", "Was until ${formatTime(clash.eventEndsAt)}")
         }
-        OutlinedTextField(note, { note = it.take(280) }, label = { Text("Note to $to (optional)") }, modifier = Modifier.fillMaxWidth())
+        LettersField(note, { note = it.take(280) }, label = { Text("Note to $to (optional)") }, modifier = Modifier.fillMaxWidth())
         Text(
             "They're told the plan now ends at ${endsAt?.let { formatTime(it.iso()) } ?: "the new time"}. " +
                 if (endsAt?.isAfter(due) == true) "Curfew moves to ${formatTime(endsAt!!.iso())} that night." else "Curfew stays at ${formatTime(clash.dueAt)}.",
@@ -300,7 +300,7 @@ fun NoteDialog(target: NoteTarget, busy: Boolean, title: String = "Note to ${tar
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text("About ${target.about}. ${target.to} is sent a notification.", style = MaterialTheme.typography.bodyMedium)
-                OutlinedTextField(body, { body = it.take(1000) }, label = { Text(if (reply) "Reply" else "Note") }, minLines = 3, modifier = Modifier.fillMaxWidth())
+                LettersField(body, { body = it.take(1000) }, label = { Text(if (reply) "Reply" else "Note") }, minLines = 3, modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = { Button(onClick = { onSend(body.trim()) }, enabled = body.isNotBlank() && !busy) { Text("Send") } },

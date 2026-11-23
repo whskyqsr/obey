@@ -44,7 +44,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -366,8 +366,8 @@ private fun RewardDialog(existing: Reward?, chastity: Boolean, onDismiss: () -> 
         title = { Text(if (existing == null) "New reward" else "Edit reward") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(title, { title = it.take(200) }, label = { Text("Title") }, singleLine = true)
-                OutlinedTextField(body, { body = it.take(5000) }, label = { Text("Description") }, minLines = 2)
+                LettersField(title, { title = it.take(200) }, label = { Text("Title") }, singleLine = true)
+                LettersField(body, { body = it.take(5000) }, label = { Text("Description") }, minLines = 2)
                 NumberField("Cost (points)", cost, Modifier.fillMaxWidth()) { cost = it }
                 LabeledSwitch(
                     "Gets them out of a consequence",
@@ -449,8 +449,8 @@ private fun ConsequenceDialog(existing: Consequence?, chastity: Boolean, onDismi
         title = { Text(if (existing == null) "New consequence" else "Edit consequence") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(title, { title = it.take(200) }, label = { Text("Title") }, singleLine = true)
-                OutlinedTextField(body, { body = it.take(5000) }, label = { Text("Description") }, minLines = 2)
+                LettersField(title, { title = it.take(200) }, label = { Text("Title") }, singleLine = true)
+                LettersField(body, { body = it.take(5000) }, label = { Text("Description") }, minLines = 2)
                 Stepper("Severity", severity, "of 5", 1..5) { severity = it }
                 if (chastity) app.obey.ui.chastity.LockTimeField("Adds lock time", lockMinutes) { lockMinutes = it }
             }
@@ -485,7 +485,7 @@ private fun AdjustDialog(
                     members.forEach { (id, name) -> FilterChip(selected = user == id, onClick = { user = id }, label = { Text(name) }) }
                 }
                 NumberField("Points (negative to deduct)", delta, Modifier.fillMaxWidth()) { delta = it }
-                OutlinedTextField(note, { note = it.take(500) }, label = { Text("Why") }, singleLine = true)
+                LettersField(note, { note = it.take(500) }, label = { Text("Why") }, singleLine = true)
             }
         },
         confirmButton = {

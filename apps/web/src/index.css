@@ -284,6 +284,10 @@ body {
 [data-card-link]:focus-visible {
   outline: none;
 }
+/* Fields show focus with their underline instead. */
+[data-field]:focus-visible {
+  outline: none;
+}
 
 input[type="date"],
 input[type="time"],

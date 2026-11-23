@@ -60,7 +60,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -950,7 +950,7 @@ private fun AgreementEditor(
                     Text("Add a section")
                 }
                 Box {
-                    OutlinedTextField(
+                    LettersField(
                         value = reviewBy?.let { plainDate(it) } ?: "",
                         onValueChange = {},
                         readOnly = true,
@@ -961,7 +961,7 @@ private fun AgreementEditor(
                     Box(Modifier.matchParentSize().clickable { picking = true })
                 }
                 if (reviewBy != null) TextButton(onClick = { reviewBy = null }) { Text("No review date") }
-                OutlinedTextField(
+                LettersField(
                     note,
                     { note = it.take(500) },
                     label = { Text("What changed, for $other") },
@@ -1036,7 +1036,7 @@ private fun SectionEditor(
             if (listText != null) {
                 Text(listText, style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant, modifier = Modifier.padding(end = 12.dp))
             } else {
-                OutlinedTextField(
+                LettersField(
                     s.body,
                     { onChange(s.copy(body = it.take(5000))) },
                     placeholder = { Text("Start a line with “- ” for a bullet") },
@@ -1097,7 +1097,7 @@ private fun AskChangesSheet(name: String, inForce: Int?, busy: Boolean, onDismis
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        OutlinedTextField(note, { note = it.take(1000) }, label = { Text("Note to $name") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+        LettersField(note, { note = it.take(1000) }, label = { Text("Note to $name") }, minLines = 2, modifier = Modifier.fillMaxWidth())
     }
 }
 

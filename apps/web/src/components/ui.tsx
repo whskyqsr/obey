@@ -532,8 +532,9 @@ export function ListItem({
 
 // ---------- Form fields (outlined, hairline)
 
+/** Letters fields: a small label above, the value, and one hairline under it that darkens on focus. */
 const fieldBox =
-  "peer w-full rounded-sm border border-outline bg-transparent px-4 text-body-large text-on-surface outline-none transition-colors hover:border-outline focus:border-on-surface disabled:opacity-40";
+  "peer w-full rounded-none border-0 border-b border-outline-variant bg-transparent px-0 text-body-large text-on-surface outline-none transition-colors placeholder:text-on-surface-variant/60 hover:border-outline focus:border-on-surface focus:shadow-[0_1px_0_var(--md-on-surface)] disabled:opacity-40";
 
 function FieldShell({
   label,
@@ -550,21 +551,16 @@ function FieldShell({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <div className="relative">
-        {children}
-        {label && (
-          <label
-            htmlFor={id}
-            className="pointer-events-none absolute -top-2 left-3 bg-[var(--field-bg,var(--md-surface))] px-1 text-body-small text-on-surface-variant peer-focus:text-on-surface"
-          >
-            {label}
-          </label>
-        )}
-      </div>
+      {label && (
+        <label htmlFor={id} className="text-body-small text-on-surface-variant">
+          {label}
+        </label>
+      )}
+      <div className="relative">{children}</div>
       {(error || help) && (
         <div
           className={cx(
-            "px-4 text-body-small",
+            "text-body-small",
             error ? "text-error" : "text-on-surface-variant",
           )}
         >
@@ -592,8 +588,9 @@ export function TextField({
       <FieldShell label={label} id={id} help={help} error={error}>
         <input
           id={id}
+          data-field
           {...rest}
-          className={cx(fieldBox, "h-14", error && "border-error")}
+          className={cx(fieldBox, "h-10", error && "border-error")}
         />
       </FieldShell>
     </div>
@@ -613,7 +610,7 @@ export function TextArea({
   return (
     <div className={className}>
       <FieldShell label={label} id={id} help={help}>
-        <textarea id={id} rows={3} {...rest} className={cx(fieldBox, "py-3")} />
+        <textarea id={id} data-field rows={3} {...rest} className={cx(fieldBox, "resize-none py-1.5")} />
       </FieldShell>
     </div>
   );
@@ -635,14 +632,15 @@ export function Select({
       <FieldShell label={label} id={id} help={help}>
         <select
           id={id}
+          data-field
           {...rest}
-          className={cx(fieldBox, "h-14 appearance-none pr-10")}
+          className={cx(fieldBox, "h-10 appearance-none pr-8")}
         >
           {children}
         </select>
         <Icon
           name="arrow_drop_down"
-          className="pointer-events-none absolute top-4 right-3 text-on-surface-variant"
+          className="pointer-events-none absolute top-2 right-0 text-on-surface-variant"
         />
       </FieldShell>
     </div>

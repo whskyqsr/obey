@@ -62,7 +62,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -154,7 +154,7 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    OutlinedTextField(
+                    LettersField(
                         value = form.title,
                         onValueChange = { v -> vm.update { it.copy(title = v.take(200)) } },
                         label = { Text("Title") },
@@ -451,7 +451,7 @@ fun TaskEditorScreen(onDone: () -> Unit, vm: TaskEditorViewModel = hiltViewModel
             title = { Text("Time zone") },
             text = {
                 Column {
-                    OutlinedTextField(query, { query = it }, label = { Text("Search") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    LettersField(query, { query = it }, label = { Text("Search") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     LazyColumn(Modifier.heightIn(max = 360.dp)) {
                         items(zones.filter { it.replace('_', ' ').contains(query.trim(), ignoreCase = true) }) { z ->
                             ListItem(
@@ -543,7 +543,7 @@ fun LabeledSwitch(title: String, subtitle: String?, checked: Boolean, onChange: 
 
 @Composable
 fun NumberField(label: String, value: String, modifier: Modifier = Modifier, onChange: (String) -> Unit) {
-    OutlinedTextField(
+    LettersField(
         value = value,
         onValueChange = { v -> if (v.isEmpty() || v == "-" || v.matches(Regex("-?\\d{0,6}"))) onChange(v) },
         label = { Text(label) },
@@ -593,7 +593,7 @@ private fun CountFold(form: TaskForm, points: Boolean, update: ((TaskForm) -> Ta
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                OutlinedTextField(
+                LettersField(
                     value = form.countN,
                     onValueChange = { v -> update { it.copy(countN = v.filter(Char::isDigit).take(4)) } },
                     label = { Text(if (form.countKind == CountKind.Range) "At least" else "How many") },
@@ -602,7 +602,7 @@ private fun CountFold(form: TaskForm, points: Boolean, update: ((TaskForm) -> Ta
                     modifier = Modifier.weight(1f),
                 )
                 if (form.countKind == CountKind.Range) {
-                    OutlinedTextField(
+                    LettersField(
                         value = form.countTo,
                         onValueChange = { v -> update { it.copy(countTo = v.filter(Char::isDigit).take(4)) } },
                         label = { Text("At most") },
@@ -661,7 +661,7 @@ private fun StepsFold(steps: List<app.obey.api.TaskStep>, onChange: (List<app.ob
         steps.forEachIndexed { i, s ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("${i + 1}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.widthIn(min = 20.dp))
-                OutlinedTextField(
+                LettersField(
                     value = s.title,
                     onValueChange = { v -> onChange(steps.map { if (it.id == s.id) it.copy(title = v.take(200)) else it }) },
                     singleLine = true,
@@ -678,7 +678,7 @@ private fun StepsFold(steps: List<app.obey.api.TaskStep>, onChange: (List<app.ob
         }
         if (steps.size < 30) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
+                LettersField(
                     value = draft,
                     onValueChange = { draft = it.take(200) },
                     label = { Text("Add a step") },
@@ -739,7 +739,7 @@ private fun ReminderFold(form: TaskForm, members: List<app.obey.api.Member>, upd
             }
         }
         if (form.reminder == "custom") {
-            OutlinedTextField(
+            LettersField(
                 form.reminderText,
                 { v -> update { it.copy(reminderText = v.take(140)) } },
                 label = { Text("What they'll read") },
@@ -874,7 +874,7 @@ private fun PlaceFold(
                     }
                 }
                 if (otherStay) {
-                    OutlinedTextField(
+                    LettersField(
                         value = stay?.toString().orEmpty(),
                         onValueChange = { v -> update { it.copy(stayMinutes = v.filter(Char::isDigit).take(3).toIntOrNull()?.coerceAtMost(720)) } },
                         label = { Text("Minutes") },

@@ -22,7 +22,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -107,7 +107,7 @@ fun SafeWordSheet(vm: SafeCallViewModel, onDismiss: () -> Unit) {
             LevelButton(Icons.Filled.FrontHand, "Red", "Stop. Tasks that slip are excused until you clear it", MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.onError) {
                 vm.call(SafeLevel.Red, note, onDismiss)
             }
-            OutlinedTextField(note, { note = it.take(500) }, Modifier.fillMaxWidth(), label = { Text("Add a note (optional)") }, minLines = 2)
+            LettersField(note, { note = it.take(500) }, Modifier.fillMaxWidth(), label = { Text("Add a note (optional)") }, minLines = 2)
         }
     }
 }

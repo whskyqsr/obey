@@ -33,7 +33,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -410,7 +410,7 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
         title = { Text(if (current == null) "New plan" else "Edit plan") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
+                LettersField(
                     value = draft.title,
                     onValueChange = { draft = draft.copy(title = it.take(80)) },
                     label = { Text("What's the plan?") },
@@ -464,7 +464,7 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
                         }
                     }
                 }
-                OutlinedTextField(
+                LettersField(
                     value = draft.note,
                     onValueChange = { draft = draft.copy(note = it.take(2000)) },
                     label = { Text("Note (optional)") },
@@ -679,7 +679,7 @@ private fun Clashes(items: List<Occurrence>, plan: ClashPlan, form: ClashForm, s
         Text("Keep means the task is fine alongside the plan, and it stops counting as a clash.", style = MaterialTheme.typography.bodySmall)
         if (subBlocked) Text("Only your Dominant can move or call off tasks in this dynamic.", style = MaterialTheme.typography.bodySmall)
         if (picked.isNotEmpty() && asks) {
-            OutlinedTextField(form.reason, { form.reason = it.take(1000) }, label = { Text("Reason (optional)") }, modifier = Modifier.fillMaxWidth())
+            LettersField(form.reason, { form.reason = it.take(1000) }, label = { Text("Reason (optional)") }, modifier = Modifier.fillMaxWidth())
         }
     }
     picking?.let { o ->
@@ -765,7 +765,7 @@ private fun CurfewWarning(
                 }
             }
             if (asking && canAsk) {
-                OutlinedTextField(reason, { onReason(it.take(280)) }, label = { Text("Tell $who why (optional)") }, modifier = Modifier.fillMaxWidth())
+                LettersField(reason, { onReason(it.take(280)) }, label = { Text("Tell $who why (optional)") }, modifier = Modifier.fillMaxWidth())
                 Text(
                     "$who is asked to move $nightName's curfew to ${formatTime(end.toString())}. The plan is saved either way; if $who says no, curfew stays at ${formatTime(night.dueAt)}.",
                     style = MaterialTheme.typography.bodySmall,

@@ -60,7 +60,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -415,7 +415,7 @@ private fun AddByCodeDialog(onDismiss: () -> Unit, onOpen: (String) -> Unit) {
         onDismissRequest = onDismiss,
         title = { Text("Add a shared kit") },
         text = {
-            OutlinedTextField(
+            LettersField(
                 value = text,
                 onValueChange = { text = it.take(200) },
                 label = { Text("Link or code") },
@@ -661,8 +661,8 @@ private fun EditKitDialog(kit: Kit, onDismiss: () -> Unit, onSave: (String, Stri
         title = { Text("Edit kit") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(title, { title = it.take(60) }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(description, { description = it.take(200) }, label = { Text("Description (optional)") }, modifier = Modifier.fillMaxWidth())
+                LettersField(title, { title = it.take(60) }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                LettersField(description, { description = it.take(200) }, label = { Text("Description (optional)") }, modifier = Modifier.fillMaxWidth())
                 Text("Untick anything to take out of the kit.", style = MaterialTheme.typography.bodyMedium)
                 items.forEach { i ->
                     Row(Modifier.fillMaxWidth().clickable { keep = if (i.key in keep) keep - i.key else keep + i.key }, verticalAlignment = Alignment.CenterVertically) {
@@ -769,9 +769,9 @@ fun NewKitScreen(onBack: () -> Unit, onSaved: (String) -> Unit, vm: KitsViewMode
                     content()
                 }
                 Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
-                    OutlinedTextField(title, { title = it.take(60) }, label = { Text("Name") }, placeholder = { Text("Weeknight routine") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    LettersField(title, { title = it.take(60) }, label = { Text("Name") }, placeholder = { Text("Weeknight routine") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(description, { description = it.take(200) }, label = { Text("Description (optional)") }, modifier = Modifier.fillMaxWidth())
+                    LettersField(description, { description = it.take(200) }, label = { Text("Description (optional)") }, modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(12.dp))
                     Text("Pick what goes in. The kit is a copy: changing a task later doesn't change the kit.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
                     group("Tasks", l.tasks.isNotEmpty()) {

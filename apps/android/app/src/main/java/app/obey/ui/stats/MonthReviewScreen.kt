@@ -40,7 +40,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -342,7 +342,7 @@ private fun FocusCard(s: MonthSummary, session: Session, titles: Map<String, Str
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FocusFields(goal: String, onGoal: (String) -> Unit, picked: List<String>, onPicked: (List<String>) -> Unit, tasks: List<Task>) {
-    OutlinedTextField(
+    LettersField(
         value = goal,
         onValueChange = { onGoal(it.take(200)) },
         label = { Text("Focus") },
@@ -602,8 +602,8 @@ private fun ReviewForm(s: MonthSummary, session: Session, mine: MonthReview?, bu
                 Text("Every day", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
             }
         }
-        OutlinedTextField(wentWell, { wentWell = it.take(2000) }, label = { Text("What went well") }, minLines = 3, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(workOn, { workOn = it.take(2000) }, label = { Text("What to work on") }, minLines = 3, modifier = Modifier.fillMaxWidth())
+        LettersField(wentWell, { wentWell = it.take(2000) }, label = { Text("What went well") }, minLines = 3, modifier = Modifier.fillMaxWidth())
+        LettersField(workOn, { workOn = it.take(2000) }, label = { Text("What to work on") }, minLines = 3, modifier = Modifier.fillMaxWidth())
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             if (mine != null) TextButton(onClick = onCancel) { Text("Cancel") }
             Button(onClick = { onSave(MonthReviewInput(rating, wentWell.trim(), workOn.trim())) }, enabled = rating > 0 && !busy) { Text(if (mine != null) "Save" else "Send") }

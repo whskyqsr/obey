@@ -40,7 +40,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
@@ -209,7 +209,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, onOpenFeatures
                             "Firebase: " + if (vm.firebaseAvailable) "configured" else "not configured (no google-services.json)",
                             style = MaterialTheme.typography.bodySmall,
                         )
-                        OutlinedTextField(
+                        LettersField(
                             value = devField,
                             onValueChange = { devField = it.trim() },
                             label = { Text("Dev user id (X-Dev-User)") },
@@ -257,7 +257,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, onOpenFeatures
                         "Your dynamic with ${partners.joinToString(" and ")} ends for both of you. They keep a read-only copy of the tasks and notes you shared, shown as from a deleted account.",
                     )
                     Text("Your profile, photo, private notes, journal and proof photos are deleted, and so is your sign-in. This can't be undone.")
-                    OutlinedTextField(typed, { typed = it }, label = { Text("Type \"delete\" to confirm") }, singleLine = true)
+                    LettersField(typed, { typed = it }, label = { Text("Type \"delete\" to confirm") }, singleLine = true)
                 }
             },
             confirmButton = {
@@ -277,7 +277,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, onOpenFeatures
                 onDismissRequest = { dialog = null },
                 title = { Text("Display name") },
                 text = {
-                    OutlinedTextField(
+                    LettersField(
                         value = name,
                         onValueChange = { name = it.take(40) },
                         singleLine = true,

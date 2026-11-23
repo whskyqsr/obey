@@ -16,7 +16,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -90,7 +90,7 @@ fun SignInScreen(vm: SettingsViewModel = hiltViewModel()) {
                     ) { Text("Continue with Google") }
 
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                    OutlinedTextField(
+                    LettersField(
                         value = email,
                         onValueChange = { email = it },
                         label = { Text("Email") },
@@ -98,7 +98,7 @@ fun SignInScreen(vm: SettingsViewModel = hiltViewModel()) {
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    OutlinedTextField(
+                    LettersField(
                         value = password,
                         onValueChange = { password = it },
                         label = { Text("Password") },
@@ -134,7 +134,7 @@ fun SignInScreen(vm: SettingsViewModel = hiltViewModel()) {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    OutlinedTextField(
+                    LettersField(
                         value = devId,
                         onValueChange = { devId = it.trim() },
                         label = { Text("Dev user id (UUID)") },

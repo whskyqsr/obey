@@ -42,7 +42,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -345,7 +345,7 @@ private fun LogDialog(vm: RuleLogViewModel, session: Session, onDismiss: () -> U
                 }
                 Picker("What was broken", broken?.label ?: "Pick a rule or protocol", options.map { it.label to it }) { broken = it }
                 OutlinedButton(onClick = { picking = "on" }) { Text("When: ${on.format(dateLabel)}") }
-                OutlinedTextField(note, { note = it.take(2000) }, label = { Text("Note (optional)") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+                LettersField(note, { note = it.take(2000) }, label = { Text("Note (optional)") }, minLines = 2, modifier = Modifier.fillMaxWidth())
                 if (isDom && features.consequences && subject != me) {
                     Picker("Consequence (optional)", consequence?.title ?: "None", listOf<Pair<String, Consequence?>>("None" to null) + choices.consequences.map { it.title to it }) { consequence = it }
                     if (consequence != null) {
@@ -431,20 +431,22 @@ private fun Pill(label: String, selected: Boolean, onClick: () -> Unit) {
     )
 }
 
-/** A labelled button that opens a menu of [options]. */
+/** A field-style row (label, value, hairline) that opens a menu of [options]. */
 @Composable
 private fun <T> Picker(label: String, value: String, options: List<Pair<String, T>>, onPick: (T) -> Unit) {
     var open by remember { mutableStateOf(false) }
+    val c = MaterialTheme.colorScheme
     Column {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
         Box {
-            OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(value, Modifier.weight(1f), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                Icon(Icons.Outlined.ArrowDropDown, null)
+            Row(Modifier.fillMaxWidth().clickable { open = true }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(value, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                Icon(Icons.Outlined.ArrowDropDown, null, tint = c.onSurfaceVariant)
             }
             DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                 options.forEach { (text, v) -> DropdownMenuItem(text = { Text(text) }, onClick = { onPick(v); open = false }) }
             }
         }
+        HorizontalDivider(color = c.outlineVariant)
     }
 }

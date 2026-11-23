@@ -35,7 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -293,7 +293,7 @@ fun PlaceDialog(
             },
         ) { padding ->
             Column(Modifier.padding(padding).fillMaxSize().imePadding()) {
-                OutlinedTextField(
+                LettersField(
                     value = q,
                     onValueChange = { q = it.take(200); hint = null },
                     leadingIcon = { Icon(Icons.Outlined.Search, null) },
@@ -379,7 +379,7 @@ fun PlaceDialog(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     hint?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    OutlinedTextField(
+                    LettersField(
                         value = draft.name,
                         onValueChange = { draft = draft.copy(name = it.take(40)) },
                         label = { Text("Name") },

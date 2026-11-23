@@ -35,7 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -185,7 +185,7 @@ internal fun AftercarePicker(value: List<String>, onChange: (List<String>) -> Un
         }
         if (adding) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
+                LettersField(
                     text,
                     { text = it.take(60) },
                     label = { Text("Other") },
@@ -233,7 +233,7 @@ internal fun SceneSheet(scene: Scene?, others: List<String>, busy: Boolean, onDi
         ) {
             Icon(Icons.Outlined.AutoAwesome, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(if (scene == null) "Log a scene" else "Edit scene", style = MaterialTheme.typography.headlineSmall)
-            OutlinedTextField(title, { title = it.take(120) }, label = { Text("Name (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            LettersField(title, { title = it.take(120) }, label = { Text("Name (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("When", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -241,7 +241,7 @@ internal fun SceneSheet(scene: Scene?, others: List<String>, busy: Boolean, onDi
                     OutlinedButton(onClick = { picking = "time" }) { Text(at.format(timeFmt), maxLines = 1) }
                 }
             }
-            OutlinedTextField(what, { what = it.take(4000) }, label = { Text("What we did (optional)") }, minLines = 3, modifier = Modifier.fillMaxWidth())
+            LettersField(what, { what = it.take(4000) }, label = { Text("What we did (optional)") }, minLines = 3, modifier = Modifier.fillMaxWidth())
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Safeword", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
@@ -309,7 +309,7 @@ internal fun SceneCheckIn(busy: Boolean, onSave: (mood: Int, note: String) -> Un
         MoodPicker(mood, { mood = it })
         mood?.let { m ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(note, { note = it.take(500) }, label = { Text("Anything you still need? (optional)") }, modifier = Modifier.weight(1f))
+                LettersField(note, { note = it.take(500) }, label = { Text("Anything you still need? (optional)") }, modifier = Modifier.weight(1f))
                 Button(onClick = { onSave(m, note.trim()) }, enabled = !busy) { Text("Save") }
             }
         }

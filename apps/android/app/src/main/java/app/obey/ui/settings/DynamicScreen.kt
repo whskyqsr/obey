@@ -56,7 +56,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -498,7 +498,7 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
                 onDismissRequest = { dialog = null },
                 title = { Text("Name this relationship") },
                 text = {
-                    OutlinedTextField(
+                    LettersField(
                         value = name,
                         onValueChange = { name = it.take(80) },
                         singleLine = true,

@@ -29,7 +29,7 @@ import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import app.obey.ui.common.LettersField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -153,7 +153,7 @@ private fun CreateStage(busy: Boolean, onBack: () -> Unit, onCreate: (String, Ro
             }
         }
     }
-    OutlinedTextField(
+    LettersField(
         value = name,
         onValueChange = { name = it.take(80) },
         label = { Text("Name for the dynamic (optional)") },
@@ -175,7 +175,7 @@ private fun JoinStage(busy: Boolean, onBack: () -> Unit, onJoin: (String, Role) 
     var role by rememberSaveable { mutableStateOf(Role.Submissive) }
     Text("Join your partner", style = MaterialTheme.typography.headlineSmall)
     Text("Paste the invite link or type the code from it.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    OutlinedTextField(
+    LettersField(
         value = code,
         onValueChange = { code = it.trim().take(200) },
         label = { Text("Invite link or code") },
