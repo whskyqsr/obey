@@ -18,6 +18,12 @@ function label(rel: Relationship, myId: string) {
   return rel.name || rel.members.length < 2 ? relTitle(rel, myId) : `with ${relTitle(rel, myId)}`;
 }
 
+/** The phone header: "with Sam" whenever there's one other person, whatever the dynamic is called. */
+function chipLabel(rel: Relationship, myId: string) {
+  const others = rel.members.filter((m) => m.userId !== myId);
+  return others.length === 1 ? `with ${others[0]!.displayName}` : label(rel, myId);
+}
+
 function subtitle(rel: Relationship, myId: string) {
   const self = rel.members.find((m) => m.userId === myId);
   if (rel.endedAt) return "Ended";
@@ -135,8 +141,8 @@ export function DynamicSwitcher({
       ) : chip ? (
         // The phone's header: the partner's picture and the dynamic's name, opening the list below it.
         <button type="button" onClick={toggle} aria-expanded={many ? open : undefined} className="state-layer flex max-w-full items-center gap-2 rounded-full py-1 pr-3 pl-1 text-left">
-          <DynamicMark rel={rel} size={28} />
-          <span className="truncate font-serif text-[19px] text-on-surface">{name}</span>
+          <DynamicMark rel={rel} size={36} />
+          <span className="truncate text-body-large text-on-surface-variant">{chipLabel(rel, me.user.id)}</span>
           {many && <Icon name="expand_more" size={18} className="text-on-surface-variant" />}
         </button>
       ) : compact ? (

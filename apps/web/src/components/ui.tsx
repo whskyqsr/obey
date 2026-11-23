@@ -940,7 +940,10 @@ export function PageHeader({
   subtitle,
   actions,
   tools,
+  hero,
 }: {
+  /** Today's greeting: the large serif line from the mockups. */
+  hero?: boolean;
   title: ReactNode;
   subtitle?: ReactNode;
   actions?: ReactNode;
@@ -954,7 +957,7 @@ export function PageHeader({
       aria-label="Safe word"
       title="Safe word"
       onClick={menu.safeWord}
-      className="state-layer flex size-10 shrink-0 items-center justify-center rounded-full text-primary"
+      className="state-layer flex size-10 shrink-0 items-center justify-center rounded-full text-on-surface"
     >
       <Icon name="front_hand" />
     </button>
@@ -984,11 +987,11 @@ export function PageHeader({
         </div>
         <div className="mt-2 flex items-end gap-2 md:mt-0">
           <div className="min-w-0 flex-1">
-            <h1 className="text-display-small text-on-surface md:text-display-medium">
+            <h1 className={hero ? "mt-4 font-serif text-[52px] leading-[1.05] tracking-[-0.01em] text-on-surface" : "text-display-small text-on-surface md:text-display-medium"}>
               {title}
             </h1>
             {subtitle && (
-              <p className="mt-1 text-body-medium text-on-surface-variant">
+              <p className={hero ? "mt-3 text-body-large text-on-surface-variant" : "mt-1 text-body-medium text-on-surface-variant"}>
                 {subtitle}
               </p>
             )}

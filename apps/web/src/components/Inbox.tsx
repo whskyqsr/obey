@@ -351,8 +351,26 @@ export function TodayInbox() {
       if (!next.delete(key)) next.add(key);
       return next;
     });
+  if (isDom)
+    // A Dominant's decisions sit at the top of Today as cards, each with its own buttons; the greeting already says how many.
+    return (
+      <section aria-label={`Needs you · ${total}`} className="flex flex-col gap-3 px-4 pb-6 md:px-6">
+        {groups.map((g) =>
+          g.body && !g.to ? (
+            <div key={g.key} className="rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-1 [&>*+*]:border-t [&>*+*]:border-outline-variant">
+              {g.body}
+              {g.action && <div className="flex justify-end py-3">{g.action}</div>}
+            </div>
+          ) : (
+            <div key={g.key} className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2">
+              <GroupRow g={g} open={false} onToggle={() => toggle(g.key)} />
+            </div>
+          ),
+        )}
+      </section>
+    );
   return (
-    <Section title={`${isDom ? "Needs you" : "For you"} · ${total}`}>
+    <Section title={`For you · ${total}`}>
       <div className="flex flex-col divide-y divide-outline-variant border-y border-outline-variant">
         {groups.map((g) => (
           <GroupRow key={g.key} g={g} open={isOpen(g.key)} onToggle={() => toggle(g.key)} />
