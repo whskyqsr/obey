@@ -46,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -61,7 +62,6 @@ import app.obey.ui.common.MenuButton
 import app.obey.ui.common.SafeWordAction
 import app.obey.ui.common.formatDateTime
 
-private enum class NoteFilter(val label: String) { All("All"), Pinned("Pinned") }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,7 +81,7 @@ fun NotesScreen(
         onPauseOrDispose { }
     }
     var query by rememberSaveable { mutableStateOf("") }
-    var filter by rememberSaveable { mutableStateOf(NoteFilter.All) }
+    var tag by rememberSaveable { mutableStateOf<String?>(null) }
     var searching by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
@@ -108,13 +108,15 @@ fun NotesScreen(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                 )
             }
-            if (!journal) {
+            val tags = (state as? Load.Ready)?.value.orEmpty().filter { it.kind == (if (journal) NoteKind.Journal else NoteKind.Note) }.flatMap { it.tags }.distinct().sorted()
+            if (!journal && tags.isNotEmpty()) {
                 Row(
                     Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    NoteFilter.entries.forEach { f ->
-                        FilterChip(selected = filter == f, onClick = { filter = f }, label = { Text(f.label) })
+                    FilterChip(selected = tag == null, onClick = { tag = null }, label = { Text("All") })
+                    tags.forEach { t ->
+                        FilterChip(selected = tag == t, onClick = { tag = if (tag == t) null else t }, label = { Text(t) })
                     }
                 }
             }
@@ -128,13 +130,13 @@ fun NotesScreen(
                     // Journal entries read newest-written first; notes keep pinned-then-recently-edited.
                     val ordered = if (journal) mine.sortedByDescending { it.createdAt } else mine
                     val shown = ordered.filter { n ->
-                        (journal || filter == NoteFilter.All || n.pinned) && (q.isEmpty() || n.title.lowercase().contains(q) || n.bodyMd.lowercase().contains(q) ||
+                        (journal || tag == null || tag in n.tags) && (q.isEmpty() || n.title.lowercase().contains(q) || n.bodyMd.lowercase().contains(q) ||
                             n.tags.any { it.lowercase().contains(q) })
                     }
                     LazyColumn(
                         Modifier.fillMaxSize(),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(if (journal) 12.dp else 0.dp),
                     ) {
                         if (journal && q.isEmpty()) item(key = "mood") { app.obey.ui.common.MoodCard() }
                         if (shown.isEmpty()) {
@@ -146,7 +148,10 @@ fun NotesScreen(
                                 }
                             }
                         }
-                        items(shown, key = { it.id }) { n ->
+                        if (!journal) items(shown, key = { it.id }) { n ->
+                            NoteRow(n, author = vm.session?.let { if (n.authorId == it.userId) null else it.nameOf(n.authorId) }, onOpen = { onOpen(n.id) })
+                        }
+                        if (journal) items(shown, key = { it.id }) { n ->
                             NoteCard(
                                 n,
                                 author = vm.session?.let { if (n.authorId == it.userId) null else it.nameOf(n.authorId) },
@@ -159,6 +164,30 @@ fun NotesScreen(
                 }
             }
         }
+    }
+}
+
+/** A note on a hairline: its title in the serif, then whether it's shared and when it last changed. */
+@Composable
+private fun NoteRow(note: Note, author: String?, onOpen: () -> Unit) {
+    Column(Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
+        Row(Modifier.padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    note.title.ifBlank { "Untitled" },
+                    style = MaterialTheme.typography.headlineSmall.copy(fontSize = 24.sp, lineHeight = 30.sp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    listOfNotNull(if (note.visibility == NoteVisibility.Private) "Private" else "Shared", author, formatDateTime(note.updatedAt)).joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (note.pinned) Icon(Icons.Outlined.PushPin, "Pinned", Modifier.padding(start = 8.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 

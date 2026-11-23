@@ -450,11 +450,11 @@ export function SegmentedButtons<T extends string>({
     <div
       role="radiogroup"
       className={cx(
-        "inline-flex h-10 overflow-hidden rounded-sm border border-outline-variant",
+        "inline-flex h-10 gap-0.5 rounded-full border border-outline-variant p-[3px]",
         className,
       )}
     >
-      {options.map((o, i) => {
+      {options.map((o) => {
         const on = o.value === value;
         return (
           <button
@@ -464,8 +464,7 @@ export function SegmentedButtons<T extends string>({
             aria-checked={on}
             onClick={() => onChange(o.value)}
             className={cx(
-              "state-layer flex min-w-12 flex-1 items-center justify-center gap-1.5 px-3 text-label-large",
-              i > 0 && "border-l border-outline-variant",
+              "state-layer flex min-w-12 flex-1 items-center justify-center gap-1.5 rounded-full px-3.5 text-label-large",
               on ? "bg-on-surface text-surface" : "text-on-surface-variant",
             )}
           >

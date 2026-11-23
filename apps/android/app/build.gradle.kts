@@ -72,6 +72,8 @@ android {
         release {
             if (uploadKeystore != null) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
+            // Libraries with native code (the map) ship their symbols in the bundle, so Play can read native crashes.
+            ndk { debugSymbolLevel = "FULL" }
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
             buildConfigField("String", "WEB_URL", "\"$webUrl\"")

@@ -4,7 +4,7 @@ import { starterKits, type ApplyKitResult, type Features, type Kit, type KitItem
 import { describe } from "@obey/recurrence";
 import { useApplyKit, useCopySharedKit, useDeleteKit, useLibrary, useMyKits, useSaveKit, useShareKit, useSharedKit, useTasks, useUpdateKit } from "../api/hooks";
 import { errorMessage } from "../api/client";
-import { SubHeader, Button, Card, Checkbox, Dialog, Empty, ErrorBox, Fab, Icon, Loading, OverflowMenu, PageHeader, Select, TextField, useSnackbar } from "../components/ui";
+import { SubHeader, Button, Card, Checkbox, IconButton, Dialog, Empty, ErrorBox, Fab, Icon, Loading, OverflowMenu, PageHeader, Select, TextField, useSnackbar } from "../components/ui";
 import { browserTimeZone, fmtClock, fmtDate, today } from "../lib/dates";
 import { useReadOnly, useRel } from "../lib/relationship";
 import { useConfirm } from "../lib/useConfirm";
@@ -66,32 +66,28 @@ export function useKits() {
   return starterKits.map((k) => ({ ...k, items: usable(k.items, features) })).filter((k) => k.items.length);
 }
 
-function KitCard({ icon, kit, shared, onClick }: { icon: string; kit: KitLike; shared?: boolean; onClick(): void }) {
-  const titles = kit.items.map((i) => (i.kind === "reward" ? `Reward: ${i.title}` : i.title));
+/** "6 tasks · 2 rules": what's in a kit, by kind. */
+function kitCounts(items: KitItem[]) {
+  const order: KitItem["kind"][] = ["task", "rule", "protocol", "reward", "consequence"];
+  return order
+    .map((k) => [k, items.filter((i) => i.kind === k).length] as const)
+    .filter(([, n]) => n)
+    .map(([k, n]) => plural(n, KIND[k].label.toLowerCase()))
+    .join(" · ");
+}
+
+/** A kit on a hairline: its name in the serif, what's in it, and what tapping does. */
+function KitRow({ kit, note, action, onClick }: { kit: KitLike; note?: string; action: string; onClick(): void }) {
   return (
-    <Card variant="elevated" onClick={onClick}>
-      <div className="flex items-start gap-4">
-        <div className="flex size-12 shrink-0 items-center justify-center text-on-surface-variant">
-          <Icon name={icon} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2 text-title-medium text-on-surface">
-            {kit.title}
-            {shared && (
-              <span className="inline-flex h-6 items-center gap-1 rounded-sm bg-tertiary-container px-2 text-label-medium text-on-tertiary-container">
-                <Icon name="link" size={16} />
-                Shared
-              </span>
-            )}
-          </div>
-          {kit.description && <div className="text-body-medium text-on-surface-variant">{kit.description}</div>}
-          <div className="mt-2 text-label-medium text-on-surface-variant">
-            {titles.slice(0, 4).join(" · ")}
-            {titles.length > 4 && ` · ${titles.length - 4} more`}
-          </div>
-        </div>
-      </div>
-    </Card>
+    <li className="border-b border-outline-variant">
+      <button type="button" onClick={onClick} className="state-layer flex w-full items-center gap-3 py-3.5 text-left">
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-serif text-[24px] leading-8 text-on-surface">{kit.title}</span>
+          <span className="block truncate text-body-medium text-on-surface-variant">{[kitCounts(kit.items), note].filter(Boolean).join(" · ")}</span>
+        </span>
+        <span className="shrink-0 text-label-large text-primary">{action}</span>
+      </button>
+    </li>
   );
 }
 
@@ -109,29 +105,30 @@ export function KitsPage() {
   if (!isDom || readOnly) return noKits;
   return (
     <>
-      <PageHeader title="Kits" />
-      <div className="flex flex-wrap gap-2 px-4 pb-4 md:px-6">
-        <Button variant="tonal" icon="download" onClick={() => setAdding(true)}>
-          Add from a link
-        </Button>
-      </div>
+      <PageHeader title="Kits" tools={<IconButton icon="link" label="Add from a link or code" onClick={() => setAdding(true)} />} />
       <Fab icon="add" label="New kit" onClick={() => void navigate({ to: "/kits/new" })} />
+      <h2 className="px-4 pb-1 eyebrow md:px-6">Starter kits</h2>
+      <ul className="px-4 pb-6 md:px-6">
+        {kits.map((k) => (
+          <KitRow key={k.id} kit={k} action="Open" onClick={() => setOpen(k)} />
+        ))}
+      </ul>
       {mine.data && mine.data.length > 0 && (
         <>
-          <h2 className="px-4 pt-2 pb-2 text-title-small text-primary md:px-6">Your kits</h2>
-          <div className="grid gap-3 px-4 pb-6 sm:grid-cols-2 md:px-6">
+          <h2 className="px-4 pb-1 eyebrow md:px-6">Yours</h2>
+          <ul className="px-4 pb-6 md:px-6">
             {mine.data.map((k) => (
-              <KitCard key={k.id} icon="widgets" kit={k} shared={!!k.shareCode} onClick={() => navigate({ to: "/kits/$kitId", params: { kitId: k.id } })} />
+              <KitRow
+                key={k.id}
+                kit={k}
+                note={k.shareCode ? "shared by link" : "private"}
+                action={k.shareCode ? "Shared" : "Open"}
+                onClick={() => navigate({ to: "/kits/$kitId", params: { kitId: k.id } })}
+              />
             ))}
-          </div>
+          </ul>
         </>
       )}
-      <h2 className="px-4 pt-2 pb-2 eyebrow md:px-6">Starter kits</h2>
-      <div className="grid gap-3 px-4 pb-24 sm:grid-cols-2 md:px-6">
-        {kits.map((k) => (
-          <KitCard key={k.id} icon={k.icon} kit={k} onClick={() => setOpen(k)} />
-        ))}
-      </div>
       {open && <KitDialog kit={open} source={{ kit: open.id }} onClose={() => setOpen(null)} />}
       {adding && <AddByCodeDialog onClose={() => setAdding(false)} />}
     </>

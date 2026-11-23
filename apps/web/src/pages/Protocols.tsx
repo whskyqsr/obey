@@ -37,9 +37,9 @@ export function ProtocolsPage() {
       <PageHeader
         title="Protocols"
         subtitle={`${protocols.length} protocol${protocols.length === 1 ? "" : "s"}`}
+        actions={<RulesTabs current="protocols" />}
         tools={<IconButton icon="assignment_late" label="Broken rules" onClick={() => void navigate({ to: "/rule-log" })} />}
       />
-      <RulesTabs current="protocols" />
       <ol className="flex flex-col gap-2 px-4 md:px-6">
         {list.isLoading && <Loading />}
         {list.error && <ErrorBox error={list.error} onRetry={() => list.refetch()} />}
