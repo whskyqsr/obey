@@ -6,7 +6,8 @@ import { EventDialog, eventOn } from "../components/EventDialog";
 import { MonthWeeks, WeekGrid, inTopStrip } from "../components/WeekGrid";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { OccurrenceCard, isOverdue } from "../components/OccurrenceCard";
-import { Button, Dialog, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, SegmentedButtons, cx } from "../components/ui";
+import { Button, Dialog, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, cx } from "../components/ui";
+import { useOpenOnNew } from "../lib/newParam";
 import { addDays, addMonths, daysBetween, fmtDate, fmtMonth, fmtTime, localDateOf, monthGrid, startOfWeek, today } from "../lib/dates";
 import { storage } from "../lib/storage";
 import { useRel } from "../lib/relationship";
@@ -49,6 +50,8 @@ export function CalendarPage() {
   const clashing = useMemo(() => new Set((events.data ?? []).flatMap((e) => e.conflictIds)), [events.data]);
   // undefined: closed; null: a new plan; otherwise that plan.
   const [plan, setPlan] = useState<CalendarEvent | null | undefined>(undefined);
+  // The + menu's "Plan".
+  useOpenOnNew(() => setPlan(null), !rel.endedAt);
 
   const byDay = useMemo(() => {
     const map = new Map<string, Occurrence[]>();
@@ -78,16 +81,16 @@ export function CalendarPage() {
   return (
     <>
       <PageHeader
-        title="Calendar"
-        actions={
-          <SegmentedButtons
-            value={view}
-            onChange={setView}
-            options={[
-              { value: "week", label: "Week" },
-              { value: "month", label: "Month" },
-            ]}
-          />
+        title={view === "month" ? "Month" : "Week"}
+        tools={
+          <>
+            <IconButton icon="checklist" label="All tasks" onClick={() => void navigate({ to: "/tasks" })} />
+            <IconButton
+              icon={view === "month" ? "view_week" : "calendar_month"}
+              label={view === "month" ? "Show the week" : "Show the month"}
+              onClick={() => setView(view === "month" ? "week" : "month")}
+            />
+          </>
         }
       />
       <div className="flex items-center gap-1 px-4 pb-3 md:px-6">
@@ -276,7 +279,9 @@ export function CalendarPage() {
         {detail && <OccurrenceCard o={detail} showDate />}
       </Dialog>
       <EventDialog event={plan ?? null} day={view === "month" ? selected : days.includes(t) ? t : from} open={plan !== undefined} onClose={() => setPlan(undefined)} />
-      {isDom && <Fab icon="add" label="New task" onClick={() => navigate({ to: "/tasks/$taskId", params: { taskId: "new" }, search: { start: newTaskDay } })} />}
+      {isDom && (
+        <Fab icon="add" label="New task" className="max-md:hidden" onClick={() => navigate({ to: "/tasks/$taskId", params: { taskId: "new" }, search: { start: newTaskDay } })} />
+      )}
     </>
   );
 }

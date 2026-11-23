@@ -7,7 +7,7 @@ import { SortableList } from "../components/SortableList";
 import { Button, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, cx, useSnackbar } from "../components/ui";
 import { useRel } from "../lib/relationship";
 import { excerpt } from "./Notes";
-import { sortRules } from "./Rules";
+import { RulesTabs, sortRules } from "./Rules";
 
 // TipTap is heavy; load it the first time a protocol is expanded.
 const MarkdownEditor = lazy(importPage(() => import("../components/MarkdownEditor").then((m) => ({ default: m.MarkdownEditor }))));
@@ -37,12 +37,9 @@ export function ProtocolsPage() {
       <PageHeader
         title="Protocols"
         subtitle={`${protocols.length} protocol${protocols.length === 1 ? "" : "s"}`}
-        actions={
-          <Button variant="tonal" icon="history" onClick={() => void navigate({ to: "/rule-log" })}>
-            Broken rules
-          </Button>
-        }
+        tools={<IconButton icon="assignment_late" label="Broken rules" onClick={() => void navigate({ to: "/rule-log" })} />}
       />
+      <RulesTabs current="protocols" />
       <ol className="flex flex-col gap-2 px-4 md:px-6">
         {list.isLoading && <Loading />}
         {list.error && <ErrorBox error={list.error} onRetry={() => list.refetch()} />}

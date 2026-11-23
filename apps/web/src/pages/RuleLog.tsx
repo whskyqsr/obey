@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useAddRuleLog, useDeleteRuleLog, useLibrary, useRuleLog } from "../api/hooks";
 import { errorMessage } from "../api/client";
+import { useOpenOnNew } from "../lib/newParam";
 import { sortRules } from "./Rules";
 import { Avatar } from "../components/Avatar";
 import { SubHeader, Button, Chip, Dialog, Empty, ErrorBox, Fab, Icon, IconButton, Loading, Select, Switch, TextArea, TextField, useSnackbar } from "../components/ui";
@@ -31,6 +32,7 @@ export function RuleLogPage() {
   const navigate = useNavigate();
   const back = useBack(() => navigate({ to: features.rules ? "/rules" : "/protocols" }));
   const [adding, setAdding] = useState(false);
+  useOpenOnNew(() => setAdding(true), !readOnly);
   const [confirm, confirmEl] = useConfirm();
   const name = (id: string) => (id === me.user.id ? "You" : memberName(id));
   const people = useMemo(() => [...new Set((log.data ?? []).map((e) => e.subjectId))], [log.data]);

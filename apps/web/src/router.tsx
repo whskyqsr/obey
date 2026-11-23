@@ -30,6 +30,7 @@ import { SettingsPage } from "./pages/Settings";
 import { TaskEditorPage } from "./pages/TaskEditor";
 import { TasksPage } from "./pages/Tasks";
 import { TodayPage } from "./pages/Today";
+import { UsPage } from "./pages/Us";
 import { Welcome } from "./pages/Welcome";
 
 // The notes editor pulls in TipTap/ProseMirror; load it on demand.
@@ -254,6 +255,7 @@ function OnboardingRoute() {
 const routeTree = rootRoute.addChildren([
   todayRoute,
   page("/calendar", CalendarPage),
+  page("/us", UsPage),
   page("/tasks", TasksPage),
   taskRoute,
   taskEditRoute,
