@@ -84,7 +84,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import app.obey.ui.common.LocalSafeWord
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AddTask
@@ -397,18 +396,22 @@ private fun SafeCallFrame(vm: SafeCallViewModel, call: SafeCall?, content: @Comp
     }
 }
 
-/** The round ink + that starts anything new. */
+/** The ink + that starts anything new: a rounded square raised through the bar's top line, in a notch of the page colour. */
 @Composable
-private fun NewButton(onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = CircleShape, color = MaterialTheme.colorScheme.onSurface, contentColor = MaterialTheme.colorScheme.surface, modifier = Modifier.size(52.dp)) {
-        Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Add, "New", Modifier.size(28.dp)) }
+private fun NewButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier.background(MaterialTheme.colorScheme.surface, RoundedCornerShape(22.dp)).padding(6.dp)) {
+        Surface(onClick = onClick, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.onSurface, contentColor = MaterialTheme.colorScheme.surface, modifier = Modifier.size(56.dp)) {
+            Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Add, "New", Modifier.size(28.dp)) }
+        }
     }
 }
 
 /** The phone's tab bar: Today, Week and Us as words in the serif, the current one in ink under a diamond, then +. */
 @Composable
 private fun TabBar(tabs: List<TopLevel>, selected: (TopLevel) -> Boolean, onClick: (TopLevel) -> Unit, onNew: (() -> Unit)?) {
-    Column(Modifier.background(MaterialTheme.colorScheme.surface).windowInsetsPadding(WindowInsets.navigationBars)) {
+    // The + rises 20dp above the line, so the bar keeps a strip above it; content never scrolls under the button.
+    Box(Modifier.background(MaterialTheme.colorScheme.surface).windowInsetsPadding(WindowInsets.navigationBars).fillMaxWidth().height(if (onNew != null) 94.dp else 69.dp)) {
+      Column(Modifier.align(Alignment.BottomStart).fillMaxWidth()) {
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Row(Modifier.fillMaxWidth().height(68.dp).padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
             // Grouped on the left, the way the mockup has them, with + on its own at the right.
@@ -429,11 +432,9 @@ private fun TabBar(tabs: List<TopLevel>, selected: (TopLevel) -> Boolean, onClic
                     }
                 }
             }
-            Spacer(Modifier.weight(1f))
-            if (onNew != null) {
-                NewButton(onNew)
-            }
         }
+      }
+      if (onNew != null) NewButton(onNew, Modifier.align(Alignment.TopEnd).padding(end = 18.dp))
     }
 }
 

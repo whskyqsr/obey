@@ -254,7 +254,7 @@ export function AppShell() {
               aria-label="New"
               title="New"
               onClick={() => setNewOpen(true)}
-              className="state-layer mt-2 flex size-13 shrink-0 items-center justify-center rounded-full bg-on-surface text-surface"
+              className="state-layer -mt-5 flex size-14 shrink-0 items-center justify-center rounded-2xl bg-on-surface text-surface shadow-[0_0_0_6px_var(--md-surface)]"
             >
               <Icon name="add" size={28} />
             </button>
