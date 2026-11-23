@@ -1,0 +1,34 @@
+name: Play access check
+# Temporary diagnostic, runs only on pushes to this branch. Never merged to main.
+on:
+  push:
+    branches: [claude/project-thread-fsd1l6]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - run: pip install --quiet google-auth requests
+      - name: Check the Play key against Solapy and Fealty
+        env:
+          KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        shell: python
+        run: |
+          import json, os, requests
+          from google.oauth2 import service_account
+          from google.auth.transport.requests import Request
+          info = json.loads(os.environ["KEY"])
+          print("key is solapy-ci:", info.get("client_email") == "solapy-ci@solapy-3e247.iam.gserviceaccount.com")
+          print("key project is solapy-3e247:", info.get("project_id") == "solapy-3e247")
+          creds = service_account.Credentials.from_service_account_info(
+              info, scopes=["https://www.googleapis.com/auth/androidpublisher"])
+          creds.refresh(Request())
+          print("token: OK (key is valid and not deleted)")
+          h = {"Authorization": f"Bearer {creds.token}"}
+          base = "https://androidpublisher.googleapis.com/androidpublisher/v3/applications"
+          for pkg in ["app.solapy", "me.fealty"]:
+              r = requests.post(f"{base}/{pkg}/edits", headers=h, json={})
+              print(f"\n{pkg} edits.insert -> HTTP {r.status_code}")
+              print(r.text)
+              if r.ok:
+                  requests.delete(f"{base}/{pkg}/edits/{r.json()['id']}", headers=h)
+                  print("edit deleted, nothing changed")
