@@ -33,11 +33,13 @@ private window) with different UUIDs to play both partners.
 
 ## How it's built
 
-- `src/theme/tokens.ts` generates light and dark M3 schemes from a seed color with
-  `@material/material-color-utilities` (tonal spot) and writes them as `--md-<role>` CSS variables. `src/index.css`
-  maps them into Tailwind (`bg-primary`, `text-on-surface-variant`, `bg-surface-container-high`, ...) and defines the
-  M3 type scale (`text-title-medium`, `text-label-large`, ...), shape and elevation tokens. The seed and
-  light/dark/system mode are chosen in Settings and kept in localStorage.
+- `src/theme/tokens.ts` holds the "Letters" palette: fixed paper and ink for light and dark, plus one accent the user
+  picks from five (`ACCENTS`). It writes every role as a `--md-<role>` CSS variable (M3 role names, so components
+  didn't need renaming). `src/index.css` maps them into Tailwind (`bg-primary`, `text-on-surface-variant`,
+  `bg-surface-container-high`, ...) and defines the type scale (`text-title-medium`, `text-label-large`, ...), shape
+  and elevation tokens. Large type (`text-title-large` and up, `font-serif`) is set in Instrument Serif; everything
+  else is Geist. The accent and light/dark/system mode are chosen in Settings and kept in localStorage; an old seed
+  colour falls back to oxblood.
 - `src/components/ui.tsx` holds the M3 pieces: filled/tonal/outlined/text buttons, icon buttons, FAB, cards, chips,
   segmented buttons, outlined text fields, switches, dialogs that become bottom sheets on phones, and a snackbar.
   `AppShell` shows a navigation rail at `md` and up and a bottom navigation bar below it.

@@ -18,7 +18,7 @@ import { useReadOnly } from "../lib/relationship";
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
-// ---------- Icon (Material Symbols Rounded)
+// ---------- Icon (Material Symbols Rounded, light weight)
 
 export function Icon({ name, filled, className, size }: { name: string; filled?: boolean; className?: string; size?: number }) {
   return (
@@ -32,11 +32,12 @@ export function Icon({ name, filled, className, size }: { name: string; filled?:
 
 type Variant = "filled" | "tonal" | "outlined" | "text" | "elevated" | "danger";
 const VARIANTS: Record<Variant, string> = {
-  filled: "bg-primary text-on-primary hover:shadow-elev-1",
-  tonal: "bg-secondary-container text-on-secondary-container hover:shadow-elev-1",
-  outlined: "border border-outline text-primary",
+  // Letters: ink is the main action, a hairline the second, the accent stays for what needs attention.
+  filled: "bg-on-surface text-surface",
+  tonal: "border border-outline-variant bg-surface-container-lowest text-on-surface",
+  outlined: "border border-on-surface text-on-surface",
   text: "text-primary px-3",
-  elevated: "bg-surface-container-low text-primary shadow-elev-1 hover:shadow-elev-2",
+  elevated: "border border-outline-variant bg-surface-container-lowest text-on-surface",
   danger: "bg-error text-on-error",
 };
 
@@ -53,7 +54,7 @@ export function Button({ variant = "filled", icon, busy, className, children, di
       {...rest}
       disabled={disabled || busy}
       className={cx(
-        "state-layer inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full px-6 text-label-large transition-shadow",
+        "state-layer inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-sm px-5 text-label-large whitespace-nowrap",
         "disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none",
         icon && variant !== "text" && "pl-4",
         VARIANTS[variant],
@@ -82,9 +83,9 @@ export function IconButton({
       {...rest}
       className={cx(
         "state-layer inline-flex size-10 shrink-0 items-center justify-center rounded-full disabled:opacity-40",
-        variant === "standard" && "text-on-surface-variant",
-        variant === "filled" && "bg-primary text-on-primary",
-        variant === "tonal" && "bg-secondary-container text-on-secondary-container",
+        variant === "standard" && "text-on-surface",
+        variant === "filled" && "bg-on-surface text-surface",
+        variant === "tonal" && "border border-outline-variant bg-surface-container-lowest text-on-surface",
         className,
       )}
     >
@@ -113,7 +114,7 @@ export function OverflowMenu({ label = "More options", items }: { label?: string
     <div ref={ref} className="relative">
       <IconButton icon="more_vert" label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)} />
       {open && (
-        <div role="menu" className="absolute top-full right-0 z-30 mt-1 min-w-44 overflow-hidden rounded-xs bg-surface-container py-2 shadow-lg">
+        <div role="menu" className="absolute top-full right-0 z-30 mt-1 min-w-44 overflow-hidden rounded-md border border-outline-variant bg-surface-container-lowest py-1 shadow-elev-2">
           {items.map((it) => (
             <button
               key={it.label}
@@ -144,7 +145,7 @@ export function Fab({ icon, label, onClick, extended = true, className }: { icon
       onClick={onClick}
       aria-label={label}
       className={cx(
-        "state-layer fixed right-4 bottom-[calc(108px+env(safe-area-inset-bottom))] in-data-nobar:bottom-[calc(16px+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-3 rounded-lg bg-primary-container text-on-primary-container shadow-elev-3 md:right-8 md:bottom-8",
+        "state-layer fixed right-4 bottom-[calc(108px+env(safe-area-inset-bottom))] in-data-nobar:bottom-[calc(16px+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-3 rounded-full bg-on-surface text-surface shadow-elev-2 md:right-8 md:bottom-8",
         extended ? "px-4 pr-5" : "w-14 justify-center",
         className,
       )}
@@ -178,9 +179,10 @@ export function Card({
       onClick={onClick}
       type={onClick ? "button" : undefined}
       className={cx(
-        "block w-full rounded-md p-4 text-left",
-        variant === "filled" && "bg-surface-container-highest",
-        variant === "elevated" && "bg-surface-container-low shadow-elev-1",
+        "block w-full rounded-lg p-4 text-left",
+        // Letters: a card is a sheet of paper with a hairline, never a filled block.
+        variant === "filled" && "border border-outline-variant bg-surface-container-lowest",
+        variant === "elevated" && "border border-outline-variant bg-surface-container-lowest",
         variant === "outlined" && "border border-outline-variant bg-surface",
         onClick && "state-layer cursor-pointer",
         className,
@@ -199,8 +201,8 @@ export function Chip({ children, selected, onClick, icon, className }: { childre
       onClick={onClick}
       aria-pressed={onClick ? !!selected : undefined}
       className={cx(
-        "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-sm px-3 text-label-large",
-        selected ? "bg-secondary-container text-on-secondary-container" : "border border-outline-variant text-on-surface-variant",
+        "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-label-large",
+        selected ? "border-on-surface bg-surface-container-lowest text-on-surface" : "border-outline-variant text-on-surface-variant",
         onClick && "state-layer",
         className,
       )}
@@ -239,7 +241,7 @@ export function SegmentedButtons<T extends string>({
   className?: string;
 }) {
   return (
-    <div role="radiogroup" className={cx("inline-flex h-10 overflow-hidden rounded-full border border-outline", className)}>
+    <div role="radiogroup" className={cx("inline-flex h-10 overflow-hidden rounded-sm border border-outline-variant", className)}>
       {options.map((o, i) => {
         const on = o.value === value;
         return (
@@ -251,11 +253,11 @@ export function SegmentedButtons<T extends string>({
             onClick={() => onChange(o.value)}
             className={cx(
               "state-layer flex min-w-12 flex-1 items-center justify-center gap-1.5 px-3 text-label-large",
-              i > 0 && "border-l border-outline",
-              on ? "bg-secondary-container text-on-secondary-container" : "text-on-surface",
+              i > 0 && "border-l border-outline-variant",
+              on ? "bg-on-surface text-surface" : "text-on-surface-variant",
             )}
           >
-            {on ? <Icon name="check" size={18} /> : o.icon ? <Icon name={o.icon} size={18} /> : null}
+            {o.icon ? <Icon name={o.icon} size={18} /> : null}
             {o.label}
           </button>
         );
@@ -297,10 +299,10 @@ export function ListItem({
   );
 }
 
-// ---------- Form fields (M3 outlined text field)
+// ---------- Form fields (outlined, hairline)
 
 const fieldBox =
-  "peer w-full rounded-xs border border-outline bg-transparent px-4 text-body-large text-on-surface outline-none transition-colors hover:border-on-surface focus:border-2 focus:border-primary focus:px-[15px] disabled:opacity-40";
+  "peer w-full rounded-sm border border-outline bg-transparent px-4 text-body-large text-on-surface outline-none transition-colors hover:border-outline focus:border-on-surface disabled:opacity-40";
 
 function FieldShell({ label, id, children, help, error }: { label?: string; id: string; children: ReactNode; help?: string; error?: string }) {
   return (
@@ -310,7 +312,7 @@ function FieldShell({ label, id, children, help, error }: { label?: string; id: 
         {label && (
           <label
             htmlFor={id}
-            className="pointer-events-none absolute -top-2 left-3 bg-[var(--field-bg,var(--md-surface))] px-1 text-body-small text-on-surface-variant peer-focus:text-primary"
+            className="pointer-events-none absolute -top-2 left-3 bg-[var(--field-bg,var(--md-surface))] px-1 text-body-small text-on-surface-variant peer-focus:text-on-surface"
           >
             {label}
           </label>
@@ -371,15 +373,15 @@ export function Switch({ checked, onChange, label, help }: { checked: boolean; o
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={cx("relative h-8 w-13 shrink-0 rounded-full border-2 transition-colors", checked ? "border-primary bg-primary" : "border-outline bg-surface-container-highest")}
+        className={cx("relative h-7 w-12 shrink-0 rounded-full border transition-colors", checked ? "border-on-surface bg-on-surface" : "border-outline bg-surface-container-lowest")}
       >
         <span
           className={cx(
             "absolute top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full transition-all",
-            checked ? "left-[22px] size-6 bg-on-primary text-primary" : "left-1.5 size-4 bg-outline",
+            checked ? "left-[23px] size-5 bg-surface text-on-surface" : "left-1 size-5 bg-outline-variant",
           )}
         >
-          {checked && <Icon name="check" size={16} />}
+          {checked && <Icon name="check" size={14} />}
         </span>
       </button>
     </label>
@@ -389,7 +391,7 @@ export function Switch({ checked, onChange, label, help }: { checked: boolean; o
 export function Checkbox({ checked, onChange, label }: { checked: boolean; onChange(v: boolean): void; label: ReactNode }) {
   return (
     <label className="flex cursor-pointer items-center gap-3 py-1 text-body-large">
-      <input type="checkbox" className="size-[18px] accent-[var(--md-primary)]" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <input type="checkbox" className="diamond" checked={checked} onChange={(e) => onChange(e.target.checked)} />
       {label}
     </label>
   );
@@ -438,17 +440,17 @@ export function Dialog({
         ref={ref}
         role="dialog"
         aria-modal="true"
-        style={{ ["--field-bg" as string]: "var(--md-surface-container-high)" }}
+        style={{ ["--field-bg" as string]: "var(--md-surface)" }}
         className={cx(
-          "relative flex max-h-[90dvh] w-full flex-col bg-surface-container-high text-on-surface shadow-elev-3",
+          "relative flex max-h-[90dvh] w-full flex-col border-outline-variant bg-surface text-on-surface shadow-elev-3",
           sheetOnMobile
-            ? "animate-sheet-up rounded-t-xl pb-[env(safe-area-inset-bottom)] md:max-w-[560px] md:animate-fade-in md:rounded-xl"
-            : "max-w-[560px] animate-fade-in rounded-xl",
+            ? "animate-sheet-up rounded-t-xl border-t pb-[env(safe-area-inset-bottom)] md:max-w-[560px] md:animate-fade-in md:rounded-xl md:border"
+            : "max-w-[560px] animate-fade-in rounded-xl border",
         )}
       >
-        {sheetOnMobile && <div className="mx-auto mt-4 h-1 w-8 rounded-full bg-on-surface-variant/40 md:hidden" />}
+        {sheetOnMobile && <div className="mx-auto mt-3 h-1 w-8 rounded-full bg-outline-variant md:hidden" />}
         <div className="overflow-y-auto px-6 pt-6 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {icon && <Icon name={icon} className="mb-4 block text-center text-secondary" />}
+          {icon && <Icon name={icon} className="mb-4 block text-center text-on-surface-variant" />}
           {title && <h2 className={cx("mb-4 text-headline-small", icon && "text-center")}>{title}</h2>}
           <div className="text-body-medium text-on-surface-variant">{children}</div>
         </div>
@@ -480,7 +482,7 @@ export function SnackbarProvider({ children }: { children: ReactNode }) {
           <div
             key={msg.key}
             role="status"
-            className="fixed bottom-[calc(108px+env(safe-area-inset-bottom))] left-1/2 z-[60] flex min-h-12 w-[min(92vw,560px)] -translate-x-1/2 animate-fade-in items-center gap-2 rounded-xs bg-inverse-surface px-4 py-3 text-body-medium text-inverse-on-surface shadow-elev-3 md:bottom-6"
+            className="fixed bottom-[calc(108px+env(safe-area-inset-bottom))] left-1/2 z-[60] flex min-h-12 w-[min(92vw,560px)] -translate-x-1/2 animate-fade-in items-center gap-2 rounded-md bg-inverse-surface px-4 py-3 text-body-medium text-inverse-on-surface shadow-elev-3 md:bottom-6"
           >
             <span className="flex-1">{msg.text}</span>
             {msg.action ? (
@@ -541,7 +543,7 @@ export function PageHeader({ title, subtitle, actions }: { title: ReactNode; sub
                 <Icon name="menu" />
               </button>
             )}
-            <h1 className="min-w-0 flex-1 text-headline-medium text-on-surface md:text-headline-large">{title}</h1>
+            <h1 className="min-w-0 flex-1 text-headline-large text-on-surface md:text-display-small">{title}</h1>
             {menu?.safeWord && (
               <button
                 type="button"
@@ -567,7 +569,7 @@ export function Section({ title, children, action }: { title: ReactNode; childre
   return (
     <section className="px-4 pb-6 md:px-6">
       <div className="mb-2 flex items-center gap-2">
-        <h2 className="flex-1 text-title-medium text-on-surface-variant">{title}</h2>
+        <h2 className="eyebrow flex-1">{title}</h2>
         {action}
       </div>
       {children}
@@ -577,9 +579,9 @@ export function Section({ title, children, action }: { title: ReactNode; childre
 
 export function Empty({ icon, title, body, action }: { icon: string; title: string; body?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center gap-2 rounded-lg bg-surface-container-low px-6 py-10 text-center">
-      <Icon name={icon} size={40} className="text-primary" />
-      <div className="text-title-medium text-on-surface">{title}</div>
+    <div className="flex flex-col items-center gap-2 border-y border-outline-variant px-6 py-10 text-center">
+      <Icon name={icon} size={32} className="text-outline" />
+      <div className="text-title-large text-on-surface">{title}</div>
       {body && <div className="max-w-sm text-body-medium text-on-surface-variant">{body}</div>}
       {action && <div className="mt-2">{action}</div>}
     </div>
@@ -596,7 +598,7 @@ export function Loading() {
 
 export function ErrorBox({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   return (
-    <div className="m-4 flex items-start gap-3 rounded-md bg-error-container p-4 text-on-error-container">
+    <div className="m-4 flex items-start gap-3 rounded-lg bg-error-container p-4 text-on-error-container">
       <Icon name="error" />
       <div className="flex-1 text-body-medium">{error instanceof Error ? error.message : String(error)}</div>
       {onRetry && (
