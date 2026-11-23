@@ -90,12 +90,12 @@ function Tab({ d, active, badge }: { d: Dest; active: boolean; badge?: number })
     <Link
       to={d.to}
       aria-current={active ? "page" : undefined}
-      className={cx("relative flex h-full w-18 items-center justify-center font-serif text-[22px] outline-none", active ? "text-on-surface" : "text-outline")}
+      className={cx("relative flex h-full items-center justify-center font-serif text-[22px] outline-none", active ? "text-on-surface" : "text-outline")}
     >
       {active && <Marker className="absolute top-2 left-1/2 -translate-x-1/2" />}
       {d.label}
       {!!badge && (
-        <span className="absolute top-3 right-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 font-sans text-label-small text-on-primary">{badge}</span>
+        <span className="absolute top-3 -right-3.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 font-sans text-label-small text-on-primary">{badge}</span>
       )}
     </Link>
   );
@@ -239,11 +239,11 @@ export function AppShell() {
         {/* Phone: Today, Week and Us, with + for anything new */}
         <nav
           className={cx(
-            "fixed inset-x-0 bottom-0 z-30 flex h-[calc(68px+env(safe-area-inset-bottom))] items-start justify-between border-t border-outline-variant bg-surface px-6 pb-[env(safe-area-inset-bottom)] md:hidden",
+            "fixed inset-x-0 bottom-0 z-30 flex h-[calc(68px+env(safe-area-inset-bottom))] items-start justify-between border-t border-outline-variant bg-surface px-7 pb-[env(safe-area-inset-bottom)] md:hidden",
             !tab && "hidden",
           )}
         >
-          <div className="flex h-17 flex-1 items-center justify-between pr-4">
+          <div className="flex h-17 items-center gap-7.5">
             <Tab d={TODAY} active={tab === TODAY} badge={todayBadge} />
             <Tab d={WEEK} active={tab === WEEK} />
             <Tab d={US} active={tab === US} />
@@ -254,7 +254,7 @@ export function AppShell() {
               aria-label="New"
               title="New"
               onClick={() => setNewOpen(true)}
-              className="state-layer mt-2.5 flex size-12 shrink-0 items-center justify-center rounded-full bg-on-surface text-surface"
+              className="state-layer mt-2 flex size-13 shrink-0 items-center justify-center rounded-full bg-on-surface text-surface"
             >
               <Icon name="add" size={28} />
             </button>
