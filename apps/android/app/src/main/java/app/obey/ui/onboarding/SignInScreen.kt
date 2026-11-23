@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.util.Log
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
@@ -170,9 +171,17 @@ private suspend fun googleSignIn(context: Context, vm: SettingsViewModel) {
         } else {
             vm.reportError("Unexpected credential type")
         }
-    } catch (e: GetCredentialCancellationException) {
-        // User backed out.
     } catch (e: GetCredentialException) {
-        vm.reportError(e.message ?: "Google sign-in failed")
+        // Google also reports some setup problems as a cancellation after an account is picked,
+        // so say what came back instead of failing silently.
+        Log.w("SignIn", "Google sign-in failed: ${e.type}", e)
+        val why = e.message?.takeIf { it.isNotBlank() } ?: e.type
+        vm.reportError(
+            if (e is GetCredentialCancellationException) "Google sign-in didn't finish ($why)"
+            else "Google sign-in failed ($why)"
+        )
+    } catch (e: Exception) {
+        Log.w("SignIn", "Google sign-in failed", e)
+        vm.reportError("Google sign-in failed (${e.message ?: e.javaClass.simpleName})")
     }
 }
