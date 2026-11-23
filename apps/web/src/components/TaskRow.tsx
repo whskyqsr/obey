@@ -2,19 +2,18 @@ import { MOODS, MOOD_LABELS } from "./Mood";
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import type { Occurrence } from "../api/types";
-import { useCompleteOccurrence, useConfirmMiss, useDropConsequence, useEditOccurrence, useReviewOccurrence, useUndoComplete } from "../api/hooks";
+import { useCompleteOccurrence, useConfirmMiss, useDropConsequence, useEditOccurrence, useUndoComplete } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { fmtDate, fmtDateTime, fmtRelative, fmtTime, isAllDayDue, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 import { CompleteDialog, isOpen, isOverdue, opensLabel } from "./OccurrenceCard";
 import { RitualDialog, isRitual, stepProgress } from "./Ritual";
-import { SendBackDialog } from "./Comments";
 import { RescheduleSheet } from "./RescheduleSheet";
 import { StreakStrip } from "./StreakStrip";
 import { useNoteAfter } from "./DecisionNote";
 import { CountRing, CountSheet, canCount, countLine, isCounted, readyToSend, useCountTap } from "./Count";
 import { CheckInButton, PlaceRing, canCheckIn, isPlaced, placeLine, useCheckIn, usePlaceLookup } from "./Location";
-import { Button, Diamond, Icon, IconButton, cx, useSnackbar } from "./ui";
+import { Diamond, Icon, IconButton, cx, useSnackbar } from "./ui";
 
 /** Where a row opens its task. Today's wide layout points it at the side panel instead of the task page. */
 export const RowLink = createContext<((taskId: string) => { to: string; params?: Record<string, string>; search?: Record<string, string>; current?: boolean }) | null>(null);
@@ -177,24 +176,6 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
 /** Rows stacked as one list, divided by hairlines. */
 export function RowGroup({ children }: { children: ReactNode }) {
   return <div className="flex flex-col divide-y divide-outline-variant border-y border-outline-variant">{children}</div>;
-}
-
-/** Approve / Send back for a submitted completion, decided in place. */
-export function ReviewActions({ o }: { o: Occurrence }) {
-  const { rel } = useRel();
-  const snack = useSnackbar();
-  const review = useReviewOccurrence(rel.id);
-  const [sendingBack, setSendingBack] = useState(false);
-  const act = (approve: boolean) => review.mutate({ id: o.id, approve }, { onSuccess: () => snack(approve ? "Approved" : "Sent back"), onError: (e) => snack(errorMessage(e)) });
-  return (
-    <>
-      <IconButton icon="undo" label="Send back" disabled={review.isPending} onClick={() => setSendingBack(true)} />
-      <SendBackDialog o={o} open={sendingBack} onClose={() => setSendingBack(false)} />
-      <Button variant="tonal" busy={review.isPending} onClick={() => act(true)}>
-        Approve
-      </Button>
-    </>
-  );
 }
 
 /**

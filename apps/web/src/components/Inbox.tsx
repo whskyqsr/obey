@@ -1,3 +1,4 @@
+import { ReviewCard } from "./ReviewCard";
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import {
@@ -25,7 +26,7 @@ import { useNoteAfter } from "./DecisionNote";
 import { EventDialog, eventOn, eventWhen } from "./EventDialog";
 import { MOOD_LABELS } from "./Mood";
 import { MoodRow, RedemptionRow, SceneCheckRow } from "./NeedsYou";
-import { MissActions, ReviewActions, RowGroup, TaskRow } from "./TaskRow";
+import { MissActions, RowGroup, TaskRow } from "./TaskRow";
 import { Button, Dialog, Icon, IconButton, Section, TextField, cx, useSnackbar } from "./ui";
 
 type Tone = "primary" | "secondary" | "tertiary" | "error" | "neutral";
@@ -114,11 +115,11 @@ export function TodayInbox() {
           </Button>
         ) : undefined,
       body: (
-        <RowGroup>
+        <div className="flex flex-col divide-y divide-outline-variant">
           {list.map((o) => (
-            <TaskRow key={o.id} o={o} showDate={localDateOf(new Date(o.dueAt)) !== today()} actions={<ReviewActions o={o} />} />
+            <ReviewCard key={o.id} o={o} />
           ))}
-        </RowGroup>
+        </div>
       ),
     });
   }

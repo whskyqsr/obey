@@ -5,7 +5,7 @@ import { errorMessage } from "../api/client";
 import type { Rule } from "../api/types";
 import { ItemDialog, type FieldDef } from "../components/ItemDialog";
 import { SortableList } from "../components/SortableList";
-import { Button, Chip, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, SegmentedButtons, useSnackbar } from "../components/ui";
+import { Chip, Empty, ErrorBox, Fab, IconButton, Loading, PageHeader, SegmentedButtons, useSnackbar } from "../components/ui";
 import { useRel } from "../lib/relationship";
 import { useConfirm } from "../lib/useConfirm";
 
@@ -64,25 +64,26 @@ export function RulesPage() {
           ))}
         </div>
       )}
-      <ol className="flex flex-col gap-2 px-4 md:px-6">
+      <ol className="flex flex-col border-t border-outline-variant mx-4 md:mx-6">
         {list.isLoading && <Loading />}
         {list.error && <ErrorBox error={list.error} onRetry={() => list.refetch()} />}
         {list.data && !list.data.length && <Empty icon="gavel" title="No rules yet" body={isDom ? "Write the first one." : undefined} />}
         {/* Reordering works on the whole list, so it's off while a category filter is on. */}
         <SortableList items={shown} enabled={isDom && !category} onReorder={(next) => reorder.mutate(next, { onError: (e) => snack(errorMessage(e)) })}>
           {(r, _i, handle) => (
-            <div className="rounded-md bg-surface-container-low py-2 pr-2 pl-1">
+            <div className="border-b border-outline-variant py-2">
               <div className="flex items-start gap-1">
-                {handle ?? <span className="w-3" />}
+                {handle}
                 <button
                   type="button"
                   disabled={!isDom}
                   onClick={() => setEditing(r)}
-                  className="state-layer flex min-w-0 flex-1 items-start gap-4 rounded-sm p-2 text-left disabled:cursor-default"
+                  className="state-layer flex min-w-0 flex-1 items-start gap-4 rounded-sm py-2 pr-2 text-left disabled:cursor-default"
                 >
-                  <span className="w-6 shrink-0 pt-0.5 text-right text-title-medium text-primary tabular-nums">{number.get(r.id)}.</span>
+                  {/* Numbered like clauses in a letter: i, ii, iii. */}
+                  <span className="w-8 shrink-0 font-serif text-[24px] leading-8 text-primary">{roman(number.get(r.id) ?? 0)}</span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-title-medium text-on-surface">{r.title}</span>
+                    <span className="block font-serif text-[24px] leading-8 text-on-surface">{r.title}</span>
                     {r.bodyMd && <span className="mt-1 block text-body-medium whitespace-pre-wrap text-on-surface-variant">{r.bodyMd}</span>}
                   </span>
                   {/* The filter already says which category; the chip only helps in the full list. */}
@@ -90,15 +91,15 @@ export function RulesPage() {
                 </button>
               </div>
               {features.protocols && !!protocolsByRule.get(r.id)?.length && (
-                <div className="flex flex-wrap gap-2 pt-1 pb-1 pl-[3.75rem]">
+                <div className="flex flex-wrap gap-x-3 pb-2 pl-12 text-body-medium text-on-surface-variant">
                   {protocolsByRule.get(r.id)!.map((p) => (
                     <Link
                       key={p.id}
                       to="/protocols/$protocolId"
                       params={{ protocolId: p.id }}
-                      className="state-layer flex h-8 items-center gap-1.5 rounded-sm border border-outline-variant px-3 text-label-large text-on-surface-variant"
+                      className="hover:underline"
                     >
-                      <Icon name="fact_check" size={18} /> {p.title}
+                      See protocol: <span className="text-primary">{p.title}</span>
                     </Link>
                   ))}
                 </div>
@@ -152,4 +153,12 @@ export function RulesTabs({ current }: { current: "rules" | "protocols" }) {
       />
     </div>
   );
+}
+
+/** 1 → i, 4 → iv, 12 → xii. */
+export function roman(n: number): string {
+  const table: [number, string][] = [[1000, "m"], [900, "cm"], [500, "d"], [400, "cd"], [100, "c"], [90, "xc"], [50, "l"], [40, "xl"], [10, "x"], [9, "ix"], [5, "v"], [4, "iv"], [1, "i"]];
+  let out = "";
+  for (const [v, sym] of table) while (n >= v) (out += sym), (n -= v);
+  return out;
 }
