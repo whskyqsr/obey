@@ -13,12 +13,14 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.UnfoldMore
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Icon
@@ -37,6 +39,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.obey.api.Relationship
 import app.obey.api.title
 import app.obey.data.Session
@@ -173,6 +176,37 @@ fun DynamicSwitcherCompact(a: SwitcherActions) {
             }
         }
         DropdownMenu(open, onDismissRequest = { open = false }, shape = RoundedCornerShape(24.dp), containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Box(Modifier.width(288.dp)) { DynamicList(a) { open = false } }
+        }
+    }
+}
+
+/**
+ * The phone's switcher at the start of Today, Week and Us: the partner's picture and the dynamic's name in the serif,
+ * opening the list below it when there's more than one dynamic.
+ */
+@Composable
+fun DynamicSwitcherChip(a: SwitcherActions) {
+    val rel = a.session.relationship ?: return
+    val many = a.session.me.relationships.size > 1
+    var open by remember { mutableStateOf(false) }
+    Box(Modifier.padding(start = 8.dp)) {
+        Row(
+            Modifier.clip(RoundedCornerShape(50)).clickable { if (many) open = true else a.openDynamic() }.padding(start = 4.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DynamicMark(rel, a, 28.dp)
+            Text(
+                rel.heading(a.session.userId),
+                style = MaterialTheme.typography.titleLarge.copy(fontSize = 19.sp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 180.dp),
+            )
+            if (many) Icon(Icons.Outlined.ExpandMore, "Switch dynamic", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        DropdownMenu(open, onDismissRequest = { open = false }, shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceContainerLowest) {
             Box(Modifier.width(288.dp)) { DynamicList(a) { open = false } }
         }
     }

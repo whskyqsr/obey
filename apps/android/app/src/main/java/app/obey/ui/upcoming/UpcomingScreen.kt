@@ -125,7 +125,7 @@ fun UpcomingScreen(
         topBar = {
             TopAppBar(
                 navigationIcon = { MenuButton() },
-                title = { Text("Calendar") },
+                title = { Text("Week") },
                 actions = {
                     if (session?.readOnly != true) IconButton(onClick = {
                         val day = if (view == CalendarView.Month && !selected.isBefore(today)) selected else today

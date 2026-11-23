@@ -1,5 +1,6 @@
 package app.obey.ui.common
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,8 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FrontHand
-import androidx.compose.material.icons.outlined.Menu
+import androidx.compose.material.icons.outlined.FrontHand
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -73,18 +74,35 @@ fun SectionHeader(text: String, modifier: Modifier = Modifier, horizontalPadding
     )
 }
 
-/** The phone menu's button, at the start of a top-level screen's top bar. */
+/** What leads a main screen's top bar: the dynamic switcher (Today, Week, Us) or back to Us (the pages listed there). */
 @Composable
 fun MenuButton() {
-    val open = LocalOpenMenu.current ?: return
-    IconButton(onClick = open) { Icon(Icons.Outlined.Menu, contentDescription = "Menu") }
+    LocalNavLead.current?.invoke()
 }
 
-/** The safe word, before Settings in a main page's top bar; nothing for a Dominant. */
+/** The safe word, at the end of a main page's top bar; nothing for a Dominant. */
 @Composable
 fun SafeWordAction() {
     val open = LocalSafeWord.current ?: return
-    IconButton(onClick = open) { Icon(Icons.Filled.FrontHand, contentDescription = "Safe word", tint = MaterialTheme.colorScheme.error) }
+    IconButton(onClick = open) { Icon(Icons.Outlined.FrontHand, contentDescription = "Safe word", tint = MaterialTheme.colorScheme.primary) }
+}
+
+/**
+ * A title that is also a toggle between two pages that live together, such as Rules and Protocols: the current one in
+ * ink, the other muted beside it.
+ */
+@Composable
+fun PairedTitle(current: String, other: String?, onOther: () -> Unit) {
+    androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Bottom) {
+        Text(current)
+        if (other != null) {
+            Text(
+                other,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.clip(MaterialTheme.shapes.small).clickable(onClick = onOther),
+            )
+        }
+    }
 }
 
 /** Shows the ViewModel's pending message once, then clears it. */

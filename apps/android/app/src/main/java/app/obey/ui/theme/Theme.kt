@@ -1,103 +1,158 @@
 package app.obey.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
+import app.obey.R
 
-// Fallback scheme (Android 8-11): Material 3 tonal-spot roles for the brand oxblood seed (#8C3A2B),
-// the same scheme the web app builds by default. Android 12+ uses the wallpaper's dynamic colour instead.
+// "Letters": paper and ink with one accent, oxblood. The same values the web app uses for its default accent
+// (apps/web/src/theme/tokens.ts). The wallpaper's dynamic colour is no longer used: paper and ink are the look.
 internal val LightColors: ColorScheme = lightColorScheme(
-    primary = Color(0xFF904B3E),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFFFDAD3),
-    onPrimaryContainer = Color(0xFF733428),
-    secondary = Color(0xFF775750),
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFFFDAD3),
-    onSecondaryContainer = Color(0xFF5D3F3A),
-    tertiary = Color(0xFF6F5C2E),
-    onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFFFAE0A6),
-    onTertiaryContainer = Color(0xFF554519),
-    error = Color(0xFFBA1A1A),
-    onError = Color(0xFFFFFFFF),
-    errorContainer = Color(0xFFFFDAD6),
-    onErrorContainer = Color(0xFF93000A),
-    background = Color(0xFFFFF8F6),
-    onBackground = Color(0xFF231918),
-    surface = Color(0xFFFFF8F6),
-    onSurface = Color(0xFF231918),
-    surfaceVariant = Color(0xFFF5DDD9),
-    onSurfaceVariant = Color(0xFF534340),
-    outline = Color(0xFF85736F),
-    outlineVariant = Color(0xFFD8C2BD),
-    inverseSurface = Color(0xFF392E2C),
-    inverseOnSurface = Color(0xFFFFEDE9),
-    inversePrimary = Color(0xFFFFB4A6),
-    surfaceContainerLowest = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFFFF0EE),
-    surfaceContainer = Color(0xFFFCEAE6),
-    surfaceContainerHigh = Color(0xFFF7E4E1),
-    surfaceContainerHighest = Color(0xFFF1DFDB),
+    primary = Color(0xFF8F3A2D),
+    onPrimary = Color(0xFFFBF8F3),
+    primaryContainer = Color(0xFFE8D8D0),
+    onPrimaryContainer = Color(0xFF682F26),
+    secondary = Color(0xFF58504A),
+    onSecondary = Color(0xFFF5F0E8),
+    secondaryContainer = Color(0xFFECE5D9),
+    onSecondaryContainer = Color(0xFF1F1B18),
+    tertiary = Color(0xFF4F6B4A),
+    onTertiary = Color(0xFFFBF8F3),
+    tertiaryContainer = Color(0xFFDEDDD2),
+    onTertiaryContainer = Color(0xFF3C4B36),
+    error = Color(0xFFA3322A),
+    onError = Color(0xFFFBF8F3),
+    errorContainer = Color(0xFFEAD7CF),
+    onErrorContainer = Color(0xFF752A24),
+    background = Color(0xFFF5F0E8),
+    onBackground = Color(0xFF1F1B18),
+    surface = Color(0xFFF5F0E8),
+    onSurface = Color(0xFF1F1B18),
+    surfaceVariant = Color(0xFFECE5D9),
+    onSurfaceVariant = Color(0xFF58504A),
+    outline = Color(0xFF8A8076),
+    outlineVariant = Color(0xFFE0D7CA),
+    inverseSurface = Color(0xFF1F1B18),
+    inverseOnSurface = Color(0xFFF5F0E8),
+    inversePrimary = Color(0xFFD27A66),
+    scrim = Color(0xFF000000),
+    surfaceTint = Color(0xFFF5F0E8),
+    surfaceBright = Color(0xFFFBF8F3),
+    surfaceDim = Color(0xFFEFE9E0),
+    surfaceContainerLowest = Color(0xFFFBF8F3),
+    surfaceContainerLow = Color(0xFFF8F4EE),
+    surfaceContainer = Color(0xFFF2ECE3),
+    surfaceContainerHigh = Color(0xFFECE5D9),
+    surfaceContainerHighest = Color(0xFFE4DDD1),
 )
 
 internal val DarkColors: ColorScheme = darkColorScheme(
-    primary = Color(0xFFFFB4A6),
-    onPrimary = Color(0xFF561E14),
-    primaryContainer = Color(0xFF733428),
-    onPrimaryContainer = Color(0xFFFFDAD3),
-    secondary = Color(0xFFE7BDB5),
-    onSecondary = Color(0xFF442A24),
-    secondaryContainer = Color(0xFF5D3F3A),
-    onSecondaryContainer = Color(0xFFFFDAD3),
-    tertiary = Color(0xFFDCC48C),
-    onTertiary = Color(0xFF3D2E04),
-    tertiaryContainer = Color(0xFF554519),
-    onTertiaryContainer = Color(0xFFFAE0A6),
-    error = Color(0xFFFFB4AB),
-    onError = Color(0xFF690005),
-    errorContainer = Color(0xFF93000A),
-    onErrorContainer = Color(0xFFFFDAD6),
-    background = Color(0xFF1A1110),
-    onBackground = Color(0xFFF1DFDB),
-    surface = Color(0xFF1A1110),
-    onSurface = Color(0xFFF1DFDB),
-    surfaceVariant = Color(0xFF534340),
-    onSurfaceVariant = Color(0xFFD8C2BD),
-    outline = Color(0xFFA08C89),
-    outlineVariant = Color(0xFF534340),
-    inverseSurface = Color(0xFFF1DFDB),
-    inverseOnSurface = Color(0xFF392E2C),
-    inversePrimary = Color(0xFF904B3E),
-    surfaceContainerLowest = Color(0xFF140C0B),
-    surfaceContainerLow = Color(0xFF231918),
-    surfaceContainer = Color(0xFF271D1C),
-    surfaceContainerHigh = Color(0xFF322826),
-    surfaceContainerHighest = Color(0xFF3D3230),
+    primary = Color(0xFFD27A66),
+    onPrimary = Color(0xFF17130F),
+    primaryContainer = Color(0xFF3C2820),
+    onPrimaryContainer = Color(0xFFE0AD9D),
+    secondary = Color(0xFFC4B9AC),
+    onSecondary = Color(0xFF17130F),
+    secondaryContainer = Color(0xFF221D18),
+    onSecondaryContainer = Color(0xFFF2EBE1),
+    tertiary = Color(0xFF9DB894),
+    onTertiary = Color(0xFF17130F),
+    tertiaryContainer = Color(0xFF32342A),
+    onTertiaryContainer = Color(0xFFC3CFB7),
+    error = Color(0xFFEF8E7A),
+    onError = Color(0xFF17130F),
+    errorContainer = Color(0xFF422C24),
+    onErrorContainer = Color(0xFFF0B8A8),
+    background = Color(0xFF17130F),
+    onBackground = Color(0xFFF2EBE1),
+    surface = Color(0xFF17130F),
+    onSurface = Color(0xFFF2EBE1),
+    surfaceVariant = Color(0xFF221D18),
+    onSurfaceVariant = Color(0xFFC4B9AC),
+    outline = Color(0xFF8A7F74),
+    outlineVariant = Color(0xFF2F2822),
+    inverseSurface = Color(0xFFF2EBE1),
+    inverseOnSurface = Color(0xFF17130F),
+    inversePrimary = Color(0xFF8F3A2D),
+    scrim = Color(0xFF000000),
+    surfaceTint = Color(0xFF17130F),
+    surfaceBright = Color(0xFF2A241E),
+    surfaceDim = Color(0xFF110E0B),
+    surfaceContainerLowest = Color(0xFF110E0B),
+    surfaceContainerLow = Color(0xFF1B1712),
+    surfaceContainer = Color(0xFF1E1914),
+    surfaceContainerHigh = Color(0xFF221D18),
+    surfaceContainerHighest = Color(0xFF2E2924),
+)
+
+/** Controls and small text. */
+val Geist = FontFamily(
+    Font(R.font.geist_regular, FontWeight.Normal),
+    Font(R.font.geist_medium, FontWeight.Medium),
+    Font(R.font.geist_semibold, FontWeight.SemiBold),
+    Font(R.font.geist_semibold, FontWeight.Bold),
+)
+
+/** Human words: headings, the partner's words, journal text. */
+val InstrumentSerif = FontFamily(
+    Font(R.font.instrument_serif, FontWeight.Normal),
+    Font(R.font.instrument_serif_italic, FontWeight.Normal, FontStyle.Italic),
+)
+
+private val base = Typography()
+
+private fun TextStyle.serif(size: Int, line: Int) =
+    copy(fontFamily = InstrumentSerif, fontWeight = FontWeight.Normal, fontSize = size.sp, lineHeight = line.sp, letterSpacing = (-0.01).em)
+
+private fun TextStyle.sans() = copy(fontFamily = Geist)
+
+/** Large type is set in the serif, everything from titleMedium down in Geist. */
+val LettersTypography = Typography(
+    displayLarge = base.displayLarge.serif(57, 60),
+    displayMedium = base.displayMedium.serif(45, 48),
+    displaySmall = base.displaySmall.serif(38, 42),
+    headlineLarge = base.headlineLarge.serif(34, 38),
+    headlineMedium = base.headlineMedium.serif(30, 34),
+    headlineSmall = base.headlineSmall.serif(26, 30),
+    titleLarge = base.titleLarge.serif(24, 28),
+    titleMedium = base.titleMedium.sans(),
+    titleSmall = base.titleSmall.sans(),
+    bodyLarge = base.bodyLarge.sans(),
+    bodyMedium = base.bodyMedium.sans(),
+    bodySmall = base.bodySmall.sans(),
+    labelLarge = base.labelLarge.sans(),
+    labelMedium = base.labelMedium.sans(),
+    labelSmall = base.labelSmall.sans(),
+)
+
+/** Small, quiet corners. */
+val LettersShapes = Shapes(
+    extraSmall = RoundedCornerShape(3.dp),
+    small = RoundedCornerShape(6.dp),
+    medium = RoundedCornerShape(10.dp),
+    large = RoundedCornerShape(12.dp),
+    extraLarge = RoundedCornerShape(16.dp),
 )
 
 @Composable
 fun ObeyTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val colors = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColors
-        else -> LightColors
-    }
-    MaterialTheme(colorScheme = colors, typography = Typography(), content = content)
+    MaterialTheme(colorScheme = if (darkTheme) DarkColors else LightColors, typography = LettersTypography, shapes = LettersShapes, content = content)
 }

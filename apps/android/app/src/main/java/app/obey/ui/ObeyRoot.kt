@@ -2,7 +2,6 @@ package app.obey.ui
 
 import android.Manifest
 import android.os.Build
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -77,21 +76,24 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.NavigationDrawerItem
-import androidx.compose.material3.NavigationDrawerItemDefaults
-import androidx.compose.material3.rememberDrawerState
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
-import kotlinx.coroutines.launch
-import app.obey.ui.common.LocalOpenMenu
 import app.obey.ui.common.LocalSafeWord
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.AddTask
+import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.unit.sp
+import app.obey.ui.common.LocalNavLead
 import app.obey.api.SafeCall
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -190,47 +192,66 @@ private fun SessionError(message: String, onRetry: () -> Unit, settingsVm: Setti
     }
 }
 
-private data class TopLevel(
+internal data class TopLevel(
     val route: Any,
     val label: String,
     val icon: ImageVector,
+    val hint: String? = null,
     val matches: (NavDestination) -> Boolean,
 )
 
-private val writingRoutes = setOf<Any>(NotesRoute, JournalRoute)
+/** The three tabs. Week is the calendar; Us lists everything else. */
+private val TodayTab = TopLevel(TodayRoute, "Today", Icons.Outlined.Today) { it.hasRoute<TodayRoute>() }
+private val WeekTab = TopLevel(UpcomingRoute, "Week", Icons.Outlined.CalendarMonth) { it.hasRoute<UpcomingRoute>() }
+private val UsTab = TopLevel(UsRoute, "Us", Icons.Outlined.FavoriteBorder) { it.hasRoute<UsRoute>() }
 
-/** The destinations this dynamic uses, in bar order. Rewards and Consequences are separate pages, as on the web. */
-private fun topLevels(f: Features) = listOfNotNull(
-    TopLevel(TodayRoute, "Today", Icons.Outlined.Today) { it.hasRoute<TodayRoute>() },
-    TopLevel(UpcomingRoute, "Calendar", Icons.Outlined.CalendarMonth) { it.hasRoute<UpcomingRoute>() },
-    if (f.points) TopLevel(RewardsRoute, "Rewards", Icons.Outlined.Redeem) { it.hasRoute<RewardsRoute>() } else null,
-    if (f.rules) TopLevel(RulesRoute, "Rules", Icons.Outlined.Gavel) { it.hasRoute<RulesRoute>() } else null,
-    if (f.protocols) TopLevel(ProtocolsRoute, "Protocols", Icons.Outlined.FactCheck) { it.hasRoute<ProtocolsRoute>() } else null,
-    if (f.consequences) TopLevel(ConsequencesRoute, "Consequences", Icons.Outlined.Bolt) { it.hasRoute<ConsequencesRoute>() } else null,
-    TopLevel(NotesRoute, "Notes", Icons.Outlined.StickyNote2) { it.hasRoute<NotesRoute>() },
-    if (f.journal) TopLevel(JournalRoute, "Journal", Icons.Outlined.AutoStories) { it.hasRoute<JournalRoute>() } else null,
-    if (f.stats) TopLevel(StatsRoute(), "Stats", Icons.Outlined.Insights) { it.hasRoute<StatsRoute>() } else null,
-    if (f.review) TopLevel(MonthReviewRoute, "Monthly review", Icons.Outlined.Flag) { it.hasRoute<MonthReviewRoute>() } else null,
-    if (f.agreement) TopLevel(AgreementRoute(), "Agreement", Icons.Outlined.Handshake) { it.hasRoute<AgreementRoute>() } else null,
-    if (f.limits) TopLevel(LimitsRoute, "Limits", Icons.Outlined.Tune) { it.hasRoute<LimitsRoute>() } else null,
-    if (f.scenes) TopLevel(ScenesRoute, "Scenes", Icons.Outlined.AutoAwesome) { it.hasRoute<ScenesRoute>() } else null,
+/** Everything the tabs don't cover, in the order Us lists it (the same as the web). Protocols are a tab inside Rules. */
+private fun sections(f: Features) = listOfNotNull(
+    if (f.points) TopLevel(RewardsRoute, "Rewards", Icons.Outlined.Redeem, "Points and what they buy") { it.hasRoute<RewardsRoute>() } else null,
+    if (f.consequences) TopLevel(ConsequencesRoute, "Consequences", Icons.Outlined.Bolt, "What's owed, and the list") { it.hasRoute<ConsequencesRoute>() } else null,
+    when {
+        f.rules -> TopLevel(RulesRoute, "Rules", Icons.Outlined.Gavel, if (f.protocols) "Rules and protocols" else null) { it.hasRoute<RulesRoute>() || it.hasRoute<ProtocolsRoute>() }
+        // With rules off, Protocols take Rules' place.
+        f.protocols -> TopLevel(ProtocolsRoute, "Protocols", Icons.Outlined.FactCheck, "How things are done") { it.hasRoute<ProtocolsRoute>() }
+        else -> null
+    },
+    TopLevel(NotesRoute, "Notes", Icons.Outlined.StickyNote2, "Shared and private notes") { it.hasRoute<NotesRoute>() },
+    if (f.journal) TopLevel(JournalRoute, "Journal", Icons.Outlined.AutoStories, "Entries and replies") { it.hasRoute<JournalRoute>() } else null,
+    if (f.limits) TopLevel(LimitsRoute, "Limits", Icons.Outlined.Tune, "Yes, no and maybe") { it.hasRoute<LimitsRoute>() } else null,
+    if (f.agreement) TopLevel(AgreementRoute(), "Agreement", Icons.Outlined.Handshake, "What you've agreed to") { it.hasRoute<AgreementRoute>() } else null,
+    if (f.scenes) TopLevel(ScenesRoute, "Scenes", Icons.Outlined.AutoAwesome, "Scenes and aftercare") { it.hasRoute<ScenesRoute>() } else null,
     if (f.chastity) TopLevel(ChastityRoute, "Chastity", Icons.Outlined.Lock) { it.hasRoute<ChastityRoute>() } else null,
-    if (f.location) TopLevel(LocationRoute, "Location", Icons.Outlined.LocationOn) { it.hasRoute<LocationRoute>() } else null,
-    // Tasks open from Today and Calendar; the full list is for managing them, so it sits in the menu.
-    TopLevel(TaskListRoute, "All tasks", Icons.Outlined.Checklist) { it.hasRoute<TaskListRoute>() },
-    TopLevel(KitsRoute, "Kits", Icons.Outlined.Widgets) { it.hasRoute<KitsRoute>() },
+    if (f.location) TopLevel(LocationRoute, "Location", Icons.Outlined.LocationOn, "Places and curfew") { it.hasRoute<LocationRoute>() } else null,
+    if (f.stats) TopLevel(StatsRoute(), "Stats", Icons.Outlined.Insights, "How the weeks are going") { it.hasRoute<StatsRoute>() } else null,
+    if (f.review) TopLevel(MonthReviewRoute, "Monthly review", Icons.Outlined.Flag, "Look back together") { it.hasRoute<MonthReviewRoute>() } else null,
+    TopLevel(KitsRoute, "Kits", Icons.Outlined.Widgets, "Sets of tasks, rules and rewards") { it.hasRoute<KitsRoute>() },
+    TopLevel(TaskListRoute, "All tasks", Icons.Outlined.Checklist, "Every task, paused ones too") { it.hasRoute<TaskListRoute>() },
 )
 
-/** Always in the menu, however many sections are switched off. Same list as the web's. */
-private val menuOnly: (Any) -> Boolean = { r ->
-    r is StatsRoute || r == MonthReviewRoute || r is AgreementRoute || r == LimitsRoute || r == ScenesRoute || r == ChastityRoute || r == LocationRoute || r == KitsRoute
-}
+/** What + can start. Each opens where it's made. */
+private data class NewItem(val label: String, val hint: String, val icon: ImageVector, val go: () -> Unit)
 
-/** The phone's bar holds Today, Calendar, the next section that's on, and the first writing space; the rest go in the menu. */
-private fun splitBar(all: List<TopLevel>): Pair<List<TopLevel>, List<TopLevel>> {
-    val writing = all.firstOrNull { it.route in writingRoutes }
-    val bar = all.filter { it.route !in writingRoutes && !menuOnly(it.route) }.take(3) + listOfNotNull(writing)
-    return bar to all.filter { it !in bar }
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NewSheet(items: List<NewItem>, onDismiss: () -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surface) {
+        Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 24.dp)) {
+            Text("New", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 8.dp))
+            items.forEach { item ->
+                Row(
+                    Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable { onDismiss(); item.go() }.padding(vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(item.icon, null)
+                    Column {
+                        Text(item.label, style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 24.sp))
+                        Text(item.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -240,16 +261,19 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
     val entry by nav.currentBackStackEntryAsState()
     val destination = entry?.destination
     val features = LocalFeatures.current
-    val all = remember(features) { topLevels(features) }
-    val (bar, overflow) = remember(all) { splitBar(all) }
-    val isTopLevel = destination != null && all.any { t -> destination.hierarchy.any(t.matches) }
+    val sections = remember(features) { sections(features) }
+    val tabs = listOf(TodayTab, WeekTab, UsTab)
+    val onTab = destination != null && tabs.any { t -> destination.hierarchy.any(t.matches) }
+    val onSection = destination != null && sections.any { t -> destination.hierarchy.any(t.matches) }
+    // The tab bar stays on the tabs and the pages Us lists; anything opened from them has its own back arrow.
+    val showBar = onTab || onSection
     val wide = LocalConfiguration.current.screenWidthDp >= 600
-    // A tab the dynamic just switched off (say, from Settings) shouldn't stay reachable underneath.
-    val switchedOff = destination != null && !isTopLevel && destination.hierarchy.any {
-        it.hasRoute<RewardsRoute>() || it.hasRoute<ConsequencesRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<ProtocolsRoute>() || it.hasRoute<JournalRoute>() || it.hasRoute<StatsRoute>() || it.hasRoute<MonthReviewRoute>() || it.hasRoute<AgreementRoute>() || it.hasRoute<ScenesRoute>() || it.hasRoute<ChastityRoute>() || it.hasRoute<LimitsRoute>() ||
-            // Limits' editor isn't top-level either.
+    // A page the dynamic just switched off (say, from Settings) shouldn't stay reachable underneath.
+    val switchedOff = destination != null && !onTab && !onSection && destination.hierarchy.any {
+        it.hasRoute<RewardsRoute>() || it.hasRoute<ConsequencesRoute>() || it.hasRoute<RulesRoute>() || it.hasRoute<ProtocolsRoute>() || it.hasRoute<JournalRoute>() || it.hasRoute<StatsRoute>() || it.hasRoute<MonthReviewRoute>() || it.hasRoute<AgreementRoute>() || it.hasRoute<ScenesRoute>() || it.hasRoute<ChastityRoute>() || it.hasRoute<LimitsRoute>() || it.hasRoute<LocationRoute>() ||
+            // Limits' editor isn't listed either.
             (!features.limits && it.hasRoute<LimitsEditRoute>()) ||
-            // A scene and the aftercare plans aren't top-level, so they only go when scenes are off.
+            // A scene and the aftercare plans aren't listed, so they only go when scenes are off.
             (!features.scenes && (it.hasRoute<SceneRoute>() || it.hasRoute<AftercareRoute>()))
     }
     LaunchedEffect(switchedOff) { if (switchedOff) nav.navigate(TodayRoute) { popUpTo(nav.graph.findStartDestination().id) } }
@@ -278,8 +302,12 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
         launchSingleTop = true
         restoreState = true
     }
+    // Back to the Us list itself, not to whichever page under it was open last (as tapping a tab would restore).
+    fun backToUs() {
+        if (!nav.popBackStack<UsRoute>(inclusive = false)) nav.navigate(UsRoute) { popUpTo(nav.graph.findStartDestination().id); launchSingleTop = true }
+    }
+    fun tab(t: TopLevel) = if (t === UsTab && onSection) backToUs() else go(t.route)
     fun selected(t: TopLevel) = destination?.hierarchy?.any(t.matches) == true
-    // Joining and starting another dynamic live on Your dynamic.
     val activeCall by safeVm.active.collectAsStateWithLifecycle()
     var safeOpen by remember { mutableStateOf(false) }
     val openSafe = remember { { safeOpen = true } }
@@ -290,69 +318,71 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
     LaunchedEffect(safeError) {
         safeError?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show(); safeVm.messageShown() }
     }
+    // Joining and starting another dynamic live on Your dynamic.
     val switcher = SwitcherActions(session, settingsVm::loadAvatar, { settingsVm.selectRelationship(it) }, { nav.navigate(DynamicRoute()) }, { nav.navigate(DynamicRoute()) })
 
-    if (wide) {
-        Row(Modifier.fillMaxSize()) {
-            NavigationRail(header = { DynamicSwitcherCompact(switcher) }) {
-                all.forEach { t ->
-                    NavigationRailItem(
-                        selected = selected(t),
-                        onClick = { go(t.route) },
-                        icon = { Icon(t.icon, null) },
-                        label = { Text(t.label) },
-                    )
-                }
-                // Your dynamic and Settings close the list, as in the phone's menu.
-                NavigationRailItem(
-                    selected = destination?.hasRoute<DynamicRoute>() == true,
-                    onClick = { nav.navigate(DynamicRoute()) { launchSingleTop = true } },
-                    icon = { Icon(Icons.Outlined.FavoriteBorder, null) },
-                    label = { Text("Your dynamic") },
-                )
-                NavigationRailItem(
-                    selected = destination?.hasRoute<SettingsRoute>() == true,
-                    onClick = { nav.navigate(SettingsRoute) { launchSingleTop = true } },
-                    icon = { Icon(Icons.Outlined.Settings, null) },
-                    label = { Text("Settings") },
-                )
-            }
-            CompositionLocalProvider(LocalSafeWord provides openSafe.takeIf { safeVm.canCall() }) {
-                Box(Modifier.weight(1f)) { SafeCallFrame(safeVm, activeCall) { ObeyNavHost(nav) } }
-            }
+    // What + can start, for this person in this dynamic.
+    val manage = session.canManage
+    val newItems = buildList {
+        if (session.readOnly) return@buildList
+        if (manage) add(NewItem("Task", "Something to do, once or on a schedule", Icons.Outlined.AddTask) { nav.navigate(TaskEditorRoute()) })
+        add(NewItem("Plan", "Something on the calendar", Icons.Outlined.Event) { go(UpcomingRoute) })
+        if (features.journal) add(NewItem("Journal entry", "Write tonight's entry", Icons.Outlined.AutoStories) { nav.navigate(NoteEditorRoute(journal = true)) })
+        add(NewItem("Note", "Shared or just for you", Icons.Outlined.StickyNote2) { nav.navigate(NoteEditorRoute()) })
+        if (features.rules || features.protocols) add(
+            if (manage) NewItem("Broken rule", "Log it, with a consequence if you like", Icons.Outlined.Gavel) { nav.navigate(RuleLogRoute) }
+            else NewItem("Own up to a rule", "Tell them before they find out", Icons.Outlined.Gavel) { nav.navigate(RuleLogRoute) },
+        )
+        if (features.consequences && manage) add(NewItem("Consequence", "Hand one out now", Icons.Outlined.Bolt) { go(ConsequencesRoute) })
+        if (features.scenes && !session.solo) add(NewItem("Scene", "Log it, then each of you writes your side", Icons.Outlined.AutoAwesome) { go(ScenesRoute) })
+        if (manage) add(NewItem("From a kit", "Add a set of tasks, rules and rewards", Icons.Outlined.Widgets) { go(KitsRoute) })
+    }
+    var newOpen by remember { mutableStateOf(false) }
+    if (newOpen) NewSheet(newItems) { newOpen = false }
+
+    val usItems = sections.map { t -> UsItem(t.label, t.hint, t.icon) { nav.navigate(t.route) { launchSingleTop = true } } } +
+        UsItem("Your dynamic", "People, dates, invites, how it works", Icons.Outlined.FavoriteBorder) { nav.navigate(DynamicRoute()) }
+
+    // Phones: the switcher leads Today, Week and Us; the pages Us lists lead back to it. Tablets have the rail.
+    val chipLead: @Composable () -> Unit = { DynamicSwitcherChip(switcher) }
+    val backLead: @Composable () -> Unit = { IconButton(onClick = { backToUs() }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Us") } }
+    val lead: (@Composable () -> Unit)? = if (wide) null else if (onTab) chipLead else if (onSection) backLead else null
+    val host: @Composable () -> Unit = {
+        SafeCallFrame(safeVm, activeCall) {
+            ObeyNavHost(nav, usItems, onInvite = if (session.solo) ({ nav.navigate(DynamicRoute(invite = true)) }) else null)
         }
-    } else {
-        val drawer = rememberDrawerState(DrawerValue.Closed)
-        val scope = rememberCoroutineScope()
-        val openMenu = remember { { scope.launch { drawer.open() }; Unit } }
-        LaunchedEffect(destination) { drawer.close() }
-        BackHandler(drawer.isOpen) { scope.launch { drawer.close() } }
-        ModalNavigationDrawer(
-            drawerState = drawer,
-            // Swiping open would fight horizontal gestures like the calendar's; the header button opens it.
-            gesturesEnabled = drawer.isOpen,
-            drawerContent = {
-                ModalDrawerSheet(Modifier.width(300.dp), drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)) {
-                    Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 12.dp)) {
-                        DynamicSwitcher(switcher) { scope.launch { drawer.close() } }
-                        Spacer(Modifier.height(8.dp))
-                        overflow.forEach { t -> MenuItem(t.label, t.icon, selected(t)) { go(t.route) } }
-                        HorizontalDivider(Modifier.padding(horizontal = 28.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                        MenuItem("Your dynamic", Icons.Outlined.FavoriteBorder, destination?.hasRoute<DynamicRoute>() == true) { nav.navigate(DynamicRoute()) }
-                        MenuItem("Settings", Icons.Outlined.Settings, destination?.hasRoute<SettingsRoute>() == true) { nav.navigate(SettingsRoute) }
-                        if (session.solo) {
-                            MenuItem("Invite a partner", Icons.Outlined.PersonAdd, false, tint = MaterialTheme.colorScheme.primary) { nav.navigate(DynamicRoute(invite = true)) }
-                        }
+    }
+
+    CompositionLocalProvider(LocalNavLead provides lead, LocalSafeWord provides openSafe.takeIf { safeVm.canCall() }) {
+        if (wide) {
+            Row(Modifier.fillMaxSize()) {
+                NavigationRail(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    header = {
+                        DynamicSwitcherCompact(switcher)
+                        if (newItems.isNotEmpty()) NewButton { newOpen = true }
+                    },
+                ) {
+                    tabs.forEach { t ->
+                        NavigationRailItem(
+                            selected = selected(t) || (t === UsTab && onSection),
+                            onClick = { tab(t) },
+                            icon = { Icon(t.icon, null) },
+                            label = { Text(t.label) },
+                        )
                     }
                 }
-            },
-        ) {
-            CompositionLocalProvider(LocalOpenMenu provides openMenu, LocalSafeWord provides openSafe.takeIf { safeVm.canCall() }) {
-                Scaffold(bottomBar = { if (isTopLevel) FloatingBar(bar, ::selected) { go(it.route) } }) { padding ->
-                    // Only the bottom bar's space is reserved here; each screen's own Scaffold handles the top insets.
-                    val bottomOnly = androidx.compose.foundation.layout.PaddingValues(bottom = padding.calculateBottomPadding())
-                    Box(Modifier.padding(bottomOnly).consumeWindowInsets(bottomOnly)) { SafeCallFrame(safeVm, activeCall) { ObeyNavHost(nav) } }
-                }
+                Box(Modifier.weight(1f)) { host() }
+            }
+        } else {
+            Scaffold(
+                bottomBar = {
+                    if (showBar) TabBar(tabs, { t -> selected(t) || (t === UsTab && onSection) }, { tab(it) }, if (newItems.isNotEmpty()) ({ newOpen = true }) else null)
+                },
+            ) { padding ->
+                // Only the bar's space is reserved here; each screen's own Scaffold handles the top insets.
+                val bottomOnly = androidx.compose.foundation.layout.PaddingValues(bottom = padding.calculateBottomPadding())
+                Box(Modifier.padding(bottomOnly).consumeWindowInsets(bottomOnly)) { host() }
             }
         }
     }
@@ -367,52 +397,48 @@ private fun SafeCallFrame(vm: SafeCallViewModel, call: SafeCall?, content: @Comp
     }
 }
 
+/** The round ink + that starts anything new. */
 @Composable
-private fun MenuItem(label: String, icon: ImageVector, selected: Boolean, tint: androidx.compose.ui.graphics.Color? = null, onClick: () -> Unit) {
-    NavigationDrawerItem(
-        label = { Text(label) },
-        icon = { Icon(icon, null) },
-        selected = selected,
-        onClick = onClick,
-        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
-        colors = if (tint != null) NavigationDrawerItemDefaults.colors(unselectedIconColor = tint, unselectedTextColor = tint) else NavigationDrawerItemDefaults.colors(),
-    )
+private fun NewButton(onClick: () -> Unit) {
+    Surface(onClick = onClick, shape = CircleShape, color = MaterialTheme.colorScheme.onSurface, contentColor = MaterialTheme.colorScheme.surface, modifier = Modifier.size(52.dp)) {
+        Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Add, "New", Modifier.size(28.dp)) }
+    }
 }
 
-/** The phone's floating row of tiles: the current page fills its tile. */
+/** The phone's tab bar: Today, Week and Us as words in the serif, the current one in ink under a diamond, then +. */
 @Composable
-private fun FloatingBar(items: List<TopLevel>, selected: (TopLevel) -> Boolean, onClick: (TopLevel) -> Unit) {
-    Surface(
-        Modifier.windowInsetsPadding(WindowInsets.navigationBars).padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 16.dp).fillMaxWidth().height(76.dp),
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLowest,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
-        shadowElevation = 3.dp,
-    ) {
-        Row(Modifier.selectableGroup().padding(6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            items.forEach { t ->
-                val on = selected(t)
-                val color = if (on) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(if (on) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
-                        .selectable(selected = on, role = Role.Tab, onClick = { onClick(t) }),
-                    verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Icon(t.icon, null, tint = color)
-                    Text(t.label, style = MaterialTheme.typography.labelMedium, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+private fun TabBar(tabs: List<TopLevel>, selected: (TopLevel) -> Boolean, onClick: (TopLevel) -> Unit, onNew: (() -> Unit)?) {
+    Column(Modifier.background(MaterialTheme.colorScheme.surface).windowInsetsPadding(WindowInsets.navigationBars)) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Row(Modifier.fillMaxWidth().height(68.dp).padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Grouped on the left, the way the mockup has them, with + on its own at the right.
+            Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(22.dp)) {
+                tabs.forEach { t ->
+                    val on = selected(t)
+                    Box(
+                        Modifier.height(56.dp).clip(MaterialTheme.shapes.small).selectable(selected = on, role = Role.Tab, onClick = { onClick(t) }).padding(horizontal = 4.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (on) Box(Modifier.align(Alignment.TopCenter).padding(top = 4.dp).size(6.dp).rotate(45f).background(MaterialTheme.colorScheme.primary))
+                        Text(
+                            t.label,
+                            style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp),
+                            color = if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,
+                            maxLines = 1,
+                        )
+                    }
                 }
+            }
+            Spacer(Modifier.weight(1f))
+            if (onNew != null) {
+                NewButton(onNew)
             }
         }
     }
 }
 
 @Composable
-private fun ObeyNavHost(nav: NavHostController) {
+private fun ObeyNavHost(nav: NavHostController, usItems: List<UsItem>, onInvite: (() -> Unit)?) {
     val settings = { nav.navigate(SettingsRoute) }
     val openTask = { id: String -> nav.navigate(TaskDetailRoute(id)) }
     NavHost(navController = nav, startDestination = TodayRoute) {
@@ -440,10 +466,17 @@ private fun ObeyNavHost(nav: NavHostController) {
                 onOpenSettings = settings,
             )
         }
+        composable<UsRoute> { UsScreen(usItems, onSettings = settings, onInvite = onInvite) }
         composable<RewardsRoute> { RewardsScreen(onOpenSettings = settings) }
         composable<ConsequencesRoute> { RewardsScreen(onOpenSettings = settings, consequences = true) }
         composable<RulesRoute> {
-            RulesScreen(onOpenSettings = settings, onOpenProtocol = { nav.navigate(ProtocolEditorRoute(protocolId = it)) }, onOpenLog = { nav.navigate(RuleLogRoute) })
+            RulesScreen(
+                onOpenSettings = settings,
+                onOpenProtocol = { nav.navigate(ProtocolEditorRoute(protocolId = it)) },
+                onOpenLog = { nav.navigate(RuleLogRoute) },
+                // Protocols are a tab inside Rules: switching replaces the page rather than stacking it.
+                onProtocols = if (LocalFeatures.current.protocols) ({ nav.navigate(ProtocolsRoute) { popUpTo<RulesRoute> { inclusive = true } } }) else null,
+            )
         }
         composable<RuleLogRoute> { RuleLogScreen(onBack = { nav.popBackStack() }, onOpenTask = openTask) }
         composable<ProtocolsRoute> {
@@ -452,6 +485,7 @@ private fun ObeyNavHost(nav: NavHostController) {
                 onNew = { nav.navigate(ProtocolEditorRoute()) },
                 onOpenSettings = settings,
                 onOpenLog = { nav.navigate(RuleLogRoute) },
+                onRules = if (LocalFeatures.current.rules) ({ nav.navigate(RulesRoute) { popUpTo<ProtocolsRoute> { inclusive = true } } }) else null,
             )
         }
         composable<ProtocolEditorRoute> { ProtocolEditorScreen(onDone = { nav.popBackStack() }) }
