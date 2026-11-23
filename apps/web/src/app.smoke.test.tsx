@@ -119,6 +119,6 @@ describe("app smoke test (dev auth, mocked API)", () => {
     await visit("/rules", "Ask before sweets");
     await visit("/notes", "Aftercare");
     await visit("/notes/n1", "blanket");
-    await visit("/settings", "Seed color");
+    await visit("/settings", "Accent");
   });
 });

@@ -14,7 +14,7 @@ import { AppLockSetting } from "../components/AppLock";
 import { DeleteAccount } from "../components/DeleteAccount";
 import { type PushState, pushState, registerPush } from "../push";
 import { type ThemeMode, useTheme } from "../theme/ThemeProvider";
-import { SEED_PRESETS } from "../theme/tokens";
+import { ACCENTS } from "../theme/tokens";
 import { Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -154,27 +154,24 @@ export function SettingsPage() {
             />
           </div>
           <div>
-            <div className="mb-2 text-label-large text-on-surface-variant">Seed color</div>
-            <div className="flex flex-wrap items-center gap-2">
-              {SEED_PRESETS.map((c) => (
+            <div className="mb-2 text-label-large text-on-surface-variant">Accent</div>
+            <div className="flex flex-wrap items-center gap-3">
+              {ACCENTS.map((a) => (
                 <button
-                  key={c}
+                  key={a.id}
                   type="button"
-                  aria-label={`Use ${c}`}
-                  aria-pressed={theme.seed === c}
-                  onClick={() => theme.setSeed(c)}
-                  className={cx("flex size-10 items-center justify-center rounded-full", theme.seed === c && "ring-2 ring-on-surface ring-offset-2 ring-offset-surface")}
-                  style={{ background: c }}
+                  aria-label={a.name}
+                  title={a.name}
+                  aria-pressed={theme.seed === a.light}
+                  onClick={() => theme.setSeed(a.light)}
+                  className={cx("flex size-9 items-center justify-center rounded-full", theme.seed === a.light && "ring-2 ring-on-surface ring-offset-2 ring-offset-surface")}
+                  style={{ background: a.light }}
                 >
-                  {theme.seed === c && <Icon name="check" className="text-white" size={20} />}
+                  {theme.seed === a.light && <Icon name="check" className="text-white" size={18} />}
                 </button>
               ))}
-              <label className="state-layer flex h-10 cursor-pointer items-center gap-2 rounded-full border border-outline px-3 text-label-large text-on-surface">
-                <input type="color" value={theme.seed} onChange={(e) => theme.setSeed(e.target.value)} className="size-6 cursor-pointer rounded-full border-0 bg-transparent p-0" />
-                Custom
-              </label>
             </div>
-            <p className="mt-2 text-body-small text-on-surface-variant">The whole palette, light and dark, is generated from this color (Material 3 tonal spot).</p>
+            <p className="mt-2 text-body-small text-on-surface-variant">Paper and ink stay the same. The accent marks what needs you.</p>
           </div>
         </div>
       </Section>

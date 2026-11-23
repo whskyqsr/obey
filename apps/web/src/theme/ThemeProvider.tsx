@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { storage } from "../lib/storage";
-import { DEFAULT_SEED, isHexColor, schemeTokens, themeCss } from "./tokens";
+import { DEFAULT_SEED, accentFor, isHexColor, schemeTokens, themeCss } from "./tokens";
 
 export type ThemeMode = "system" | "light" | "dark";
 
@@ -18,7 +18,7 @@ const MODE_KEY = "obey.theme.mode";
 
 function initialSeed(): string {
   const stored = storage.get(SEED_KEY);
-  return stored && isHexColor(stored) ? stored : DEFAULT_SEED;
+  return stored && isHexColor(stored) ? accentFor(stored).light : DEFAULT_SEED;
 }
 
 function initialMode(): ThemeMode {
@@ -62,8 +62,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       mode,
       setSeed(next) {
         if (!isHexColor(next)) return;
-        storage.set(SEED_KEY, next);
-        setSeedState(next);
+        const accent = accentFor(next).light;
+        storage.set(SEED_KEY, accent);
+        setSeedState(accent);
       },
       setMode(next) {
         storage.set(MODE_KEY, next);
