@@ -151,16 +151,14 @@ fun UpcomingScreen(
                         plan = null to day
                     }) { Icon(Icons.Outlined.EditCalendar, "New plan") }
                     IconButton(onClick = onAllTasks) { Icon(Icons.AutoMirrored.Outlined.List, "All tasks") }
+                    if (canManage) {
+                        // Like a new calendar event: on the picked day in month view.
+                        val day = if (view == CalendarView.Month && !selected.isBefore(today)) selected else null
+                        IconButton(onClick = { onNewTask(day) }) { Icon(Icons.Outlined.Add, "New task") }
+                    }
                     SafeWordAction()
                 },
             )
-        },
-        floatingActionButton = {
-            if (canManage) {
-                // Like a new calendar event: on the picked day in month view.
-                val day = if (view == CalendarView.Month && !selected.isBefore(today)) selected else null
-                FloatingActionButton(onClick = { onNewTask(day) }) { Icon(Icons.Outlined.Add, "New task") }
-            }
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->

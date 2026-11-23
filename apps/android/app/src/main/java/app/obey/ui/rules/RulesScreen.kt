@@ -31,6 +31,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -136,18 +137,16 @@ fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, on
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 navigationIcon = { MenuButton() },
                 // Protocols are a tab inside Rules.
                 title = { app.obey.ui.common.PairedTitle("Rules", if (onProtocols != null) "Protocols" else null) { onProtocols?.invoke() } },
                 actions = {
                     IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.AssignmentLate, "Broken rules") }
+                    if (canManage) IconButton(onClick = { editing = Editing(null) }) { Icon(Icons.Outlined.Add, "New rule") }
                     SafeWordAction()
                 },
             )
-        },
-        floatingActionButton = {
-            if (canManage) FloatingActionButton(onClick = { editing = Editing(null) }) { Icon(Icons.Outlined.Add, "New rule") }
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->

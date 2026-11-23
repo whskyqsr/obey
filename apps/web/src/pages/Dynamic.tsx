@@ -192,7 +192,7 @@ export function DynamicPage() {
 
   return (
     <div className="flex flex-col pb-10">
-      <SubHeader title="Your dynamic" onBack={back} />
+      <SubHeader title="Your dynamic" back="Us" onBack={back} />
       <div className="mx-auto w-full max-w-2xl px-4 md:px-6">
         <DynamicHero
           className="py-4"

@@ -42,7 +42,7 @@ export function RuleLogPage() {
 
   return (
     <>
-      <SubHeader title="Broken rules" onBack={back} />
+      <SubHeader title="Broken rules" back="Rules" onBack={back} />
       {!!log.data?.length && <p className="px-4 pb-3 text-body-medium text-on-surface-variant md:px-6">{log.data.length} logged</p>}
       {people.length > 1 && (
         <div className="flex gap-2 overflow-x-auto px-4 pb-4 md:px-6">

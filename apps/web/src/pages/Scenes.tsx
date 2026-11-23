@@ -516,7 +516,7 @@ export function AftercarePage() {
   const list = [...(plans.data ?? [])].sort((a, b) => Number(a.userId === me.user.id) - Number(b.userId === me.user.id));
   return (
     <div className="flex flex-col">
-      <SubHeader title="Aftercare" onBack={back} />
+      <SubHeader title="Aftercare" back="Scenes" onBack={back} />
       <div className="flex flex-col gap-3 px-4 pb-10 md:px-6">
         <p className="text-body-medium text-on-surface-variant">What each of you needs afterwards. It's shown to the others when a scene is logged.</p>
         {plans.isLoading && <Loading />}

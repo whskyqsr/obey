@@ -49,6 +49,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
@@ -64,6 +65,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import app.obey.ui.common.BackLink
 import app.obey.api.Consequence
 import app.obey.api.ObeyApi
 import app.obey.api.Protocol
@@ -160,13 +162,13 @@ fun RuleLogScreen(onBack: () -> Unit, onOpenTask: (String) -> Unit, vm: RuleLogV
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 title = { Text("Broken rules") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") } },
+                navigationIcon = { BackLink("Rules", onBack) },
+                actions = {
+                    if (!readOnly) IconButton(onClick = { adding = true }) { Icon(Icons.Outlined.Add, if (isDom) "Log a broken rule" else "Own up to one") }
+                },
             )
-        },
-        floatingActionButton = {
-            if (!readOnly) ExtendedFloatingActionButton(onClick = { adding = true }, icon = { Icon(Icons.Outlined.Add, null) }, text = { Text(if (isDom) "Log a broken rule" else "Own up to one") })
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->

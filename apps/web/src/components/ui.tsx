@@ -11,6 +11,7 @@ import {
   useId,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "@tanstack/react-router";
@@ -18,13 +19,28 @@ import { useMenu } from "../lib/menu";
 import { DynamicSwitcher } from "./DynamicSwitcher";
 import { useReadOnly } from "../lib/relationship";
 
-export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
+export const cx = (...c: (string | false | null | undefined)[]) =>
+  c.filter(Boolean).join(" ");
 
 // ---------- Icon (Material Symbols Rounded, light weight)
 
-export function Icon({ name, filled, className, size }: { name: string; filled?: boolean; className?: string; size?: number }) {
+export function Icon({
+  name,
+  filled,
+  className,
+  size,
+}: {
+  name: string;
+  filled?: boolean;
+  className?: string;
+  size?: number;
+}) {
   return (
-    <span aria-hidden className={cx("icon", filled && "filled", className)} style={size ? { fontSize: size } : undefined}>
+    <span
+      aria-hidden
+      className={cx("icon", filled && "filled", className)}
+      style={size ? { fontSize: size } : undefined}
+    >
       {name}
     </span>
   );
@@ -35,7 +51,15 @@ export function Icon({ name, filled, className, size }: { name: string; filled?:
 export type DiamondState = "open" | "done" | "owed" | "waiting" | "off";
 
 /** A diamond in the state of a task: open, done (filled ink), owed or missed (accent), waiting (half), off (muted). */
-export function Diamond({ state = "open", size = 14, className }: { state?: DiamondState; size?: number; className?: string }) {
+export function Diamond({
+  state = "open",
+  size = 14,
+  className,
+}: {
+  state?: DiamondState;
+  size?: number;
+  className?: string;
+}) {
   return (
     <span
       aria-hidden
@@ -44,7 +68,8 @@ export function Diamond({ state = "open", size = 14, className }: { state?: Diam
         state === "open" && "border-on-surface",
         state === "done" && "border-on-surface bg-on-surface",
         state === "owed" && "border-primary bg-primary-container",
-        state === "waiting" && "border-on-surface bg-[linear-gradient(135deg,var(--md-on-surface)_50%,transparent_50%)]",
+        state === "waiting" &&
+          "border-on-surface bg-[linear-gradient(135deg,var(--md-on-surface)_50%,transparent_50%)]",
         state === "off" && "border-outline",
         className,
       )}
@@ -59,10 +84,12 @@ type Variant = "filled" | "tonal" | "outlined" | "text" | "elevated" | "danger";
 const VARIANTS: Record<Variant, string> = {
   // Letters: ink is the main action, a hairline the second, the accent stays for what needs attention.
   filled: "bg-on-surface text-surface",
-  tonal: "border border-outline-variant bg-surface-container-lowest text-on-surface",
+  tonal:
+    "border border-outline-variant bg-surface-container-lowest text-on-surface",
   outlined: "border border-on-surface text-on-surface",
   text: "text-primary px-3",
-  elevated: "border border-outline-variant bg-surface-container-lowest text-on-surface",
+  elevated:
+    "border border-outline-variant bg-surface-container-lowest text-on-surface",
   danger: "bg-error text-on-error",
 };
 
@@ -72,7 +99,15 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   busy?: boolean;
 }
 
-export function Button({ variant = "filled", icon, busy, className, children, disabled, ...rest }: ButtonProps) {
+export function Button({
+  variant = "filled",
+  icon,
+  busy,
+  className,
+  children,
+  disabled,
+  ...rest
+}: ButtonProps) {
   return (
     <button
       type="button"
@@ -86,7 +121,11 @@ export function Button({ variant = "filled", icon, busy, className, children, di
         className,
       )}
     >
-      {busy ? <Spinner size={18} /> : icon ? <Icon name={icon} size={18} /> : null}
+      {busy ? (
+        <Spinner size={18} />
+      ) : icon ? (
+        <Icon name={icon} size={18} />
+      ) : null}
       {children}
     </button>
   );
@@ -99,7 +138,12 @@ export function IconButton({
   filled,
   className,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { icon: string; label: string; variant?: "standard" | "filled" | "tonal"; filled?: boolean }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  icon: string;
+  label: string;
+  variant?: "standard" | "filled" | "tonal";
+  filled?: boolean;
+}) {
   return (
     <button
       type="button"
@@ -110,7 +154,8 @@ export function IconButton({
         "state-layer inline-flex size-10 shrink-0 items-center justify-center rounded-full disabled:opacity-40",
         variant === "standard" && "text-on-surface",
         variant === "filled" && "bg-on-surface text-surface",
-        variant === "tonal" && "border border-outline-variant bg-surface-container-lowest text-on-surface",
+        variant === "tonal" &&
+          "border border-outline-variant bg-surface-container-lowest text-on-surface",
         className,
       )}
     >
@@ -120,13 +165,24 @@ export function IconButton({
 }
 
 /** An overflow menu (⋮). Items close it when chosen. */
-export function OverflowMenu({ label = "More options", items }: { label?: string; items: { label: string; icon: string; onClick(): void; danger?: boolean }[] }) {
+export function OverflowMenu({
+  label = "More options",
+  items,
+}: {
+  label?: string;
+  items: { label: string; icon: string; onClick(): void; danger?: boolean }[];
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
     const close = (e: Event) => {
-      if (e instanceof KeyboardEvent ? e.key === "Escape" : !ref.current?.contains(e.target as Node)) setOpen(false);
+      if (
+        e instanceof KeyboardEvent
+          ? e.key === "Escape"
+          : !ref.current?.contains(e.target as Node)
+      )
+        setOpen(false);
     };
     document.addEventListener("pointerdown", close);
     document.addEventListener("keydown", close);
@@ -137,9 +193,18 @@ export function OverflowMenu({ label = "More options", items }: { label?: string
   }, [open]);
   return (
     <div ref={ref} className="relative">
-      <IconButton icon="more_vert" label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)} />
+      <IconButton
+        icon="more_vert"
+        label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      />
       {open && (
-        <div role="menu" className="absolute top-full right-0 z-30 mt-1 min-w-44 overflow-hidden rounded-md border border-outline-variant bg-surface-container-lowest py-1 shadow-elev-2">
+        <div
+          role="menu"
+          className="absolute top-full right-0 z-30 mt-1 min-w-44 overflow-hidden rounded-md border border-outline-variant bg-surface-container-lowest py-1 shadow-elev-2"
+        >
           {items.map((it) => (
             <button
               key={it.label}
@@ -149,9 +214,16 @@ export function OverflowMenu({ label = "More options", items }: { label?: string
                 setOpen(false);
                 it.onClick();
               }}
-              className={cx("state-layer flex h-12 w-full items-center gap-3 px-3 text-left text-label-large", it.danger ? "text-error" : "text-on-surface")}
+              className={cx(
+                "state-layer flex h-12 w-full items-center gap-3 px-3 text-left text-label-large",
+                it.danger ? "text-error" : "text-on-surface",
+              )}
             >
-              <Icon name={it.icon} size={20} className={it.danger ? "" : "text-on-surface-variant"} />
+              <Icon
+                name={it.icon}
+                size={20}
+                className={it.danger ? "" : "text-on-surface-variant"}
+              />
               {it.label}
             </button>
           ))}
@@ -161,9 +233,85 @@ export function OverflowMenu({ label = "More options", items }: { label?: string
   );
 }
 
-export function Fab({ icon, label, onClick, extended = true, className }: { icon: string; label: string; onClick(): void; extended?: boolean; className?: string }) {
+/**
+ * Where a page's "new" action goes: the header mounts a slot, and [Fab] puts its button there. Only the newest header
+ * counts, so a dialog or sheet with its own header doesn't steal it.
+ */
+type Slots = { narrow: HTMLElement | null; wide: HTMLElement | null };
+let headerSlots: Slots = { narrow: null, wide: null };
+const slotListeners = new Set<() => void>();
+function setHeaderSlot(which: keyof Slots, el: HTMLElement) {
+  if (headerSlots[which] === el) return;
+  headerSlots = { ...headerSlots, [which]: el };
+  slotListeners.forEach((l) => l());
+}
+function useHeaderSlots() {
+  return useSyncExternalStore(
+    (l) => (slotListeners.add(l), () => slotListeners.delete(l)),
+    () => headerSlots,
+  );
+}
+/** Phones: in the top line with the header icons. Wider screens: beside the title. */
+function HeaderSlot({ wide }: { wide?: boolean }) {
+  return (
+    <span
+      className={wide ? "hidden items-center gap-2 md:flex" : "contents"}
+      ref={(el) => {
+        if (el) setHeaderSlot(wide ? "wide" : "narrow", el);
+      }}
+    />
+  );
+}
+
+/**
+ * A page's way to start something new. It sits in the page header, as in the mockups: a + (or the given icon) on
+ * phones, and a small labelled button on wider screens. Without a header it floats at the bottom right.
+ */
+export function Fab({
+  icon,
+  label,
+  onClick,
+  extended = true,
+  className,
+}: {
+  icon: string;
+  label: string;
+  onClick(): void;
+  extended?: boolean;
+  className?: string;
+}) {
+  const slots = useHeaderSlots();
   // Every FAB starts something new, and nothing new goes into an ended dynamic.
   if (useReadOnly()) return null;
+  if (slots.narrow?.isConnected && slots.wide?.isConnected) {
+    return (
+      <>
+        {createPortal(
+          <IconButton
+            icon={icon === "edit" ? "add" : icon}
+            label={label}
+            onClick={onClick}
+            className={cx("md:hidden", className)}
+          />,
+          slots.narrow,
+        )}
+        {createPortal(
+          <button
+            type="button"
+            onClick={onClick}
+            className={cx(
+              "state-layer inline-flex h-10 items-center gap-2 rounded-md border border-on-surface px-4 text-label-large text-on-surface",
+              className,
+            )}
+          >
+            <Icon name="add" size={18} />
+            {label}
+          </button>,
+          slots.wide,
+        )}
+      </>
+    );
+  }
   return (
     <button
       type="button"
@@ -182,7 +330,13 @@ export function Fab({ icon, label, onClick, extended = true, className }: { icon
 }
 
 export function Spinner({ size = 24 }: { size?: number }) {
-  return <span role="progressbar" className="inline-block animate-spin rounded-full border-2 border-current border-t-transparent" style={{ width: size, height: size }} />;
+  return (
+    <span
+      role="progressbar"
+      className="inline-block animate-spin rounded-full border-2 border-current border-t-transparent"
+      style={{ width: size, height: size }}
+    />
+  );
 }
 
 // ---------- Surfaces
@@ -206,8 +360,10 @@ export function Card({
       className={cx(
         "block w-full rounded-lg p-4 text-left",
         // Letters: a card is a sheet of paper with a hairline, never a filled block.
-        variant === "filled" && "border border-outline-variant bg-surface-container-lowest",
-        variant === "elevated" && "border border-outline-variant bg-surface-container-lowest",
+        variant === "filled" &&
+          "border border-outline-variant bg-surface-container-lowest",
+        variant === "elevated" &&
+          "border border-outline-variant bg-surface-container-lowest",
         variant === "outlined" && "border border-outline-variant bg-surface",
         onClick && "state-layer cursor-pointer",
         className,
@@ -218,7 +374,19 @@ export function Card({
   );
 }
 
-export function Chip({ children, selected, onClick, icon, className }: { children: ReactNode; selected?: boolean; onClick?: () => void; icon?: string; className?: string }) {
+export function Chip({
+  children,
+  selected,
+  onClick,
+  icon,
+  className,
+}: {
+  children: ReactNode;
+  selected?: boolean;
+  onClick?: () => void;
+  icon?: string;
+  className?: string;
+}) {
   const Comp = onClick ? "button" : "span";
   return (
     <Comp
@@ -227,18 +395,30 @@ export function Chip({ children, selected, onClick, icon, className }: { childre
       aria-pressed={onClick ? !!selected : undefined}
       className={cx(
         "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-label-large",
-        selected ? "border-on-surface bg-surface-container-lowest text-on-surface" : "border-outline-variant text-on-surface-variant",
+        selected
+          ? "border-on-surface bg-surface-container-lowest text-on-surface"
+          : "border-outline-variant text-on-surface-variant",
         onClick && "state-layer",
         className,
       )}
     >
-      {selected && onClick ? <Icon name="check" size={18} /> : icon ? <Icon name={icon} size={18} /> : null}
+      {selected && onClick ? (
+        <Icon name="check" size={18} />
+      ) : icon ? (
+        <Icon name={icon} size={18} />
+      ) : null}
       {children}
     </Comp>
   );
 }
 
-export function Badge({ children, tone = "primary" }: { children: ReactNode; tone?: "primary" | "error" | "tertiary" | "neutral" }) {
+export function Badge({
+  children,
+  tone = "primary",
+}: {
+  children: ReactNode;
+  tone?: "primary" | "error" | "tertiary" | "neutral";
+}) {
   return (
     <span
       className={cx(
@@ -267,7 +447,13 @@ export function SegmentedButtons<T extends string>({
   className?: string;
 }) {
   return (
-    <div role="radiogroup" className={cx("inline-flex h-10 overflow-hidden rounded-sm border border-outline-variant", className)}>
+    <div
+      role="radiogroup"
+      className={cx(
+        "inline-flex h-10 overflow-hidden rounded-sm border border-outline-variant",
+        className,
+      )}
+    >
       {options.map((o, i) => {
         const on = o.value === value;
         return (
@@ -293,7 +479,9 @@ export function SegmentedButtons<T extends string>({
 }
 
 export function Divider({ className }: { className?: string }) {
-  return <hr className={cx("border-0 border-t border-outline-variant", className)} />;
+  return (
+    <hr className={cx("border-0 border-t border-outline-variant", className)} />
+  );
 }
 
 export function ListItem({
@@ -313,12 +501,27 @@ export function ListItem({
 }) {
   const Comp = onClick ? "button" : "div";
   return (
-    <Comp type={onClick ? "button" : undefined} onClick={onClick} className={cx("flex w-full items-center gap-4 px-4 py-3 text-left", onClick && "state-layer")}>
+    <Comp
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      className={cx(
+        "flex w-full items-center gap-4 px-4 py-3 text-left",
+        onClick && "state-layer",
+      )}
+    >
       {leading}
       <div className="min-w-0 flex-1">
-        {overline && <div className="text-label-medium text-on-surface-variant">{overline}</div>}
+        {overline && (
+          <div className="text-label-medium text-on-surface-variant">
+            {overline}
+          </div>
+        )}
         <div className="text-body-large text-on-surface">{headline}</div>
-        {supporting && <div className="text-body-medium text-on-surface-variant">{supporting}</div>}
+        {supporting && (
+          <div className="text-body-medium text-on-surface-variant">
+            {supporting}
+          </div>
+        )}
       </div>
       {trailing}
     </Comp>
@@ -330,7 +533,19 @@ export function ListItem({
 const fieldBox =
   "peer w-full rounded-sm border border-outline bg-transparent px-4 text-body-large text-on-surface outline-none transition-colors hover:border-outline focus:border-on-surface disabled:opacity-40";
 
-function FieldShell({ label, id, children, help, error }: { label?: string; id: string; children: ReactNode; help?: string; error?: string }) {
+function FieldShell({
+  label,
+  id,
+  children,
+  help,
+  error,
+}: {
+  label?: string;
+  id: string;
+  children: ReactNode;
+  help?: string;
+  error?: string;
+}) {
   return (
     <div className="flex flex-col gap-1">
       <div className="relative">
@@ -344,23 +559,54 @@ function FieldShell({ label, id, children, help, error }: { label?: string; id: 
           </label>
         )}
       </div>
-      {(error || help) && <div className={cx("px-4 text-body-small", error ? "text-error" : "text-on-surface-variant")}>{error || help}</div>}
+      {(error || help) && (
+        <div
+          className={cx(
+            "px-4 text-body-small",
+            error ? "text-error" : "text-on-surface-variant",
+          )}
+        >
+          {error || help}
+        </div>
+      )}
     </div>
   );
 }
 
-export function TextField({ label, help, error, className, ...rest }: InputHTMLAttributes<HTMLInputElement> & { label?: string; help?: string; error?: string }) {
+export function TextField({
+  label,
+  help,
+  error,
+  className,
+  ...rest
+}: InputHTMLAttributes<HTMLInputElement> & {
+  label?: string;
+  help?: string;
+  error?: string;
+}) {
   const id = useId();
   return (
     <div className={className}>
       <FieldShell label={label} id={id} help={help} error={error}>
-        <input id={id} {...rest} className={cx(fieldBox, "h-14", error && "border-error")} />
+        <input
+          id={id}
+          {...rest}
+          className={cx(fieldBox, "h-14", error && "border-error")}
+        />
       </FieldShell>
     </div>
   );
 }
 
-export function TextArea({ label, help, className, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement> & { label?: string; help?: string }) {
+export function TextArea({
+  label,
+  help,
+  className,
+  ...rest
+}: TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  label?: string;
+  help?: string;
+}) {
   const id = useId();
   return (
     <div className={className}>
@@ -371,27 +617,55 @@ export function TextArea({ label, help, className, ...rest }: TextareaHTMLAttrib
   );
 }
 
-export function Select({ label, help, className, children, ...rest }: SelectHTMLAttributes<HTMLSelectElement> & { label?: string; help?: string }) {
+export function Select({
+  label,
+  help,
+  className,
+  children,
+  ...rest
+}: SelectHTMLAttributes<HTMLSelectElement> & {
+  label?: string;
+  help?: string;
+}) {
   const id = useId();
   return (
     <div className={className}>
       <FieldShell label={label} id={id} help={help}>
-        <select id={id} {...rest} className={cx(fieldBox, "h-14 appearance-none pr-10")}>
+        <select
+          id={id}
+          {...rest}
+          className={cx(fieldBox, "h-14 appearance-none pr-10")}
+        >
           {children}
         </select>
-        <Icon name="arrow_drop_down" className="pointer-events-none absolute top-4 right-3 text-on-surface-variant" />
+        <Icon
+          name="arrow_drop_down"
+          className="pointer-events-none absolute top-4 right-3 text-on-surface-variant"
+        />
       </FieldShell>
     </div>
   );
 }
 
-export function Switch({ checked, onChange, label, help }: { checked: boolean; onChange(v: boolean): void; label: ReactNode; help?: ReactNode }) {
+export function Switch({
+  checked,
+  onChange,
+  label,
+  help,
+}: {
+  checked: boolean;
+  onChange(v: boolean): void;
+  label: ReactNode;
+  help?: ReactNode;
+}) {
   const id = useId();
   return (
     <label htmlFor={id} className="flex cursor-pointer items-center gap-4 py-2">
       <div className="min-w-0 flex-1">
         <div className="text-body-large text-on-surface">{label}</div>
-        {help && <div className="text-body-medium text-on-surface-variant">{help}</div>}
+        {help && (
+          <div className="text-body-medium text-on-surface-variant">{help}</div>
+        )}
       </div>
       <button
         id={id}
@@ -399,12 +673,19 @@ export function Switch({ checked, onChange, label, help }: { checked: boolean; o
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={cx("relative h-7 w-12 shrink-0 rounded-full border transition-colors", checked ? "border-on-surface bg-on-surface" : "border-outline bg-surface-container-lowest")}
+        className={cx(
+          "relative h-7 w-12 shrink-0 rounded-full border transition-colors",
+          checked
+            ? "border-on-surface bg-on-surface"
+            : "border-outline bg-surface-container-lowest",
+        )}
       >
         <span
           className={cx(
             "absolute top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full transition-all",
-            checked ? "left-[23px] size-5 bg-surface text-on-surface" : "left-1 size-5 bg-outline-variant",
+            checked
+              ? "left-[23px] size-5 bg-surface text-on-surface"
+              : "left-1 size-5 bg-outline-variant",
           )}
         >
           {checked && <Icon name="check" size={14} />}
@@ -414,10 +695,23 @@ export function Switch({ checked, onChange, label, help }: { checked: boolean; o
   );
 }
 
-export function Checkbox({ checked, onChange, label }: { checked: boolean; onChange(v: boolean): void; label: ReactNode }) {
+export function Checkbox({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange(v: boolean): void;
+  label: ReactNode;
+}) {
   return (
     <label className="flex cursor-pointer items-center gap-3 py-1 text-body-large">
-      <input type="checkbox" className="diamond" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <input
+        type="checkbox"
+        className="diamond"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
       {label}
     </label>
   );
@@ -448,11 +742,14 @@ export function Dialog({
   closeRef.current = onClose;
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && closeRef.current();
+    const onKey = (e: KeyboardEvent) =>
+      e.key === "Escape" && closeRef.current();
     document.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    ref.current?.querySelector<HTMLElement>("input,textarea,select,button")?.focus();
+    ref.current
+      ?.querySelector<HTMLElement>("input,textarea,select,button")
+      ?.focus();
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
@@ -460,8 +757,16 @@ export function Dialog({
   }, [open]);
   if (!open) return null;
   return createPortal(
-    <div className={cx("fixed inset-0 z-50 flex justify-center", sheetOnMobile ? "items-end md:items-center" : "items-center p-4")}>
-      <div className="absolute inset-0 animate-fade-in bg-scrim/40" onClick={onClose} />
+    <div
+      className={cx(
+        "fixed inset-0 z-50 flex justify-center",
+        sheetOnMobile ? "items-end md:items-center" : "items-center p-4",
+      )}
+    >
+      <div
+        className="absolute inset-0 animate-fade-in bg-scrim/40"
+        onClick={onClose}
+      />
       <div
         ref={ref}
         role="dialog"
@@ -474,13 +779,32 @@ export function Dialog({
             : "max-w-[560px] animate-fade-in rounded-xl border",
         )}
       >
-        {sheetOnMobile && <div className="mx-auto mt-3 h-1 w-8 rounded-full bg-outline-variant md:hidden" />}
+        {sheetOnMobile && (
+          <div className="mx-auto mt-3 h-1 w-8 rounded-full bg-outline-variant md:hidden" />
+        )}
         <div className="overflow-y-auto px-6 pt-6 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {icon && <Icon name={icon} className="mb-4 block text-center text-on-surface-variant" />}
-          {title && <h2 className={cx("mb-4 text-headline-small", icon && "text-center")}>{title}</h2>}
-          <div className="text-body-medium text-on-surface-variant">{children}</div>
+          {icon && (
+            <Icon
+              name={icon}
+              className="mb-4 block text-center text-on-surface-variant"
+            />
+          )}
+          {title && (
+            <h2
+              className={cx("mb-4 text-headline-small", icon && "text-center")}
+            >
+              {title}
+            </h2>
+          )}
+          <div className="text-body-medium text-on-surface-variant">
+            {children}
+          </div>
         </div>
-        {actions && <div className="flex flex-wrap justify-end gap-2 px-6 pt-2 pb-6">{actions}</div>}
+        {actions && (
+          <div className="flex flex-wrap justify-end gap-2 px-6 pt-2 pb-6">
+            {actions}
+          </div>
+        )}
       </div>
     </div>,
     document.body,
@@ -490,11 +814,21 @@ export function Dialog({
 // ---------- Snackbar
 
 type SnackAction = { label: string; onClick(): void };
-const SnackContext = createContext<(msg: string, action?: SnackAction) => void>(() => {});
+const SnackContext = createContext<(msg: string, action?: SnackAction) => void>(
+  () => {},
+);
 
 export function SnackbarProvider({ children }: { children: ReactNode }) {
-  const [msg, setMsg] = useState<{ text: string; key: number; action?: SnackAction } | null>(null);
-  const show = useCallback((text: string, action?: SnackAction) => setMsg({ text, key: Date.now(), action }), []);
+  const [msg, setMsg] = useState<{
+    text: string;
+    key: number;
+    action?: SnackAction;
+  } | null>(null);
+  const show = useCallback(
+    (text: string, action?: SnackAction) =>
+      setMsg({ text, key: Date.now(), action }),
+    [],
+  );
   useEffect(() => {
     if (!msg) return;
     const t = setTimeout(() => setMsg(null), msg.action ? 6000 : 4000);
@@ -523,7 +857,11 @@ export function SnackbarProvider({ children }: { children: ReactNode }) {
                 {msg.action.label}
               </button>
             ) : (
-              <button type="button" className="text-label-large text-inverse-primary" onClick={() => setMsg(null)}>
+              <button
+                type="button"
+                className="text-label-large text-inverse-primary"
+                onClick={() => setMsg(null)}
+              >
                 Dismiss
               </button>
             )}
@@ -539,12 +877,56 @@ export const useSnackbar = () => useContext(SnackContext);
 // ---------- Page scaffolding
 
 /** A secondary page's header: back, then the title, with optional actions at the end. Main pages use PageHeader. */
-export function SubHeader({ title, onBack, actions }: { title: ReactNode; onBack(): void; actions?: ReactNode }) {
+/** A text link back to where you came from, as in the mockups: "‹ Us". */
+export function BackLink({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick(): void;
+}) {
   return (
-    <header className="sticky top-0 z-10 flex h-16 items-center gap-1 bg-surface px-2 md:px-4">
-      <IconButton icon="arrow_back" label="Back" onClick={onBack} />
-      <h1 className="min-w-0 flex-1 truncate text-title-large text-on-surface">{title}</h1>
-      {actions}
+    <button
+      type="button"
+      onClick={onClick}
+      className="state-layer -ml-1 flex h-10 items-center gap-1 rounded-md pr-2 text-body-large text-on-surface-variant"
+    >
+      <Icon name="chevron_left" size={22} />
+      {label}
+    </button>
+  );
+}
+
+/**
+ * A page opened from another one: a way back named for where it goes, the page's icons on the right, and the title in
+ * the serif below.
+ */
+export function SubHeader({
+  title,
+  onBack,
+  back = "Back",
+  actions,
+}: {
+  title: ReactNode;
+  onBack(): void;
+  back?: string;
+  actions?: ReactNode;
+}) {
+  return (
+    <header className="px-4 pt-3 pb-4 md:px-6 md:pt-6">
+      <div className="-mx-2 flex min-h-10 items-center gap-1 px-2">
+        <div className="min-w-0 flex-1">
+          <BackLink label={back} onClick={onBack} />
+        </div>
+        {actions}
+        <HeaderSlot />
+      </div>
+      <div className="mt-2 flex items-end gap-2">
+        <h1 className="min-w-0 flex-1 text-display-small text-on-surface md:text-display-medium">
+          {title}
+        </h1>
+        <HeaderSlot wide />
+      </div>
     </header>
   );
 }
@@ -554,7 +936,17 @@ export function SubHeader({ title, onBack, actions }: { title: ReactNode; onBack
  * (the pages listed there), and ends with the page's header icons (`tools`) and, for subs and switches, the safe-word
  * hand. Then the title in the serif, with `actions` beside it.
  */
-export function PageHeader({ title, subtitle, actions, tools }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; tools?: ReactNode }) {
+export function PageHeader({
+  title,
+  subtitle,
+  actions,
+  tools,
+}: {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  actions?: ReactNode;
+  tools?: ReactNode;
+}) {
   const menu = useMenu();
   const navigate = useNavigate();
   const hand = menu?.safeWord && (
@@ -571,21 +963,39 @@ export function PageHeader({ title, subtitle, actions, tools }: { title: ReactNo
   return (
     <>
       <header className="px-4 pt-3 pb-4 md:px-6 md:pt-6">
-        <div className={cx("-mx-2 flex min-h-10 items-center gap-1", !tools && !hand && "md:hidden")}>
+        <div
+          className={cx(
+            "-mx-2 flex min-h-10 items-center gap-1",
+            !tools && !hand && "md:hidden",
+          )}
+        >
           <div className="min-w-0 flex-1 md:hidden">
             {menu?.lead === "switcher" && <DynamicSwitcher chip />}
-            {menu?.lead === "back" && <IconButton icon="arrow_back" label="Us" onClick={() => void navigate({ to: "/us" })} />}
+            {menu?.lead === "back" && (
+              <BackLink
+                label="Us"
+                onClick={() => void navigate({ to: "/us" })}
+              />
+            )}
           </div>
           <div className="hidden flex-1 md:block" />
           {tools}
+          <HeaderSlot />
           {hand}
         </div>
         <div className="mt-2 flex items-end gap-2 md:mt-0">
           <div className="min-w-0 flex-1">
-            <h1 className="text-display-small text-on-surface md:text-display-medium">{title}</h1>
-            {subtitle && <p className="mt-1 text-body-medium text-on-surface-variant">{subtitle}</p>}
+            <h1 className="text-display-small text-on-surface md:text-display-medium">
+              {title}
+            </h1>
+            {subtitle && (
+              <p className="mt-1 text-body-medium text-on-surface-variant">
+                {subtitle}
+              </p>
+            )}
           </div>
           {actions && <div className="flex items-center gap-1">{actions}</div>}
+          <HeaderSlot wide />
         </div>
       </header>
       {menu?.banner}
@@ -593,7 +1003,15 @@ export function PageHeader({ title, subtitle, actions, tools }: { title: ReactNo
   );
 }
 
-export function Section({ title, children, action }: { title: ReactNode; children: ReactNode; action?: ReactNode }) {
+export function Section({
+  title,
+  children,
+  action,
+}: {
+  title: ReactNode;
+  children: ReactNode;
+  action?: ReactNode;
+}) {
   return (
     <section className="px-4 pb-6 md:px-6">
       <div className="mb-2 flex items-center gap-2">
@@ -605,12 +1023,26 @@ export function Section({ title, children, action }: { title: ReactNode; childre
   );
 }
 
-export function Empty({ icon, title, body, action }: { icon: string; title: string; body?: ReactNode; action?: ReactNode }) {
+export function Empty({
+  icon,
+  title,
+  body,
+  action,
+}: {
+  icon: string;
+  title: string;
+  body?: ReactNode;
+  action?: ReactNode;
+}) {
   return (
     <div className="flex flex-col items-center gap-2 border-y border-outline-variant px-6 py-10 text-center">
       <Icon name={icon} size={32} className="text-outline" />
       <div className="text-title-large text-on-surface">{title}</div>
-      {body && <div className="max-w-sm text-body-medium text-on-surface-variant">{body}</div>}
+      {body && (
+        <div className="max-w-sm text-body-medium text-on-surface-variant">
+          {body}
+        </div>
+      )}
       {action && <div className="mt-2">{action}</div>}
     </div>
   );
@@ -624,13 +1056,25 @@ export function Loading() {
   );
 }
 
-export function ErrorBox({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+export function ErrorBox({
+  error,
+  onRetry,
+}: {
+  error: unknown;
+  onRetry?: () => void;
+}) {
   return (
     <div className="m-4 flex items-start gap-3 rounded-lg bg-error-container p-4 text-on-error-container">
       <Icon name="error" />
-      <div className="flex-1 text-body-medium">{error instanceof Error ? error.message : String(error)}</div>
+      <div className="flex-1 text-body-medium">
+        {error instanceof Error ? error.message : String(error)}
+      </div>
       {onRetry && (
-        <button type="button" className="text-label-large underline" onClick={onRetry}>
+        <button
+          type="button"
+          className="text-label-large underline"
+          onClick={onRetry}
+        >
           Retry
         </button>
       )}

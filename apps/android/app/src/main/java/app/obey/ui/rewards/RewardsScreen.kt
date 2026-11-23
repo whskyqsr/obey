@@ -48,6 +48,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -105,30 +106,16 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 navigationIcon = { MenuButton() },
                 title = { Text(if (consequences) "Consequences" else "Rewards") },
                 actions = {
                     if (canManage && features.points) IconButton(onClick = { adjusting = true }) { Icon(Icons.Outlined.Exposure, "Adjust points") }
+                    if (canManage && consequences && features.consequences) IconButton(onClick = { editConsequence = Editing(null) }) { Icon(Icons.Outlined.Add, "New consequence") }
+                    if (canManage && !consequences && features.points) IconButton(onClick = { editReward = Editing(null) }) { Icon(Icons.Outlined.Add, "New reward") }
                     SafeWordAction()
                 },
             )
-        },
-        floatingActionButton = {
-            if (canManage && features.points) {
-                ExtendedFloatingActionButton(
-                    onClick = { editReward = Editing(null) },
-                    icon = { Icon(Icons.Outlined.Add, null) },
-                    text = { Text("Reward") },
-                )
-            }
-            if (canManage && features.consequences) {
-                ExtendedFloatingActionButton(
-                    onClick = { editConsequence = Editing(null) },
-                    icon = { Icon(Icons.Outlined.Add, null) },
-                    text = { Text("Consequence") },
-                )
-            }
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->

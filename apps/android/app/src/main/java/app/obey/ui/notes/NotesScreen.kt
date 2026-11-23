@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.StickyNote2
 import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.SearchOff
@@ -32,6 +33,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -84,17 +86,15 @@ fun NotesScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 navigationIcon = { MenuButton() },
                 title = { Text(if (journal) "Journal" else "Notes") },
                 actions = {
                     IconButton(onClick = { searching = !searching; if (!searching) query = "" }) { Icon(Icons.Outlined.Search, "Search") }
+                    if (vm.canWrite(journal)) IconButton(onClick = onNew) { Icon(Icons.Outlined.Add, "Write") }
                     SafeWordAction()
                 },
             )
-        },
-        floatingActionButton = {
-            if (vm.canWrite(journal)) ExtendedFloatingActionButton(onClick = onNew, icon = { Icon(Icons.Outlined.Edit, null) }, text = { Text("Write") })
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->

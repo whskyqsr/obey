@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.outlined.Shower
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +29,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -112,7 +115,7 @@ fun ChastityScreen(onOpenSettings: () -> Unit, vm: ChastityViewModel = hiltViewM
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 title = {
                     Column {
                         Text("Chastity")
@@ -121,12 +124,10 @@ fun ChastityScreen(onOpenSettings: () -> Unit, vm: ChastityViewModel = hiltViewM
                 },
                 navigationIcon = { MenuButton() },
                 actions = {
+                    if (wearers.isNotEmpty()) IconButton(onClick = { starting = true }) { Icon(Icons.Outlined.Add, "Lock") }
                     SafeWordAction()
                 },
             )
-        },
-        floatingActionButton = {
-            if (wearers.isNotEmpty()) ExtendedFloatingActionButton(onClick = { starting = true }, icon = { Icon(Icons.Outlined.Lock, null) }, text = { Text("Lock") })
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->

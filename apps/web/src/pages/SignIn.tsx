@@ -2,7 +2,6 @@ import { useState } from "react";
 import { FIREBASE_ENABLED, API_URL } from "../env";
 import { UUID_RE, authErrorMessage, createAccount, signInDev, signInWithEmail, signInWithGoogle } from "../auth/session";
 import { errorMessage } from "../api/client";
-import { BrandMark } from "../components/BrandMark";
 import { Button, Icon, TextField } from "../components/ui";
 import { pendingInvite } from "../lib/invite";
 
@@ -38,11 +37,14 @@ export function SignInPage() {
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-surface-container-low p-4">
-      <div className="w-full max-w-md rounded-xl bg-surface p-8 shadow-elev-1">
-        <BrandMark className="mb-6 size-16 rounded-lg" />
-        <h1 className="text-headline-large text-on-surface">Fealty</h1>
-        <p className="mt-2 mb-8 text-body-large text-on-surface-variant">Less upkeep. More of each other.</p>
+    <div className="flex min-h-dvh items-center justify-center bg-surface p-6">
+      <div className="w-full max-w-md">
+        <h1 className="font-serif text-[64px] leading-none text-on-surface">Fealty</h1>
+        <p className="mt-4 mb-12 font-serif text-[30px] leading-9 text-on-surface-variant italic">
+          Less upkeep.
+          <br />
+          More of each other.
+        </p>
         {pendingInvite() && (
           <div className="border border-outline-variant -mt-4 mb-6 flex items-center gap-3 rounded-md p-3 text-body-medium text-on-surface">
             <Icon name="mail" />

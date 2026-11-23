@@ -37,6 +37,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -163,19 +164,17 @@ fun TaskListScreen(
     }
     Scaffold(
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 navigationIcon = { MenuButton() },
                 title = { Text("All tasks") },
                 actions = {
                     if (vm.session?.canManage == true && vm.session?.readOnly != true) IconButton(onClick = onKits) { Icon(Icons.Outlined.Widgets, "Kits") }
+                    if (vm.session?.canManage == true) IconButton(onClick = onNew) { Icon(Icons.Outlined.Add, "New task") }
                     SafeWordAction()
                 },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
-        floatingActionButton = {
-            if (vm.session?.canManage == true) FloatingActionButton(onClick = onNew) { Icon(Icons.Outlined.Add, "New task") }
-        },
     ) { padding ->
         when (val s = state) {
             Load.Loading -> LoadingBox(Modifier.padding(padding))

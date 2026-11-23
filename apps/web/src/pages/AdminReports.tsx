@@ -74,7 +74,7 @@ export function AdminReportsPage() {
   const reports = useAdminReports(all === "all");
   return (
     <div className="flex flex-col pb-10">
-      <SubHeader title="Reports" onBack={back} />
+      <SubHeader title="Reports" back="Settings" onBack={back} />
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-3 px-4 md:px-6">
         <SegmentedButtons<"open" | "all">
           value={all}

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.outlined.FrontHand
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -157,5 +158,18 @@ fun MessageEffect(message: String?, snackbar: SnackbarHostState, onShown: () -> 
             snackbar.showSnackbar(message)
             onShown()
         }
+    }
+}
+
+/** A text link back to where you came from, as in the mockups: "‹ Us". */
+@Composable
+fun BackLink(label: String, onClick: () -> Unit) {
+    androidx.compose.foundation.layout.Row(
+        Modifier.padding(start = 4.dp).clip(MaterialTheme.shapes.small).clickable(onClick = onClick).padding(vertical = 8.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

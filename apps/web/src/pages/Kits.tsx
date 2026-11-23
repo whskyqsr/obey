@@ -317,7 +317,7 @@ export function KitPage({ kitId }: { kitId: string }) {
   const items = sorted(kit.items);
   return (
     <>
-      <SubHeader title={kit.title} onBack={() => void navigate({ to: "/kits" })} />
+      <SubHeader title={kit.title} back="Kits" onBack={() => void navigate({ to: "/kits" })} />
       <p className="px-4 pb-4 text-body-medium text-on-surface-variant md:px-6">{kit.description || counts(items)}</p>
       <div className="flex flex-wrap items-center gap-2 px-4 pb-4 md:px-6">
         {isDom && !readOnly && (
@@ -572,6 +572,7 @@ export function NewKitPage() {
     <>
       <SubHeader
         title="New kit"
+        back="Kits"
         onBack={() => void navigate({ to: "/kits" })}
         actions={
           <Button busy={save.isPending} disabled={!title.trim() || !total} onClick={submit}>
@@ -639,7 +640,7 @@ export function SharedKitPage({ code }: { code: string }) {
   const canUse = isDom && !readOnly;
   return (
     <>
-      <SubHeader title={kit.data.title} onBack={() => void navigate({ to: "/kits" })} />
+      <SubHeader title={kit.data.title} back="Kits" onBack={() => void navigate({ to: "/kits" })} />
       <p className="px-4 pb-2 text-body-medium text-on-surface-variant md:px-6">A shared kit · {counts(items)}</p>
       {kit.data.description && <p className="px-4 pb-4 text-body-medium text-on-surface-variant md:px-6">{kit.data.description}</p>}
       <ItemList items={items} />
