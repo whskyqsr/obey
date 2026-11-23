@@ -23,7 +23,7 @@ export function PlacesPage() {
 
   return (
     <div className="flex flex-col pb-10">
-      <SubHeader title="Places" onBack={back} />
+      <SubHeader title="Places" back="Location" onBack={back} />
       <div className="flex flex-col gap-4 px-4 md:px-6">
         {isDom && subs.map((m) => <LocationReadiness key={m.userId} member={m} />)}
         {places.isPending ? (

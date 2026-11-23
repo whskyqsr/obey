@@ -57,7 +57,7 @@ export function CurfewPage() {
   }, [curfew.data, places.data, form, subs]);
 
   const header = (
-    <SubHeader title="Curfew" onBack={back} />
+    <SubHeader title="Curfew" back="Location" onBack={back} />
   );
   if (curfew.error || places.error)
     return (
