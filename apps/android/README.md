@@ -50,15 +50,21 @@ upload key never goes in this repo; it lives in four repository secrets:
 | `UPLOAD_KEY_ALIAS` | the key alias (`upload`) |
 | `UPLOAD_KEY_PASSWORD` | the key password (the same as the store password for a PKCS12 keystore) |
 
-To make the key once, on your own computer:
+To make the key once, on your own computer (macOS's built-in openssl, no Java needed; it asks for a password,
+which goes in both password secrets):
 
 ```
-keytool -genkeypair -v -keystore fealty-upload.jks -storetype PKCS12 -alias upload \
-  -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=Fealty"
-base64 -i fealty-upload.jks | pbcopy        # macOS; on Linux: base64 -w0 fealty-upload.jks
+openssl req -x509 -newkey rsa:4096 -sha256 -days 10000 -nodes -subj "/CN=Fealty" -keyout upload.key -out upload.crt
+openssl pkcs12 -export -name upload -inkey upload.key -in upload.crt -out fealty-upload.p12
+base64 -i fealty-upload.p12 | pbcopy      # paste into UPLOAD_KEYSTORE_BASE64
+rm upload.key upload.crt
 ```
 
-Keep `fealty-upload.jks` and its password in a password manager. To build: Actions, **Android release**, Run
+Check it has a password: `openssl pkcs12 -in fealty-upload.p12 -noout -passin pass:` must fail. With Java,
+`keytool -genkeypair -keystore fealty-upload.jks -storetype PKCS12 -alias upload -keyalg RSA -keysize 4096
+-validity 10000` makes the same thing. Keep the key file and its password in a password manager.
+
+To build: Actions, **Android release**, Run
 workflow, enter the version name (like `1.0.0`). The versionCode is the workflow's run number, so it always goes up.
 The signed `.aab` is the run's `fealty-release-aab-…` artifact.
 
