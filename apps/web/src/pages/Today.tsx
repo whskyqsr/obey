@@ -142,7 +142,8 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
           )}
           {wide && occ.data && <ShortcutHints dom={isDom} />}
           <DayRescheduleSheet tasks={myOpenToday} open={daySheet} onClose={() => setDaySheet(false)} />
-          {isDom && <Fab icon="add" label="New task" onClick={newTask} className="xl:hidden" />}
+          {/* On phones the + in the tab bar starts a task. */}
+          {isDom && <Fab icon="add" label="New task" onClick={newTask} className="max-md:hidden xl:hidden" />}
         </div>
         {wide && (
           <aside className="sticky top-0 h-dvh w-[400px] shrink-0 overflow-y-auto bg-surface-container-low" aria-label="Task details">

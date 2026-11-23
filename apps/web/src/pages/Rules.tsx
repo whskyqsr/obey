@@ -5,7 +5,7 @@ import { errorMessage } from "../api/client";
 import type { Rule } from "../api/types";
 import { ItemDialog, type FieldDef } from "../components/ItemDialog";
 import { SortableList } from "../components/SortableList";
-import { Button, Chip, Empty, ErrorBox, Fab, Icon, Loading, PageHeader, useSnackbar } from "../components/ui";
+import { Button, Chip, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, SegmentedButtons, useSnackbar } from "../components/ui";
 import { useRel } from "../lib/relationship";
 import { useConfirm } from "../lib/useConfirm";
 
@@ -49,12 +49,9 @@ export function RulesPage() {
       <PageHeader
         title="Rules"
         subtitle={`${rules.length} rule${rules.length === 1 ? "" : "s"}`}
-        actions={
-          <Button variant="tonal" icon="history" onClick={() => void navigate({ to: "/rule-log" })}>
-            Broken rules
-          </Button>
-        }
+        tools={<IconButton icon="assignment_late" label="Broken rules" onClick={() => void navigate({ to: "/rule-log" })} />}
       />
+      <RulesTabs current="rules" />
       {categories.length > 0 && (
         <div className="flex gap-2 overflow-x-auto px-4 pb-4 md:px-6">
           <Chip selected={!category} onClick={() => setCategory(null)}>
@@ -135,5 +132,24 @@ export function RulesPage() {
       />
       {confirmEl}
     </>
+  );
+}
+
+/** Rules and protocols are one place: a toggle under the title, shown when both are switched on. */
+export function RulesTabs({ current }: { current: "rules" | "protocols" }) {
+  const { features } = useRel();
+  const navigate = useNavigate();
+  if (!features.rules || !features.protocols) return null;
+  return (
+    <div className="px-4 pb-4 md:px-6">
+      <SegmentedButtons
+        value={current}
+        onChange={(v) => void navigate({ to: v === "rules" ? "/rules" : "/protocols" })}
+        options={[
+          { value: "rules", label: "Rules" },
+          { value: "protocols", label: "Protocols" },
+        ]}
+      />
+    </div>
   );
 }

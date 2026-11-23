@@ -42,7 +42,10 @@ private window) with different UUIDs to play both partners.
   colour falls back to oxblood.
 - `src/components/ui.tsx` holds the M3 pieces: filled/tonal/outlined/text buttons, icon buttons, FAB, cards, chips,
   segmented buttons, outlined text fields, switches, dialogs that become bottom sheets on phones, and a snackbar.
-  `AppShell` shows a navigation rail at `md` and up and a bottom navigation bar below it.
+  `AppShell` shows a sidebar at `md` and up (dynamic switcher on top, Today, Week, the sections, then Your dynamic
+  and Settings). On phones it shows three tabs, Today, Week (the calendar) and Us (`/us`, the list of every other
+  section), plus a + button for anything new. Pages put their shortcuts in `PageHeader`'s `tools`, next to the
+  safe-word hand. Protocols are a tab inside Rules. `?new=1` opens a page's "new" dialog (`useOpenOnNew`).
 - `src/api` wraps the REST API (`client.ts`) and exposes TanStack Query hooks (`hooks.ts`); response types come from
   `@obey/contracts`.
 - `src/recurrence/picker.ts` converts the task editor's recurrence picker state to and from the stored `Schedule`

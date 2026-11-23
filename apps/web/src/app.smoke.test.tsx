@@ -107,7 +107,8 @@ describe("app smoke test (dev auth, mocked API)", () => {
       await act(() => router.navigate({ to } as never));
       await waitFor(() => expect(screen.getAllByText(text).length).toBeGreaterThan(0));
     };
-    await visit("/calendar", "Calendar");
+    await visit("/calendar", "Week");
+    await visit("/us", "Your dynamic");
     await visit("/tasks", /Every 2 weeks on Mon, Thu at 9:00\s?PM/);
     await visit("/tasks/t1", "Streak");
     await visit("/tasks/t1", /, all day$/);

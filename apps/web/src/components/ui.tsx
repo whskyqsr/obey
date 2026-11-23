@@ -13,7 +13,9 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "@tanstack/react-router";
 import { useMenu } from "../lib/menu";
+import { DynamicSwitcher } from "./DynamicSwitcher";
 import { useReadOnly } from "../lib/relationship";
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
@@ -145,7 +147,7 @@ export function Fab({ icon, label, onClick, extended = true, className }: { icon
       onClick={onClick}
       aria-label={label}
       className={cx(
-        "state-layer fixed right-4 bottom-[calc(108px+env(safe-area-inset-bottom))] in-data-nobar:bottom-[calc(16px+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-3 rounded-full bg-on-surface text-surface shadow-elev-2 md:right-8 md:bottom-8",
+        "state-layer fixed right-4 bottom-[calc(84px+env(safe-area-inset-bottom))] in-data-nobar:bottom-[calc(16px+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-3 rounded-full bg-on-surface text-surface shadow-elev-2 md:right-8 md:bottom-8",
         extended ? "px-4 pr-5" : "w-14 justify-center",
         className,
       )}
@@ -482,7 +484,7 @@ export function SnackbarProvider({ children }: { children: ReactNode }) {
           <div
             key={msg.key}
             role="status"
-            className="fixed bottom-[calc(108px+env(safe-area-inset-bottom))] left-1/2 z-[60] flex min-h-12 w-[min(92vw,560px)] -translate-x-1/2 animate-fade-in items-center gap-2 rounded-md bg-inverse-surface px-4 py-3 text-body-medium text-inverse-on-surface shadow-elev-3 md:bottom-6"
+            className="fixed bottom-[calc(84px+env(safe-area-inset-bottom))] left-1/2 z-[60] flex min-h-12 w-[min(92vw,560px)] -translate-x-1/2 animate-fade-in items-center gap-2 rounded-md bg-inverse-surface px-4 py-3 text-body-medium text-inverse-on-surface shadow-elev-3 md:bottom-6"
           >
             <span className="flex-1">{msg.text}</span>
             {msg.action ? (
@@ -512,7 +514,6 @@ export const useSnackbar = () => useContext(SnackContext);
 
 // ---------- Page scaffolding
 
-/** On phones the menu button leads the title line, and the subtitle lines up under the title. */
 /** A secondary page's header: back, then the title, with optional actions at the end. Main pages use PageHeader. */
 export function SubHeader({ title, onBack, actions }: { title: ReactNode; onBack(): void; actions?: ReactNode }) {
   return (
@@ -524,41 +525,44 @@ export function SubHeader({ title, onBack, actions }: { title: ReactNode; onBack
   );
 }
 
-export function PageHeader({ title, subtitle, actions }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode }) {
+/**
+ * A main page's header. On phones a top line leads with the dynamic switcher (Today, Week, Us) or a way back to Us
+ * (the pages listed there), and ends with the page's header icons (`tools`) and, for subs and switches, the safe-word
+ * hand. Then the title in the serif, with `actions` beside it.
+ */
+export function PageHeader({ title, subtitle, actions, tools }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; tools?: ReactNode }) {
   const menu = useMenu();
+  const navigate = useNavigate();
+  const hand = menu?.safeWord && (
+    <button
+      type="button"
+      aria-label="Safe word"
+      title="Safe word"
+      onClick={menu.safeWord}
+      className="state-layer flex size-10 shrink-0 items-center justify-center rounded-full text-primary"
+    >
+      <Icon name="front_hand" />
+    </button>
+  );
   return (
     <>
-      <header className="flex items-end gap-2 px-4 pt-6 pb-4 md:px-6">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1">
-            {menu && (
-              <button
-                ref={menu.track}
-                type="button"
-                aria-label="Menu"
-                title="Menu"
-                onClick={menu.open}
-                className="state-layer -my-1 -ml-3 flex size-12 shrink-0 items-center justify-center rounded-full text-on-surface md:hidden"
-              >
-                <Icon name="menu" />
-              </button>
-            )}
-            <h1 className="min-w-0 flex-1 text-headline-large text-on-surface md:text-display-small">{title}</h1>
-            {menu?.safeWord && (
-              <button
-                type="button"
-                aria-label="Safe word"
-                title="Safe word"
-                onClick={menu.safeWord}
-                className="state-layer -my-1 -mr-3 flex size-12 shrink-0 items-center justify-center rounded-full text-error"
-              >
-                <Icon name="front_hand" filled />
-              </button>
-            )}
+      <header className="px-4 pt-3 pb-4 md:px-6 md:pt-6">
+        <div className={cx("-mx-2 flex min-h-10 items-center gap-1", !tools && !hand && "md:hidden")}>
+          <div className="min-w-0 flex-1 md:hidden">
+            {menu?.lead === "switcher" && <DynamicSwitcher chip />}
+            {menu?.lead === "back" && <IconButton icon="arrow_back" label="Us" onClick={() => void navigate({ to: "/us" })} />}
           </div>
-          {subtitle && <p className={cx("mt-1 text-body-medium text-on-surface-variant", menu && "pl-10 md:pl-0")}>{subtitle}</p>}
+          <div className="hidden flex-1 md:block" />
+          {tools}
+          {hand}
         </div>
-        {actions && <div className="flex items-center gap-1">{actions}</div>}
+        <div className="mt-2 flex items-end gap-2 md:mt-0">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-display-small text-on-surface md:text-display-medium">{title}</h1>
+            {subtitle && <p className="mt-1 text-body-medium text-on-surface-variant">{subtitle}</p>}
+          </div>
+          {actions && <div className="flex items-center gap-1">{actions}</div>}
+        </div>
       </header>
       {menu?.banner}
     </>

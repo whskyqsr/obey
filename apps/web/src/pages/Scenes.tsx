@@ -15,6 +15,7 @@ import {
   useShareSide,
 } from "../api/hooks";
 import { errorMessage } from "../api/client";
+import { useOpenOnNew } from "../lib/newParam";
 import type { AftercarePlan, Scene, SceneSide } from "../api/types";
 import { Avatar } from "../components/Avatar";
 import { CommentThread } from "../components/Comments";
@@ -78,6 +79,7 @@ export function ScenesPage() {
   const readOnly = useReadOnly();
   const scenes = useScenes(rel.id);
   const [logging, setLogging] = useState(false);
+  useOpenOnNew(() => setLogging(true), !readOnly);
   const navigate = useNavigate();
   return (
     <>

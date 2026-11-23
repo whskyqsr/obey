@@ -79,7 +79,7 @@ function DynamicList({ onPick }: { onPick(): void }) {
  * Where the Fealty mark was: the dynamic in view. With more than one dynamic it opens a list to switch.
  * `inline` expands the list in place (the phone menu); otherwise it pops over (sidebar and rail).
  */
-export function DynamicSwitcher({ compact, inline, onSwitched }: { compact?: boolean; inline?: boolean; onSwitched?(): void }) {
+export function DynamicSwitcher({ compact, inline, chip, onSwitched }: { compact?: boolean; inline?: boolean; chip?: boolean; onSwitched?(): void }) {
   const { me, rel } = useRel();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -107,8 +107,15 @@ export function DynamicSwitcher({ compact, inline, onSwitched }: { compact?: boo
   };
 
   return (
-    <div ref={ref} className={cx("relative", !compact && "w-full")}>
-      {compact ? (
+    <div ref={ref} className={cx("relative", !compact && !chip && "w-full")}>
+      {chip ? (
+        // The phone's header: the partner's picture and the dynamic's name, opening the list below it.
+        <button type="button" onClick={toggle} aria-expanded={many ? open : undefined} className="state-layer flex max-w-full items-center gap-2 rounded-full py-1 pr-3 pl-1 text-left">
+          <DynamicMark rel={rel} size={28} />
+          <span className="truncate font-serif text-[19px] text-on-surface">{name}</span>
+          {many && <Icon name="expand_more" size={18} className="text-on-surface-variant" />}
+        </button>
+      ) : compact ? (
         <button type="button" onClick={toggle} title={name} aria-expanded={many ? open : undefined} className="state-layer relative rounded-2xl p-1">
           <DynamicMark rel={rel} size={48} />
           {many && (
@@ -133,7 +140,10 @@ export function DynamicSwitcher({ compact, inline, onSwitched }: { compact?: boo
             <DynamicList onPick={() => (setOpen(false), onSwitched?.())} />
           </div>
         ) : (
-          <div className={cx("z-50 rounded-3xl bg-surface-container-high p-1.5 shadow-elev-2", compact ? "fixed w-72" : "mt-1")} style={compact && at ? at : undefined}>
+          <div
+            className={cx("z-50 rounded-lg border border-outline-variant bg-surface-container-lowest p-1.5 shadow-elev-2", compact ? "fixed w-72" : chip ? "absolute top-full left-0 mt-1 w-72" : "mt-1")}
+            style={compact && at ? at : undefined}
+          >
             <DynamicList onPick={() => setOpen(false)} />
           </div>
         ))}
