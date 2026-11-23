@@ -137,7 +137,7 @@ function dueHeading(current: { dueAt: string }[]) {
 
 function Stat({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
-    <div className="rounded-md bg-surface-container-low px-3 py-3">
+    <div className="border border-outline-variant rounded-md px-3 py-3">
       <dt className="text-label-medium text-on-surface-variant">{label}</dt>
       <dd className="truncate text-title-large text-on-surface">{value}</dd>
       <dd className="truncate text-body-small text-on-surface-variant">{sub}</dd>

@@ -64,13 +64,13 @@ export function TasksPage() {
       )}
       <div className="flex flex-col gap-2 px-4 md:px-6">
         {list.map((t) => (
-          <div key={t.id} className="flex items-center gap-1 rounded-md bg-surface-container-low pr-2">
+          <div key={t.id} className="border border-outline-variant flex items-center gap-1 rounded-md pr-2">
             <button
               type="button"
               onClick={() => navigate({ to: "/tasks/$taskId", params: { taskId: t.id } })}
               className="state-layer flex min-w-0 flex-1 items-center gap-4 rounded-md p-4 text-left"
             >
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-container text-on-primary-container">
+              <div className="flex size-10 shrink-0 items-center justify-center text-on-surface-variant">
                 <Icon
                   name={
                     t.assignedConsequenceId

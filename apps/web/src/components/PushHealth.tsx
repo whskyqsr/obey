@@ -44,7 +44,7 @@ export function PushHealth() {
   const problem = here?.lastError ? errorText(here.lastError) : !devices.isLoading && !here ? "this browser isn't registered yet; use Re-register above" : null;
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg bg-surface-container-low p-4">
+    <div className="border border-outline-variant flex flex-col gap-3 rounded-lg p-4">
       <div className="flex items-start gap-3">
         <Icon name={problem ? "error" : "check_circle"} className={problem ? "text-error" : "text-primary"} />
         <div className="min-w-0 flex-1 text-body-medium text-on-surface-variant">

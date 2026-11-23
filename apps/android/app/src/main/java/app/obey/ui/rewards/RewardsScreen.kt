@@ -1,5 +1,13 @@
 package app.obey.ui.rewards
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.unit.sp
 import app.obey.ui.common.LocalFeatures
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -130,22 +138,27 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
             is Load.Ready -> LazyColumn(Modifier.padding(padding).fillMaxSize()) {
                 val d = s.value
                 if (features.points) item(key = "balances") {
-                    Row(
-                        Modifier.horizontalScroll(rememberScrollState()).padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        val members = session?.relationship?.members.orEmpty()
-                        members.forEach { m ->
-                            val bal = d.balances.firstOrNull { it.userId == m.userId }?.balance ?: 0
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                                modifier = Modifier.widthIn(min = 140.dp),
-                            ) {
-                                Column(Modifier.padding(16.dp)) {
-                                    Text(if (m.userId == session?.userId) "You" else m.displayName, style = MaterialTheme.typography.labelLarge)
-                                    Text("$bal", style = MaterialTheme.typography.displaySmall)
-                                    Text("points", style = MaterialTheme.typography.bodySmall)
-                                }
+                    // The earner's balance leads, big in the serif, with how far it is to the next reward.
+                    val members = session?.relationship?.members.orEmpty()
+                    val me = session?.userId
+                    val all = members.map { m -> m.userId to (d.balances.firstOrNull { it.userId == m.userId }?.balance ?: 0) }
+                    val lead = all.firstOrNull { (id, _) -> members.first { it.userId == id }.role == app.obey.api.Role.Submissive || (id == me && (solo || !canManage)) } ?: all.firstOrNull()
+                    if (lead != null) {
+                        val nameOf = { id: String -> if (id == me) "You have" else "${session?.nameOf(id) ?: "They"} has" }
+                        val next = d.rewards.filter { it.cost > lead.second }.minByOrNull { it.cost }
+                        Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp)) {
+                            Text(nameOf(lead.first).uppercase(), style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Row(verticalAlignment = androidx.compose.ui.Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Text("${lead.second}", style = MaterialTheme.typography.displayLarge.copy(fontSize = 88.sp, lineHeight = 88.sp), color = MaterialTheme.colorScheme.onSurface)
+                                Text("points", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 14.dp))
+                            }
+                            if (d.rewards.isNotEmpty()) Text(
+                                next?.let { "${it.cost - lead.second} more for ${it.title}." } ?: "Enough for any reward.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            all.filter { it != lead && it.second != 0 }.forEach { (id, bal) ->
+                                Text("${nameOf(id)} $bal points.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -155,19 +168,30 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
                 if (features.points && d.rewards.isEmpty()) item(key = "e-rewards") { EmptyBox("No rewards yet", if (canManage) "Add things worth earning." else null, icon = Icons.Outlined.Redeem) }
                 items(if (features.points) d.rewards else emptyList(), key = { "r-" + it.id }) { r ->
                     val myBalance = vm.balanceOf(session?.userId.orEmpty())
-                    ListItem(
-                        modifier = if (canManage) Modifier.clickable { editReward = Editing(r) } else Modifier,
-                        headlineContent = { Text(r.title) },
-                        supportingContent = {
-                            Text(listOfNotNull(r.bodyMd.takeIf { it.isNotBlank() }, if (r.letsOff) "Gets ${if (canManage) "them" else "you"} out of a consequence" else null, r.lockMinutes?.takeIf { features.chastity }?.let { "Takes ${app.obey.ui.chastity.fmtMinutes(it)} off the lock" }).joinToString(" · "))
-                        },
-                        trailingContent = {
-                            if (canManage && !solo) Text("${r.cost} pts", style = MaterialTheme.typography.labelLarge)
-                            else FilledTonalButton(onClick = { confirmRedeem = r }, enabled = myBalance >= r.cost) {
-                                Text("${r.cost} pts")
+                    // A menu, not cards: the title, a dotted leader, the price; dimmed until it's affordable.
+                    val spender = solo || !canManage
+                    val dim = spender && myBalance < r.cost
+                    val ink = if (dim) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
+                    val leader = MaterialTheme.colorScheme.outlineVariant
+                    val notes = listOfNotNull(r.bodyMd.takeIf { it.isNotBlank() }, if (r.letsOff) "Gets ${if (canManage && !solo) "them" else "you"} out of a consequence" else null, r.lockMinutes?.takeIf { features.chastity }?.let { "Takes ${app.obey.ui.chastity.fmtMinutes(it)} off the lock" })
+                    Column(
+                        Modifier.fillMaxWidth()
+                            .clickable(enabled = canManage || !dim, onClickLabel = if (canManage) "Edit" else "Spend ${r.cost} points") { if (canManage) editReward = Editing(r) else confirmRedeem = r }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                    ) {
+                        Row(verticalAlignment = androidx.compose.ui.Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(r.title, style = MaterialTheme.typography.headlineSmall, color = ink, modifier = Modifier.weight(1f, fill = false))
+                            androidx.compose.foundation.Canvas(Modifier.weight(1f).padding(bottom = 8.dp).height(2.dp)) {
+                                var x = 0f
+                                while (x < size.width) { drawCircle(leader, radius = 1.dp.toPx(), center = androidx.compose.ui.geometry.Offset(x + 1.dp.toPx(), size.height / 2)); x += 5.dp.toPx() }
                             }
-                        },
-                    )
+                            Text("${r.cost}", style = MaterialTheme.typography.bodyLarge, color = ink, modifier = Modifier.padding(bottom = 2.dp))
+                        }
+                        if (notes.isNotEmpty()) Text(notes.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                if (features.points && (solo || !canManage) && d.rewards.isNotEmpty()) item(key = "spend-hint") {
+                    Text("Tap a reward to spend your points on it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
                 }
 
                 // Rewards spent but not yet given: a Dominant marks them redeemed; a sub sees what they're waiting on.
@@ -201,7 +225,16 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
                             .takeIf { it.isNotEmpty() }?.let { lines -> { Text(lines.joinToString("\n")) } },
                         trailingContent = {
                             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                                Text("●".repeat(c.severity), color = MaterialTheme.colorScheme.error)
+                                Row(horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.semantics { contentDescription = "Severity ${c.severity} of 5" }) {
+                                    repeat(5) { i ->
+                                        val on = i < c.severity
+                                        androidx.compose.foundation.layout.Box(
+                                            Modifier.size(7.dp).rotate(45f)
+                                                .background(if (on) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent)
+                                                .border(1.dp, if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
+                                        )
+                                    }
+                                }
                                 if (canManage) TextButton(onClick = { assigning = c }) { Text("Assign") }
                             }
                         },

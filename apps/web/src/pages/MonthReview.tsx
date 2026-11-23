@@ -66,7 +66,7 @@ export function MonthReviewPage() {
               {!!past.data?.length && (
                 <section className="flex flex-col gap-2">
                   <h2 className="mt-1 text-title-medium text-on-surface">Past months</h2>
-                  <ul className="overflow-hidden rounded-lg bg-surface-container-low">
+                  <ul className="border border-outline-variant overflow-hidden rounded-lg">
                     {past.data.map((p) => (
                       <li key={p.month} className="border-t border-surface-container-highest first:border-t-0">
                         <button
@@ -79,7 +79,7 @@ export function MonthReviewPage() {
                             <span className="block truncate text-body-medium text-on-surface-variant">{p.goal ?? "No focus set"}</span>
                           </span>
                           {p.myRating != null && (
-                            <span className="rounded-sm bg-secondary-container px-2 py-0.5 text-label-medium text-on-secondary-container">{p.myRating} of 5</span>
+                            <span className="border border-outline-variant rounded-sm px-2 py-0.5 text-label-medium text-on-surface">{p.myRating} of 5</span>
                           )}
                           <span className="w-10 text-right text-body-medium text-on-surface-variant">{pct(p.rate)}</span>
                           <Icon name="chevron_right" className="text-on-surface-variant" />
@@ -105,7 +105,7 @@ function FocusCard({ s }: { s: MonthSummary }) {
   const isCurrent = s.month === monthOf(today());
   if (!f)
     return (
-      <section className="flex flex-col items-start gap-3 rounded-lg bg-surface-container-low p-4">
+      <section className="border border-outline-variant flex flex-col items-start gap-3 rounded-lg p-4">
         <h2 className="text-title-medium text-on-surface">Focus for {monthName(s.month)}</h2>
         <p className="text-body-medium text-on-surface-variant">
           {isDom ? "Pick one thing to work on this month, and the tasks that count towards it." : "No focus has been set for this month yet."}
@@ -120,7 +120,7 @@ function FocusCard({ s }: { s: MonthSummary }) {
     );
   const titles = new Map((tasks.data ?? []).map((t) => [t.id, t.title]));
   return (
-    <section className="flex flex-col gap-3 rounded-lg bg-primary-container p-4 text-on-primary-container">
+    <section className="flex flex-col gap-3 rounded-md border border-primary/40 p-4 text-on-surface">
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <div className="text-label-medium tracking-wide uppercase opacity-80">Focus for {monthName(s.month)}</div>
@@ -236,7 +236,7 @@ function ProgressCard({ s }: { s: MonthSummary }) {
     </span>
   );
   return (
-    <section className="flex flex-col gap-3 rounded-lg bg-surface-container-low pt-4 pb-1">
+    <section className="border border-outline-variant flex flex-col gap-3 rounded-lg pt-4 pb-1">
       <h2 className="px-4 text-title-medium text-on-surface">
         {isCurrent ? `How ${monthName(s.month)} is going` : `How ${monthName(s.month)} went`}
         {who !== "You" && <span className="text-on-surface-variant"> for {who}</span>}
@@ -320,7 +320,7 @@ function ReviewSoon({ s }: { s: MonthSummary }) {
   const { isDom, partners } = useRel();
   const dom = partners.find((p) => p.role !== "submissive")?.displayName;
   return (
-    <section className="flex items-start gap-3 rounded-lg bg-surface-container-low p-4">
+    <section className="border border-outline-variant flex items-start gap-3 rounded-lg p-4">
       <Icon name="event_upcoming" className="text-on-surface-variant" />
       <div>
         <h2 className="text-title-medium text-on-surface">Review opens {fmtDate(s.reviewOpensOn, { month: "short", day: "numeric" })}</h2>
@@ -341,7 +341,7 @@ function LookBack({ s }: { s: MonthSummary }) {
   const waiting = s.waitingOn.filter((id) => id !== me.user.id).map(memberName);
   if (editing && !rel.endedAt) return <ReviewForm s={s} mine={mine} onDone={() => setEditing(false)} />;
   return (
-    <section className="flex flex-col gap-4 rounded-lg bg-surface-container-low p-4">
+    <section className="border border-outline-variant flex flex-col gap-4 rounded-lg p-4">
       <div className="flex items-center gap-2">
         <h2 className="flex-1 text-title-medium text-on-surface">{monthName(s.month)}, looking back</h2>
         {mine && !rel.endedAt && <IconButton icon="edit" label="Change your answers" onClick={() => setEditing(true)} />}
@@ -396,7 +396,7 @@ function ReviewForm({ s, mine, onDone }: { s: MonthSummary; mine?: MonthReview; 
   const [workOn, setWorkOn] = useState(mine?.workOn ?? "");
   const others = rel.members.filter((m) => m.userId !== me.user.id && s.waitingOn.includes(m.userId)).map((m) => m.displayName);
   return (
-    <section className="flex flex-col gap-4 rounded-lg bg-surface-container-low p-4">
+    <section className="border border-outline-variant flex flex-col gap-4 rounded-lg p-4">
       <h2 className="text-title-medium text-on-surface">Look back on {monthName(s.month)}</h2>
       {others.length > 0 && (
         <p className="text-body-medium text-on-surface-variant">
@@ -463,7 +463,7 @@ function NextFocus({ month }: { month: string }) {
   if (!isDom || rel.endedAt || next.isPending) return null;
   if (focus && !editing)
     return (
-      <section className="flex items-start gap-3 rounded-lg bg-surface-container-low p-4">
+      <section className="border border-outline-variant flex items-start gap-3 rounded-lg p-4">
         <Icon name="flag" className="text-primary" />
         <div className="min-w-0 flex-1">
           <h2 className="text-title-medium text-on-surface">Focus for {monthName(month)}</h2>
@@ -473,7 +473,7 @@ function NextFocus({ month }: { month: string }) {
       </section>
     );
   return (
-    <section className="flex flex-col gap-4 rounded-lg bg-surface-container-low p-4">
+    <section className="border border-outline-variant flex flex-col gap-4 rounded-lg p-4">
       <h2 className="text-title-medium text-on-surface">Focus for {monthName(month)}</h2>
       <FocusFields goal={goal} setGoal={setGoal} picked={picked} setPicked={setPicked} tasks={tasks} />
       <div className="flex justify-end gap-2">

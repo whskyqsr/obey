@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -68,11 +69,13 @@ internal fun plural(n: Int, one: String, many: String = one + "s") = "$n ${if (n
 @Composable
 fun TodayInbox(heading: String, groups: List<InboxGroup>, busy: Boolean) {
     SectionHeader("$heading · ${groups.sumOf { it.count }}")
-    Column(
-        Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(MaterialTheme.shapes.large),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        groups.forEach { g -> key(g.key) { InboxRow(g, startOpen = groups.size == 1, busy = busy) } }
+    // Letters: groups on hairlines, no filled cards.
+    Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        groups.forEach { g ->
+            key(g.key) { InboxRow(g, startOpen = groups.size == 1, busy = busy) }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        }
     }
 }
 
@@ -81,14 +84,12 @@ private fun InboxRow(g: InboxGroup, startOpen: Boolean, busy: Boolean) {
     var toggled by rememberSaveable(g.key) { mutableStateOf(false) }
     val open = g.body != null && g.onOpen == null && toggled != startOpen
     val c = MaterialTheme.colorScheme
-    val (container, onContainer) = when (g.tone) {
-        InboxTone.Primary -> c.primaryContainer to c.onPrimaryContainer
-        InboxTone.Secondary -> c.secondaryContainer to c.onSecondaryContainer
-        InboxTone.Tertiary -> c.tertiaryContainer to c.onTertiaryContainer
-        InboxTone.Error -> c.errorContainer to c.onErrorContainer
-        InboxTone.Neutral -> c.surfaceContainerHighest to c.onSurfaceVariant
+    // The icon carries the tone on its own.
+    val tint = when (g.tone) {
+        InboxTone.Primary, InboxTone.Error -> c.primary
+        else -> c.onSurfaceVariant
     }
-    Column(Modifier.fillMaxWidth().background(c.surfaceContainerLow)) {
+    Column(Modifier.fillMaxWidth()) {
         Row(
             Modifier
                 .fillMaxWidth()
@@ -100,12 +101,12 @@ private fun InboxRow(g: InboxGroup, startOpen: Boolean, busy: Boolean) {
                         toggled = !toggled
                     }
                 }
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Box(Modifier.size(40.dp).background(container, CircleShape), contentAlignment = Alignment.Center) {
-                Icon(g.icon, null, Modifier.size(22.dp), tint = onContainer)
+            Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+                Icon(g.icon, null, Modifier.size(22.dp), tint = tint)
             }
             Column(Modifier.weight(1f)) {
                 Text(g.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -125,7 +126,7 @@ private fun InboxRow(g: InboxGroup, startOpen: Boolean, busy: Boolean) {
             }
         }
         AnimatedVisibility(open) {
-            Column(Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.padding(bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 g.body?.invoke()
                 g.action?.let { (label, run) ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -140,7 +141,10 @@ private fun InboxRow(g: InboxGroup, startOpen: Boolean, busy: Boolean) {
 /** Rows inside an opened group, joined like the groups themselves. */
 @Composable
 fun InboxRows(content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large), verticalArrangement = Arrangement.spacedBy(2.dp), content = content)
+    Column(Modifier.fillMaxWidth()) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        content()
+    }
 }
 
 /** "Sam added 1 rule, changed 2 protocols" from one person, otherwise "Changes: …". */
@@ -156,7 +160,7 @@ internal fun librarySummary(list: List<LibraryChange>, nameOf: (String) -> Strin
 fun LibraryChangeRow(change: LibraryChange, name: String, onOpen: (() -> Unit)?, onSeen: () -> Unit) {
     ListItem(
         modifier = if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier,
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
         headlineContent = { Text(change.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         supportingContent = { Text("$name ${change.verb} this ${if (change.kind == "rules") "rule" else "protocol"} · ${dayAndTime(change.createdAt)}") },
         trailingContent = { IconButton(onClick = onSeen) { Icon(Icons.Outlined.Close, "Seen") } },

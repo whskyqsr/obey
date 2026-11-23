@@ -1,5 +1,22 @@
 package app.obey.ui.upcoming
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.sp
+import app.obey.ui.common.Diamond
+import app.obey.ui.common.DiamondState
+import app.obey.ui.common.formatTime
+import app.obey.ui.today.diamondState
 import app.obey.ui.today.needsDoneDialog
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -97,6 +114,8 @@ fun UpcomingScreen(
     val session = vm.session
     val today = LocalDate.now()
     val canManage = session?.canManage == true
+    // Week view opens today by default; any day can be opened or closed.
+    var openDays by remember { mutableStateOf(setOf(today)) }
 
     val occurrenceRow: @Composable (Occurrence) -> Unit = { o ->
         val mine = o.assigneeId == session?.userId
@@ -203,36 +222,25 @@ fun UpcomingScreen(
                         dayItems(selected, items, events, occurrenceRow, planRow, planChip)
                     }
                 } else LazyColumn(Modifier.fillMaxSize()) {
-                    s.value.days.forEach { (day, occs) ->
+                    // Letters: one hairline row per day, a diamond for each task and a word on how it went. Tap a day to open it.
+                    item(key = "top") { HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant) }
+                    s.value.days.forEach { (day, all) ->
+                        val occs = all.filter { it.status != app.obey.api.OccurrenceStatus.Cancelled }
                         val events = s.value.eventsOn(day)
+                        val isOpen = day in openDays
                         item(key = "h-$day") {
-                            Row(
-                                Modifier.padding(start = 16.dp, end = 8.dp, top = 16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    if (day == today) "Today · ${formatDate(day)}" else formatDate(day),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = if (day == today) FontWeight.Bold else null,
-                                    color = if (day == today) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                if (canManage && !day.isBefore(today)) {
-                                    IconButton(onClick = { onNewTask(day) }) { Icon(Icons.Outlined.Add, "New task on ${formatDate(day)}") }
-                                }
+                            WeekDayRow(day, today, occs, events, isOpen) { openDays = if (isOpen) openDays - day else openDays + day }
+                        }
+                        if (isOpen) {
+                            dayItems(day, occs, events, occurrenceRow, planRow, planChip)
+                            if (canManage && !day.isBefore(today)) item(key = "add-$day") {
+                                TextButton(onClick = { onNewTask(day) }, modifier = Modifier.padding(start = 64.dp)) { Text("Add a task") }
                             }
                         }
-                        if (occs.isEmpty() && events.isEmpty()) {
-                            item(key = "e-$day") {
-                                Text(
-                                    "Nothing scheduled",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                                )
-                            }
-                        }
-                        dayItems(day, occs, events, occurrenceRow, planRow, planChip)
+                        item(key = "rule-$day") { HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant) }
+                    }
+                    item(key = "hint") {
+                        Text("Tap a day to see it, and a task to open it.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp))
                     }
                 }
             }
@@ -265,5 +273,44 @@ private fun LazyListScope.dayItems(
     val rows: List<Pair<Instant, Any>> = (timed.map { parseInstant(it.startsAt) to it } + occs.map { parseInstant(it.dueAt) to it }).sortedBy { it.first }
     items(rows, key = { (_, v) -> if (v is CalendarEvent) "pt-$day-${v.id}" else (v as Occurrence).id }) { (_, v) ->
         if (v is CalendarEvent) planRow(v, day) else occurrenceRow(v as Occurrence)
+    }
+}
+
+/** A day in the week: short weekday over the date in the serif, a diamond per task, then "1 missed", "all done", "2 of 6", a plan or "Off day". */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun WeekDayRow(day: LocalDate, today: LocalDate, occs: List<Occurrence>, events: List<CalendarEvent>, open: Boolean, onToggle: () -> Unit) {
+    val c = MaterialTheme.colorScheme
+    val now = Instant.now()
+    val states = occs.map { it.diamondState(now) }
+    val missed = states.count { it == DiamondState.Owed }
+    val done = occs.count { it.status == app.obey.api.OccurrenceStatus.Completed || it.status == app.obey.api.OccurrenceStatus.Excused }
+    val plan = events.firstOrNull()?.let { e -> e.title + if (e.allDay) "" else " " + formatTime(e.startsAt) }
+    val summary = when {
+        occs.isEmpty() -> plan ?: "Off day"
+        missed > 0 -> "$missed missed"
+        done == occs.size -> "all done"
+        day == today -> "$done of ${occs.size}"
+        else -> plan ?: if (day.isBefore(today)) "$done of ${occs.size}" else ""
+    }
+    val isToday = day == today
+    Row(
+        Modifier.fillMaxWidth()
+            .then(if (isToday) Modifier.background(c.surfaceContainerLowest).drawBehind { drawRect(c.primary, size = androidx.compose.ui.geometry.Size(2.dp.toPx(), size.height)) } else Modifier)
+            .clickable(onClickLabel = if (open) "Close" else "Open") { onToggle() }
+            .semantics { stateDescription = if (open) "Open" else "Closed"; contentDescription = "${formatDate(day)}, ${occs.size} tasks, $summary" }
+            .heightIn(min = 68.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Column(Modifier.width(40.dp)) {
+            Text(day.format(DateTimeFormatter.ofPattern("EEE")), style = MaterialTheme.typography.labelMedium, color = c.onSurfaceVariant)
+            Text("${day.dayOfMonth}", style = MaterialTheme.typography.headlineMedium.copy(fontSize = 28.sp, lineHeight = 28.sp), color = if (isToday) c.primary else c.onSurface)
+        }
+        FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            states.forEach { Diamond(it, size = 12.dp) }
+        }
+        Text(summary, style = MaterialTheme.typography.bodyMedium, color = if (missed > 0) c.error else c.onSurfaceVariant)
     }
 }

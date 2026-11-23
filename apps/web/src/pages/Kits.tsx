@@ -71,7 +71,7 @@ function KitCard({ icon, kit, shared, onClick }: { icon: string; kit: KitLike; s
   return (
     <Card variant="elevated" onClick={onClick}>
       <div className="flex items-start gap-4">
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-secondary-container text-on-secondary-container">
+        <div className="flex size-12 shrink-0 items-center justify-center text-on-surface-variant">
           <Icon name={icon} />
         </div>
         <div className="min-w-0 flex-1">
@@ -126,7 +126,7 @@ export function KitsPage() {
           </div>
         </>
       )}
-      <h2 className="px-4 pt-2 pb-2 text-title-small text-primary md:px-6">Starter kits</h2>
+      <h2 className="px-4 pt-2 pb-2 eyebrow md:px-6">Starter kits</h2>
       <div className="grid gap-3 px-4 pb-24 sm:grid-cols-2 md:px-6">
         {kits.map((k) => (
           <KitCard key={k.id} icon={k.icon} kit={k} onClick={() => setOpen(k)} />
@@ -275,7 +275,7 @@ export function KitDialog({ kit, source, onClose, onApplied }: { kit: KitLike; s
 
 function ItemList({ items }: { items: KitItem[] }) {
   return (
-    <div className="mx-4 overflow-hidden rounded-lg bg-surface-container-low md:mx-6">
+    <div className="border border-outline-variant mx-4 overflow-hidden rounded-lg md:mx-6">
       {items.map((i) => (
         <div key={i.key} className="flex items-center gap-4 border-t border-surface-container-highest px-4 py-3 first:border-t-0">
           <Icon name={KIND[i.kind].icon} className="text-on-surface-variant" />

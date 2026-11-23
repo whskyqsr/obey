@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -104,7 +105,7 @@ fun SwipeableRow(o: Occurrence, onDone: (() -> Unit)?, onMoreTime: (() -> Unit)?
 
 /** "1 of 5 done", what's next and the points still on the table today. */
 @Composable
-fun ProgressCard(today: List<Occurrence>) {
+fun ProgressCard(today: List<Occurrence>, showNext: Boolean = true) {
     val done = today.count { it.status == OccurrenceStatus.Completed || it.status == OccurrenceStatus.Submitted }
     val open = today.filter { it.status == OccurrenceStatus.Pending }
     val now = Instant.now()
@@ -112,34 +113,23 @@ fun ProgressCard(today: List<Occurrence>) {
     val left = open.sumOf { maxOf(0, it.points) }
     val showPoints = LocalFeatures.current.points
     val colors = MaterialTheme.colorScheme
-    Row(
-        Modifier
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .fillMaxWidth()
-            .background(colors.primaryContainer, RoundedCornerShape(24.dp))
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        CircularProgressIndicator(
-            progress = { if (today.isEmpty()) 0f else done.toFloat() / today.size },
-            modifier = Modifier.size(48.dp),
-            strokeWidth = 6.dp,
-            trackColor = colors.onPrimaryContainer.copy(alpha = 0.15f),
-        )
-        Column {
+    // Letters: the count in the serif and a thin ink line, not a ring. Progress is a glance, not the point.
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
             Text(
                 if (done == today.size) "All done for today" else "$done of ${today.size} done",
-                style = MaterialTheme.typography.titleLarge,
-                color = colors.onPrimaryContainer,
+                style = MaterialTheme.typography.headlineSmall,
+                color = colors.onSurface,
+                modifier = Modifier.weight(1f),
             )
-            val parts = listOfNotNull(
-                next?.let { "Next: ${it.title} in ${untilText(Duration.between(now, parseInstant(it.dueAt)))}" }
-                    ?: if (open.isNotEmpty()) "${open.size} still open" else null,
-                if (showPoints && left > 0) "$left pts left today" else null,
-            )
-            if (parts.isNotEmpty()) Text(parts.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = colors.onPrimaryContainer)
+            if (showPoints && left > 0) Text("$left pts left", style = MaterialTheme.typography.bodySmall, color = colors.outline)
         }
+        Box(Modifier.padding(top = 8.dp).fillMaxWidth().height(2.dp).background(colors.outlineVariant)) {
+            Box(Modifier.fillMaxWidth(if (today.isEmpty()) 0f else done.toFloat() / today.size).height(2.dp).background(colors.onSurface))
+        }
+        val line = if (!showNext) null else next?.let { "Next: ${it.title} in ${untilText(Duration.between(now, parseInstant(it.dueAt)))}" }
+            ?: if (open.isNotEmpty()) "${open.size} still open" else null
+        if (line != null) Text(line, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
     }
 }
 

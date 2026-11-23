@@ -26,7 +26,7 @@ export function NoteHistory({ note, open, onClose }: { note: Note; open: boolean
         {revisions.isLoading && <Loading />}
         {revisions.error && <ErrorBox error={revisions.error} onRetry={() => revisions.refetch()} />}
         {revisions.data?.map((r) => (
-          <section key={r.id} className="flex flex-col gap-1 rounded-md bg-surface-container px-4 py-3">
+          <section key={r.id} className="border border-outline-variant flex flex-col gap-1 rounded-md px-4 py-3">
             <div className="text-label-medium text-on-surface-variant">
               Replaced {fmtDateTime(r.createdAt)} by {r.editorId === me.user.id ? "you" : memberName(r.editorId)}
             </div>

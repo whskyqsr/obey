@@ -108,7 +108,7 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
         </div>
       </div>
       {counted && (
-        <div className="relative z-10 flex flex-col gap-2 rounded-sm bg-surface-container px-3 py-2">
+        <div className="border border-outline-variant relative z-10 flex flex-col gap-2 rounded-sm px-3 py-2">
           <div className="flex items-center gap-3">
             <CountRing
               o={o}
@@ -138,7 +138,7 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
         </div>
       )}
       {placed && (
-        <div className="relative z-10 flex flex-wrap items-center gap-3 rounded-sm bg-surface-container px-3 py-2">
+        <div className="border border-outline-variant relative z-10 flex flex-wrap items-center gap-3 rounded-sm px-3 py-2">
           <PlaceRing o={o} />
           <span className="min-w-0 flex-1 text-body-medium text-on-surface">
             {placeLine(o, placeOf(o.placeId)) ?? placeOf(o.placeId)?.name}
@@ -151,7 +151,7 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
       )}
       {counting && <CountSheet o={o} open onClose={() => setCounting(false)} />}
       {isRitual(o) && (
-        <div className="flex flex-col gap-2 rounded-sm bg-surface-container px-3 py-2">
+        <div className="border border-outline-variant flex flex-col gap-2 rounded-sm px-3 py-2">
           <div className="text-label-large text-on-surface-variant">{stepProgress(o)}</div>
           <StepList o={o} />
         </div>
@@ -166,7 +166,7 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
           <Icon name={MOODS[o.mood - 1]!} size={18} /> Felt {MOOD_LABELS[o.mood - 1]!.toLowerCase()}
         </p>
       )}
-      {o.noteMd && <p className="rounded-sm bg-surface-container px-3 py-2 text-body-medium whitespace-pre-wrap text-on-surface-variant">{o.noteMd}</p>}
+      {o.noteMd && <p className="border border-outline-variant rounded-sm px-3 py-2 text-body-medium whitespace-pre-wrap text-on-surface-variant">{o.noteMd}</p>}
       {o.photoCount > 0 && (
         <div className="relative z-10">
           <ProofPhotos o={o} canAdd={mine && (o.status === "pending" || o.status === "submitted")} />

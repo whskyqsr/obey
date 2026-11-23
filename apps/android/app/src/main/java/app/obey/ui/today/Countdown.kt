@@ -35,6 +35,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.obey.api.Occurrence
 import app.obey.api.OccurrenceStatus
 import app.obey.ui.common.formatTime
@@ -70,6 +71,8 @@ fun CountdownCard(
     onDone: (Occurrence) -> Unit,
     onMoreTime: (Occurrence) -> Unit,
     onOpen: (Occurrence) -> Unit,
+    /** The task the Next block already counts down. */
+    skip: String? = null,
 ) {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -78,7 +81,7 @@ fun CountdownCard(
             now = System.currentTimeMillis()
         }
     }
-    val o = nextDeadline(list, me, isDom, now) ?: return
+    val o = nextDeadline(list, me, isDom, now)?.takeIf { it.id != skip } ?: return
     val left = parseInstant(o.dueAt).toEpochMilli() - now
     val urgent = left <= URGENT
     val mine = o.assigneeId == me
@@ -121,6 +124,71 @@ fun CountdownCard(
                 gapSize = 0.dp,
                 drawStopIndicator = {},
             )
+        }
+    }
+}
+
+
+/** The one thing to do next: today's soonest open task of this person's own. Counted, location and curfew tasks keep their rings in the list. */
+fun pickNext(today: List<Occurrence>, me: String?): Occurrence? {
+    val now = java.time.Instant.now()
+    return today.asSequence()
+        .filter { it.assigneeId == me && it.status == OccurrenceStatus.Pending && it.isOpen() && !it.isCounted && !it.isPlaced && !it.curfew }
+        .filter { !parseInstant(it.dueAt).isBefore(now) }
+        .minByOrNull { it.dueAt }
+}
+
+/**
+ * Today leads with this for whoever has tasks: what's next, when, and Done or More time. Inside the last hour the
+ * "when" becomes a live countdown, red in the last 15 minutes.
+ */
+@Composable
+fun NextUp(o: Occurrence, by: String?, onDone: () -> Unit, onMoreTime: () -> Unit, onOpen: () -> Unit) {
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000 - System.currentTimeMillis() % 1000)
+            now = System.currentTimeMillis()
+        }
+    }
+    val c = MaterialTheme.colorScheme
+    val left = parseInstant(o.dueAt).toEpochMilli() - now
+    val allDay = isAllDayDue(o.dueAt)
+    val soon = !allDay && left in 1..HOUR
+    val urgent = soon && left <= URGENT
+    val minutes = left / 60_000
+    val whenText = when {
+        soon -> "${mmss(left)} left"
+        allDay -> "today"
+        minutes >= 60 -> "in ${minutes / 60}h"
+        else -> "in ${minutes.coerceAtLeast(1)} min"
+    }
+    val meta = listOfNotNull(
+        if (allDay) "Any time today" else formatTime(o.dueAt),
+        if (o.isRitual && o.stepsDone.isNotEmpty()) o.stepProgress else null,
+        if (o.proofRequired) (by?.let { "$it wants a photo" } ?: "Photo") else null,
+        if (o.approvalRequired && !o.proofRequired) (by?.let { "$it approves it" } ?: "Needs approval") else null,
+    ).joinToString(" · ")
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 16.dp)) {
+        Text(
+            "NEXT · ${whenText.uppercase()}",
+            style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
+            color = if (urgent) c.error else c.onSurfaceVariant,
+        )
+        Text(
+            o.title,
+            style = MaterialTheme.typography.headlineMedium,
+            color = c.onSurface,
+            modifier = Modifier.padding(top = 4.dp).clickable(onClick = onOpen),
+        )
+        Text(meta, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
+        Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            androidx.compose.material3.Button(onClick = onDone, modifier = Modifier.weight(1f).height(48.dp)) {
+                Text(if (o.isRitual) (if (o.stepsDone.isNotEmpty()) "Carry on" else "Start") else "Done")
+            }
+            androidx.compose.material3.OutlinedButton(onClick = onMoreTime, modifier = Modifier.weight(1f).height(48.dp)) {
+                Text("More time")
+            }
         }
     }
 }

@@ -88,7 +88,7 @@ function ReviewOpen() {
   if (!month.data?.reviewOpen || !month.data.waitingOn.includes(me.user.id)) return null;
   const name = fmtDate(`${current}-01`, { month: "long" });
   return (
-    <section className="flex flex-col gap-3 rounded-lg bg-secondary-container p-4 text-on-secondary-container sm:flex-row sm:items-center sm:gap-4">
+    <section className="border border-outline-variant flex flex-col gap-3 rounded-lg p-4 sm:flex-row sm:items-center sm:gap-4 text-on-surface">
       <div className="flex min-w-0 flex-1 items-start gap-3">
         <Icon name="flag" />
         <div className="min-w-0">
@@ -165,7 +165,7 @@ function Trend({ rate, previous, before }: { rate: number | null; previous: numb
 
 function Count({ label, value, dot }: { label: string; value: number; dot: string }) {
   return (
-    <div className="min-w-16 rounded-md bg-surface-container px-3 py-2">
+    <div className="border border-outline-variant min-w-16 rounded-md px-3 py-2">
       <dd className="text-title-large text-on-surface">{value}</dd>
       <dt className="flex items-center justify-center gap-1.5 text-label-medium text-on-surface-variant">
         <span className={cx("size-2 rounded-full", dot)} />
@@ -235,7 +235,7 @@ function Weekdays({ days }: { days: Tally[] }) {
           const d = days[i]!;
           return (
             <div key={i} className="flex flex-col items-center gap-1">
-              <div className="relative flex h-20 w-full max-w-10 items-end overflow-hidden rounded-sm bg-surface-container">
+              <div className="border border-outline-variant relative flex h-20 w-full max-w-10 items-end overflow-hidden rounded-sm">
                 {d.rate !== null && <div className="w-full bg-primary" style={{ height: `${Math.max(4, d.rate * 100)}%` }} />}
               </div>
               <span className={cx("text-label-medium", i === worst ? "font-bold text-on-surface" : "text-on-surface-variant")}>{WEEKDAYS[i]!.slice(0, 3)}</span>

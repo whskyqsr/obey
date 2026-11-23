@@ -37,7 +37,7 @@ export function PlacesPage() {
             body={canEdit ? "Save the places tasks can ask for: the gym, work, home." : "Places a Dominant saves for location tasks show here."}
           />
         ) : (
-          <ul className="overflow-hidden rounded-lg bg-surface-container-low">
+          <ul className="border border-outline-variant overflow-hidden rounded-lg">
             {places.data.map((p) => (
               <li key={p.id} className="border-t border-surface-container-highest first:border-t-0">
                 <button
@@ -46,7 +46,7 @@ export function PlacesPage() {
                   onClick={() => setEditing({ place: p })}
                   className="state-layer flex w-full items-center gap-4 px-4 py-3 text-left disabled:cursor-default"
                 >
-                  <span className="flex size-12 shrink-0 items-center justify-center rounded-md bg-primary-container text-on-primary-container">
+                  <span className="flex size-12 shrink-0 items-center justify-center text-on-surface-variant">
                     <Icon name="location_on" filled />
                   </span>
                   <span className="min-w-0 flex-1">

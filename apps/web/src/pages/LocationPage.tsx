@@ -10,7 +10,7 @@ import { AskLocationButton } from "./Places";
 import { describeCurfew } from "./Curfew";
 
 const Card = ({ icon, tone, title, body, children }: { icon: string; tone: "ok" | "warn"; title: string; body: string; children?: React.ReactNode }) => (
-  <div className="flex flex-col gap-3 rounded-lg bg-surface-container-low p-4">
+  <div className="border border-outline-variant flex flex-col gap-3 rounded-lg p-4">
     <div className="flex items-start gap-3">
       <Icon name={icon} filled className={tone === "ok" ? "text-primary" : "text-on-surface-variant"} />
       <div className="min-w-0 flex-1">
@@ -106,10 +106,10 @@ export function LocationPage() {
     items.length === 0 ? (
       <p className="px-1 text-body-medium text-on-surface-variant">No location tasks left today.</p>
     ) : (
-      <ul className="overflow-hidden rounded-lg bg-surface-container-low">
+      <ul className="border border-outline-variant overflow-hidden rounded-lg">
         {items.map((o) => (
           <li key={o.id} className="flex items-center gap-4 border-t border-surface-container-highest px-4 py-3 first:border-t-0">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary-container text-on-primary-container">
+            <span className="flex size-10 shrink-0 items-center justify-center text-primary">
               <Icon name="location_on" filled />
             </span>
             <span className="min-w-0 flex-1">
@@ -129,7 +129,7 @@ export function LocationPage() {
     <>
       <PageHeader title="Location" subtitle="Places, curfew and tasks done by getting somewhere." />
       <div className="flex flex-col gap-4 px-4 pb-10 md:px-6">
-        <div className="overflow-hidden rounded-lg bg-surface-container-low">
+        <div className="border border-outline-variant overflow-hidden rounded-lg">
           <LinkRow
             icon="location_on"
             title="Places"
@@ -148,7 +148,7 @@ export function LocationPage() {
 
         {watched ? (
           <>
-            <h2 className="px-1 pt-2 text-title-small text-primary">Your phone</h2>
+            <h2 className="px-1 pt-2 eyebrow">Your phone</h2>
             {ready ? (
               <Card icon="check_circle" tone="ok" title="On, allowed all the time" body={`${who} sees when you arrive at or leave a place a task names, and nothing else.`} />
             ) : (
@@ -160,10 +160,10 @@ export function LocationPage() {
               />
             )}
 
-            <h2 className="px-1 pt-2 text-title-small text-primary">Watching today</h2>
+            <h2 className="px-1 pt-2 eyebrow">Watching today</h2>
             {list(watching, false)}
 
-            <div className="flex flex-col gap-3 rounded-lg bg-surface-container-low p-4">
+            <div className="border border-outline-variant flex flex-col gap-3 rounded-lg p-4">
               <div className="text-body-large text-on-surface">Pause</div>
               {self?.locationPaused ? (
                 <>
@@ -194,11 +194,11 @@ export function LocationPage() {
         ) : (
           watchedOthers.length > 0 && (
             <>
-              <h2 className="px-1 pt-2 text-title-small text-primary">{watchedOthers.length === 1 ? `${watchedOthers[0]!.displayName}'s phone` : "Their phones"}</h2>
+              <h2 className="px-1 pt-2 eyebrow">{watchedOthers.length === 1 ? `${watchedOthers[0]!.displayName}'s phone` : "Their phones"}</h2>
               {watchedOthers.map((m) => (
                 <LocationReadiness key={m.userId} member={m} />
               ))}
-              <h2 className="px-1 pt-2 text-title-small text-primary">Watching today</h2>
+              <h2 className="px-1 pt-2 eyebrow">Watching today</h2>
               {list(
                 placeTasks.filter((o) => o.assigneeId !== me.user.id),
                 watchedOthers.length > 1,

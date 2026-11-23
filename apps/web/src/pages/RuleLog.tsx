@@ -70,7 +70,7 @@ export function RuleLogPage() {
           const m = rel.members.find((x) => x.userId === e.subjectId);
           const canRemove = !readOnly && (e.loggedBy === me.user.id || isDom);
           return (
-            <li key={e.id} className="flex items-start gap-3 rounded-md bg-surface-container-low p-3">
+            <li key={e.id} className="border border-outline-variant flex items-start gap-3 rounded-md p-3">
               <Avatar userId={e.subjectId} name={m?.displayName ?? "?"} version={m?.avatarVersion ?? null} size={32} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 text-title-medium text-on-surface">
