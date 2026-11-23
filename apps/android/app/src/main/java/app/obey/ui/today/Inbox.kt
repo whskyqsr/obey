@@ -79,6 +79,37 @@ fun TodayInbox(heading: String, groups: List<InboxGroup>, busy: Boolean) {
     }
 }
 
+/** A Dominant's decisions at the top of Today: a card each, its rows and buttons showing, no folding. */
+@Composable
+fun NeedsYouCards(groups: List<InboxGroup>, busy: Boolean) {
+    val c = MaterialTheme.colorScheme
+    Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        groups.forEach { g ->
+            key(g.key) {
+                Surface(
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                    color = c.surfaceContainerLowest,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+                        if (g.body != null && g.onOpen == null) {
+                            g.body.invoke()
+                            g.action?.let { (label, run) ->
+                                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.End) {
+                                    OutlinedButton(onClick = run, enabled = !busy) { Text(label) }
+                                }
+                            }
+                        } else {
+                            InboxRow(g, startOpen = false, busy = busy)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun InboxRow(g: InboxGroup, startOpen: Boolean, busy: Boolean) {
     var toggled by rememberSaveable(g.key) { mutableStateOf(false) }
