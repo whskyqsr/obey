@@ -7,10 +7,23 @@ on:
         description: "Version shown to users, like 1.0.0"
         required: true
         default: "1.0.0"
+      releaseNotes:
+        description: "What's new, shown to testers (optional)"
+        required: false
+        default: ""
+      playStatus:
+        description: "Internal testing release status: completed rolls out to testers; draft waits in Play Console"
+        required: true
+        default: completed
+        type: choice
+        options: [completed, draft]
 
 jobs:
   bundle:
     runs-on: ubuntu-latest
+    env:
+      # Set once Jake adds the Play service account key; until then builds stop at the artifact.
+      HAS_PLAY_KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
     defaults:
       run:
         working-directory: apps/android
@@ -50,3 +63,22 @@ jobs:
           name: fealty-release-aab-${{ inputs.versionName }}-${{ github.run_number }}
           path: apps/android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
+      - name: Write release notes
+        if: env.HAS_PLAY_KEY == 'true' && inputs.releaseNotes != ''
+        env:
+          NOTES: ${{ inputs.releaseNotes }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/whatsnew"
+          printf '%s' "$NOTES" > "$RUNNER_TEMP/whatsnew/whatsnew-en-US"
+      # Sends the bundle to the internal testing track; only listed testers get it. Production stays a manual promotion.
+      - name: Upload to Play internal testing
+        if: env.HAS_PLAY_KEY == 'true'
+        uses: r0adkll/upload-google-play@v1.1.3
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: me.fealty
+          releaseFiles: apps/android/app/build/outputs/bundle/release/*.aab
+          track: internal
+          status: ${{ inputs.playStatus }}
+          releaseName: ${{ inputs.versionName }} (${{ github.run_number }})
+          whatsNewDirectory: ${{ inputs.releaseNotes != '' && format('{0}/whatsnew', runner.temp) || '' }}
