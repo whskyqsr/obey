@@ -176,12 +176,30 @@ private suspend fun googleSignIn(context: Context, vm: SettingsViewModel) {
         // so say what came back instead of failing silently.
         Log.w("SignIn", "Google sign-in failed: ${e.type}", e)
         val why = e.message?.takeIf { it.isNotBlank() } ?: e.type
+        // [16] and [10] mean Google didn't match this app's package and signing certificate to an Android
+        // OAuth client, so show the certificate the installed app is actually signed with.
+        val cert = if (why.startsWith("[16]") || why.startsWith("[10]")) " · app SHA-1 ${signingSha1(context)}" else ""
         vm.reportError(
-            if (e is GetCredentialCancellationException) "Google sign-in didn't finish ($why)"
-            else "Google sign-in failed ($why)"
+            if (e is GetCredentialCancellationException) "Google sign-in didn't finish ($why)$cert"
+            else "Google sign-in failed ($why)$cert"
         )
     } catch (e: Exception) {
         Log.w("SignIn", "Google sign-in failed", e)
         vm.reportError("Google sign-in failed (${e.message ?: e.javaClass.simpleName})")
     }
 }
+
+/** SHA-1 of the certificate this install is signed with (Play's app signing key for Play installs). */
+@Suppress("DEPRECATION")
+private fun signingSha1(context: Context): String = runCatching {
+    val pm = context.packageManager
+    val certs = if (android.os.Build.VERSION.SDK_INT >= 28) {
+        val info = pm.getPackageInfo(context.packageName, android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES).signingInfo
+        if (info == null) emptyArray() else if (info.hasMultipleSigners()) info.apkContentsSigners else info.signingCertificateHistory
+    } else {
+        pm.getPackageInfo(context.packageName, android.content.pm.PackageManager.GET_SIGNATURES).signatures ?: emptyArray()
+    }
+    certs.joinToString(" / ") { sig ->
+        java.security.MessageDigest.getInstance("SHA-1").digest(sig.toByteArray()).joinToString(":") { "%02X".format(it) }
+    }.ifEmpty { "unknown" }
+}.getOrElse { "unknown" }
