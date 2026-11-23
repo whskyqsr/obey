@@ -10,6 +10,7 @@ export function Avatar({
   size = 40,
   collared,
   className,
+  serif,
 }: {
   userId: string;
   name: string;
@@ -18,6 +19,8 @@ export function Avatar({
   /** Shows a small collar badge at the bottom right. */
   collared?: boolean;
   className?: string;
+  /** The initial in the serif, as in the Letters mockups. */
+  serif?: boolean;
 }) {
   const url = useAvatarUrl(userId, version).data;
   const initial = name.trim().charAt(0).toUpperCase() || "?";
@@ -25,8 +28,11 @@ export function Avatar({
   return (
     <span className={cx("relative inline-flex shrink-0 rounded-full", className)} style={{ width: size, height: size }} aria-hidden>
       <span
-        className="inline-flex size-full items-center justify-center overflow-hidden rounded-full bg-secondary-container text-on-secondary-container"
-        style={{ fontSize: size * 0.42 }}
+        className={cx(
+          "inline-flex size-full items-center justify-center overflow-hidden rounded-full bg-secondary-container text-on-secondary-container",
+          serif && "font-serif",
+        )}
+        style={{ fontSize: size * (serif ? 0.56 : 0.42) }}
       >
         {url ? <img src={url} alt="" className="size-full object-cover" /> : initial}
       </span>

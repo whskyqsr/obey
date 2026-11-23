@@ -286,13 +286,17 @@ fun ProofBlurSetting(vm: ProofViewModel = hiltViewModel(key = "proof-settings"))
 
 /** A "Report" action for a person in the dynamic. */
 @Composable
-fun ReportPersonButton(userId: String, vm: ProofViewModel = hiltViewModel(key = "proof-report")) {
+fun ReportPersonButton(userId: String, text: Boolean = false, vm: ProofViewModel = hiltViewModel(key = "proof-report")) {
     var open by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val message by vm.message.collectAsStateWithLifecycle()
     LaunchedEffect(message) {
         message?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show(); vm.messageShown() }
     }
-    androidx.compose.material3.IconButton(onClick = { open = true }) { Icon(Icons.Outlined.Flag, "Report") }
+    if (text) {
+        androidx.compose.material3.TextButton(onClick = { open = true }) { androidx.compose.material3.Text("Report", color = androidx.compose.material3.MaterialTheme.colorScheme.primary) }
+    } else {
+        androidx.compose.material3.IconButton(onClick = { open = true }) { Icon(Icons.Outlined.Flag, "Report") }
+    }
     if (open) ReportDialog(photo = false, onDismiss = { open = false }, onSubmit = { r, d -> vm.report(userId, null, r, d); open = false })
 }

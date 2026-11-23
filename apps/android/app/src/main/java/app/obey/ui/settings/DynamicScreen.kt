@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -40,6 +41,7 @@ import androidx.compose.material.icons.outlined.AddLink
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.PersonAdd
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material3.AlertDialog
@@ -143,7 +145,7 @@ fun dynamicTitle(rel: Relationship, myId: String): String {
 
 /** The people in a dynamic as overlapping avatars. [ring] matches the surface behind them. */
 @Composable
-fun AvatarStack(members: List<Member>, load: suspend (String, String) -> androidx.compose.ui.graphics.ImageBitmap?, size: Dp, ring: Color, collared: (Member) -> Boolean = { false }) {
+fun AvatarStack(members: List<Member>, load: suspend (String, String) -> androidx.compose.ui.graphics.ImageBitmap?, size: Dp, ring: Color, collared: (Member) -> Boolean = { false }, serif: Boolean = false) {
     Row {
         members.take(4).forEachIndexed { i, m ->
             val c = collared(m)
@@ -152,11 +154,90 @@ fun AvatarStack(members: List<Member>, load: suspend (String, String) -> android
                 // A collared sub sits on top so the badge isn't hidden under the next picture.
                 modifier = Modifier
                     .zIndex(if (c) 1f else 0f)
-                    .offset(x = -(size / 5) * i)
-                    .border(4.dp, ring, CircleShape),
+                    .offset(x = -(size / (if (serif) 4 else 5)) * i)
+                    .border(if (serif) 1.dp else 4.dp, ring, CircleShape),
                 size = size,
                 collared = c,
+                serif = serif,
             )
+        }
+    }
+}
+
+/** "Sir leads · Kitten is the submissive"; a switch "switches". */
+fun whoLeads(members: List<Member>): String = members.joinToString(" · ") {
+    when (it.role) {
+        Role.Dominant -> "${it.displayName} leads"
+        Role.Submissive -> "${it.displayName} is the submissive"
+        else -> "${it.displayName} switches"
+    }
+}
+
+/** The hairline between rows. */
+@Composable
+private fun Hair() = HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+
+/** An action written as a link: "Add a date", "Join with a link or code". */
+@Composable
+private fun LinkRow(text: String, onClick: () -> Unit) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 16.dp),
+    )
+}
+
+/** Everyone's mood over the last month, one line each: the submissive's in ink, the others dashed in the accent. */
+@Composable
+private fun BothMoods(rel: Relationship, myId: String, header: @Composable () -> Unit) {
+    val vm: app.obey.ui.common.MoodViewModel = hiltViewModel(key = "moods-both")
+    LaunchedEffect(Unit) { vm.load(30) }
+    val all by vm.entries.collectAsStateWithLifecycle()
+    val list = all.orEmpty()
+    if (list.isEmpty()) return
+    val people = list.map { it.userId }.distinct().sortedBy { id -> if (rel.members.firstOrNull { it.userId == id }?.role == Role.Submissive) 0 else 1 }
+    val ink = MaterialTheme.colorScheme.onSurface
+    val accent = MaterialTheme.colorScheme.primary
+    header()
+    val end = System.currentTimeMillis()
+    val start = end - 30L * 86_400_000L
+    androidx.compose.foundation.Canvas(Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth().height(90.dp)) {
+        val y = { m: Int -> 6.dp.toPx() + ((5 - m) / 4f) * (size.height - 12.dp.toPx()) }
+        people.forEachIndexed { i, id ->
+            val pts = list.filter { it.userId == id }.sortedBy { it.at }.map { e ->
+                val t = runCatching { Instant.parse(e.at).toEpochMilli() }.getOrDefault(end)
+                androidx.compose.ui.geometry.Offset(((t - start).toFloat() / (end - start)) * size.width, y(e.mood))
+            }
+            val path = androidx.compose.ui.graphics.Path()
+            if (pts.size == 1) {
+                path.moveTo(0f, pts[0].y); path.lineTo(size.width, pts[0].y)
+            } else pts.forEachIndexed { j, p -> if (j == 0) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y) }
+            drawPath(
+                path,
+                color = if (i == 0) ink else accent,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                    width = (if (i == 0) 2f else 1.75f).dp.toPx(),
+                    join = androidx.compose.ui.graphics.StrokeJoin.Round,
+                    pathEffect = if (i == 0) null else androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 4.dp.toPx())),
+                ),
+            )
+        }
+    }
+    Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+        people.forEachIndexed { i, id ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                androidx.compose.foundation.Canvas(Modifier.width(20.dp).height(2.dp)) {
+                    drawLine(
+                        if (i == 0) ink else accent,
+                        androidx.compose.ui.geometry.Offset(0f, size.height / 2),
+                        androidx.compose.ui.geometry.Offset(size.width, size.height / 2),
+                        strokeWidth = 2.dp.toPx(),
+                        pathEffect = if (i == 0) null else androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())),
+                    )
+                }
+                Text(if (id == myId) "You" else rel.members.firstOrNull { it.userId == id }?.displayName ?: "Someone", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
@@ -185,40 +266,106 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
         onPauseOrDispose {}
     }
 
+    // People, other dynamics and leaving open as their own page, as in the mockups.
+    var people by rememberSaveable { mutableStateOf(false) }
+    androidx.activity.compose.BackHandler(people) { people = false }
+    val ended = session?.relationship?.ended == true
+
     Scaffold(
         topBar = {
-            LargeTopAppBar(
-                title = { Text("Your dynamic") },
-                navigationIcon = { BackLink("Us", onBack) },
-            )
+            if (people) {
+                LargeTopAppBar(title = { Text("People") }, navigationIcon = { BackLink("Your dynamic") { people = false } })
+            } else {
+                TopAppBar(
+                    title = {},
+                    navigationIcon = { BackLink("Us", onBack) },
+                    actions = {
+                        if (!ended) IconButton(onClick = { vm.clearInvite(); dialog = "invite" }) { Icon(Icons.Outlined.PersonAdd, "Invite someone") }
+                    },
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         val s = session ?: return@Scaffold
         val rel = s.relationship ?: return@Scaffold
         val me = rel.members.firstOrNull { it.userId == s.userId }
+        val c = MaterialTheme.colorScheme
         Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             // Opened from Settings' Features row: scroll to the switches once they're laid out.
             val scroll = rememberScrollState()
             var featuresAt by remember { mutableStateOf<Int?>(null) }
             LaunchedEffect(featuresAt) { if (startFeatures) featuresAt?.let { scroll.animateScrollTo(it) } }
-            Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(scroll)) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    AvatarStack(rel.members, vm::loadAvatar, size = 64.dp, ring = MaterialTheme.colorScheme.surface, collared = { rel.isCollared(it.userId) })
-                    Spacer(Modifier.height(12.dp))
-                    Text(dynamicTitle(rel, s.userId), style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
-                    val since = runCatching { formatDate(Instant.parse(rel.createdAt).atZone(ZoneId.systemDefault()).toLocalDate()) }.getOrNull()
+            if (people) {
+                Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                    rel.members.forEach { m ->
+                        ListItem(
+                            leadingContent = { Avatar(m.userId, m.displayName, m.avatarVersion, vm::loadAvatar, size = 44.dp, collared = rel.isCollared(m.userId), serif = true) },
+                            headlineContent = { Text(m.displayName) },
+                            supportingContent = { Text(if (m.userId == s.userId) "${m.role.label} · you" else m.role.label) },
+                            trailingContent = { if (m.userId != s.userId) app.obey.ui.proof.ReportPersonButton(m.userId, text = true) },
+                        )
+                        Hair()
+                    }
+                    if (!rel.ended) {
+                        OutlinedButton(
+                            onClick = { vm.clearInvite(); dialog = "invite" },
+                            modifier = Modifier.padding(16.dp).fillMaxWidth().height(56.dp),
+                        ) {
+                            Icon(Icons.Outlined.PersonAdd, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Invite someone")
+                        }
+                    }
+                    SectionHeader("Other dynamics")
+                    s.me.relationships.filter { it.id != rel.id }.forEach { r ->
+                        ListItem(
+                            modifier = Modifier.clickable { vm.selectRelationship(r.id) },
+                            headlineContent = { Text(r.title(s.userId)) },
+                            trailingContent = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
+                        )
+                        Hair()
+                    }
+                    LinkRow("Join with a link or code") { dialog = "join" }
+                    Hair()
+                    LinkRow("Start a new one") { dialog = "create" }
+                    Hair()
+                    SectionHeader(if (rel.ended) "Blocking" else "Leaving")
                     Text(
-                        listOfNotNull(me?.let { "You're the ${it.role.label}" }, since?.let { "together in Fealty since $it" }).joinToString(" · "),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        if (rel.ended) "Blocking stops them pairing with you again."
+                        else "Leaving or blocking ends this dynamic for everyone in it. You each keep a read-only copy. Proof photos are deleted.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = c.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                    // Kept apart from everything that edits, so it's never hit by accident.
+                    androidx.compose.foundation.layout.FlowRow(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (!rel.ended) OutlinedButton(onClick = { dialog = "leave" }) { Text("Leave") }
+                        s.partners.forEach { p ->
+                            OutlinedButton(
+                                onClick = { dialog = "block:${p.userId}" },
+                                border = androidx.compose.foundation.BorderStroke(1.dp, c.error),
+                            ) { Text(if (s.partners.size > 1) "Block ${p.displayName}" else "Block", color = c.error) }
+                        }
+                    }
+                    Spacer(Modifier.height(24.dp))
+                }
+            } else Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(scroll)) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    AvatarStack(rel.members, vm::loadAvatar, size = 72.dp, ring = c.outlineVariant, collared = { rel.isCollared(it.userId) }, serif = true)
+                    Spacer(Modifier.height(12.dp))
+                    Text(dynamicTitle(rel, s.userId), style = MaterialTheme.typography.displaySmall, textAlign = TextAlign.Center)
+                    Text(
+                        whoLeads(rel.members),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = c.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                     )
                 }
 
                 if (rel.ended) {
                     Surface(
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        color = c.surfaceContainerHigh,
                         shape = MaterialTheme.shapes.large,
                         modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
                     ) {
@@ -229,31 +376,6 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
                     }
                 }
 
-                SectionHeader("People")
-                rel.members.forEach { m ->
-                    ListItem(
-                        leadingContent = { Avatar(m.userId, m.displayName, m.avatarVersion, vm::loadAvatar, collared = rel.isCollared(m.userId)) },
-                        headlineContent = { Text(m.displayName + if (m.userId == s.userId) " (you)" else "") },
-                        supportingContent = { Text(m.role.label) },
-                        trailingContent = {
-                            if (m.userId != s.userId) Row {
-                                app.obey.ui.proof.ReportPersonButton(m.userId)
-                                IconButton(onClick = { dialog = "block:${m.userId}" }) { Icon(Icons.Outlined.Block, "Block ${m.displayName}") }
-                            }
-                        },
-                    )
-                }
-                if (!rel.ended) {
-                    ListItem(
-                        modifier = Modifier.clickable { vm.clearInvite(); dialog = "invite" },
-                        leadingContent = { Icon(Icons.Outlined.PersonAdd, null) },
-                        headlineContent = { Text("Invite someone") },
-                    )
-                }
-
-                // Journal and Stats both chart moods; this is the fallback when neither is on.
-                if (!rel.features.journal && !rel.features.stats) app.obey.ui.common.MoodCard(Modifier.padding(horizontal = 16.dp), header = { SectionHeader("Mood") })
-
                 val today = java.time.LocalDate.now()
                 val dates = rel.dates.sortedBy { d -> runCatching { daysUntilNext(java.time.LocalDate.parse(d.date), today) }.getOrDefault(Long.MAX_VALUE) }
                 if (s.canManage || dates.isNotEmpty()) {
@@ -261,26 +383,72 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
                     dates.forEach { d ->
                         ListItem(
                             modifier = if (s.canManage) Modifier.clickable { editingDate = d } else Modifier,
-                            leadingContent = { Icon(dateIcon(d.label), null) },
                             headlineContent = { Text(d.label) },
-                            supportingContent = { Text(runCatching { describeDate(java.time.LocalDate.parse(d.date), today) }.getOrDefault(d.date)) },
-                            trailingContent = { if (s.canManage) Icon(Icons.Outlined.Edit, "Edit ${d.label}") },
+                            trailingContent = {
+                                Text(
+                                    runCatching { describeDate(java.time.LocalDate.parse(d.date), today) }.getOrDefault(d.date),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = c.onSurfaceVariant,
+                                    textAlign = TextAlign.End,
+                                    modifier = Modifier.widthIn(max = 220.dp),
+                                )
+                            },
                         )
+                        Hair()
                     }
                     if (s.canManage) {
-                        val hint: (@Composable () -> Unit)? = if (dates.isEmpty()) {
-                            { Text("An anniversary, a collaring, the day you met") }
-                        } else {
-                            null
-                        }
-                        ListItem(
-                            modifier = Modifier.clickable { editingDate = DynamicDate("", "", "") },
-                            leadingContent = { Icon(Icons.Outlined.Add, null) },
-                            headlineContent = { Text("Add a date") },
-                            supportingContent = hint,
-                        )
+                        LinkRow("Add a date") { editingDate = DynamicDate("", "", "") }
+                        Hair()
                     }
                 }
+
+                BothMoods(rel, s.userId) { SectionHeader("Mood, both of you") }
+
+                val swapWith = app.obey.ui.roles.swapPartner(s)
+                val swap = rel.roleSwap
+                val inSwap = swap != null && (swap.requestedBy == s.userId || swap.partnerId == s.userId)
+                if (!rel.ended) {
+                    SectionHeader("Together")
+                    if (swapWith != null || inSwap) {
+                        val opens = swap == null || swap.active || swap.requestedBy == s.userId
+                        ListItem(
+                            modifier = if (opens) Modifier.clickable { dialog = if (swap == null) "swap" else "end-swap" } else Modifier,
+                            leadingContent = { Icon(Icons.Outlined.SwapHoriz, null) },
+                            headlineContent = { Text(if (swap?.active == true) "Roles swapped" else if (swap != null) "Swap asked for" else "Swap roles for a while") },
+                            supportingContent = {
+                                Text(
+                                    when {
+                                        swap == null -> "Both of you agree first"
+                                        swap.active -> swap.endsAt?.let { "Until ${app.obey.ui.roles.formatSwapEnd(it)}" } ?: "Until one of you swaps back"
+                                        swap.requestedBy == s.userId -> "Waiting for ${s.nameOf(swap.partnerId)} to accept"
+                                        else -> "${s.nameOf(swap.requestedBy)} asked; answer on Today"
+                                    },
+                                )
+                            },
+                        )
+                        Hair()
+                        when (dialog) {
+                            "swap" -> app.obey.ui.roles.SwapSheet(s, onDismiss = { dialog = null })
+                            "end-swap" -> swap?.let { app.obey.ui.roles.EndSwapDialog(s, it, onDismiss = { dialog = null }) }
+                        }
+                    }
+                    ListItem(
+                        modifier = Modifier.clickable { vm.clearInvite(); dialog = "invite" },
+                        leadingContent = { Icon(Icons.Outlined.PersonAdd, null) },
+                        headlineContent = { Text("Invite someone") },
+                        supportingContent = { Text("Link or code") },
+                    )
+                    Hair()
+                }
+
+                SectionHeader("People")
+                ListItem(
+                    modifier = Modifier.clickable { people = true },
+                    leadingContent = { Icon(Icons.Outlined.Group, null) },
+                    headlineContent = { Text(rel.members.joinToString(", ") { if (it.userId == s.userId) "You" else it.displayName }) },
+                    trailingContent = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
+                )
+                Hair()
 
                 if (rel.features.location) {
                     SectionHeader("Location")
@@ -291,6 +459,7 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
                         supportingContent = { Text(if (s.canManage) "Where location tasks can send someone" else "The places location tasks use") },
                         trailingContent = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
                     )
+                    Hair()
                     if (s.canManage || curfew?.enabled == true) {
                         ListItem(
                             modifier = Modifier.clickable(onClick = onCurfew),
@@ -299,6 +468,7 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
                             supportingContent = { Text(curfew?.takeIf { it.enabled }?.let { app.obey.ui.location.describeCurfew(it) } ?: "Off") },
                             trailingContent = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
                         )
+                        Hair()
                     }
                     if (me != null && me.role != Role.Dominant && !rel.ended) {
                         ListItem(
@@ -316,37 +486,9 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
                             },
                             trailingContent = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
                         )
+                        Hair()
                     }
                 }
-
-                val swapWith = app.obey.ui.roles.swapPartner(s)
-                val swap = rel.roleSwap
-                val inSwap = swap != null && (swap.requestedBy == s.userId || swap.partnerId == s.userId)
-                if (!rel.ended && (swapWith != null || inSwap)) {
-                    SectionHeader("Roles")
-                    val opens = swap == null || swap.active || swap.requestedBy == s.userId
-                    ListItem(
-                        modifier = if (opens) Modifier.clickable { dialog = if (swap == null) "swap" else "end-swap" } else Modifier,
-                        leadingContent = { Icon(Icons.Outlined.SwapHoriz, null) },
-                        headlineContent = { Text(if (swap?.active == true) "Roles swapped" else if (swap != null) "Swap asked for" else "Swap roles") },
-                        supportingContent = {
-                            Text(
-                                when {
-                                    swap == null -> "Trade Dominant and submissive with ${swapWith?.displayName}, for a while or for good"
-                                    swap.active -> swap.endsAt?.let { "Until ${app.obey.ui.roles.formatSwapEnd(it)}" } ?: "Until one of you swaps back"
-                                    swap.requestedBy == s.userId -> "Waiting for ${s.nameOf(swap.partnerId)} to accept"
-                                    else -> "${s.nameOf(swap.requestedBy)} asked; answer on Today"
-                                },
-                            )
-                        },
-                        trailingContent = { if (opens) Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
-                    )
-                    when (dialog) {
-                        "swap" -> app.obey.ui.roles.SwapSheet(s, onDismiss = { dialog = null })
-                        "end-swap" -> swap?.let { app.obey.ui.roles.EndSwapDialog(s, it, onDismiss = { dialog = null }) }
-                    }
-                }
-
                 SectionHeader("How it works")
                 ListItem(
                     modifier = if (s.canManage) Modifier.clickable { dialog = "relname" } else Modifier,
@@ -423,34 +565,6 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 )
 
-                SectionHeader("Other dynamics")
-                s.me.relationships.filter { it.id != rel.id }.forEach { r ->
-                    ListItem(
-                        modifier = Modifier.clickable { vm.selectRelationship(r.id) },
-                        leadingContent = { Icon(Icons.Outlined.SwapHoriz, null) },
-                        headlineContent = { Text("Switch to ${r.title(s.userId)}") },
-                    )
-                }
-                ListItem(
-                    modifier = Modifier.clickable { dialog = "join" },
-                    leadingContent = { Icon(Icons.Outlined.AddLink, null) },
-                    headlineContent = { Text("Join with a link or code") },
-                )
-                ListItem(
-                    modifier = Modifier.clickable { dialog = "create" },
-                    leadingContent = { Icon(Icons.Outlined.Add, null) },
-                    headlineContent = { Text("Start a new one") },
-                )
-                if (!rel.ended) {
-                    // Kept apart from everything that edits, so it's never hit by accident.
-                    SectionHeader("Leave")
-                    ListItem(
-                        modifier = Modifier.clickable { dialog = "leave" },
-                        leadingContent = { Icon(Icons.AutoMirrored.Outlined.Logout, null, tint = MaterialTheme.colorScheme.error) },
-                        headlineContent = { Text("Leave this dynamic", color = MaterialTheme.colorScheme.error) },
-                        supportingContent = { Text("Ends it for both of you; you each keep a read-only copy") },
-                    )
-                }
                 Spacer(Modifier.height(24.dp))
             }
         }

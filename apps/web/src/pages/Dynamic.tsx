@@ -1,13 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { useCreateInvite, useCurfew, useLeaveRelationship, useUpdateRelationship } from "../api/hooks";
+import { useCreateInvite, useCurfew, useLeaveRelationship, useMoods, useUpdateRelationship } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { DynamicDate, Features, Invite, Member, Relationship, ReschedulePolicy, Role } from "../api/types";
 import { Avatar } from "../components/Avatar";
 import { CollarIcon } from "../components/CollarIcon";
-import { MoodCard } from "../components/Mood";
 import { DynamicHero } from "../components/DynamicHero";
-import { SubHeader, Button, Checkbox, Chip, Dialog, Icon, OverflowMenu, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
+import { SubHeader, BackLink, Button, Checkbox, Chip, Dialog, Icon, IconButton, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
 import { ReportDialog } from "../components/Proof";
 import { EndSwapDialog, SwapDialog, fmtSwapEnd, swapPartner } from "../components/RoleSwap";
 import { fmtDate, fmtDateTime, localDateOf, today } from "../lib/dates";
@@ -53,7 +52,17 @@ const DATE_PRESETS = ["Anniversary", "Collaring", "First met"];
 const DATE_ICON: Record<string, string> = { Anniversary: "favorite", "First met": "waving_hand" };
 
 /** Add or change one of the dynamic's dates; a preset label or any other. */
-function DateDialog({ value, onClose, onSave, onDelete }: { value: DynamicDate | null; onClose(): void; onSave(d: DynamicDate): void; onDelete(id: string): void }) {
+function DateDialog({
+  value,
+  onClose,
+  onSave,
+  onDelete,
+}: {
+  value: DynamicDate | null;
+  onClose(): void;
+  onSave(d: DynamicDate): void;
+  onDelete(id: string): void;
+}) {
   const [label, setLabel] = useState("");
   const [date, setDate] = useState("");
   useEffect(() => {
@@ -121,11 +130,14 @@ export function useDynamicTitle() {
 }
 
 const Label = ({ children, id }: { children: ReactNode; id?: string }) => (
-  <h2 id={id} className="scroll-mt-4 px-1 pt-6 pb-2 eyebrow">
+  <h2 id={id} className="scroll-mt-4 pt-8 pb-1 eyebrow">
     {children}
   </h2>
 );
-const Group = ({ children }: { children: ReactNode }) => <div className="border border-outline-variant overflow-hidden rounded-lg">{children}</div>;
+/** Rows between hairlines, as in the mockups. */
+const Group = ({ children }: { children: ReactNode }) => (
+  <div className="flex flex-col divide-y divide-outline-variant border-b border-outline-variant">{children}</div>
+);
 
 function Row({
   leading,
@@ -142,10 +154,14 @@ function Row({
 }) {
   const Comp = onClick ? "button" : "div";
   return (
-    <Comp type={onClick ? "button" : undefined} onClick={onClick} className={cx("flex min-h-14 w-full items-center gap-4 px-4 py-3 text-left", onClick && "state-layer")}>
+    <Comp
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      className={cx("flex min-h-16 w-full items-center gap-4 py-3.5 text-left", onClick && "state-layer")}
+    >
       {leading}
       <span className="min-w-0 flex-1">
-        <span className="block text-body-large text-on-surface">{headline}</span>
+        <span className="block text-body-large text-on-surface md:text-[17px]">{headline}</span>
         {supporting && <span className="block text-body-medium text-on-surface-variant">{supporting}</span>}
       </span>
       {trailing}
@@ -175,79 +191,40 @@ export function DynamicPage() {
   const swapWith = swapPartner(rel, me.user.id);
   const swap = rel.roleSwap;
   const inSwap = swap && (swap.requestedBy === me.user.id || swap.partnerId === me.user.id);
-  const [reporting, setReporting] = useState<string | null>(null);
-  // Leaving (null target) or blocking one person.
-  const [leaving, setLeaving] = useState<{ target: Member | null } | null>(null);
   const ended = rel.endedAt !== null;
   // The date being edited: an existing one, or a blank new one.
   const [editingDate, setEditingDate] = useState<DynamicDate | null>(null);
   const now = today();
   // Soonest to come round first.
-  const dates = [...(rel.dates ?? [])].sort((a, b) => (a.date > now ? 0 : anniversary(a.date, now).daysUntil) - (b.date > now ? 0 : anniversary(b.date, now).daysUntil));
+  const dates = [...(rel.dates ?? [])].sort(
+    (a, b) => (a.date > now ? 0 : anniversary(a.date, now).daysUntil) - (b.date > now ? 0 : anniversary(b.date, now).daysUntil),
+  );
   const saveDates = (next: DynamicDate[], msg: string) => patch({ dates: next }, msg);
-  const patch = (body: Parameters<typeof update.mutate>[0], msg = "Saved") => update.mutate(body, { onSuccess: () => snack(msg), onError: (e) => snack(errorMessage(e)) });
+  const patch = (body: Parameters<typeof update.mutate>[0], msg = "Saved") =>
+    update.mutate(body, { onSuccess: () => snack(msg), onError: (e) => snack(errorMessage(e)) });
   const partner = rel.members.find((m) => m.userId !== me.user.id);
   const policy = POLICIES.find((p) => p.value === rel.reschedulePolicy);
   const sub = rel.members.find((m) => m.role === "submissive");
 
   return (
     <div className="flex flex-col pb-10">
-      <SubHeader title="Your dynamic" back="Us" onBack={back} />
+      <TopBar back={back} onInvite={ended ? undefined : () => setSheet("invite")} />
       <div className="mx-auto w-full max-w-2xl px-4 md:px-6">
         <DynamicHero
-          className="py-4"
+          className="pt-2 pb-2"
+          size={72}
+          large
           people={rel.members.map((m) => ({ ...m, collared: isCollared(rel, m.userId) }))}
           title={title}
-          sub={[
-            self ? `You're the ${ROLE_LABEL[self.role]}` : null,
-            `together in Fealty since ${fmtDate(localDateOf(new Date(rel.createdAt)), { month: "short", day: "numeric", year: "numeric" })}`,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
+          sub={whoLeads(rel.members)}
         />
 
         {ended && (
-          <div className="mb-2 flex items-start gap-3 border-l-2 border-outline-variant px-4 py-1 text-body-medium text-on-surface-variant">
+          <div className="mt-4 flex items-start gap-3 border-l-2 border-outline-variant px-4 py-1 text-body-medium text-on-surface-variant">
             <Icon name="inventory_2" className="shrink-0" />
             {endedLine(rel, me.user.id, memberName)}
           </div>
         )}
-        {reporting && <ReportDialog subjectId={reporting} onClose={() => setReporting(null)} />}
-        <Label>People</Label>
-        <Group>
-          {rel.members.map((m) => (
-            <Row
-              key={m.userId}
-              leading={<Avatar userId={m.userId} name={m.displayName} version={m.avatarVersion} collared={isCollared(rel, m.userId)} />}
-              headline={m.userId === me.user.id ? `${m.displayName} (you)` : m.displayName}
-              supporting={ROLE_LABEL[m.role]}
-              trailing={
-                m.userId !== me.user.id ? (
-                  <OverflowMenu
-                    items={[
-                      { label: "Report", icon: "flag", onClick: () => setReporting(m.userId) },
-                      { label: "Block", icon: "block", danger: true, onClick: () => setLeaving({ target: m }) },
-                    ]}
-                  />
-                ) : undefined
-              }
-            />
-          ))}
-          {!ended && (
-            <Row
-              leading={
-                <span className="flex size-10 items-center justify-center text-on-surface-variant">
-                  <Icon name="person_add" />
-                </span>
-              }
-              headline="Invite someone"
-              onClick={() => setSheet("invite")}
-            />
-          )}
-        </Group>
-
-        {/* Journal and Stats both chart moods; this is the fallback when neither is on. */}
-        {!features.journal && !features.stats && <MoodCard heading={<Label>Mood</Label>} />}
 
         {(isDom || dates.length > 0) && (
           <>
@@ -256,26 +233,68 @@ export function DynamicPage() {
               {dates.map((d) => (
                 <Row
                   key={d.id}
-                  leading={
-                    d.label === "Collaring" ? <CollarIcon className="text-on-surface-variant" /> : <Icon name={DATE_ICON[d.label] ?? "event"} className="text-on-surface-variant" />
-                  }
                   headline={d.label}
-                  supporting={describeDate(d.date, now)}
-                  trailing={isDom && <Icon name="edit" className="text-on-surface-variant" />}
+                  trailing={<span className="shrink-0 text-right text-body-medium text-on-surface-variant">{describeDate(d.date, now)}</span>}
                   onClick={isDom ? () => setEditingDate(d) : undefined}
                 />
               ))}
               {isDom && (
-                <Row
-                  leading={<Icon name="add" className="text-on-surface-variant" />}
-                  headline="Add a date"
-                  supporting={dates.length ? undefined : "An anniversary, a collaring, the day you met"}
+                <button
+                  type="button"
                   onClick={() => setEditingDate({ id: "", label: "", date: "" })}
-                />
+                  className="state-layer py-3.5 text-left text-body-large text-primary"
+                >
+                  Add a date
+                </button>
               )}
             </Group>
           </>
         )}
+
+        <BothMoods heading={<Label>Mood, both of you</Label>} />
+
+        {!ended && (
+          <>
+            <Label>Together</Label>
+            <Group>
+              {(swapWith || inSwap) && (
+                <Row
+                  leading={<Icon name="swap_horiz" className="text-on-surface-variant" />}
+                  headline={swap?.status === "active" ? "Roles swapped" : swap ? "Swap asked for" : "Swap roles for a while"}
+                  supporting={
+                    swap?.status === "active"
+                      ? swap.endsAt
+                        ? `Until ${fmtSwapEnd(swap.endsAt)}`
+                        : "Until one of you swaps back"
+                      : swap
+                        ? swap.requestedBy === me.user.id
+                          ? `Waiting for ${memberName(swap.partnerId)} to accept`
+                          : `${memberName(swap.requestedBy)} asked; answer on Today`
+                        : "Both of you agree first"
+                  }
+                  onClick={
+                    !swap ? () => setSheet("swap") : swap.status === "active" || swap.requestedBy === me.user.id ? () => setSheet("end-swap") : undefined
+                  }
+                />
+              )}
+              <Row
+                leading={<Icon name="person_add" className="text-on-surface-variant" />}
+                headline="Invite someone"
+                supporting="Link or code"
+                onClick={() => setSheet("invite")}
+              />
+            </Group>
+          </>
+        )}
+        <Label>People</Label>
+        <Group>
+          <Row
+            leading={<Icon name="group" className="text-on-surface-variant" />}
+            headline={rel.members.map((m) => (m.userId === me.user.id ? "You" : m.displayName)).join(", ")}
+            trailing={<Icon name="chevron_right" className="text-on-surface-variant" />}
+            onClick={() => navigate({ to: "/dynamic/people" })}
+          />
+        </Group>
 
         {features.location && (
           <>
@@ -310,31 +329,6 @@ export function DynamicPage() {
           </>
         )}
 
-        {!rel.endedAt && (swapWith || inSwap) && (
-          <>
-            <Label>Roles</Label>
-            <Group>
-              <Row
-                leading={<Icon name="swap_horiz" className="text-on-surface-variant" />}
-                headline={swap?.status === "active" ? "Roles swapped" : swap ? "Swap asked for" : "Swap roles"}
-                supporting={
-                  swap?.status === "active"
-                    ? swap.endsAt
-                      ? `Until ${fmtSwapEnd(swap.endsAt)}`
-                      : "Until one of you swaps back"
-                    : swap
-                      ? swap.requestedBy === me.user.id
-                        ? `Waiting for ${memberName(swap.partnerId)} to accept`
-                        : `${memberName(swap.requestedBy)} asked; answer on Today`
-                      : `Trade Dominant and submissive with ${swapWith!.displayName}, for a while or for good`
-                }
-                trailing={(!swap || swap.status === "active" || swap.requestedBy === me.user.id) && <Icon name="chevron_right" className="text-on-surface-variant" />}
-                onClick={!swap ? () => setSheet("swap") : swap.status === "active" || swap.requestedBy === me.user.id ? () => setSheet("end-swap") : undefined}
-              />
-            </Group>
-          </>
-        )}
-
         <Label>How it works</Label>
         <Group>
           <Row
@@ -349,7 +343,7 @@ export function DynamicPage() {
             trailing={isDom && <Icon name="chevron_right" className="text-on-surface-variant" />}
             onClick={isDom ? () => setSheet("deadlines") : undefined}
           />
-          <div className="px-4 py-1">
+          <div className="py-1">
             <Switch
               checked={rel.subNotes}
               onChange={(on) => isDom && patch({ subNotes: on }, on ? "Notes turned on for them" : "Notes turned off for them")}
@@ -357,14 +351,17 @@ export function DynamicPage() {
               help="Their own notes. Yours stay read-only to them unless you let them edit one."
             />
           </div>
-          <div className="px-4 pt-3 pb-4">
+          <div className="pt-3 pb-4">
             <Select
               label="Keep proof photos"
               value={rel.proofDays === null ? "" : String(rel.proofDays)}
               disabled={!!rel.endedAt}
               onChange={(e) => {
                 const days = e.target.value ? Number(e.target.value) : null;
-                patch({ proofDays: days }, days ? `Proof photos are deleted ${PROOF_DAYS.find((d) => d.value === days)?.label.toLowerCase()}` : "Proof photos are kept");
+                patch(
+                  { proofDays: days },
+                  days ? `Proof photos are deleted ${PROOF_DAYS.find((d) => d.value === days)?.label.toLowerCase()}` : "Proof photos are kept",
+                );
               }}
               help="Either of you can change this. A photo that's been reported stays until it's reviewed."
             >
@@ -380,7 +377,7 @@ export function DynamicPage() {
 
         <Label id="features">Features</Label>
         <Group>
-          <div className="px-4 py-1">
+          <div className="py-1">
             {FEATURE_ROWS.map((f) => (
               <Switch
                 key={f.key}
@@ -391,48 +388,14 @@ export function DynamicPage() {
             ))}
           </div>
         </Group>
-        <p className="px-1 pt-2 text-body-small text-on-surface-variant">
+        <p className="pt-2 text-body-small text-on-surface-variant">
           {isDom
             ? "Switched-off features are hidden for everyone here. Nothing is deleted."
             : ended
               ? "This dynamic has ended, so nothing here can change."
               : "Only a Dominant can change how this dynamic works."}
         </p>
-
-        <Label>Other dynamics</Label>
-        <Group>
-          {me.relationships.length > 1 &&
-            me.relationships
-              .filter((r) => r.id !== rel.id)
-              .map((r) => (
-                <Row
-                  key={r.id}
-                  leading={<Icon name="swap_horiz" className="text-on-surface-variant" />}
-                  headline={`Switch to ${relTitle(r, me.user.id)}`}
-                  onClick={() => {
-                    select(r.id);
-                    void navigate({ to: "/" });
-                  }}
-                />
-              ))}
-          <Row leading={<Icon name="add_link" className="text-on-surface-variant" />} headline="Join or start another" onClick={() => navigate({ to: "/onboarding" })} />
-        </Group>
-
-        {!ended && (
-          <>
-            <Label>Leave</Label>
-            <Group>
-              <Row
-                leading={<Icon name="logout" className="text-error" />}
-                headline={<span className="text-error">Leave this dynamic</span>}
-                supporting="Ends it for both of you; you each keep a read-only copy"
-                onClick={() => setLeaving({ target: null })}
-              />
-            </Group>
-          </>
-        )}
       </div>
-      {leaving && <LeaveDialog target={leaving.target} onClose={() => setLeaving(null)} />}
 
       <InviteSheet open={sheet === "invite"} onClose={() => setSheet(null)} />
       <SwapDialog open={sheet === "swap"} onClose={() => setSheet(null)} />
@@ -453,6 +416,161 @@ export function DynamicPage() {
         }
       />
       <DeadlinesDialog open={sheet === "deadlines"} onClose={() => setSheet(null)} onSave={(body) => patch(body)} />
+    </div>
+  );
+}
+
+/** The top line: back to Us, and inviting someone. */
+function TopBar({ back, onInvite, label = "Us" }: { back(): void; onInvite?: () => void; label?: string }) {
+  return (
+    <div className="flex min-h-10 items-center gap-1 px-4 pt-3 md:px-6 md:pt-6">
+      <div className="min-w-0 flex-1">
+        <BackLink label={label} onClick={back} />
+      </div>
+      {onInvite && <IconButton icon="person_add" label="Invite someone" onClick={onInvite} />}
+    </div>
+  );
+}
+
+/** "Sir leads · Kitten is the submissive"; a switch "switches". */
+export function whoLeads(members: Member[]) {
+  return members
+    .map((m) =>
+      m.role === "dominant" ? `${m.displayName} leads` : m.role === "submissive" ? `${m.displayName} is the submissive` : `${m.displayName} switches`,
+    )
+    .join(" · ");
+}
+
+/** Everyone's mood over the last month as one line each; the submissive's in ink, the others dashed. */
+function BothMoods({ heading }: { heading: ReactNode }) {
+  const { rel, me, memberName } = useRel();
+  const moods = useMoods(rel.id, 30);
+  const list = moods.data ?? [];
+  if (!list.length) return null;
+  const people = [...new Set(list.map((m) => m.userId))].sort((a, b) => {
+    const r = (id: string) => (rel.members.find((m) => m.userId === id)?.role === "submissive" ? 0 : 1);
+    return r(a) - r(b);
+  });
+  const W = 600;
+  const Hh = 90;
+  const end = Date.now();
+  const start = end - 30 * 86_400_000;
+  const x = (iso: string) => ((new Date(iso).getTime() - start) / (end - start)) * W;
+  const y = (m: number) => 6 + ((5 - m) / 4) * (Hh - 12);
+  return (
+    <>
+      {heading}
+      <svg viewBox={`0 0 ${W} ${Hh}`} preserveAspectRatio="none" className="mt-3 block h-[90px] w-full" role="img" aria-label="Mood over the last 30 days">
+        {people.map((id, i) => {
+          const pts = list.filter((m) => m.userId === id).sort((a, b) => a.at.localeCompare(b.at));
+          const d = pts.map((p, j) => `${j ? "L" : "M"}${x(p.at).toFixed(1)},${y(p.mood).toFixed(1)}`).join(" ");
+          return (
+            <path
+              key={id}
+              d={pts.length > 1 ? d : `M0,${y(pts[0]!.mood)} L${W},${y(pts[0]!.mood)}`}
+              fill="none"
+              vectorEffect="non-scaling-stroke"
+              strokeWidth={i ? 1.75 : 2}
+              strokeDasharray={i ? "5 4" : undefined}
+              className={i ? "stroke-primary" : "stroke-on-surface"}
+              strokeLinejoin="round"
+            />
+          );
+        })}
+      </svg>
+      {
+        <div className="mt-2 flex gap-5 text-body-small text-on-surface-variant">
+          {people.map((id, i) => (
+            <span key={id} className="flex items-center gap-2">
+              <span className={cx("inline-block w-5 border-t-2", i ? "border-dashed border-primary" : "border-on-surface")} />
+              {id === me.user.id ? "You" : memberName(id)}
+            </span>
+          ))}
+        </div>
+      }
+    </>
+  );
+}
+
+/** Who's in it, inviting, other dynamics, and leaving or blocking. Opened from Your dynamic. */
+export function PeoplePage() {
+  const { me, rel, select } = useRel();
+  const navigate = useNavigate();
+  const back = useBack(() => navigate({ to: "/dynamic" }));
+  const [invite, setInvite] = useState(false);
+  const [reporting, setReporting] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState<{ target: Member | null } | null>(null);
+  const ended = rel.endedAt !== null;
+  const others = rel.members.filter((m) => m.userId !== me.user.id);
+  return (
+    <div className="flex flex-col pb-10">
+      <SubHeader title="People" back="Your dynamic" onBack={back} />
+      <div className="mx-auto w-full max-w-2xl px-4 md:px-6">
+        <Group>
+          {rel.members.map((m) => (
+            <Row
+              key={m.userId}
+              leading={<Avatar userId={m.userId} name={m.displayName} version={m.avatarVersion} size={44} serif collared={isCollared(rel, m.userId)} />}
+              headline={m.displayName}
+              supporting={m.userId === me.user.id ? `${ROLE_LABEL[m.role]} · you` : ROLE_LABEL[m.role]}
+              trailing={
+                m.userId !== me.user.id && (
+                  <button type="button" onClick={() => setReporting(m.userId)} className="state-layer rounded-sm px-1 py-1 text-body-large text-primary">
+                    Report
+                  </button>
+                )
+              }
+            />
+          ))}
+        </Group>
+        {!ended && (
+          <Button variant="outlined" icon="person_add" className="mt-5 h-14! w-full" onClick={() => setInvite(true)}>
+            Invite someone
+          </Button>
+        )}
+
+        <Label>Other dynamics</Label>
+        <Group>
+          {me.relationships
+            .filter((r) => r.id !== rel.id)
+            .map((r) => (
+              <Row
+                key={r.id}
+                headline={relTitle(r, me.user.id)}
+                trailing={<Icon name="chevron_right" className="text-on-surface-variant" />}
+                onClick={() => {
+                  select(r.id);
+                  void navigate({ to: "/" });
+                }}
+              />
+            ))}
+          <button type="button" onClick={() => void navigate({ to: "/onboarding" })} className="state-layer py-3.5 text-left text-body-large text-primary">
+            Join or start another
+          </button>
+        </Group>
+
+        <Label>{ended ? "Blocking" : "Leaving"}</Label>
+        <p className="pt-1 text-body-large text-on-surface-variant">
+          {ended
+            ? "Blocking stops them pairing with you again."
+            : "Leaving or blocking ends this dynamic for everyone in it. You each keep a read-only copy. Proof photos are deleted."}
+        </p>
+        <div className="mt-4 flex gap-3">
+          {!ended && (
+            <Button variant="outlined" onClick={() => setLeaving({ target: null })}>
+              Leave
+            </Button>
+          )}
+          {others.map((m) => (
+            <Button key={m.userId} variant="outlined" className="border-error! text-error" onClick={() => setLeaving({ target: m })}>
+              {others.length > 1 ? `Block ${m.displayName}` : "Block"}
+            </Button>
+          ))}
+        </div>
+      </div>
+      {reporting && <ReportDialog subjectId={reporting} onClose={() => setReporting(null)} />}
+      {leaving && <LeaveDialog target={leaving.target} onClose={() => setLeaving(null)} />}
+      <InviteSheet open={invite} onClose={() => setInvite(false)} />
     </div>
   );
 }
@@ -506,7 +624,10 @@ function LeaveDialog({ target, onClose }: { target: Member | null; onClose(): vo
     >
       <div className="flex flex-col gap-3">
         {!ended && (
-          <p>This ends the dynamic for everyone in it. You each keep a read-only copy of its tasks, notes and history. Open tasks are cancelled and proof photos are deleted.</p>
+          <p>
+            This ends the dynamic for everyone in it. You each keep a read-only copy of its tasks, notes and history. Open tasks are cancelled and proof photos
+            are deleted.
+          </p>
         )}
         {target ? (
           <p>{target.displayName} won't be able to pair with you again. They aren't told you blocked them.</p>
@@ -574,7 +695,11 @@ export function InviteSheet({ open, onClose }: { open: boolean; onClose(): void 
             <Button variant="text" onClick={onClose}>
               Cancel
             </Button>
-            <Button icon="add_link" busy={create.isPending} onClick={() => create.mutate(role, { onSuccess: setInvite, onError: (e) => snack(errorMessage(e)) })}>
+            <Button
+              icon="add_link"
+              busy={create.isPending}
+              onClick={() => create.mutate(role, { onSuccess: setInvite, onError: (e) => snack(errorMessage(e)) })}
+            >
               Create link
             </Button>
           </>
@@ -645,7 +770,15 @@ function NameDialog({ open, onClose, onSave }: { open: boolean; onClose(): void;
   );
 }
 
-function DeadlinesDialog({ open, onClose, onSave }: { open: boolean; onClose(): void; onSave(body: { reschedulePolicy: ReschedulePolicy; weeklyDelayAllowance?: number }): void }) {
+function DeadlinesDialog({
+  open,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  onClose(): void;
+  onSave(body: { reschedulePolicy: ReschedulePolicy; weeklyDelayAllowance?: number }): void;
+}) {
   const { rel } = useRel();
   const [policy, setPolicy] = useState(rel.reschedulePolicy);
   const [allowance, setAllowance] = useState(String(rel.weeklyDelayAllowance));
@@ -684,7 +817,9 @@ function DeadlinesDialog({ open, onClose, onSave }: { open: boolean; onClose(): 
             </option>
           ))}
         </Select>
-        {policy === "allowance" && <TextField label="Free delays per week" type="number" min={0} max={50} value={allowance} onChange={(e) => setAllowance(e.target.value)} />}
+        {policy === "allowance" && (
+          <TextField label="Free delays per week" type="number" min={0} max={50} value={allowance} onChange={(e) => setAllowance(e.target.value)} />
+        )}
       </div>
     </Dialog>
   );
