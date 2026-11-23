@@ -30,6 +30,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
@@ -225,10 +226,16 @@ fun TodayScreen(
                             body = {
                                 InboxRows {
                                     d.awaitingReview.forEach { o ->
-                                        Column(Modifier.background(MaterialTheme.colorScheme.surface)) {
-                                            row(o, OccurrenceActions(onApprove = { vm.review(o, true) }, onReject = { sendingBack = o }, onComments = { commenting = o }))()
-                                            if (o.photoCount > 0) ProofPhotos(o.id, canAdd = false, modifier = Modifier.padding(start = 64.dp, end = 16.dp, bottom = 8.dp))
-                                        }
+                                        ReviewCard(
+                                            o,
+                                            who = session?.nameOf(o.assigneeId) ?: "They",
+                                            busy = busy,
+                                            onApprove = { vm.review(o, true) },
+                                            onSendBack = { sendingBack = o },
+                                            onAddWord = { commenting = o },
+                                            onOpen = { onOpenTask(o.seriesId) },
+                                        )
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                                     }
                                 }
                             },
