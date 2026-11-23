@@ -3,7 +3,7 @@ import { useAdjustPoints, useBalances, useDeleteLibraryItem, useLedger, useLibra
 import { errorMessage } from "../api/client";
 import type { LedgerEntry, Reward, RewardInput } from "../api/types";
 import { ItemDialog, type FieldDef } from "../components/ItemDialog";
-import { Badge, Button, Dialog, Empty, ErrorBox, Fab, Icon, Loading, PageHeader, Section, Select, TextField, cx, useSnackbar } from "../components/ui";
+import { Button, Diamond, Dialog, Empty, ErrorBox, Fab, Icon, Loading, PageHeader, Section, Select, TextField, cx, useSnackbar } from "../components/ui";
 import { ago, fmtDateTime } from "../lib/dates";
 import { useTodayOccurrences } from "../lib/today";
 import { useAskWho } from "../components/CurfewStrip";
@@ -72,37 +72,9 @@ export function RewardsPage() {
         }
       />
 
-      <Section title="Balances">
-        {balances.error && <ErrorBox error={balances.error} />}
-        <div className="flex flex-wrap gap-3">
-          {balances.data && withEveryMember(balances.data, rel.members).map((b) => {
-            // The earner's balance is the headline: the sub's, or yours when you're the one earning.
-            const earner = rel.members.find((m) => m.userId === b.userId)?.role === "submissive" || (b.userId === me.user.id && (solo || !isDom));
-            const next = rewards.data?.filter((r) => r.cost > b.balance).sort((a, z) => a.cost - z.cost)[0];
-            return (
-              <div
-                key={b.userId}
-                className={cx("min-w-40 flex-1 rounded-lg p-4", earner ? "bg-primary-container text-on-primary-container" : "bg-surface-container-low text-on-surface")}
-              >
-                <div className="text-label-large opacity-80">{memberName(b.userId)}</div>
-                <div className="text-display-small tabular-nums">{b.balance}</div>
-                <div className="text-body-small opacity-80">points</div>
-                {earner && !!rewards.data?.length && (
-                  <div className="mt-3">
-                    <div className="h-1.5 overflow-hidden rounded-full bg-on-primary-container/15">
-                      <div className="h-full rounded-full bg-primary" style={{ width: `${next ? Math.max(0, Math.min(100, (b.balance / next.cost) * 100)) : 100}%` }} />
-                    </div>
-                    <div className="mt-1.5 text-body-medium">{next ? `${next.cost - b.balance} more for ${next.title}` : "Enough for any reward"}</div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          {balances.isLoading && <Loading />}
-        </div>
-      </Section>
+      <Balances balances={balances} rewards={rewards.data ?? []} />
 
-      <Section title="Rewards">
+      <Section title={solo || !isDom ? "Spend" : "Rewards"}>
         {rewards.isLoading && <Loading />}
         {rewards.error && <ErrorBox error={rewards.error} />}
         {rewards.data && !rewards.data.length && (
@@ -112,55 +84,54 @@ export function RewardsPage() {
             body={solo ? "Add treats to spend your points on." : isDom ? "Add treats your sub can spend points on." : "Your Dominant hasn't added any rewards yet."}
           />
         )}
-        <div className="grid gap-2 sm:grid-cols-2">
-          {rewards.data?.map((r) => (
-            <div key={r.id} className="flex flex-col gap-2 rounded-md bg-surface-container-low p-4">
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="text-title-medium text-on-surface">{r.title}</div>
-                  {r.bodyMd && <div className="mt-1 text-body-medium whitespace-pre-wrap text-on-surface-variant">{r.bodyMd}</div>}
-                </div>
-                <Badge>{r.cost} pts</Badge>
-              </div>
-              <div className="flex items-center gap-2">
-                {r.letsOff && <span className="text-body-small text-on-surface-variant">Gets you out of a consequence</span>}
-                {features.chastity && r.lockMinutes && <span className="text-body-small text-on-surface-variant">Takes {fmtMinutes(r.lockMinutes)} off the lock</span>}
-                <div className="flex-1" />
-                {isDom && (
-                  <Button variant="text" onClick={() => setEditing(r)}>
-                    Edit
-                  </Button>
-                )}
-                {(solo || !isDom) && (
-                  <Button
-                    variant="tonal"
-                    icon="redeem"
-                    disabled={myBalance < r.cost || redeem.isPending}
-                    onClick={() =>
-                      r.letsOff
-                        ? setLettingOff(r)
-                        : confirm(
-                            solo
-                              ? `Spend ${r.cost} points on “${r.title}”? Mark it redeemed once you've had it.`
-                              : `Spend ${r.cost} points on “${r.title}”? ${domName} marks it redeemed once it's given.`,
-                            () =>
-                              redeem.mutate(
-                                { id: r.id },
-                                {
-                                  onSuccess: () => snack(solo ? `Spent ${r.cost} points.` : `Spent ${r.cost} points. ${domName} has been told.`),
-                                  onError: (e) => snack(errorMessage(e)),
-                                },
-                              ),
-                          )
-                    }
-                  >
-                    Redeem
-                  </Button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+        {/* A menu, not cards: each reward and its price, with a dotted leader between, dimmed until it's affordable. */}
+        <ul className="flex flex-col">
+          {rewards.data?.map((r) => {
+            const canSpend = (solo || !isDom) && myBalance >= r.cost && !redeem.isPending;
+            const spend = () =>
+              r.letsOff
+                ? setLettingOff(r)
+                : confirm(
+                    solo
+                      ? `Spend ${r.cost} points on “${r.title}”? Mark it redeemed once you've had it.`
+                      : `Spend ${r.cost} points on “${r.title}”? ${domName} marks it redeemed once it's given.`,
+                    () =>
+                      redeem.mutate(
+                        { id: r.id },
+                        {
+                          onSuccess: () => snack(solo ? `Spent ${r.cost} points.` : `Spent ${r.cost} points. ${domName} has been told.`),
+                          onError: (e) => snack(errorMessage(e)),
+                        },
+                      ),
+                  );
+            const dim = (solo || !isDom) && myBalance < r.cost;
+            const notes = [
+              r.bodyMd?.trim() || null,
+              r.letsOff ? "Gets you out of a consequence" : null,
+              features.chastity && r.lockMinutes ? `Takes ${fmtMinutes(r.lockMinutes)} off the lock` : null,
+            ].filter(Boolean);
+            return (
+              <li key={r.id}>
+                <button
+                  type="button"
+                  disabled={isDom ? false : !canSpend}
+                  aria-label={isDom ? `Edit “${r.title}”` : `Spend ${r.cost} points on “${r.title}”`}
+                  title={dim ? `${r.cost - myBalance} more points` : undefined}
+                  onClick={() => (isDom ? setEditing(r) : spend())}
+                  className={cx("state-layer flex w-full flex-col py-3 text-left disabled:cursor-default", dim && "text-outline")}
+                >
+                  <span className="flex w-full items-baseline gap-3">
+                    <span className={cx("font-serif text-[24px] leading-8", dim ? "text-outline" : "text-on-surface")}>{r.title}</span>
+                    <span className="mb-1.5 min-w-6 flex-1 self-end border-b border-dotted border-outline-variant" aria-hidden />
+                    <span className={cx("text-body-large tabular-nums", dim ? "text-outline" : "text-on-surface")}>{r.cost}</span>
+                  </span>
+                  {notes.length > 0 && <span className="text-body-medium text-on-surface-variant">{notes.join(" · ")}</span>}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        {(solo || !isDom) && !!rewards.data?.length && <p className="mt-2 text-body-small text-on-surface-variant">Tap a reward to spend your points on it.</p>}
       </Section>
 
       {waiting.length > 0 && (
@@ -170,9 +141,9 @@ export function RewardsPage() {
               isDom ? (
                 <RedemptionRow key={e.id} e={e} />
               ) : (
-                <div key={e.id} className="flex min-h-16 items-center gap-2 bg-surface-container-low py-2 pr-4 pl-1">
-                  <span className="flex size-10 shrink-0 items-center justify-center">
-                    <Icon name="hourglass_top" className="text-tertiary" />
+                <div key={e.id} className="flex min-h-16 items-center gap-2 py-2 pr-4">
+                  <span className="flex size-10 shrink-0 items-center justify-center" title="Waiting">
+                    <Diamond state="waiting" />
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="text-body-large text-on-surface">{e.note}</div>
@@ -192,9 +163,9 @@ export function RewardsPage() {
         {ledger.isLoading && <Loading />}
         {ledger.error && <ErrorBox error={ledger.error} />}
         {ledger.data && !ledger.data.length && <p className="text-body-medium text-on-surface-variant">No points yet.</p>}
-        <div className="overflow-hidden rounded-lg bg-surface-container-low">
-          {ledger.data?.map((e, i) => (
-            <div key={e.id} className={cx("flex items-center gap-4 px-4 py-3", i > 0 && "border-t border-outline-variant")}>
+        <div className="flex flex-col divide-y divide-outline-variant border-y border-outline-variant">
+          {ledger.data?.map((e) => (
+            <div key={e.id} className="flex items-center gap-4 py-3">
               <Icon name={KIND_ICON[e.kind] ?? "paid"} className="text-on-surface-variant" />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-body-large text-on-surface">{e.note || e.kind}</div>
@@ -205,7 +176,7 @@ export function RewardsPage() {
                 </div>
                 {e.redeemNote && <div className="text-body-medium italic text-on-surface-variant">“{e.redeemNote}”</div>}
               </div>
-              <div className={cx("text-title-medium", e.delta >= 0 ? "text-primary" : "text-error")}>{e.delta > 0 ? `+${e.delta}` : e.delta}</div>
+              <div className={cx("text-title-medium tabular-nums", e.delta >= 0 ? "text-on-surface" : "text-error")}>{e.delta > 0 ? `+${e.delta}` : e.delta}</div>
             </div>
           ))}
         </div>
@@ -367,5 +338,38 @@ function AdjustDialog({ open, onClose }: { open: boolean; onClose(): void }) {
         <TextField label="Why" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
       </div>
     </Dialog>
+  );
+}
+
+/**
+ * The earner's balance as the headline, in the serif, with how far it is to the next reward. Anyone else's balance
+ * is one quiet line under it.
+ */
+function Balances({ balances, rewards }: { balances: ReturnType<typeof useBalances>; rewards: Reward[] }) {
+  const { rel, me, isDom, solo, memberName } = useRel();
+  if (balances.isLoading) return <Loading />;
+  if (balances.error) return <ErrorBox error={balances.error} />;
+  if (!balances.data) return null;
+  const all = withEveryMember(balances.data, rel.members);
+  const isEarner = (id: string) => rel.members.find((m) => m.userId === id)?.role === "submissive" || (id === me.user.id && (solo || !isDom));
+  const lead = all.find((b) => isEarner(b.userId)) ?? all[0];
+  if (!lead) return null;
+  const rest = all.filter((b) => b !== lead && b.balance !== 0);
+  const next = rewards.filter((r) => r.cost > lead.balance).sort((a, z) => a.cost - z.cost)[0];
+  const mine = lead.userId === me.user.id;
+  return (
+    <section aria-label="Points" className="mx-4 mb-8 md:mx-6">
+      <div className="eyebrow">{mine ? "You have" : `${memberName(lead.userId)} has`}</div>
+      <div className="flex items-baseline gap-3">
+        <span className="font-serif text-[88px] leading-[0.95] text-on-surface tabular-nums">{lead.balance}</span>
+        <span className="text-body-large text-on-surface-variant">points</span>
+      </div>
+      {!!rewards.length && <p className="mt-2 text-body-medium text-on-surface-variant">{next ? `${next.cost - lead.balance} more for ${next.title}.` : "Enough for any reward."}</p>}
+      {rest.map((b) => (
+        <p key={b.userId} className="text-body-medium text-on-surface-variant">
+          {b.userId === me.user.id ? "You have" : `${memberName(b.userId)} has`} {b.balance} points.
+        </p>
+      ))}
+    </section>
   );
 }
