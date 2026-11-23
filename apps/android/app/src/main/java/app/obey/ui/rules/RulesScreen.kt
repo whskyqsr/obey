@@ -31,7 +31,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -137,10 +136,9 @@ fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, on
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 navigationIcon = { MenuButton() },
-                // Protocols are a tab inside Rules.
-                title = { app.obey.ui.common.PairedTitle("Rules", if (onProtocols != null) "Protocols" else null) { onProtocols?.invoke() } },
+                title = {},
                 actions = {
                     IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.AssignmentLate, "Broken rules") }
                     if (canManage) IconButton(onClick = { editing = Editing(null) }) { Icon(Icons.Outlined.Add, "New rule") }
@@ -150,12 +148,15 @@ fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, on
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
+      Column(Modifier.padding(padding).fillMaxSize()) {
+        // Protocols are a tab inside Rules.
+        app.obey.ui.common.TitleWithToggle("Rules", listOf("Rules", "Protocols"), 0, { onProtocols?.invoke() }, showToggle = onProtocols != null)
         when (val s = state) {
-            Load.Loading -> LoadingBox(Modifier.padding(padding))
-            is Load.Failed -> ErrorBox(s.message, vm::refresh, Modifier.padding(padding))
+            Load.Loading -> LoadingBox()
+            is Load.Failed -> ErrorBox(s.message, vm::refresh)
             is Load.Ready -> {
                 if (s.value.isEmpty()) {
-                    EmptyBox("No rules yet", if (canManage) "Rules are numbered in the order you add them." else null, Modifier.padding(padding), icon = Icons.Outlined.Gavel)
+                    EmptyBox("No rules yet", if (canManage) "Rules are numbered in the order you add them." else null, icon = Icons.Outlined.Gavel)
                 } else {
                     // Numbers always follow the list order; a Dominant drags the handle to change it.
                     ReorderableList(
@@ -163,7 +164,7 @@ fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, on
                         key = { it.id },
                         enabled = canManage,
                         onReorder = vm::reorder,
-                        modifier = Modifier.padding(padding).fillMaxSize(),
+                        modifier = Modifier.fillMaxSize(),
                     ) { r, index, handle ->
                         val linked = if (showProtocols) protocols[r.id].orEmpty() else emptyList()
                         ListItem(
@@ -198,6 +199,7 @@ fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, on
                 }
             }
         }
+      }
     }
 
     editing?.let { e ->

@@ -1,5 +1,9 @@
 package app.obey.ui.common
 
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -145,6 +149,53 @@ fun PairedTitle(current: String, other: String?, onOther: () -> Unit) {
                 other,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.clip(MaterialTheme.shapes.small).clickable(onClick = onOther),
+            )
+        }
+    }
+}
+
+/**
+ * The large serif page title with a pill toggle beside it, as in the mockups for Rules | Protocols.
+ * [showToggle] is false when only one of the pair is switched on, and then only the title shows.
+ */
+@Composable
+fun TitleWithToggle(title: String, options: List<String>, selected: Int, onSelect: (Int) -> Unit, showToggle: Boolean = true) {
+    androidx.compose.foundation.layout.Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title,
+            style = MaterialTheme.typography.displaySmall,
+            maxLines = 1,
+            modifier = Modifier.weight(1f).semantics { heading() },
+        )
+        if (showToggle) PillToggle(options, selected, onSelect)
+    }
+}
+
+/** Two or three choices in an outlined pill; the chosen one is filled in ink. */
+@Composable
+fun PillToggle(options: List<String>, selected: Int, onSelect: (Int) -> Unit) {
+    val c = MaterialTheme.colorScheme
+    androidx.compose.foundation.layout.Row(
+        Modifier
+            .border(1.dp, c.outlineVariant, androidx.compose.foundation.shape.CircleShape)
+            .padding(4.dp)
+            .selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        options.forEachIndexed { i, label ->
+            val on = i == selected
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp),
+                color = if (on) c.surface else c.onSurfaceVariant,
+                modifier = Modifier
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(if (on) c.onSurface else androidx.compose.ui.graphics.Color.Transparent)
+                    .selectable(selected = on, role = androidx.compose.ui.semantics.Role.Tab) { if (!on) onSelect(i) }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
             )
         }
     }
