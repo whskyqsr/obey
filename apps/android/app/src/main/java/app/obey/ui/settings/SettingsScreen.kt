@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.ToggleOn
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -83,7 +84,7 @@ import app.obey.ui.tasks.Stepper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, onOpenFeatures: () -> Unit = onOpenDynamic, vm: SettingsViewModel = hiltViewModel()) {
     val sessionState by vm.session.collectAsStateWithLifecycle()
     val devUserId by vm.devUserId.collectAsStateWithLifecycle()
     val appIcon by vm.appIcon.collectAsStateWithLifecycle()
@@ -122,13 +123,23 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, vm: SettingsVi
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
                     ) {
                         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            AvatarStack(rel.members, vm::loadAvatar, size = 48.dp, ring = MaterialTheme.colorScheme.primaryContainer, collared = { rel.isCollared(it.userId) })
+                            AvatarStack(rel.members, vm::loadAvatar, size = 48.dp, ring = MaterialTheme.colorScheme.surface, collared = { rel.isCollared(it.userId) })
                             Column(Modifier.weight(1f)) {
                                 Text(dynamicTitle(rel, session.userId), style = MaterialTheme.typography.titleLarge)
                                 Text("Your dynamic · people, invites, how it works, features", style = MaterialTheme.typography.bodyMedium)
                             }
                             Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null)
                         }
+                    }
+                    // Feature switches live on Your dynamic, but Settings is where people look for them first.
+                    if (session.canManage) {
+                        ListItem(
+                            modifier = Modifier.clickable(onClick = onOpenFeatures),
+                            leadingContent = { Icon(Icons.Outlined.ToggleOn, null) },
+                            headlineContent = { Text("Features") },
+                            supportingContent = { Text("Turn parts of the app on or off for your dynamic") },
+                            trailingContent = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
+                        )
                     }
                 }
 

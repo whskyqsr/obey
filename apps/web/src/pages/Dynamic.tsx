@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useCreateInvite, useCurfew, useLeaveRelationship, useUpdateRelationship } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { DynamicDate, Features, Invite, Member, Relationship, ReschedulePolicy, Role } from "../api/types";
@@ -162,6 +162,13 @@ export function DynamicPage() {
   const snack = useSnackbar();
   const update = useUpdateRelationship(rel.id);
   const curfew = useCurfew(rel.id, features.location);
+  // Settings' Features row opens this page at #features; scroll there once the page has rendered.
+  const hash = useRouterState({ select: (st) => st.location.hash });
+  useEffect(() => {
+    if (hash !== "features") return;
+    const t = setTimeout(() => document.getElementById("features")?.scrollIntoView({ block: "start" }), 50);
+    return () => clearTimeout(t);
+  }, [hash]);
   const back = useBack(() => navigate({ to: "/settings" }));
   const title = useDynamicTitle();
   const [sheet, setSheet] = useState<"invite" | "name" | "deadlines" | "swap" | "end-swap" | null>(null);
@@ -239,7 +246,8 @@ export function DynamicPage() {
           )}
         </Group>
 
-        <MoodCard heading={<Label>Mood</Label>} />
+        {/* Journal and Stats both chart moods; this is the fallback when neither is on. */}
+        {!features.journal && !features.stats && <MoodCard heading={<Label>Mood</Label>} />}
 
         {(isDom || dates.length > 0) && (
           <>

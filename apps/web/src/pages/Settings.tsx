@@ -19,7 +19,7 @@ import { Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 
 export function SettingsPage() {
-  const { me, rel } = useRel();
+  const { me, rel, isDom } = useRel();
   const dynamicTitle = useDynamicTitle();
   const theme = useTheme();
   const snack = useSnackbar();
@@ -59,7 +59,7 @@ export function SettingsPage() {
                 version={m.avatarVersion}
                 size={48}
                 collared={isCollared(rel, m.userId)}
-                className={cx("ring-4 ring-primary-container", i > 0 && "-ml-3", isCollared(rel, m.userId) && "z-10")}
+                className={cx("ring-4 ring-surface", i > 0 && "-ml-3", isCollared(rel, m.userId) && "z-10")}
               />
             ))}
           </span>
@@ -69,6 +69,17 @@ export function SettingsPage() {
           </span>
           <Icon name="chevron_right" />
         </Link>
+        {/* Feature switches live on Your dynamic, but Settings is where people look for them first. */}
+        {isDom && !rel.endedAt && (
+          <Link to="/dynamic" hash="features" className="state-layer mt-2 flex min-h-14 items-center gap-4 rounded-lg bg-surface-container-low px-4 py-3">
+            <Icon name="toggle_on" className="text-on-surface-variant" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-body-large text-on-surface">Features</span>
+              <span className="block text-body-medium text-on-surface-variant">Turn parts of the app on or off for your dynamic</span>
+            </span>
+            <Icon name="chevron_right" className="text-on-surface-variant" />
+          </Link>
+        )}
       </div>
 
       <Section title="Profile">
