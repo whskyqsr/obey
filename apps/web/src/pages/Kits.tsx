@@ -109,7 +109,7 @@ export function KitsPage() {
   if (!isDom || readOnly) return noKits;
   return (
     <>
-      <PageHeader title="Kits" subtitle="Sets of tasks, rules and rewards you can add to any dynamic." />
+      <PageHeader title="Kits" />
       <div className="flex flex-wrap gap-2 px-4 pb-4 md:px-6">
         <Button variant="tonal" icon="download" onClick={() => setAdding(true)}>
           Add from a link

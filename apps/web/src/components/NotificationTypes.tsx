@@ -4,15 +4,15 @@ import type { NotifyCategory } from "../api/types";
 import { useRel } from "../lib/relationship";
 import { Switch, useSnackbar } from "./ui";
 
-export const NOTIFY_TYPES: { key: NotifyCategory; label: string; help: string; feature?: "points" }[] = [
-  { key: "reminders", label: "Reminders", help: "Before a task is due" },
-  { key: "completions", label: "Done and reviewed", help: "When a task is completed, sent for review, approved or sent back" },
-  { key: "missed", label: "Missed tasks", help: "When a deadline passes" },
-  { key: "requests", label: "More time", help: "Requests for more time, the answers, and moved deadlines" },
-  { key: "comments", label: "Comments", help: "On a task or journal entry" },
-  { key: "assigned", label: "New tasks and consequences", help: "Tasks given to you, history corrections, logged broken rules, and changes to rules and protocols" },
-  { key: "plans", label: "Plans", help: "When a partner adds or changes a calendar plan" },
-  { key: "rewards", label: "Rewards", help: "When a reward is redeemed", feature: "points" },
+export const NOTIFY_TYPES: { key: NotifyCategory; label: string; feature?: "points" }[] = [
+  { key: "reminders", label: "Reminders" },
+  { key: "completions", label: "Done and reviewed" },
+  { key: "missed", label: "Missed tasks" },
+  { key: "requests", label: "More time" },
+  { key: "comments", label: "Comments" },
+  { key: "assigned", label: "New tasks and consequences" },
+  { key: "plans", label: "Plans" },
+  { key: "rewards", label: "Rewards", feature: "points" },
 ];
 
 /** Which kinds of notification this account gets, on every device. Anything about the dynamic itself always comes through. */
@@ -30,7 +30,7 @@ export function NotificationTypes() {
   return (
     <div className="border border-outline-variant mt-3 rounded-lg px-4 py-2">
       {NOTIFY_TYPES.filter((t) => !t.feature || features[t.feature]).map((t) => (
-        <Switch key={t.key} checked={!muted.has(t.key)} onChange={(on) => set(t.key, on)} label={t.label} help={t.help} />
+        <Switch key={t.key} checked={!muted.has(t.key)} onChange={(on) => set(t.key, on)} label={t.label} />
       ))}
       <div className="my-2 border-t border-outline-variant" />
       <Switch

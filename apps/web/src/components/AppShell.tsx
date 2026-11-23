@@ -14,7 +14,6 @@ export interface Dest {
   label: string;
   icon: string;
   /** One line on the Us page. */
-  hint?: string;
   /** Hidden when the dynamic switches this feature off. */
   feature?: keyof Features;
 }
@@ -26,26 +25,26 @@ const US: Dest = { to: "/us", label: "Us", icon: "favorite" };
 
 /** Everything the tabs don't cover, in the order Us and the desktop sidebar list them. Protocols live inside Rules. */
 const SECTIONS: Dest[] = [
-  { to: "/rewards", label: "Rewards", icon: "redeem", hint: "Points and what they buy", feature: "points" },
-  { to: "/consequences", label: "Consequences", icon: "bolt", hint: "What's owed, and the list", feature: "consequences" },
-  { to: "/rules", label: "Rules", icon: "gavel", hint: "Rules and protocols", feature: "rules" },
-  { to: "/notes", label: "Notes", icon: "sticky_note_2", hint: "Shared and private notes" },
-  { to: "/journal", label: "Journal", icon: "auto_stories", hint: "Entries and replies", feature: "journal" },
-  { to: "/limits", label: "Limits", icon: "tune", hint: "Yes, no and maybe", feature: "limits" },
-  { to: "/agreement", label: "Agreement", icon: "handshake", hint: "What you've agreed to", feature: "agreement" },
-  { to: "/scenes", label: "Scenes", icon: "auto_awesome", hint: "Scenes and aftercare", feature: "scenes" },
+  { to: "/rewards", label: "Rewards", icon: "redeem", feature: "points" },
+  { to: "/consequences", label: "Consequences", icon: "bolt", feature: "consequences" },
+  { to: "/rules", label: "Rules", icon: "gavel", feature: "rules" },
+  { to: "/notes", label: "Notes", icon: "sticky_note_2" },
+  { to: "/journal", label: "Journal", icon: "auto_stories", feature: "journal" },
+  { to: "/limits", label: "Limits", icon: "tune", feature: "limits" },
+  { to: "/agreement", label: "Agreement", icon: "handshake", feature: "agreement" },
+  { to: "/scenes", label: "Scenes", icon: "auto_awesome", feature: "scenes" },
   { to: "/chastity", label: "Chastity", icon: "lock", feature: "chastity" },
-  { to: "/location", label: "Location", icon: "location_on", hint: "Places and curfew", feature: "location" },
-  { to: "/stats", label: "Stats", icon: "insights", hint: "How the weeks are going", feature: "stats" },
-  { to: "/review", label: "Monthly review", icon: "flag", hint: "Look back together", feature: "review" },
-  { to: "/kits", label: "Kits", icon: "widgets", hint: "Sets of tasks, rules and rewards" },
-  { to: "/tasks", label: "All tasks", icon: "checklist", hint: "Every task, paused ones too" },
+  { to: "/location", label: "Location", icon: "location_on", feature: "location" },
+  { to: "/stats", label: "Stats", icon: "insights", feature: "stats" },
+  { to: "/review", label: "Monthly review", icon: "flag", feature: "review" },
+  { to: "/kits", label: "Kits", icon: "widgets" },
+  { to: "/tasks", label: "All tasks", icon: "checklist" },
 ];
 
-const PROTOCOLS: Dest = { to: "/protocols", label: "Protocols", icon: "fact_check", hint: "How things are done", feature: "protocols" };
+const PROTOCOLS: Dest = { to: "/protocols", label: "Protocols", icon: "fact_check", feature: "protocols" };
 
 /** Your dynamic and Settings: not sections, so they sit at the bottom of Us and the sidebar. */
-export const DYNAMIC: Dest = { to: "/dynamic", label: "Your dynamic", icon: "favorite", hint: "People, dates, invites, how it works" };
+export const DYNAMIC: Dest = { to: "/dynamic", label: "Your dynamic", icon: "favorite" };
 export const SETTINGS: Dest = { to: "/settings", label: "Settings", icon: "settings" };
 
 /** What needs a second person, so it stays out of the way while someone is on their own. */
@@ -104,17 +103,17 @@ function Tab({ d, active, badge }: { d: Dest; active: boolean; badge?: number })
 /** What the + button can start. Each one opens where it's made, with its form already open where the page has one. */
 function useNewItems() {
   const { isDom, features, solo, rel } = useRel();
-  const items: { label: string; icon: string; hint: string; go: { to: string; params?: Record<string, string>; search?: Record<string, string> } }[] = [];
+  const items: { label: string; icon: string; go: { to: string; params?: Record<string, string>; search?: Record<string, string> } }[] = [];
   if (rel.endedAt) return items;
-  if (isDom) items.push({ label: "Task", icon: "add_task", hint: "Something to do, once or on a schedule", go: { to: "/tasks/$taskId", params: { taskId: "new" } } });
-  items.push({ label: "Plan", icon: "event", hint: "Something on the calendar", go: { to: "/calendar", search: { new: "1" } } });
-  if (features.journal) items.push({ label: "Journal entry", icon: "auto_stories", hint: "Write tonight's entry", go: { to: "/journal/$noteId", params: { noteId: "new" } } });
-  items.push({ label: "Note", icon: "sticky_note_2", hint: "Shared or just for you", go: { to: "/notes/$noteId", params: { noteId: "new" } } });
+  if (isDom) items.push({ label: "Task", icon: "add_task", go: { to: "/tasks/$taskId", params: { taskId: "new" } } });
+  items.push({ label: "Plan", icon: "event", go: { to: "/calendar", search: { new: "1" } } });
+  if (features.journal) items.push({ label: "Journal entry", icon: "auto_stories", go: { to: "/journal/$noteId", params: { noteId: "new" } } });
+  items.push({ label: "Note", icon: "sticky_note_2", go: { to: "/notes/$noteId", params: { noteId: "new" } } });
   if (features.rules)
-    items.push({ label: isDom ? "Broken rule" : "Own up to a rule", icon: "gavel", hint: isDom ? "Log it, with a consequence if you like" : "Tell them before they find out", go: { to: "/rule-log", search: { new: "1" } } });
-  if (features.consequences && isDom) items.push({ label: "Consequence", icon: "bolt", hint: "Hand one out now", go: { to: "/consequences" } });
-  if (features.scenes && !solo) items.push({ label: "Scene", icon: "auto_awesome", hint: "Log it, then each of you writes your side", go: { to: "/scenes", search: { new: "1" } } });
-  if (isDom) items.push({ label: "From a kit", icon: "widgets", hint: "Add a set of tasks, rules and rewards", go: { to: "/kits" } });
+    items.push({ label: isDom ? "Broken rule" : "Own up to a rule", icon: "gavel", go: { to: "/rule-log", search: { new: "1" } } });
+  if (features.consequences && isDom) items.push({ label: "Consequence", icon: "bolt", go: { to: "/consequences" } });
+  if (features.scenes && !solo) items.push({ label: "Scene", icon: "auto_awesome", go: { to: "/scenes", search: { new: "1" } } });
+  if (isDom) items.push({ label: "From a kit", icon: "widgets", go: { to: "/kits" } });
   return items;
 }
 
@@ -137,7 +136,6 @@ function NewSheet({ open, onClose }: { open: boolean; onClose(): void }) {
               <Icon name={it.icon} className="text-on-surface" />
               <span className="min-w-0 flex-1">
                 <span className="block font-serif text-[20px] leading-6 text-on-surface">{it.label}</span>
-                <span className="block text-body-small text-on-surface-variant">{it.hint}</span>
               </span>
             </button>
           </li>

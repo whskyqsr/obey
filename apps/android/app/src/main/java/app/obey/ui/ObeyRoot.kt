@@ -245,7 +245,6 @@ private fun NewSheet(items: List<NewItem>, onDismiss: () -> Unit) {
                     Icon(item.icon, null)
                     Column {
                         Text(item.label, style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 24.sp))
-                        Text(item.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -339,8 +338,7 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
     var newOpen by remember { mutableStateOf(false) }
     if (newOpen) NewSheet(newItems) { newOpen = false }
 
-    val usItems = sections.map { t -> UsItem(t.label, t.hint, t.icon) { nav.navigate(t.route) { launchSingleTop = true } } } +
-        UsItem("Your dynamic", "People, dates, invites, how it works", Icons.Outlined.FavoriteBorder) { nav.navigate(DynamicRoute()) }
+    val usItems = sections.map { t -> UsItem(t.label, t.icon) { nav.navigate(t.route) { launchSingleTop = true } } }
 
     // Phones: the switcher leads Today, Week and Us; the pages Us lists lead back to it. Tablets have the rail.
     val chipLead: @Composable () -> Unit = { DynamicSwitcherChip(switcher) }
@@ -348,7 +346,7 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
     val lead: (@Composable () -> Unit)? = if (wide) null else if (onTab) chipLead else if (onSection) backLead else null
     val host: @Composable () -> Unit = {
         SafeCallFrame(safeVm, activeCall) {
-            ObeyNavHost(nav, usItems, onInvite = if (session.solo) ({ nav.navigate(DynamicRoute(invite = true)) }) else null)
+            ObeyNavHost(nav, usItems, switcher, onInvite = if (session.solo) ({ nav.navigate(DynamicRoute(invite = true)) }) else null)
         }
     }
 
@@ -439,7 +437,7 @@ private fun TabBar(tabs: List<TopLevel>, selected: (TopLevel) -> Boolean, onClic
 }
 
 @Composable
-private fun ObeyNavHost(nav: NavHostController, usItems: List<UsItem>, onInvite: (() -> Unit)?) {
+private fun ObeyNavHost(nav: NavHostController, usItems: List<UsItem>, switcher: SwitcherActions, onInvite: (() -> Unit)?) {
     val settings = { nav.navigate(SettingsRoute) }
     val openTask = { id: String -> nav.navigate(TaskDetailRoute(id)) }
     NavHost(navController = nav, startDestination = TodayRoute) {
@@ -467,7 +465,7 @@ private fun ObeyNavHost(nav: NavHostController, usItems: List<UsItem>, onInvite:
                 onOpenSettings = settings,
             )
         }
-        composable<UsRoute> { UsScreen(usItems, onSettings = settings, onInvite = onInvite) }
+        composable<UsRoute> { UsScreen(usItems, switcher, onDynamic = { nav.navigate(DynamicRoute()) }, onSettings = settings, onInvite = onInvite) }
         composable<RewardsRoute> { RewardsScreen(onOpenSettings = settings) }
         composable<ConsequencesRoute> { RewardsScreen(onOpenSettings = settings, consequences = true) }
         composable<RulesRoute> {

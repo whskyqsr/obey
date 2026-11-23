@@ -357,9 +357,9 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
                     supportingContent = {
                         Text(
                             when (rel.reschedulePolicy) {
-                                ReschedulePolicy.DominantOnly -> "Only a Dominant can move deadlines."
-                                ReschedulePolicy.Request -> "The sub asks; a Dominant approves or declines."
-                                ReschedulePolicy.Allowance -> "${rel.weeklyDelayAllowance} free delays a week; more need approval."
+                                ReschedulePolicy.DominantOnly -> "Dominant only"
+                                ReschedulePolicy.Request -> "Sub may request"
+                                ReschedulePolicy.Allowance -> "Weekly allowance: ${rel.weeklyDelayAllowance} free a week"
                             },
                         )
                     },
@@ -401,10 +401,9 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
                 }
 
                 SectionHeader("Features", Modifier.onGloballyPositioned { if (featuresAt == null) featuresAt = it.positionInParent().y.toInt() })
-                featureRows.forEach { (label, help, get, set) ->
+                featureRows.forEach { (label, _, get, set) ->
                     ListItem(
                         headlineContent = { Text(label) },
-                        supportingContent = { Text(help) },
                         trailingContent = {
                             Switch(
                                 checked = get(rel.features),

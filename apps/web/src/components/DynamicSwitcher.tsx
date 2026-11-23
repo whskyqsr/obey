@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import type { Relationship } from "../api/types";
 import { ROLE_LABEL, relTitle, useRel } from "../lib/relationship";
@@ -79,7 +79,20 @@ function DynamicList({ onPick }: { onPick(): void }) {
  * Where the Fealty mark was: the dynamic in view. With more than one dynamic it opens a list to switch.
  * `inline` expands the list in place (the phone menu); otherwise it pops over (sidebar and rail).
  */
-export function DynamicSwitcher({ compact, inline, chip, onSwitched }: { compact?: boolean; inline?: boolean; chip?: boolean; onSwitched?(): void }) {
+export function DynamicSwitcher({
+  compact,
+  inline,
+  chip,
+  hero,
+  onSwitched,
+}: {
+  compact?: boolean;
+  inline?: boolean;
+  chip?: boolean;
+  /** Us: the dynamic's name large beside the people in it, with a line under it. */
+  hero?: { title: ReactNode; sub: ReactNode; people: ReactNode };
+  onSwitched?(): void;
+}) {
   const { me, rel } = useRel();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -108,7 +121,18 @@ export function DynamicSwitcher({ compact, inline, chip, onSwitched }: { compact
 
   return (
     <div ref={ref} className={cx("relative", !compact && !chip && "w-full")}>
-      {chip ? (
+      {hero ? (
+        <button type="button" onClick={toggle} aria-expanded={many ? open : undefined} className="state-layer -mx-2 flex w-[calc(100%+1rem)] items-center gap-4 rounded-lg p-2 text-left">
+          {hero.people}
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-1">
+              <span className="truncate font-serif text-[30px] leading-9 text-on-surface">{hero.title}</span>
+              <Icon name={many ? "expand_more" : "chevron_right"} size={20} className="shrink-0 text-on-surface-variant" />
+            </span>
+            <span className="block text-body-small text-on-surface-variant">{hero.sub}</span>
+          </span>
+        </button>
+      ) : chip ? (
         // The phone's header: the partner's picture and the dynamic's name, opening the list below it.
         <button type="button" onClick={toggle} aria-expanded={many ? open : undefined} className="state-layer flex max-w-full items-center gap-2 rounded-full py-1 pr-3 pl-1 text-left">
           <DynamicMark rel={rel} size={28} />
@@ -141,7 +165,7 @@ export function DynamicSwitcher({ compact, inline, chip, onSwitched }: { compact
           </div>
         ) : (
           <div
-            className={cx("z-50 rounded-lg border border-outline-variant bg-surface-container-lowest p-1.5 shadow-elev-2", compact ? "fixed w-72" : chip ? "absolute top-full left-0 mt-1 w-72" : "mt-1")}
+            className={cx("z-50 rounded-lg border border-outline-variant bg-surface-container-lowest p-1.5 shadow-elev-2", compact ? "fixed w-72" : chip || hero ? "absolute top-full left-0 mt-1 w-72" : "mt-1")}
             style={compact && at ? at : undefined}
           >
             <DynamicList onPick={() => setOpen(false)} />

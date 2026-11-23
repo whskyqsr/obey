@@ -190,9 +190,6 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
                         if (notes.isNotEmpty()) Text(notes.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                if (features.points && (solo || !canManage) && d.rewards.isNotEmpty()) item(key = "spend-hint") {
-                    Text("Tap a reward to spend your points on it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
-                }
 
                 // Rewards spent but not yet given: a Dominant marks them redeemed; a sub sees what they're waiting on.
                 val waiting = if (features.points) d.ledger.filter {
@@ -208,14 +205,6 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
                     )
                 }
 
-                if (features.consequences) item(key = "h-cons") {
-                    Text(
-                        "Attach one to a task for when it's missed, or hand one out on its own.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
-                }
                 if (features.consequences && d.consequences.isEmpty()) item(key = "e-cons") { EmptyBox("No consequences yet", icon = Icons.Outlined.Bolt) }
                 items(if (features.consequences) d.consequences else emptyList(), key = { "c-" + it.id }) { c ->
                     ListItem(

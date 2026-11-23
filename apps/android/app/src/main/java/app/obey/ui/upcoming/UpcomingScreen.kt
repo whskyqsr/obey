@@ -239,9 +239,6 @@ fun UpcomingScreen(
                         }
                         item(key = "rule-$day") { HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant) }
                     }
-                    item(key = "hint") {
-                        Text("Tap a day to see it, and a task to open it.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp))
-                    }
                 }
             }
         }

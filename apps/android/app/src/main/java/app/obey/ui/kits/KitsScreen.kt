@@ -397,7 +397,6 @@ fun KitsScreen(
                 LazyColumn(Modifier.padding(padding).fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
                     item(key = "intro") {
                         Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("Sets of tasks, rules and rewards you can add to any dynamic.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(onClick = onNewKit) { Icon(Icons.Outlined.Add, null); Text("  New kit") }
                                 OutlinedButton(onClick = { adding = true }) { Icon(Icons.Outlined.Download, null); Text("  Add from a link") }
