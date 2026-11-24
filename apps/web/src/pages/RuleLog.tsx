@@ -56,7 +56,7 @@ export function RuleLogPage() {
             : o.status === "excused"
               ? "excused"
               : o.status === "cancelled"
-                ? "called off"
+                ? "skipped"
                 : "owed";
     if (!state) return isDom ? "needs your approval" : "sent for approval";
     return `${o.title.toLowerCase()} · ${state}`;

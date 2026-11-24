@@ -603,7 +603,7 @@ function PendingRequests({ cards }: { cards: RescheduleRequest[][] }) {
       { onSuccess: () => (snack(`Moved “${instead.title}”`), setInstead(null)), onError: (e) => snack(errorMessage(e)) },
     );
   }
-  const change = (x: RescheduleRequest) => (x.kind === "cancel" ? "Call off" : `${fmtDateTime(x.fromDueAt)} → ${fmtDateTime(x.toDueAt)}`);
+  const change = (x: RescheduleRequest) => (x.kind === "cancel" ? "Skip" : `${fmtDateTime(x.fromDueAt)} → ${fmtDateTime(x.toDueAt)}`);
 
   return (
     <div className="flex flex-col gap-2">
@@ -618,7 +618,7 @@ function PendingRequests({ cards }: { cards: RescheduleRequest[][] }) {
               <div className="text-title-medium">
                 {single && r.kind === "cancel" ? (
                   <>
-                    {who} to call off “{r.title}”
+                    {who} to skip “{r.title}”
                   </>
                 ) : single ? (
                   <>
@@ -685,7 +685,7 @@ function PendingRequests({ cards }: { cards: RescheduleRequest[][] }) {
         }
       >
         <p className="mb-3">
-          “{instead?.title}” moves to this deadline{instead?.kind === "cancel" ? " instead of being called off" : ""}. The rest of the request stays for you to
+          “{instead?.title}” moves to this deadline{instead?.kind === "cancel" ? " instead of being skipped" : ""}. The rest of the request stays for you to
           decide.
         </p>
         <TextField type="datetime-local" label="New deadline" value={insteadAt} onChange={(e) => setInsteadAt(e.target.value)} />

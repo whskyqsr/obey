@@ -14,6 +14,7 @@ import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.EventBusy
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.TaskAlt
@@ -61,6 +62,9 @@ data class OccurrenceActions(
     val onDropConsequence: (() -> Unit)? = null,
     /** A Dominant excusing a miss from the ⋯ menu; with it, Reschedule shows for the miss too. */
     val onExcuseInMenu: (() -> Unit)? = null,
+    /** Skip this one due date; [skipAsks] when it goes to a Dominant to approve. */
+    val onSkip: (() -> Unit)? = null,
+    val skipAsks: Boolean = false,
     /** Opens the comments on this due date. */
     val onComments: (() -> Unit)? = null,
     /** A count task: a tap adds one; holding opens the dialog to change the count. */
@@ -182,7 +186,7 @@ fun OccurrenceRow(
                     actions.onReject?.let { IconButton(onClick = it) { Icon(Icons.AutoMirrored.Outlined.Undo, "Send back") } }
                     actions.onApprove?.let { IconButton(onClick = it) { Icon(Icons.Outlined.TaskAlt, "Approve") } }
                 }
-            } else if (listOf(actions.onCompleteWithNote, actions.onReschedule, actions.onEditTask, actions.onComments, actions.onExcuseInMenu).any { it != null }) {
+            } else if (listOf(actions.onCompleteWithNote, actions.onReschedule, actions.onSkip, actions.onEditTask, actions.onComments, actions.onExcuseInMenu).any { it != null }) {
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreHoriz, "More") }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
@@ -210,6 +214,13 @@ fun OccurrenceRow(
                                 )
                             }
                         }
+                        if (occurrence.status == OccurrenceStatus.Pending) actions.onSkip?.let {
+                            DropdownMenuItem(
+                                text = { Text(occurrence.skipLabel(asks = actions.skipAsks)) },
+                                leadingIcon = { Icon(Icons.Outlined.EventBusy, null) },
+                                onClick = { menu = false; it() },
+                            )
+                        }
                         actions.onComments?.let {
                             DropdownMenuItem(
                                 text = { Text("Comment") },
@@ -230,6 +241,12 @@ fun OccurrenceRow(
           }
         },
     )
+}
+
+/** Skip while it's still to come; Excuse once it's past due, since it already shows as owed (the API excuses it then). */
+fun Occurrence.skipLabel(asks: Boolean): String {
+    val word = if (app.obey.ui.common.parseInstant(dueAt).isAfter(java.time.Instant.now())) "Skip" else "Excuse"
+    return if (asks) "Ask to ${word.lowercase()}" else word
 }
 
 /** How a task reads as a diamond: done, waiting on approval, owed (missed or overdue), excused, or still open. */

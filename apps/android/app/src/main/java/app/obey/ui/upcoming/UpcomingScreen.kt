@@ -136,6 +136,8 @@ fun UpcomingScreen(
             OccurrenceActions(
                 onComplete = if (mine) ({ if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) }) else null,
                 onReschedule = { rescheduling = o },
+                onSkip = if (o.status == app.obey.api.OccurrenceStatus.Pending && (mine || canManage)) ({ vm.skip(o) }) else null,
+                skipAsks = !canManage,
                 onEditTask = if (canManage) ({ onEditTask(o.seriesId) }) else null,
                 onCount = if (mine && o.canCount(true, canManage)) ({ if (o.readyToSend) noting = o else vm.count(o, by = 1) { noting = it } }) else null,
                 onCountHold = if (o.canCount(mine, canManage)) ({ counting = o }) else null,
@@ -217,7 +219,7 @@ fun UpcomingScreen(
                 is Load.Ready -> if (s.value.view == CalendarView.Month) {
                     val items = s.value.days.firstOrNull { it.first == selected }?.second.orEmpty()
                     val events = s.value.eventsOn(selected)
-                    LazyColumn(Modifier.fillMaxSize()) {
+                    LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 88.dp)) {
                         item(key = "grid") {
                             MonthGrid(s.value, selected, today, session?.relationship, onSelect = vm::select, Modifier.padding(horizontal = 12.dp))
                         }
@@ -240,7 +242,7 @@ fun UpcomingScreen(
                         }
                         dayItems(selected, items, events, occurrenceRow, planRow, planChip)
                     }
-                } else LazyColumn(Modifier.fillMaxSize()) {
+                } else LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 88.dp)) {
                     // Letters: one hairline row per day, a diamond for each task and a word on how it went. Tap a day to open it.
                     item(key = "top") { HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant) }
                     s.value.days.forEach { (day, all) ->

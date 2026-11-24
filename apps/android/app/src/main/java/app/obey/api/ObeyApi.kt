@@ -323,6 +323,14 @@ interface ObeyApi {
     @POST("occurrences/{id}/reschedule")
     suspend fun reschedule(@Path("id") occurrenceId: String, @Body body: RescheduleInput): RescheduleResult
 
+    /** Skip one due date: a Dominant's applies at once, the assignee's asks a Dominant. */
+    @POST("occurrences/{id}/skip")
+    suspend fun skip(@Path("id") occurrenceId: String, @Body body: Map<String, String> = emptyMap()): RescheduleResult
+
+    /** Undo a Dominant's skip straight after it. */
+    @POST("occurrences/{id}/unskip")
+    suspend fun unskip(@Path("id") occurrenceId: String, @Body body: Map<String, String> = emptyMap()): Occurrence
+
     @POST("relationships/{id}/reschedules/day")
     suspend fun rescheduleDay(@Path("id") relationshipId: String, @Body body: RescheduleDayInput): RescheduleDayResult
 

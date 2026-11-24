@@ -960,7 +960,7 @@ describe("rescheduling", () => {
     await sub.post(`/relationships/${relId}/reschedules/plan`, { items: [{ occurrenceId: first.id, action: "cancel" }] });
     const [asked] = (await dom.get(`/relationships/${relId}/reschedules?status=requested`)).body;
     expect((await dom.post(`/reschedules/${asked.id}/decide`, { approve: true })).body.occurrence.status).toBe("cancelled");
-    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Dom OK'd calling off your task");
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Dom OK'd skipping your task");
 
     const [next] = (await dom.get(`/relationships/${relId}/occurrences?from=2026-10-19&to=2026-10-19`)).body;
     const direct = await dom.post(`/relationships/${relId}/reschedules/plan`, { items: [{ occurrenceId: next.id, action: "cancel" }] });
@@ -974,6 +974,29 @@ describe("rescheduling", () => {
         .map((o) => o.id)
         .sort(),
     ).toEqual([first.id, next.id].sort());
+  });
+
+  it("skips one due date: a Dom's applies at once, a sub's waits for the Dom", async () => {
+    const { dom, sub, relId, first } = await withTask("allowance", 3);
+    const asked = await sub.post(`/occurrences/${first.id}/skip`, {});
+    expect(asked.body).toMatchObject({ applied: false, request: { kind: "cancel", status: "requested" }, occurrence: { status: "pending" } });
+    expect(ctx.notifier.sent.at(-1)!.push.body).toMatch(/^Sub asked to skip “/);
+    const [req] = (await dom.get(`/relationships/${relId}/reschedules?status=requested`)).body;
+    expect((await dom.post(`/reschedules/${req.id}/decide`, { approve: true })).body.occurrence.status).toBe("cancelled");
+
+    const [next] = (await dom.get(`/relationships/${relId}/occurrences?from=2026-10-19&to=2026-10-19`)).body;
+    const direct = await dom.post(`/occurrences/${next.id}/skip`, {});
+    expect(direct.body).toMatchObject({ applied: true, occurrence: { status: "cancelled" } });
+    expect(ctx.notifier.sent.at(-1)!.push.body).toMatch(/^Dom skipped “.*” for you$/);
+    expect((await dom.post(`/occurrences/${next.id}/skip`, {})).status).toBe(409);
+    expect((await sub.post(`/occurrences/${next.id}/unskip`, {})).status).toBe(403);
+    expect((await dom.post(`/occurrences/${next.id}/unskip`, {})).body.status).toBe("pending");
+
+    // Past due but not yet marked missed: it reads as owed, so skipping it excuses it.
+    const was = ctx.clock.now;
+    ctx.clock.now = new Date("2026-10-20T01:30:00Z");
+    expect((await dom.post(`/occurrences/${next.id}/skip`, {})).body.occurrence.status).toBe("excused");
+    ctx.clock.now = was;
   });
 
   it("rejects deadlines in the past", async () => {

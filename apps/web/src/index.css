@@ -256,9 +256,10 @@ body {
   }
   /* A row between hairlines keeps its text on the page's edge; its highlight reaches 12px past the text on each
      side, so it never sits tight against the words. */
+  /* Square: the highlight meets the rows' hairlines, and rounded corners look wrong against a straight line (Jake). */
   .state-row::after {
     inset: 0 -12px;
-    border-radius: 6px;
+    border-radius: 0;
   }
 }
 

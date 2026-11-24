@@ -545,6 +545,24 @@ export function useReschedule(rel: string) {
   });
 }
 
+/** Skip one due date: a Dominant's applies at once, the assignee's asks a Dominant. */
+export function useSkip(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (id: string) => api<{ applied: boolean; occurrence: Occurrence }>(`/occurrences/${id}/skip`, { method: "POST", body: {} }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+/** Undo a Dominant's skip straight after it. */
+export function useUnskip(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: (id: string) => api<Occurrence>(`/occurrences/${id}/unskip`, { method: "POST", body: {} }),
+    onSuccess: () => invalidate(),
+  });
+}
+
 export function useRescheduleDay(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({

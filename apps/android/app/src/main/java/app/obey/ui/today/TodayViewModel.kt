@@ -566,6 +566,22 @@ class TodayViewModel @Inject constructor(
         refresh()
     }
 
+    /** The due date a Dominant just skipped, for the screen's snackbar with Undo. */
+    private val _skipped = MutableStateFlow<Occurrence?>(null)
+    val skipped: StateFlow<Occurrence?> = _skipped
+    fun skippedShown() { _skipped.value = null }
+
+    fun skip(o: Occurrence) = action {
+        val r = api.skip(o.id)
+        if (r.applied) _skipped.value = o else say("Asked to ${o.skipLabel(asks = false).lowercase()} “${o.title}”")
+        refresh()
+    }
+
+    fun unskip(o: Occurrence) = action {
+        api.unskip(o.id)
+        refresh()
+    }
+
     fun dropConsequence(o: Occurrence) = action {
         api.dropConsequence(o.id)
         _noteFor.value = NoteTarget("Dropped “${o.missConsequence}”", o.id, nameOf(o.assigneeId), "dropping “${o.missConsequence}” for “${o.title}”")
