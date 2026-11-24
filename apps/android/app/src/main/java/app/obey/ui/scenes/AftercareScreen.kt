@@ -119,7 +119,7 @@ fun AftercareScreen(onBack: () -> Unit, vm: AftercareViewModel = hiltViewModel()
                     val isMe = p.userId == me
                     if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Column(Modifier.fillMaxWidth().padding(vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Eyebrow(if (isMe) "Your aftercare plan" else "${session.nameOf(p.userId)}'s aftercare plan")
+                        Eyebrow(if (isMe) "You" else session.nameOf(p.userId))
                         PlanText(p, if (isMe) "You haven't written yours yet." else "Not written yet.")
                         p.updatedAt?.let { at ->
                             Text("Updated ${formatDateTime(at)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

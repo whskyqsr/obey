@@ -246,7 +246,7 @@ function TheMonth({ s }: { s: MonthSummary }) {
   const any = t.done + t.missed + t.excused > 0;
   return (
     <section>
-      <h2 className="eyebrow">{who === "You" ? "Your month" : `${who}'s month`}</h2>
+      <h2 className="eyebrow">{who}</h2>
       <p className="mt-2 text-body-large text-on-surface">
         {any
           ? `${pct(t.rate)} of tasks done${isCurrent ? " so far" : ""} · ${t.done} done, ${t.missed} missed`
@@ -450,7 +450,7 @@ function Together({ s, onChange }: { s: MonthSummary; onChange(): void }) {
                 <span className="text-[22px] text-on-surface-variant">/5</span>
               </div>
               <div className="mt-2 text-body-medium text-on-surface-variant">
-                {r.userId === me.user.id ? "Your rating" : `${memberName(r.userId)}'s rating`}
+                {r.userId === me.user.id ? "You" : memberName(r.userId)}
               </div>
             </div>
           ))}
@@ -483,7 +483,7 @@ function NextFocus({ month }: { month: string }) {
       {focus ? (
         <>
           <div className="flex items-center gap-2">
-            <h2 className="eyebrow flex-1">{monthName(month)}'s focus</h2>
+            <h2 className="eyebrow flex-1">Focus</h2>
             <IconButton icon="edit" label={`Change ${monthName(month)}'s focus`} onClick={() => setEditing(true)} />
           </div>
           <p className="mt-1 font-serif text-[22px] leading-7 text-on-surface">{focus.goal}</p>

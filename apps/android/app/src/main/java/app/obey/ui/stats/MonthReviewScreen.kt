@@ -382,7 +382,7 @@ private fun TheMonth(s: MonthSummary, session: Session, onOpenStats: (String, St
     val isCurrent = s.month == currentMonth()
     val any = t.done + t.missed + t.excused > 0
     Column {
-        Eyebrow(if (subject == session.userId) "Your month" else "${session.nameOf(subject)}'s month")
+        Eyebrow(if (subject == session.userId) "You" else session.nameOf(subject))
         Text(
             when {
                 any -> "${pct(t.rate)} of tasks done" + (if (isCurrent) " so far" else "") + " · ${t.done} done, ${t.missed} missed"
@@ -557,7 +557,7 @@ private fun Together(s: MonthSummary, session: Session, onChange: () -> Unit) {
     Column {
         Eyebrow(s.focus?.let { "Focus: ${it.goal}" } ?: "How it went")
         FlowRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(36.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            order.forEach { r -> Figure("${r.rating}", "/5", if (r.userId == session.userId) "Your rating" else "${session.nameOf(r.userId)}'s rating") }
+            order.forEach { r -> Figure("${r.rating}", "/5", if (r.userId == session.userId) "You" else session.nameOf(r.userId)) }
             s.totals.rate?.let { Figure(pct(it), "", "tasks done") }
         }
         if (!session.readOnly) {
@@ -588,7 +588,7 @@ private fun NextFocus(month: String, focus: MonthFocus?, tasks: List<Task>, busy
     }
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Eyebrow("${monthName(month)}'s focus", Modifier.weight(1f))
+            Eyebrow("Focus", Modifier.weight(1f))
             IconButton(onClick = { editing = true }) { Icon(Icons.Outlined.Edit, "Change ${monthName(month)}'s focus") }
         }
         Text(focus.goal, style = MaterialTheme.typography.headlineSmall)

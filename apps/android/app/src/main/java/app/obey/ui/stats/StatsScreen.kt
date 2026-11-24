@@ -267,7 +267,7 @@ private fun StatsBody(s: DynamicStats, before: String, name: String?, weekStart:
         }
         Text(
             listOfNotNull(
-                name?.let { "$it's tasks" },
+                name,
                 t.rate?.let { "${pct(it)} done" },
                 trend(t.rate, s.previous.rate, before),
                 if (t.excused > 0) "${t.excused} excused" else null,
