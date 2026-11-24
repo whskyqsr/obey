@@ -1,0 +1,24 @@
+Traceback (most recent call last):
+  File "/home/runner/work/obey/obey/.audit/drive.py", line 92, in <module>
+    try: run(who, uid)
+         ~~~^^^^^^^^^^
+  File "/home/runner/work/obey/obey/.audit/drive.py", line 70, in run
+    signin(uid)
+    ~~~~~~^^^^^
+  File "/home/runner/work/obey/obey/.audit/drive.py", line 57, in signin
+    x, y = center(edits[-1]); adb("shell", "input", "tap", str(x), str(y)); time.sleep(1)
+                  ~~~~~^^^^
+IndexError: list index out of range
+Traceback (most recent call last):
+  File "/home/runner/work/obey/obey/.audit/drive.py", line 92, in <module>
+    try: run(who, uid)
+         ~~~^^^^^^^^^^
+  File "/home/runner/work/obey/obey/.audit/drive.py", line 70, in run
+    signin(uid)
+    ~~~~~~^^^^^
+  File "/home/runner/work/obey/obey/.audit/drive.py", line 57, in signin
+    x, y = center(edits[-1]); adb("shell", "input", "tap", str(x), str(y)); time.sleep(1)
+                  ~~~~~^^^^
+IndexError: list index out of range
+shot signin
+shot signin
