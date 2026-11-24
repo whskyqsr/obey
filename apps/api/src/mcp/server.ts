@@ -7,6 +7,7 @@ import type { Deps } from "../app.js";
 import { aiCalls, aiGrants } from "../db/schema.js";
 import { aiReachable, grantForAccessToken } from "../services/aiAccess.js";
 import { publicApiUrl } from "../routes/oauth.js";
+import { type Call, USER_ROUTES, failed, registerUserTools, text } from "./tools.js";
 
 export const AI_INTERNAL_HEADER = "x-fealty-ai-internal";
 
@@ -14,15 +15,11 @@ export const AI_INTERNAL_HEADER = "x-fealty-ai-internal";
  * The app routes MCP tools may call, by method and route pattern. Anything not listed (photos, the keybox, location,
  * safe calls, settings, AI access itself) can't be reached by an AI app even by mistake.
  */
-const AI_ROUTES = new Set<string>(["GET /me"]);
+const AI_ROUTES = new Set<string>([...USER_ROUTES]);
 
 export const aiRouteAllowed = (method: string, routeUrl: string | undefined) => routeUrl !== undefined && AI_ROUTES.has(`${method} ${routeUrl}`);
 
 type Grant = typeof aiGrants.$inferSelect;
-type Call = (method: "GET" | "POST" | "PATCH" | "PUT", url: string, payload?: unknown) => Promise<{ status: number; body: unknown }>;
-
-const text = (value: unknown): CallToolResult => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }] });
-const failed = (message: string): CallToolResult => ({ content: [{ type: "text", text: message }], isError: true });
 
 interface MeBody {
   user: { id: string; displayName: string };
@@ -93,6 +90,7 @@ function buildServer(deps: Deps, grant: Grant, call: Call) {
     }),
   );
 
+  registerUserTools(server, call, logged);
   return server;
 }
 
