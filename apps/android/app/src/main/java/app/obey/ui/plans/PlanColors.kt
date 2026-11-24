@@ -7,9 +7,8 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,13 +46,13 @@ private fun personTone(index: Int): PlanTone {
     else PlanTone(hsl(0.60f, 0.88f), hsl(0.60f, 0.12f), hsl(0.50f, 0.40f))
 }
 
-/** Plans for both share the tertiary colour; a "Just me" plan takes its author's colour. */
+/** Plans for both are ink; a "Just me" plan takes its author's colour. */
 @Composable
 fun planTone(e: CalendarEvent, rel: Relationship?): PlanTone {
     val i = if (e.withPartner) -1 else planPeople(rel).indexOfFirst { it.userId == e.authorId }
     if (i < 0) {
         val colors = MaterialTheme.colorScheme
-        return PlanTone(colors.tertiaryContainer, colors.onTertiaryContainer, colors.tertiary)
+        return PlanTone(colors.tertiaryContainer, colors.onTertiaryContainer, colors.onSurface)
     }
     return personTone(i)
 }
@@ -65,11 +64,11 @@ fun PlanLegend(rel: Relationship?, myId: String?, modifier: Modifier = Modifier)
     val people = planPeople(rel)
     if (people.size < 2) return
     val colors = MaterialTheme.colorScheme
-    val entries = people.mapIndexed { i, m -> (if (m.userId == myId) "You" else m.displayName) to personTone(i).dot } + ("Both" to colors.tertiary)
+    val entries = people.mapIndexed { i, m -> (if (m.userId == myId) "You" else m.displayName) to personTone(i).dot } + ("Both" to colors.onSurface)
     FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         entries.forEach { (label, dot) ->
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(10.dp).background(dot, CircleShape))
+                Box(Modifier.width(16.dp).height(2.dp).background(dot))
                 Spacer(Modifier.width(6.dp))
                 Text(label, style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
             }

@@ -45,10 +45,11 @@ Once Jake decides how something looks or behaves, apply it everywhere the same s
 
 - Create buttons read "+ New" (from Rules/Protocols, 2026-11-23).
 - No explainers under names or settings (2026-11-23).
+- Write for people who already know their dynamic: everyone who sees a screen is a partner who knows whose plans, tasks and notes are whose, so don't spell out what they already know (2026-11-24).
 - Form fields are label-above Letters fields with one hairline (2026-11-23).
 - Deleting an item returns to its list, never back through history to wherever it was opened from (Notes, 2026-11-23).
 - The overflow menu is a horizontal ⋯, as in every mockup (2026-11-24).
-- Plans are marked with an accent rule and say whose they are ("Kitten's plan"), not a colour per person (mockup 13, 2026-11-24).
+- Plans are marked with a rule or line in their person's colour, ink for plans for both of you, and don't name whose they are; a small key under the calendar says which colour is whose. Copy never names what the page already makes clear ("Kitten's plan", "Kitten's side"). Oxblood stays for what's owed or clashing. (Jake, 2026-11-24, reversing Claude's earlier single-accent call for mockup 13.)
 
 Pixel perfection isn't the goal. Once the big gaps in `design/STATUS.md` are closed, there will be a consistency pass across every screen: same headers, same row styles, same buttons and same spacing for the same jobs.
 

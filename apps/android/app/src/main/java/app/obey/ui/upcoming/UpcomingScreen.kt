@@ -126,6 +126,8 @@ fun UpcomingScreen(
         }
     }
 
+    // Tasks that run into a plan and haven't been sorted out yet (moved, or kept as they are).
+    val clashing = (state as? Load.Ready)?.value?.events?.flatMap { it.conflictIds }?.toSet().orEmpty()
     val occurrenceRow: @Composable (Occurrence) -> Unit = { o ->
         val mine = o.assigneeId == session?.userId
         OccurrenceRow(
@@ -139,11 +141,12 @@ fun UpcomingScreen(
                 onCountHold = if (o.canCount(mine, canManage)) ({ counting = o }) else null,
             ),
             onOpen = { onOpenTask(o.seriesId) },
+            clash = o.id in clashing,
         )
     }
 
     val planRow: @Composable (CalendarEvent, LocalDate) -> Unit = { e, day ->
-        PlanRow(e, day, if (e.authorId == session?.userId || e.withPartner) null else session?.nameOf(e.authorId), planTone(e, session?.relationship)) { plan = e to day }
+        PlanRow(e, day, planTone(e, session?.relationship)) { plan = e to day }
     }
     val planChip: @Composable (CalendarEvent, LocalDate) -> Unit = { e, day ->
         PlanChip(e, day, planTone(e, session?.relationship), onOpen = { plan = e to day })
