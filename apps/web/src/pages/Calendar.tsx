@@ -7,7 +7,7 @@ import { useMediaQuery } from "../lib/useMediaQuery";
 import { OccurrenceCard, isOverdue } from "../components/OccurrenceCard";
 import { Button, Diamond, Dialog, type DiamondState, ErrorBox, Fab, IconButton, Loading, PageHeader, SegmentedButtons, cx } from "../components/ui";
 import { useOpenOnNew } from "../lib/newParam";
-import { WeekGrid } from "../components/WeekGrid";
+import { WeekColumns } from "../components/WeekColumns";
 import { addDays, addMonths, daysBetween, fmtDate, fmtMonth, fmtTime, localDateOf, monthGrid, startOfWeek, today } from "../lib/dates";
 import { storage } from "../lib/storage";
 import { useRel } from "../lib/relationship";
@@ -203,7 +203,7 @@ export function CalendarPage() {
           </section>
         </div>
       ) : desk ? (
-        <WeekGrid
+        <WeekColumns
           days={days}
           occurrences={(occ.data ?? []).filter((o) => o.status !== "cancelled")}
           events={events.data ?? []}
