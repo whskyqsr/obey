@@ -43,13 +43,13 @@ const rules = [
     name: "Raw colour on web (use theme tokens)",
     files: web,
     test: /(bg|text|border|fill|stroke)-\[#[0-9a-fA-F]{3,8}\]|["'`]#[0-9a-fA-F]{6}\b/,
-    allow: ["theme/", "components/PlaceMap.tsx", "components/SafeCall.tsx", "pages/Limits.tsx", "lib/limits.ts"],
+    allow: ["theme/", "components/PlaceMap.tsx", "components/SafeCall.tsx"],
   },
   {
     name: "Raw colour on Android (use MaterialTheme.colorScheme)",
     files: android,
     test: /\bColor\(0x/,
-    allow: ["ui/theme/", "ui/SafeCall.kt", "ui/agreement/AgreementScreen.kt", "ui/limits/LimitsScreen.kt"],
+    allow: ["ui/theme/", "ui/SafeCall.kt", "ui/agreement/AgreementScreen.kt"],
   },
   {
     name: 'Capital "Submissive" in user-facing text (always lowercase)',
