@@ -6,6 +6,7 @@ shot sub-plan-editor-repeat
 shot sub-after-save
 shot signin
 tap dev at 540 1433 [429,1407][652,1460]
-after signin texts: ['Good morning, Marcus.', 'Seven things are waiting on you. Kitten has five left today.', 'Kitten is locked', 'until Fri 5:39\u202fPM · hidden from Kitten', '3d 5h', "KITTEN'S AFTERCARE", 'Kitten likes: Water, Cuddles. Stay close for a while.', 'Done', 'Open the scene', 'How are you feeling after yesterday?', 'Awful', 'Low', 'Okay', 'Good', 'Great', 'Anything you still need? (optional)', 'Send', 'K', 'with Kitten', 'Today', 'Week', 'Us']
+after signin texts: ['Good morning, Marcus.', 'Six things are waiting on you. Kitten has five left today.', 'Kitten is locked', 'until Fri 5:47\u202fPM · hidden from Kitten', '3d 5h', "KITTEN'S AFTERCARE", 'Kitten likes: Water, Cuddles. Stay close for a while.', 'Done', 'Open the scene', 'How are you feeling after yesterday?', 'Awful', 'Low', 'Okay', 'Good', 'Great', 'Anything you still need? (optional)', 'Send', 'K', 'with Kitten', 'Today', 'Week', 'Us']
 shot dom-today-pauseask
-missing asks to pause tasks [("Write tonight's journal entry", ''), ('', 'Mark done'), ('11:00\u202fPM', ''), ('', 'More'), ('Drink water', ''), ('', 'Mark done'), ('11:59\u202fPM', ''), ('', 'More'), ('Tidy the desk', ''), ('LATER', ''), ('Tomorrow · 6 tasks', ''), ("Morning ritual, Make the bed, Send a photo of your outfit, Evening walk, 30 minutes, Write tonight's journal entry, Drink water", ''), ('', 'Expand'), ('Thursday, Nov 26 · 6 tasks', ''), ("Morning ritual, Make the bed, Send a photo of your outfit, Evening walk, 30 minutes, Write tonight's journal entry, Drink water", ''), ('', 'Expand'), ('Friday, Nov 27 · 6 tasks', ''), ("Morning ritual, Make the bed, Send a photo of your outfit, Evening walk, 30 minutes, Write tonight's journal entry, Drink water", ''), ('', 'Expand'), ('K', ''), ('with Kitten', ''), ('Today', ''), ('Week', ''), ('Us', ''), ('', 'New')]
+shot dom-pauseask-open
+shot dom-week
