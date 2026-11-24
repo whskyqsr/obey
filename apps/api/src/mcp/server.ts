@@ -68,7 +68,7 @@ function buildServer(deps: Deps, grant: Grant, call: Call, touched: Set<string>)
     "list_dynamics",
     {
       title: "List dynamics",
-      description: "The dynamics you can reach here, with the ids and switches other tools need. When asked about them, just say who each one is with.",
+      description: "The dynamics you can reach here, with the ids and switches other tools need. When asked about them, just say who each one is with and their role, e.g. \"One, with Felicia, your submissive.\"",
       inputSchema: {},
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
