@@ -37,9 +37,29 @@ fun Eyebrow(text: String, modifier: Modifier = Modifier, color: Color = Material
     Text(text.uppercase(), style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.5.sp), color = color, modifier = modifier)
 }
 
-/** The ink button: the one filled button in Letters. */
+/** The ink button: the one filled button in Letters. Disabled, it fades like the web's instead of turning grey. */
 @Composable
-fun inkButtonColors() = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface, contentColor = MaterialTheme.colorScheme.surface)
+fun inkButtonColors() = ButtonDefaults.buttonColors(
+    containerColor = MaterialTheme.colorScheme.onSurface,
+    contentColor = MaterialTheme.colorScheme.surface,
+    disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+    disabledContentColor = MaterialTheme.colorScheme.surface,
+)
+
+/**
+ * The filled button in ink with small corners, as on the web. Use it in place of Material's, whose default fill is the
+ * oxblood accent and whose shape is a pill.
+ */
+@Composable
+fun Button(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    shape: androidx.compose.ui.graphics.Shape = MaterialTheme.shapes.small,
+    colors: androidx.compose.material3.ButtonColors = inkButtonColors(),
+    contentPadding: androidx.compose.foundation.layout.PaddingValues = ButtonDefaults.ContentPadding,
+    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
+) = androidx.compose.material3.Button(onClick = onClick, modifier = modifier, enabled = enabled, shape = shape, colors = colors, contentPadding = contentPadding, content = content)
 
 /** A read-only pill on a hairline, such as each aftercare given on a scene. */
 @Composable

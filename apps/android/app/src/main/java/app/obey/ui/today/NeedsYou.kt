@@ -16,7 +16,7 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MoreTime
 import androidx.compose.material.icons.outlined.Redeem
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import app.obey.ui.common.Button
 import app.obey.ui.common.TonalButton
 import app.obey.ui.common.TonalIconButton
 import androidx.compose.material3.Icon

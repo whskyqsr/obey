@@ -28,7 +28,7 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.SentimentDissatisfied
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import app.obey.ui.common.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import app.obey.ui.common.TonalButton
 import androidx.compose.material3.HorizontalDivider

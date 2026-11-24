@@ -1,5 +1,13 @@
 package app.obey.ui
 
+import androidx.compose.material.icons.outlined.CheckBox
+import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
+import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material.icons.outlined.SwapHoriz
+import androidx.compose.material.icons.outlined.PersonAddAlt
 import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -20,7 +28,7 @@ import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.Today
-import androidx.compose.material3.Button
+import app.obey.ui.common.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
@@ -227,24 +235,44 @@ private fun sections(f: Features) = listOfNotNull(
     TopLevel(TaskListRoute, "All tasks", Icons.Outlined.Checklist, "Every task, paused ones too") { it.hasRoute<TaskListRoute>() },
 )
 
-/** What + can start. Each opens where it's made. */
-private data class NewItem(val label: String, val hint: String, val icon: ImageVector, val go: () -> Unit)
+/** What + can start (mockup 17). Each opens where it's made. */
+private data class NewItem(val label: String, val icon: ImageVector, val go: () -> Unit)
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun NewSheet(items: List<NewItem>, onDismiss: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surface) {
+private fun NewSheet(items: List<NewItem>, onSwap: (() -> Unit)?, onInvite: (() -> Unit)?, onDismiss: () -> Unit) {
+    val c = MaterialTheme.colorScheme
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = c.surface) {
         Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 24.dp)) {
-            Text("New", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 8.dp))
-            items.forEach { item ->
+            app.obey.ui.common.Eyebrow("New", Modifier.padding(bottom = 4.dp))
+            items.forEachIndexed { i, item ->
+                if (i > 0) HorizontalDivider(color = c.outlineVariant)
                 Row(
-                    Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable { onDismiss(); item.go() }.padding(vertical = 10.dp),
+                    Modifier.fillMaxWidth().clickable { onDismiss(); item.go() }.padding(vertical = 14.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(item.icon, null)
-                    Column {
-                        Text(item.label, style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 24.sp))
+                    Icon(item.icon, null, tint = c.onSurfaceVariant)
+                    Text(item.label, style = MaterialTheme.typography.headlineSmall.copy(fontSize = 22.sp, lineHeight = 28.sp))
+                }
+            }
+            if (onSwap != null || onInvite != null) {
+                androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    onSwap?.let { go ->
+                        app.obey.ui.common.ChoiceChip(
+                            selected = false,
+                            onClick = { onDismiss(); go() },
+                            label = { Text("Ask to swap roles") },
+                            leadingIcon = { Icon(Icons.Outlined.SwapHoriz, null, Modifier.size(18.dp)) },
+                        )
+                    }
+                    onInvite?.let { go ->
+                        app.obey.ui.common.ChoiceChip(
+                            selected = false,
+                            onClick = { onDismiss(); go() },
+                            label = { Text("Invite") },
+                            leadingIcon = { Icon(Icons.Outlined.PersonAddAlt, null, Modifier.size(18.dp)) },
+                        )
                     }
                 }
             }
@@ -327,20 +355,26 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
     val manage = session.canManage
     val newItems = buildList {
         if (session.readOnly) return@buildList
-        if (manage) add(NewItem("Task", "Something to do, once or on a schedule", Icons.Outlined.AddTask) { nav.navigate(TaskEditorRoute()) })
-        add(NewItem("Plan", "Something on the calendar", Icons.Outlined.Event) { app.obey.ui.plans.NewPlanRequest.pending.value = true; go(UpcomingRoute) })
-        if (features.journal) add(NewItem("Journal entry", "Write tonight's entry", Icons.Outlined.AutoStories) { nav.navigate(NoteEditorRoute(journal = true)) })
-        add(NewItem("Note", "Shared or just for you", Icons.Outlined.StickyNote2) { nav.navigate(NoteEditorRoute()) })
+        if (manage) add(NewItem("Task", Icons.Outlined.CheckBox) { nav.navigate(TaskEditorRoute()) })
+        add(NewItem("Plan", Icons.Outlined.Event) { app.obey.ui.plans.NewPlanRequest.pending.value = true; go(UpcomingRoute) })
+        add(NewItem("Note", Icons.Outlined.EditNote) { nav.navigate(NoteEditorRoute()) })
+        if (features.journal) add(NewItem("Journal entry", Icons.AutoMirrored.Outlined.MenuBook) { nav.navigate(NoteEditorRoute(journal = true)) })
+        if (features.scenes && !session.solo) add(NewItem("Log a scene", Icons.Outlined.Bedtime) { go(ScenesRoute) })
         if (features.rules || features.protocols) add(
-            if (manage) NewItem("Broken rule", "Log it, with a consequence if you like", Icons.Outlined.Gavel) { nav.navigate(RuleLogRoute) }
-            else NewItem("Own up to a rule", "Tell them before they find out", Icons.Outlined.Gavel) { nav.navigate(RuleLogRoute) },
+            NewItem(if (manage) "Log a broken rule" else "Own up to a rule", Icons.AutoMirrored.Outlined.ReceiptLong) { nav.navigate(RuleLogRoute) },
         )
-        if (features.consequences && manage) add(NewItem("Consequence", "Hand one out now", Icons.Outlined.Bolt) { go(ConsequencesRoute) })
-        if (features.scenes && !session.solo) add(NewItem("Scene", "Log it, then each of you writes your side", Icons.Outlined.AutoAwesome) { go(ScenesRoute) })
-        if (manage) add(NewItem("From a kit", "Add a set of tasks, rules and rewards", Icons.Outlined.Widgets) { go(KitsRoute) })
+        if (features.consequences && manage) add(NewItem("Assign a consequence", Icons.Outlined.Bolt) { go(ConsequencesRoute) })
+        if (manage) add(NewItem("Start from a kit", Icons.Outlined.Layers) { go(KitsRoute) })
     }
     var newOpen by remember { mutableStateOf(false) }
-    if (newOpen) NewSheet(newItems) { newOpen = false }
+    var swapping by remember { mutableStateOf(false) }
+    val canSwap = !session.readOnly && session.relationship?.roleSwap == null && session.myRole != app.obey.api.Role.Switch && app.obey.ui.roles.swapPartner(session) != null
+    if (newOpen) NewSheet(
+        newItems,
+        onSwap = if (canSwap) ({ swapping = true }) else null,
+        onInvite = if (!session.readOnly) ({ nav.navigate(DynamicRoute(invite = true)) }) else null,
+    ) { newOpen = false }
+    if (swapping) app.obey.ui.roles.SwapSheet(session, onDismiss = { swapping = false })
 
     val usItems = sections.map { t -> UsItem(t.label, t.icon) { nav.navigate(t.route) { launchSingleTop = true } } }
 
