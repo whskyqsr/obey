@@ -9,7 +9,7 @@ import { DynamicHero } from "../components/DynamicHero";
 import { SubHeader, BackLink, Button, Checkbox, Chip, Diamond, Dialog, Icon, IconButton, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
 import { ReportDialog } from "../components/Proof";
 import { EndSwapDialog, SwapDialog, fmtSwapEnd, swapPartner } from "../components/RoleSwap";
-import { fmtDate, fmtDateTime, localDateOf, today } from "../lib/dates";
+import { fmtClock, fmtDate, fmtDateTime, localDateOf, today } from "../lib/dates";
 import { anniversary, describeDate } from "../lib/dynamicDates";
 import { inviteLink } from "../lib/invite";
 import { ROLE_LABEL, isCollared, relTitle, useRel } from "../lib/relationship";
@@ -675,6 +675,12 @@ function NameDialog({ open, onClose, onSave }: { open: boolean; onClose(): void;
 }
 
 /** Rules for the app itself: the name, who moves deadlines, sub notes and how long proof photos stay. Opened from Your dynamic (mockup 87). */
+/** Hourly from noon to 11 PM, plus whatever is stored if it's off the hour. */
+function anytimeTimes(current: string) {
+  const hours = Array.from({ length: 12 }, (_, i) => `${String(12 + i).padStart(2, "0")}:00`);
+  return hours.includes(current) ? hours : [...hours, current].sort();
+}
+
 export function HowItWorksPage() {
   const { rel, me, isDom: dom, memberName } = useRel();
   const isDom = dom && rel.endedAt === null;
@@ -737,6 +743,23 @@ export function HowItWorksPage() {
               />
             </div>
           )}
+        </Group>
+        <Label>Reminders</Label>
+        <Group>
+          <div className="pt-3 pb-4">
+            <Select
+              label="Tasks with no time"
+              value={rel.anytimeReminder}
+              disabled={!isDom}
+              onChange={(e) => patch({ anytimeReminder: e.target.value }, `Reminded at ${fmtClock(e.target.value)}`)}
+            >
+              {anytimeTimes(rel.anytimeReminder).map((t) => (
+                <option key={t} value={t}>
+                  {fmtClock(t)}
+                </option>
+              ))}
+            </Select>
+          </div>
         </Group>
         <Label>Notes</Label>
         <Group>

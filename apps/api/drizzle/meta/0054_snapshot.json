@@ -1,5 +1,5 @@
 {
-  "id": "ac348a62-d6af-46bb-921a-ef66b163d96c",
+  "id": "6530c24e-e4d5-47b4-85b4-4bc1b7aa3db8",
   "prevId": "c0994251-5fa5-4c47-bd4a-b49c58de5f8e",
   "version": "7",
   "dialect": "postgresql",
@@ -2088,147 +2088,6 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.limit_prefilled": {
-      "name": "limit_prefilled",
-      "schema": "",
-      "columns": {
-        "relationship_id": {
-          "name": "relationship_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "filled_at": {
-          "name": "filled_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "limit_prefilled_relationship_id_relationships_id_fk": {
-          "name": "limit_prefilled_relationship_id_relationships_id_fk",
-          "tableFrom": "limit_prefilled",
-          "tableTo": "relationships",
-          "columnsFrom": [
-            "relationship_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "limit_prefilled_user_id_users_id_fk": {
-          "name": "limit_prefilled_user_id_users_id_fk",
-          "tableFrom": "limit_prefilled",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "limit_prefilled_relationship_id_user_id_pk": {
-          "name": "limit_prefilled_relationship_id_user_id_pk",
-          "columns": [
-            "relationship_id",
-            "user_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.limit_profile": {
-      "name": "limit_profile",
-      "schema": "",
-      "columns": {
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "item_key": {
-          "name": "item_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "side": {
-          "name": "side",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "rating": {
-          "name": "rating",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "note": {
-          "name": "note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "''"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "limit_profile_user_id_users_id_fk": {
-          "name": "limit_profile_user_id_users_id_fk",
-          "tableFrom": "limit_profile",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "limit_profile_user_id_item_key_side_pk": {
-          "name": "limit_profile_user_id_item_key_side_pk",
-          "columns": [
-            "user_id",
-            "item_key",
-            "side"
-          ]
-        }
-      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
@@ -4334,6 +4193,13 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": false
+        },
+        "anytime_reminder": {
+          "name": "anytime_reminder",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'20:00'"
         },
         "dates": {
           "name": "dates",

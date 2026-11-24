@@ -611,15 +611,17 @@ export async function applyMiss(db: Tx, series: Series, occ: Occurrence, now: Da
   return issueMissConsequence(db, series, occ, now);
 }
 
-/** Untimed tasks are reminded this long before the end of their day. */
-export const UNTIMED_REMINDER_HOURS = 4;
-
 /** Pending occurrences due within `leadMinutes` that haven't had a reminder yet; marks them reminded. */
 export async function claimReminders(db: Tx, now: Date, leadMinutes: number) {
   const horizon = new Date(now.getTime() + leadMinutes * 60_000);
-  // A task with no time is due at the end of its day; its reminder comes about 8 PM instead of just before midnight.
-  const evening = new Date(now.getTime() + UNTIMED_REMINDER_HOURS * 3_600_000);
   const untimed = db.select({ id: taskSeries.id }).from(taskSeries).where(isNull(taskSeries.dueTime));
+  // A task with no time is due at the end of its day, so it's reminded at the dynamic's set time that day (8 PM unless
+  // a Dominant changed it), in the task's own time zone, rather than just before midnight.
+  const anytimeDue = sql`exists (
+    select 1 from ${taskSeries} ts join ${relationships} r on r.id = ts.relationship_id
+    where ts.id = "occurrences"."series_id"
+      and (("occurrences"."due_at" at time zone ts.timezone)::date + r.anytime_reminder::time) at time zone ts.timezone <= ${now.toISOString()}::timestamptz
+  )`;
   const due = await db
     .update(occurrences)
     .set({ reminderSentAt: now })
@@ -627,7 +629,7 @@ export async function claimReminders(db: Tx, now: Date, leadMinutes: number) {
       and(
         eq(occurrences.status, "pending"),
         isNull(occurrences.reminderSentAt),
-        or(and(notInArray(occurrences.seriesId, untimed), lte(occurrences.dueAt, horizon)), and(inArray(occurrences.seriesId, untimed), lte(occurrences.dueAt, evening))),
+        or(and(notInArray(occurrences.seriesId, untimed), lte(occurrences.dueAt, horizon)), and(inArray(occurrences.seriesId, untimed), anytimeDue)),
         gte(occurrences.dueAt, now),
         // Curfews get their own nudge, and only when the sub isn't home yet.
         notInArray(occurrences.seriesId, db.select({ id: taskSeries.id }).from(taskSeries).where(isNotNull(taskSeries.curfewUntil))),

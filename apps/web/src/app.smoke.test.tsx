@@ -28,6 +28,7 @@ const routes: Record<string, unknown> = {
         ],
         reschedulePolicy: "request",
         weeklyDelayAllowance: 2,
+        anytimeReminder: "20:00",
         createdAt: iso(-100),
       },
     ],

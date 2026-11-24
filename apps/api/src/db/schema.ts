@@ -50,6 +50,8 @@ export const relationships = pgTable("relationships", {
   subNotes: boolean("sub_notes").notNull().default(true),
   /** Proof photos are deleted this many days after their task is settled; null keeps them. */
   proofDays: integer("proof_days"),
+  /** Local time ("HH:mm") a task with no due time is reminded about on its day; a Dominant sets it. */
+  anytimeReminder: text("anytime_reminder").notNull().default("20:00"),
   /** Anniversaries and other dates the dynamic marks. */
   dates: jsonb("dates").$type<DynamicDate[]>().notNull().default([]),
   /** The sub's curfew as a Dominant set it; its nights are hidden task series (see task_series.curfew_until). */

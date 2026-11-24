@@ -295,7 +295,7 @@ export function useDisconnectAiApp(rel: string) {
 export function useUpdateRelationship(rel: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Partial<Pick<Relationship, "name" | "reschedulePolicy" | "weeklyDelayAllowance" | "subNotes" | "proofDays" | "dates">> & { features?: Partial<Features> }) =>
+    mutationFn: (body: Partial<Pick<Relationship, "name" | "reschedulePolicy" | "weeklyDelayAllowance" | "subNotes" | "proofDays" | "anytimeReminder" | "dates">> & { features?: Partial<Features> }) =>
       api<Relationship>(`/relationships/${rel}`, { method: "PATCH", body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.me }),
   });
