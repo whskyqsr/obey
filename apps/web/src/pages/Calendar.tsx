@@ -7,11 +7,11 @@ import { useMediaQuery } from "../lib/useMediaQuery";
 import { OccurrenceCard, isOverdue } from "../components/OccurrenceCard";
 import { Button, Diamond, Dialog, type DiamondState, ErrorBox, Fab, IconButton, Loading, PageHeader, SegmentedButtons, cx } from "../components/ui";
 import { useOpenOnNew } from "../lib/newParam";
-import { WeekColumns } from "../components/WeekColumns";
+import { PlanKey, WeekColumns } from "../components/WeekColumns";
 import { addDays, addMonths, daysBetween, fmtDate, fmtMonth, fmtTime, localDateOf, monthGrid, startOfWeek, today } from "../lib/dates";
 import { storage } from "../lib/storage";
 import { useRel } from "../lib/relationship";
-import { planPeople, planTone } from "../lib/planColors";
+import { planLegend, planTone } from "../lib/planColors";
 import type { WeekStart } from "../api/types";
 
 type View = "week" | "month";
@@ -261,6 +261,7 @@ export function CalendarPage() {
           })}
         </div>
       )}
+      {!(desk && view === "week") && (events.data?.length ?? 0) > 0 && <PlanKey items={planLegend(rel, me.user.id)} className="mx-4 mt-4 md:mx-6" />}
       <Dialog
         open={!!detail}
         onClose={() => setDetailId(null)}
@@ -290,26 +291,15 @@ export function CalendarPage() {
   );
 }
 
-/** A plan: an accent rule down its side and whose it is, so it never reads as a task. */
+/** A plan: a rule down its side in its person's colour, so it never reads as a task. */
 function EventItem({ e, onOpen, large }: { e: CalendarEvent; onOpen(): void; large?: boolean }) {
-  const { rel, me } = useRel();
-  const whose =
-    e.withPartner || planPeople(rel).length < 2
-      ? null
-      : e.authorId === me.user.id
-        ? "You"
-        : (rel.members.find((m) => m.userId === e.authorId)?.displayName ?? "Them");
+  const { rel } = useRel();
   return (
     <button type="button" onClick={onOpen} className={cx("state-layer flex w-full text-left", large ? "border-b border-outline-variant py-3" : "py-1")}>
       <span className={cx("min-w-0 flex-1 border-l-2", planTone(e, rel).rule, large ? "pl-4" : "pl-2")}>
         <span className={cx("line-clamp-2 block break-words text-on-surface", large ? "text-body-large" : "text-body-small")}>{e.title}</span>
         <span className={cx("block text-on-surface-variant", large ? "text-body-medium" : "text-label-small")}>
-          {[
-            e.allDay ? "All day" : `${fmtTime(e.startsAt)}–${fmtTime(e.endsAt)}`,
-            whose,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
+          {e.allDay ? "All day" : `${fmtTime(e.startsAt)}–${fmtTime(e.endsAt)}`}
         </span>
       </span>
     </button>

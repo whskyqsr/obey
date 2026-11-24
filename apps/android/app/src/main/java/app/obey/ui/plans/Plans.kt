@@ -221,10 +221,10 @@ class PlanViewModel @Inject constructor(
     }
 }
 
-/** A plan in a day's list: a rule down its side in its person's colour, its title, and when and whose. */
+/** A plan in a day's list: a rule down its side in its person's colour, its title, and when. */
 @Composable
-fun PlanRow(e: CalendarEvent, day: LocalDate, who: String?, tone: PlanTone, onOpen: () -> Unit) {
-    PlanLine(e.title, listOfNotNull(e.dayLabel(day), who).joinToString(" · "), tone.dot, onOpen)
+fun PlanRow(e: CalendarEvent, day: LocalDate, tone: PlanTone, onOpen: () -> Unit) {
+    PlanLine(e.title, e.dayLabel(day), tone.dot, onOpen)
 }
 
 /** An all-day or multi-day plan above a day's tasks, ruled the same way as [PlanRow]. */

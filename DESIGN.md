@@ -48,7 +48,7 @@ Once Jake decides how something looks or behaves, apply it everywhere the same s
 - Form fields are label-above Letters fields with one hairline (2026-11-23).
 - Deleting an item returns to its list, never back through history to wherever it was opened from (Notes, 2026-11-23).
 - The overflow menu is a horizontal ⋯, as in every mockup (2026-11-24).
-- Plans are marked with a rule or line in their person's colour (plans for both share one colour), and say whose they are by name alone ("Kitten", or "You"), never "Kitten's plan". Jake brought per-person colours back on 2026-11-24, after first dropping them for mockup 13. Oxblood stays for what's owed or clashing. The desktop week is a column per day with its plans and tasks in the order they happen, with no space for gaps in time. A timed plan holds the tasks that fall during it, and all-day or multi-day plans are their name over a line that spans the days they cover. Plans don't say how many tasks they overlap; a task that runs into a plan is marked in oxblood until someone moves it or keeps it (2026-11-24).
+- Plans are marked with a rule or line in their person's colour, ink for plans for both of you, and don't name whose they are; a small key under the calendar says which colour is whose. Copy never names what the page already makes clear ("Kitten's plan", "Kitten's side"). Oxblood stays for what's owed or clashing. (Jake, 2026-11-24, reversing Claude's earlier single-accent call for mockup 13.)
 
 Pixel perfection isn't the goal. Once the big gaps in `design/STATUS.md` are closed, there will be a consistency pass across every screen: same headers, same row styles, same buttons and same spacing for the same jobs.
 

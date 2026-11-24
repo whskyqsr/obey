@@ -1,7 +1,7 @@
 import type { CalendarEvent, Occurrence } from "../api/types";
 import { fmtDate, fmtTime, isAllDayDue, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
-import { planPeople, planTone } from "../lib/planColors";
+import { planLegend, planTone } from "../lib/planColors";
 import { isOverdue } from "./OccurrenceCard";
 import { Diamond, type DiamondState, cx } from "./ui";
 
@@ -70,12 +70,7 @@ export function WeekColumns({
 }) {
   const t = today();
   const { rel, me } = useRel();
-  const whose = (e: CalendarEvent) =>
-    e.withPartner || planPeople(rel).length < 2
-      ? null
-      : e.authorId === me.user.id
-        ? "You"
-        : (rel.members.find((m) => m.userId === e.authorId)?.displayName ?? null);
+  const key = events.length ? planLegend(rel, me.user.id) : [];
 
   const long = spans(days, events.filter(coversDays));
   const labelRows = long.length ? Math.max(...long.map((s) => s.row)) + 1 : 0;
@@ -116,7 +111,11 @@ export function WeekColumns({
         <span
           className={cx(
             "line-clamp-2 min-w-0 flex-1 text-body-small break-words",
-            clash ? "text-error underline decoration-error/50 underline-offset-2" : state === "done" || state === "off" ? "text-on-surface-variant" : "text-on-surface",
+            clash
+              ? "text-error underline decoration-error/50 underline-offset-2"
+              : state === "done" || state === "off"
+                ? "text-on-surface-variant"
+                : "text-on-surface",
           )}
         >
           {o.title}
@@ -126,65 +125,81 @@ export function WeekColumns({
   };
 
   return (
-    <div className="mx-6 grid grid-cols-7 border-y border-outline-variant" style={{ gridTemplateRows: `auto repeat(${labelRows}, auto) 1fr` }}>
-      {days.map((d, i) => (
-        <div
-          key={`bg-${d}`}
-          aria-hidden
-          className={cx(
-            i > 0 && "border-l border-outline-variant",
-            d === t && "bg-surface-container-lowest",
-          )}
-          style={{ gridColumn: i + 1, gridRow: "1 / -1" }}
-        />
+    <>
+      <div className="mx-6 grid grid-cols-7 border-y border-outline-variant" style={{ gridTemplateRows: `auto repeat(${labelRows}, auto) 1fr` }}>
+        {days.map((d, i) => (
+          <div
+            key={`bg-${d}`}
+            aria-hidden
+            className={cx(i > 0 && "border-l border-outline-variant", d === t && "bg-surface-container-lowest")}
+            style={{ gridColumn: i + 1, gridRow: "1 / -1" }}
+          />
+        ))}
+        {days.map((d, i) => (
+          <div key={`head-${d}`} className="flex min-w-0 flex-col px-3 pt-3 pb-2" style={{ gridColumn: i + 1, gridRow: 1 }}>
+            <span className={cx("text-label-medium", d === t ? "text-primary" : "text-on-surface-variant")}>{fmtDate(d, { weekday: "short" })}</span>
+            <span className="font-serif text-[30px] leading-8 text-on-surface">{Number(d.slice(8))}</span>
+          </div>
+        ))}
+        {long.map((s) => {
+          const meta = s.e.allDay ? null : `${fmtTime(s.e.startsAt)} to ${fmtDate(localDateOf(new Date(s.e.endsAt)), { weekday: "short" })}`;
+          return (
+            <button
+              key={s.e.id}
+              type="button"
+              onClick={() => onOpenEvent(s.e)}
+              style={{ gridColumn: `${s.from + 1} / ${s.to + 2}`, gridRow: s.row + 2 }}
+              className={cx("state-layer mb-1 block min-w-0 pt-0.5 text-left", s.before ? "pl-0" : "pl-3", s.after ? "pr-0" : "pr-3")}
+            >
+              <span className={cx("flex min-w-0 items-baseline gap-2", s.before && "pl-3", s.after && "pr-3")}>
+                {s.before && <span className="text-label-small text-on-surface-variant">‹</span>}
+                <span className="max-w-full shrink-0 truncate text-body-small text-on-surface">{s.e.title}</span>
+                {meta && <span className="min-w-0 truncate text-label-small text-on-surface-variant">{meta}</span>}
+                {s.after && <span className="ml-auto text-label-small text-on-surface-variant">›</span>}
+              </span>
+              {/* The line runs across every day the plan covers. */}
+              <span aria-hidden className={cx("mt-1 block h-0.5", planTone(s.e, rel).dot)} />
+            </button>
+          );
+        })}
+        {columns.map(({ d, untimed, entries }, i) => (
+          <div key={d} className="flex min-h-[420px] min-w-0 flex-col gap-1 px-3 pt-2 pb-6" style={{ gridColumn: i + 1, gridRow: labelRows + 2 }}>
+            {untimed.map(task)}
+            {entries.map((x) =>
+              x.kind === "task" ? (
+                task(x.o)
+              ) : (
+                <div key={x.e.id} className={cx("my-1 border-l-2 pl-2", planTone(x.e, rel).rule)}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenEvent(x.e)}
+                    className="state-layer -ml-2 block w-[calc(100%+0.5rem)] py-0.5 pl-2 text-left"
+                  >
+                    <span className="line-clamp-2 block text-body-small break-words text-on-surface">{x.e.title}</span>
+                    <span className="block text-label-small text-on-surface-variant">{span(x.e)}</span>
+                  </button>
+                  {x.during.length > 0 && <div className="mt-0.5 flex flex-col gap-1">{x.during.map(task)}</div>}
+                </div>
+              ),
+            )}
+          </div>
+        ))}
+      </div>
+      {/* Plans carry their person's colour instead of a name, so the key says whose is whose. */}
+      {key.length > 0 && <PlanKey items={key} className="mx-6 mt-3" />}
+    </>
+  );
+}
+
+export function PlanKey({ items, className }: { items: ReturnType<typeof planLegend>; className?: string }) {
+  return (
+    <ul className={cx("flex flex-wrap gap-x-5 gap-y-1 text-label-medium text-on-surface-variant", className)} aria-label="Plan colours">
+      {items.map(({ label, tone }) => (
+        <li key={label} className="flex items-center gap-2">
+          <span aria-hidden className={cx("h-0.5 w-4", tone.dot)} />
+          {label}
+        </li>
       ))}
-      {days.map((d, i) => (
-        <div key={`head-${d}`} className="flex min-w-0 flex-col px-3 pt-3 pb-2" style={{ gridColumn: i + 1, gridRow: 1 }}>
-          <span className={cx("text-label-medium", d === t ? "text-primary" : "text-on-surface-variant")}>{fmtDate(d, { weekday: "short" })}</span>
-          <span className="font-serif text-[30px] leading-8 text-on-surface">{Number(d.slice(8))}</span>
-        </div>
-      ))}
-      {long.map((s) => {
-        const meta = [s.e.allDay ? null : `${fmtTime(s.e.startsAt)} to ${fmtDate(localDateOf(new Date(s.e.endsAt)), { weekday: "short" })}`, whose(s.e)]
-          .filter(Boolean)
-          .join(" · ");
-        return (
-          <button
-            key={s.e.id}
-            type="button"
-            onClick={() => onOpenEvent(s.e)}
-            style={{ gridColumn: `${s.from + 1} / ${s.to + 2}`, gridRow: s.row + 2 }}
-            className={cx("state-layer mb-1 block min-w-0 pt-0.5 text-left", s.before ? "pl-0" : "pl-3", s.after ? "pr-0" : "pr-3")}
-          >
-            <span className={cx("flex min-w-0 items-baseline gap-2", s.before && "pl-3", s.after && "pr-3")}>
-              {s.before && <span className="text-label-small text-on-surface-variant">‹</span>}
-              <span className="max-w-full shrink-0 truncate text-body-small text-on-surface">{s.e.title}</span>
-              {meta && <span className="min-w-0 truncate text-label-small text-on-surface-variant">{meta}</span>}
-              {s.after && <span className="ml-auto text-label-small text-on-surface-variant">›</span>}
-            </span>
-            {/* The line runs across every day the plan covers. */}
-            <span aria-hidden className={cx("mt-1 block h-0.5", planTone(s.e, rel).dot)} />
-          </button>
-        );
-      })}
-      {columns.map(({ d, untimed, entries }, i) => (
-        <div key={d} className="flex min-h-[420px] min-w-0 flex-col gap-1 px-3 pt-2 pb-6" style={{ gridColumn: i + 1, gridRow: labelRows + 2 }}>
-          {untimed.map(task)}
-          {entries.map((x) =>
-            x.kind === "task" ? (
-              task(x.o)
-            ) : (
-              <div key={x.e.id} className={cx("my-1 border-l-2 pl-2", planTone(x.e, rel).rule)}>
-                <button type="button" onClick={() => onOpenEvent(x.e)} className="state-layer -ml-2 block w-[calc(100%+0.5rem)] py-0.5 pl-2 text-left">
-                  <span className="line-clamp-2 block text-body-small break-words text-on-surface">{x.e.title}</span>
-                  <span className="block text-label-small text-on-surface-variant">{[span(x.e), whose(x.e)].filter(Boolean).join(" · ")}</span>
-                </button>
-                {x.during.length > 0 && <div className="mt-0.5 flex flex-col gap-1">{x.during.map(task)}</div>}
-              </div>
-            ),
-          )}
-        </div>
-      ))}
-    </div>
+    </ul>
   );
 }

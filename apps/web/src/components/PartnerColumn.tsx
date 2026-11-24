@@ -105,12 +105,11 @@ function ComingRow({ title, sub }: { title: string; sub: string }) {
   );
 }
 
-/** "Fri 7–10 PM · Kitten". */
+/** "Fri 7–10 PM". */
 function planLine(e: CalendarEvent, members: { userId: string }[], myId: string, memberName: (id: string) => string) {
   const day = fmtDate(localDateOf(new Date(e.startsAt)), { weekday: "short" });
   const when = e.allDay ? `${day}, all day` : `${day} ${fmtTime(e.startsAt)}–${fmtTime(e.endsAt)}`;
-  const whose = e.withPartner || members.length < 2 ? null : e.authorId === myId ? "You" : memberName(e.authorId);
-  return [when, whose].filter(Boolean).join(" · ");
+  return when;
 }
 
 /** Days in a row, counting back from yesterday (today counts once something's done), with tasks due and none missed. */
