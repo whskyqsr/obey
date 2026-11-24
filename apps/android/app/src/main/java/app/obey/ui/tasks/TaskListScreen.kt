@@ -1,5 +1,7 @@
 package app.obey.ui.tasks
 
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import app.obey.ui.common.LocalFeatures
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Row
@@ -24,11 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.HourglassTop
-import androidx.compose.material.icons.outlined.PlayCircle
-import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -290,11 +288,14 @@ private fun NowStatus(occurrences: List<Occurrence>, mine: Boolean, onComplete: 
     when {
         open != null && open.isPlaced -> app.obey.ui.location.PlaceRing(open, null)
         open != null && open.isCounted -> app.obey.ui.today.CountRing(open, if (mine && open.canCount(true, false)) ({ onCount(open) }) else null, null)
-        open != null && mine && open.isRitual -> IconButton(onClick = { onComplete(open) }) { Icon(Icons.Outlined.PlayCircle, "Start “${open.title}”", tint = tint) }
-        open != null && mine -> IconButton(onClick = { onComplete(open) }) { Icon(Icons.Outlined.RadioButtonUnchecked, "Mark “${open.title}” done", tint = tint) }
+        open != null && mine -> IconButton(
+            onClick = { onComplete(open) },
+            modifier = Modifier.semantics { contentDescription = if (open.isRitual) "Start “${open.title}”" else "Mark “${open.title}” done" },
+        ) { app.obey.ui.common.Diamond(if (overdue(open)) app.obey.ui.common.DiamondState.Owed else app.obey.ui.common.DiamondState.Open) }
         occurrences.any { day(it) == today && it.status == OccurrenceStatus.Completed } ->
-            Icon(Icons.Filled.CheckCircle, "Done today", tint = MaterialTheme.colorScheme.primary)
-        occurrences.any { it.status == OccurrenceStatus.Submitted } -> Icon(Icons.Outlined.HourglassTop, "Awaiting approval")
+            Text("done today", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        occurrences.any { it.status == OccurrenceStatus.Submitted } ->
+            Text("waiting", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         open != null && overdue(open) -> Text("overdue", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         else -> Unit
     }

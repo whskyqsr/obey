@@ -143,7 +143,7 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
         data-task-row
         className="min-w-0 flex-1 py-1 after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
       >
-        <div className={cx("truncate text-body-large text-on-surface", done && !counted && "line-through opacity-70")}>{o.title}</div>
+        <div className={cx("truncate text-body-large text-on-surface", done && !counted && "text-on-surface-variant")}>{o.title}</div>
         <div className={cx("flex flex-wrap items-center gap-x-2 text-body-medium empty:hidden", missed ? "text-error" : "text-on-surface-variant")}>
           <span className="contents max-md:hidden">
             <StreakStrip taskId={o.seriesId} compact />

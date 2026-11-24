@@ -3,6 +3,7 @@ import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-route
 import type { Features } from "../api/types";
 import { MenuContext, type Menu } from "../lib/menu";
 import { useRel } from "../lib/relationship";
+import { useHistoryTrail } from "../lib/origin";
 import { useNeedsYou } from "../lib/today";
 import { DynamicSwitcher } from "./DynamicSwitcher";
 import { InviteSheet } from "../pages/Dynamic";
@@ -25,9 +26,9 @@ const US: Dest = { to: "/us", label: "Us", icon: "favorite" };
 
 /** Everything the tabs don't cover, in the order Us and the desktop sidebar list them. Protocols live inside Rules. */
 const SECTIONS: Dest[] = [
+  { to: "/rules", label: "Rules", icon: "gavel", feature: "rules" },
   { to: "/rewards", label: "Rewards", icon: "redeem", feature: "points" },
   { to: "/consequences", label: "Consequences", icon: "bolt", feature: "consequences" },
-  { to: "/rules", label: "Rules", icon: "gavel", feature: "rules" },
   { to: "/notes", label: "Notes", icon: "sticky_note_2" },
   { to: "/journal", label: "Journal", icon: "auto_stories", feature: "journal" },
   { to: "/limits", label: "Limits", icon: "tune", feature: "limits" },
@@ -50,7 +51,7 @@ export const SETTINGS: Dest = { to: "/settings", label: "Settings", icon: "setti
 /** What needs a second person, so it stays out of the way while someone is on their own. */
 const NOT_SOLO = ["/agreement", "/chastity"];
 
-/** Pages that count as part of Us on the phone: the tab stays marked and the header leads back to Us. */
+/** Pages that count as part of Us on the phone: the tab stays marked and the header leads back to where they were opened from (Us when it isn't known). */
 const UNDER_US: string[] = [...SECTIONS.map((d) => d.to), "/protocols", "/rule-log", DYNAMIC.to, SETTINGS.to, "/places", "/curfew", "/aftercare"];
 
 /** The sections for the current dynamic. */
@@ -81,6 +82,24 @@ function tabFor(pathname: string, sections: Dest[]): Dest | null {
 /** The diamond that marks where you are. */
 function Marker({ className }: { className?: string }) {
   return <span aria-hidden className={cx("size-1.5 rotate-45 bg-primary", className)} />;
+}
+
+/** What a back link calls a page: its tab or section name, or undefined when it has none (a task, a note). */
+function labelFor(pathname: string, sections: Dest[]): string | undefined {
+  const all = [TODAY, WEEK, US, ...sections, PROTOCOLS, DYNAMIC, SETTINGS, { to: "/rule-log", label: "Rule log", icon: "" }];
+  return all.find((d) => d.to === pathname)?.label;
+}
+
+/** The tab a page under Us was reached from: the nearest Today, Week or Us page behind it, else Us. */
+function originTab(trail: { index: number; at(i: number): string | undefined }, sections: Dest[]): Dest {
+  for (let i = trail.index - 1; i >= 0; i--) {
+    const p = trail.at(i);
+    if (p === undefined) break;
+    const t = tabFor(p, sections);
+    if (t === TODAY || t === WEEK) return t;
+    if (p === US.to) return US;
+  }
+  return US;
 }
 
 /** A phone tab: a word in the serif, the current one in ink with a diamond above it. */
@@ -188,10 +207,23 @@ export function AppShell() {
   const invite = solo ? () => setInviteOpen(true) : undefined;
   useEffect(() => setNewOpen(false), [pathname]);
   const lead: Menu["lead"] = tab === null ? null : tab === US && pathname !== US.to ? "back" : "switcher";
+  // A page under Us opened from Week (All tasks) or Today goes back there, named for it, with that tab still marked.
+  const navigate = useNavigate();
+  const trail = useHistoryTrail();
+  const from = lead === "back" ? trail.at(trail.index - 1) : undefined;
+  const fromLabel = from ? labelFor(from, sections) : undefined;
+  const homeTab = lead === "back" ? originTab(trail, sections) : tab;
+  const backLabel = fromLabel ?? "Us";
   const menu = useMemo<Menu>(
-    () => ({ lead, safeWord: canCall ? () => setSafeOpen(true) : undefined, invite, banner: <SafeCallBanner /> }),
+    () => ({
+      lead,
+      back: { label: backLabel, go: () => (fromLabel ? window.history.back() : void navigate({ to: US.to })) },
+      safeWord: canCall ? () => setSafeOpen(true) : undefined,
+      invite,
+      banner: <SafeCallBanner />,
+    }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lead, canCall, solo],
+    [lead, backLabel, fromLabel, canCall, solo],
   );
   const canAdd = !rel.endedAt;
 
@@ -242,9 +274,9 @@ export function AppShell() {
           )}
         >
           <div className="flex h-17 items-center gap-7.5">
-            <Tab d={TODAY} active={tab === TODAY} badge={todayBadge} />
-            <Tab d={WEEK} active={tab === WEEK} />
-            <Tab d={US} active={tab === US} />
+            <Tab d={TODAY} active={homeTab === TODAY} badge={todayBadge} />
+            <Tab d={WEEK} active={homeTab === WEEK} />
+            <Tab d={US} active={homeTab === US} />
           </div>
           {canAdd && (
             <button
