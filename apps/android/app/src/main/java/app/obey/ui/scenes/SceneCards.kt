@@ -75,7 +75,7 @@ fun SceneCards(data: TodayScenes, session: Session, busy: Boolean, onAftercareDo
                 theirs.forEach { p ->
                     val name = session.nameOf(p.userId)
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Eyebrow("$name's aftercare plan", color = c.primary)
+                        Eyebrow("$name's aftercare", color = c.primary)
                         Text("$name likes: " + listOf(p.needs.joinToString(", "), p.note).filter { it.isNotBlank() }.joinToString(". "), style = MaterialTheme.typography.bodyLarge)
                     }
                 }
