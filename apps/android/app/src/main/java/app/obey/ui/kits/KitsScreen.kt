@@ -52,7 +52,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
+import app.obey.ui.common.TonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -566,7 +566,7 @@ fun KitScreen(kitId: String, onBack: () -> Unit, onAdded: (ApplyKitResult) -> Un
                     Text(kit.description.ifBlank { counts(items) }, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
                     FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = { dialog = "add" }) { Icon(Icons.Outlined.Add, null); Text("  Add to this dynamic") }
-                        FilledTonalButton(onClick = { dialog = "share" }) { Icon(Icons.Outlined.Share, null); Text("  Share") }
+                        TonalButton(onClick = { dialog = "share" }) { Icon(Icons.Outlined.Share, null); Text("  Share") }
                     }
                     ItemList(items)
                     val saved = runCatching { OffsetDateTime.parse(kit.createdAt).toLocalDate().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)) }.getOrNull()
@@ -851,7 +851,7 @@ fun SharedKitScreen(code: String, onBack: () -> Unit, onAdded: (ApplyKitResult) 
                     ItemList(items)
                     FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(enabled = !busy, onClick = { vm.copy(code) }) { Icon(Icons.Outlined.BookmarkAdd, null); Text("  Save to your kits") }
-                        FilledTonalButton(onClick = { adding = true }) { Text("Add to this dynamic") }
+                        TonalButton(onClick = { adding = true }) { Text("Add to this dynamic") }
                     }
                 }
                 if (adding) vm.session?.let { session ->
@@ -875,7 +875,7 @@ fun KitPrompt(onBrowse: () -> Unit, modifier: Modifier = Modifier) {
                 Text("Ready-made daily tasks and rules you can pick from and edit.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
             }
             Spacer(Modifier.width(8.dp))
-            FilledTonalButton(onClick = onBrowse) { Text("Browse") }
+            TonalButton(onClick = onBrowse) { Text("Browse") }
         }
     }
 }

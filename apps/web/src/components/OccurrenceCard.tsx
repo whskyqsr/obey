@@ -7,7 +7,7 @@ import { fmtDate, fmtDateTime, fmtRelative, fmtTime, localDateOf, today } from "
 import { useReadOnly, useRel } from "../lib/relationship";
 import { Comments, SendBackDialog } from "./Comments";
 import { ProofPhotos } from "./Proof";
-import { MOODS, MOOD_LABELS, MoodPicker } from "./Mood";
+import { MOOD_LABELS, MoodPicker } from "./Mood";
 import { RitualDialog, StepList, isRitual, stepProgress } from "./Ritual";
 import { RescheduleSheet } from "./RescheduleSheet";
 import { CountRing, CountSheet, canCount, countLine, isCounted, readyToSend, useCountTap } from "./Count";
@@ -179,11 +179,7 @@ export function OccurrenceCard({ o, showDate, linkTask = true, plain }: { o: Occ
           <Icon name="auto_stories" size={18} /> Read the journal entry
         </Link>
       )}
-      {o.mood && (
-        <p className="flex items-center gap-1.5 text-body-medium text-on-surface-variant">
-          <Icon name={MOODS[o.mood - 1]!} size={18} /> Felt {MOOD_LABELS[o.mood - 1]!.toLowerCase()}
-        </p>
-      )}
+      {o.mood && <p className="text-body-medium text-on-surface-variant">Felt {MOOD_LABELS[o.mood - 1]!.toLowerCase()}</p>}
       {o.noteMd && <p className="border-l-2 border-primary pl-3 font-serif text-[17px] whitespace-pre-wrap text-on-surface italic">“{o.noteMd}”</p>}
       {o.photoCount > 0 && (
         <div className="relative z-10">

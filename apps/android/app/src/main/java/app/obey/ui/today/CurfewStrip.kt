@@ -27,7 +27,7 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MoreTime
 import androidx.compose.material.icons.outlined.WavingHand
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalButton
+import app.obey.ui.common.TonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -135,7 +135,7 @@ fun CurfewStrip(
                 if (told != null) "Told $askWho at ${formatTime(told)} · stay in until $until" else "Let $askWho know you're in · stay until $until",
             ) {
                 if (told == null) {
-                    FilledTonalButton(onClick = onTell) {
+                    TonalButton(onClick = onTell) {
                         Icon(Icons.Outlined.WavingHand, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("Tell $askWho")
@@ -156,7 +156,7 @@ fun CurfewStrip(
                 },
             ) {
                 if (told != null) {
-                    FilledTonalButton(onClick = onReply) {
+                    TonalButton(onClick = onReply) {
                         Icon(Icons.AutoMirrored.Outlined.Chat, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("Reply")
@@ -173,7 +173,7 @@ fun CurfewStrip(
         !mine -> Strip(Tone.Neutral, Icons.Outlined.Bedtime, if (started) "Curfew started at $due" else "Curfew at $due", "$name isn't home yet · in until $until")
         night.canTap && !started -> Strip(Tone.Neutral, Icons.Outlined.Bedtime, "Curfew at $due", "Stay in until $until$waiting$note") {
             onMoreTime?.let { IconButton(onClick = it) { Icon(Icons.Outlined.MoreTime, "More time") } }
-            FilledTonalButton(onClick = onHome) {
+            TonalButton(onClick = onHome) {
                 Icon(Icons.Outlined.Home, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("I'm home")
@@ -188,7 +188,7 @@ fun CurfewStrip(
                 (if (waiting.isNotEmpty()) "Be home by $due$waiting" else "Be home by $due, stay in until $until") + note,
             ) {
                 onMoreTime?.let {
-                    FilledTonalButton(onClick = it) {
+                    TonalButton(onClick = it) {
                         Icon(Icons.Outlined.MoreTime, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("More time")

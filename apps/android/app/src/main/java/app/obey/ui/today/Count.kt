@@ -15,7 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilledTonalIconButton
+import app.obey.ui.common.TonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -120,7 +120,7 @@ fun CountDialog(o: Occurrence, onDismiss: () -> Unit, onSave: (Int) -> Unit) {
                     color = colors.onSurfaceVariant,
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                    FilledTonalIconButton(onClick = { n -= 1 }, enabled = n > 0, modifier = Modifier.size(56.dp)) { Icon(Icons.Outlined.Remove, "One fewer") }
+                    TonalIconButton(onClick = { n -= 1 }, enabled = n > 0, modifier = Modifier.size(56.dp)) { Icon(Icons.Outlined.Remove, "One fewer") }
                     Text(
                         "$n",
                         style = MaterialTheme.typography.displayLarge,
@@ -128,7 +128,7 @@ fun CountDialog(o: Occurrence, onDismiss: () -> Unit, onSave: (Int) -> Unit) {
                         textAlign = TextAlign.Center,
                         modifier = Modifier.widthIn(min = 112.dp),
                     )
-                    FilledTonalIconButton(onClick = { n += 1 }, modifier = Modifier.size(56.dp)) { Icon(Icons.Outlined.Add, "One more") }
+                    TonalIconButton(onClick = { n += 1 }, modifier = Modifier.size(56.dp)) { Icon(Icons.Outlined.Add, "One more") }
                 }
                 Text(
                     hint,

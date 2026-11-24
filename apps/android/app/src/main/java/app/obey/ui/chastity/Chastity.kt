@@ -31,7 +31,7 @@ import androidx.compose.material.icons.outlined.Shower
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
+import app.obey.ui.common.TonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -247,7 +247,7 @@ private fun KeyboxPicker(photo: Uri?, onPhoto: (Uri) -> Unit) {
         camera.launch(uri)
     }
     if (photo == null) {
-        FilledTonalButton(onClick = { take() }, modifier = Modifier.fillMaxWidth()) {
+        TonalButton(onClick = { take() }, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Outlined.AddAPhoto, null)
             Text("Photograph the keybox code", Modifier.padding(start = 8.dp))
         }
@@ -385,7 +385,7 @@ fun LockCard(l: ChastityLock, events: List<ChastityEvent>, session: Session, bus
             if (!readOnly) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (wearer && l.status == "active") {
-                        FilledTonalButton(onClick = { dialog = LockDialog.AskRelease }, enabled = !asked("release_ask")) {
+                        TonalButton(onClick = { dialog = LockDialog.AskRelease }, enabled = !asked("release_ask")) {
                             Text(if (asked("release_ask")) "Release asked" else "Ask for release")
                         }
                         OutlinedButton(onClick = { dialog = LockDialog.AskBreak }, enabled = !asked("break")) {
@@ -395,7 +395,7 @@ fun LockCard(l: ChastityLock, events: List<ChastityEvent>, session: Session, bus
                     }
                     if (keyholder) {
                         if (l.endsAt != null) {
-                            FilledTonalButton(onClick = { dialog = LockDialog.Add }) {
+                            TonalButton(onClick = { dialog = LockDialog.Add }) {
                                 Icon(Icons.Outlined.MoreTime, null, Modifier.size(18.dp))
                                 Text("Add time", Modifier.padding(start = 8.dp))
                             }

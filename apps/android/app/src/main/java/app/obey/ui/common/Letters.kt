@@ -76,3 +76,31 @@ fun FormScreen(
         }
     }
 }
+
+/** The web's "tonal" button in Letters: a hairline on paper, not a filled container. */
+@Composable
+fun TonalButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+    val c = MaterialTheme.colorScheme
+    androidx.compose.material3.OutlinedButton(
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        colors = ButtonDefaults.outlinedButtonColors(containerColor = c.surfaceContainerLowest, contentColor = c.onSurface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant),
+        content = content,
+    )
+}
+
+/** [TonalButton] for a single icon. */
+@Composable
+fun TonalIconButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable () -> Unit) {
+    val c = MaterialTheme.colorScheme
+    androidx.compose.material3.OutlinedIconButton(
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        colors = androidx.compose.material3.IconButtonDefaults.outlinedIconButtonColors(containerColor = c.surfaceContainerLowest, contentColor = c.onSurface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant),
+        content = content,
+    )
+}

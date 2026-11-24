@@ -18,7 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.NotificationsOff
-import androidx.compose.material3.FilledTonalButton
+import app.obey.ui.common.TonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -180,12 +180,12 @@ fun PushHealthSection(vm: PushHealthViewModel = hiltViewModel()) {
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (!allowed) {
-                    FilledTonalButton(onClick = {
+                    TonalButton(onClick = {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ask.launch(Manifest.permission.POST_NOTIFICATIONS)
                         else context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
                     }) { Text("Turn on") }
                 } else if (vm.available) {
-                    FilledTonalButton(onClick = vm::test, enabled = !busy) { Text("Send me a test") }
+                    TonalButton(onClick = vm::test, enabled = !busy) { Text("Send me a test") }
                     TextButton(onClick = vm::reRegister, enabled = !busy) { Text("Re-register") }
                 }
             }

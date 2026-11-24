@@ -650,14 +650,7 @@ private fun PanelDone(onClick: () -> Unit) {
 }
 
 @Composable
-private fun Eyebrow(text: String) {
-    Text(
-        text.uppercase(),
-        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 32.dp, bottom = 12.dp),
-    )
-}
+private fun Eyebrow(text: String) = app.obey.ui.common.Eyebrow(text, Modifier.padding(top = 32.dp, bottom = 12.dp))
 
 @Composable
 private fun Note(text: String) {

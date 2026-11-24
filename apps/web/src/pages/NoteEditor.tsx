@@ -10,7 +10,7 @@ import { NoteHistory } from "../components/NoteHistory";
 import { BackLink, Button, Chip, ErrorBox, Icon, IconButton, Loading, OverflowMenu, SegmentedButtons, Switch, useSnackbar } from "../components/ui";
 import { fmtDateTime } from "../lib/dates";
 import { dayWord } from "./Notes";
-import { MOODS } from "../components/Mood";
+import { MOOD_LABELS } from "../components/Mood";
 import { useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
 import { useConfirm } from "../lib/useConfirm";
@@ -381,7 +381,7 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
         <article className="flex flex-col gap-3 px-4 pb-10 md:px-6">
           <h1 className="text-headline-medium text-on-surface">{form.title || (kind === "journal" ? "Journal entry" : "Untitled")}</h1>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body-medium text-on-surface-variant">
-            {kind === "journal" && form.mood && <Icon name={MOODS[form.mood - 1]!} size={20} />}
+            {kind === "journal" && form.mood && <span>Felt {MOOD_LABELS[form.mood - 1]!.toLowerCase()} ·</span>}
             <span>
               {memberName(note.authorId)} · {fmtDateTime(kind === "journal" ? note.createdAt : note.updatedAt)}
             </span>

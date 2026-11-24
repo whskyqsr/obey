@@ -15,7 +15,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
+import app.obey.ui.common.TonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -107,18 +107,18 @@ fun RescheduleSheet(
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                FilledTonalButton(onClick = { submit(delayHours = 1) }, modifier = Modifier.weight(1f)) {
+                TonalButton(onClick = { submit(delayHours = 1) }, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Outlined.Schedule, contentDescription = null)
                     Text("  +1 hour")
                 }
-                FilledTonalButton(onClick = { submit(delayHours = 24) }, modifier = Modifier.weight(1f)) {
+                TonalButton(onClick = { submit(delayHours = 24) }, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Outlined.Schedule, contentDescription = null)
                     Text("  +24 hours")
                 }
             }
             if (after != null) {
                 val at = afterPlan(occurrence.dueAt, after)
-                FilledTonalButton(onClick = { submit(dueAt = at.iso()) }, modifier = Modifier.fillMaxWidth()) {
+                TonalButton(onClick = { submit(dueAt = at.iso()) }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Outlined.Event, contentDescription = null)
                     Text("  After ${after.title} · ${formatDue(at.iso())}", maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }

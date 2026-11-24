@@ -11,7 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.EditCalendar
-import androidx.compose.material3.FilledTonalButton
+import app.obey.ui.common.TonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Card
@@ -153,7 +153,7 @@ fun ExtensionRequestCard(
             if (canDecide) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { onDecide(true) }) { Text(if (rows.size == 1) "Approve" else "Approve all") }
-                    if (rows.size == 1) FilledTonalButton(onClick = { onInstead(r) }) { Text(if (r.kind == "cancel") "Reschedule instead" else "Other time") }
+                    if (rows.size == 1) TonalButton(onClick = { onInstead(r) }) { Text(if (r.kind == "cancel") "Reschedule instead" else "Other time") }
                     TextButton(onClick = { onDecide(false) }) { Text("Decline") }
                 }
             }

@@ -9,6 +9,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import app.obey.ui.common.inkButtonColors
+import app.obey.ui.common.Eyebrow
 import app.obey.ui.common.BackLink
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
@@ -63,7 +65,7 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
+import app.obey.ui.common.TonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -491,20 +493,14 @@ private fun Main(
             if (!session.readOnly) OutlinedButton(onClick = onEdit) { Text("Propose changes") }
         }
         cur == null && a.proposal == null && !session.readOnly -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = onTemplate, colors = inkButton()) { Text("Start from our template") }
+            Button(onClick = onTemplate, colors = inkButtonColors()) { Text("Start from our template") }
             TextButton(onClick = onBlank) { Text("Start blank") }
         }
         else -> Unit
     }
 }
 
-@Composable
-private fun inkButton() = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface, contentColor = MaterialTheme.colorScheme.surface)
 
-@Composable
-private fun Eyebrow(text: String) {
-    Text(text.uppercase(), style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.5.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-}
 
 /** The sections a proposal changes, marked, then the unchanged ones named in a line (mockup 23). */
 @Composable
@@ -588,7 +584,7 @@ private fun ProposalBanner(
             Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 when {
                     !mine && p.status == "proposed" && !agreed -> {
-                        Button(onClick = onAgree, colors = inkButton()) { Text("Agree") }
+                        Button(onClick = onAgree, colors = inkButtonColors()) { Text("Agree") }
                         OutlinedButton(onClick = onAsk) { Text("Ask for changes") }
                     }
                     mine || asked -> {
@@ -795,7 +791,7 @@ private fun VersionRow(s: AgreementVersionSummary, a: Agreement, session: Sessio
             Text("Version ${s.number}", style = MaterialTheme.typography.headlineSmall)
             Text(line, style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
         }
-        if (needsMe) Button(onClick = onClick, colors = inkButton()) { Text("Review") }
+        if (needsMe) Button(onClick = onClick, colors = inkButtonColors()) { Text("Review") }
         else Text("Read", style = MaterialTheme.typography.labelLarge, color = c.primary)
     }
 }

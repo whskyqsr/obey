@@ -3,9 +3,8 @@ import type { MoodEntry } from "@obey/contracts";
 import { useMoods } from "../api/hooks";
 import { fmtDateTime } from "../lib/dates";
 import { useRel } from "../lib/relationship";
-import { Chip, Icon, SegmentedButtons, cx } from "./ui";
+import { Chip, SegmentedButtons, cx } from "./ui";
 
-export const MOODS = ["sentiment_very_dissatisfied", "sentiment_dissatisfied", "sentiment_neutral", "sentiment_satisfied", "sentiment_very_satisfied"];
 export const MOOD_LABELS = ["Awful", "Low", "Okay", "Good", "Great"];
 
 /** Five pills to pick how you feel, 1 (awful) to 5 (great). The chosen one has the ink border. */
@@ -205,9 +204,7 @@ function MoodChart({ entries, days }: { entries: MoodEntry[]; days: number }) {
             className="pointer-events-none absolute z-10 w-max max-w-56 rounded-md bg-inverse-surface px-3 py-2 text-body-small text-inverse-on-surface shadow-md"
             style={h.x < width / 2 ? { left: h.x + 14, top: 0 } : { right: width - h.x + 14, top: 0 }}
           >
-            <div className="flex items-center gap-1.5 text-label-large">
-              <Icon name={MOODS[h.e.mood - 1]!} size={18} /> {MOOD_LABELS[h.e.mood - 1]}
-            </div>
+            <div className="text-label-large">{MOOD_LABELS[h.e.mood - 1]}</div>
             <div className="truncate">{h.e.title || (h.e.source === "journal" ? "Journal entry" : "Check-in")}</div>
             {h.e.note && <div className="line-clamp-2 opacity-80">{h.e.note}</div>}
             <div className="opacity-80">{fmtDateTime(h.e.at)}</div>

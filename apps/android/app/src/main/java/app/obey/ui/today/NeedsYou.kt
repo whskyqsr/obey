@@ -17,8 +17,8 @@ import androidx.compose.material.icons.outlined.MoreTime
 import androidx.compose.material.icons.outlined.Redeem
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilledTonalIconButton
+import app.obey.ui.common.TonalButton
+import app.obey.ui.common.TonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -43,7 +43,6 @@ import app.obey.ui.common.ago
 import app.obey.ui.common.formatDateTime
 import app.obey.ui.common.formatTime
 import app.obey.ui.common.local
-import app.obey.ui.common.moodIcon
 import app.obey.ui.common.moodLabel
 import app.obey.ui.common.parseInstant
 import java.time.LocalDate
@@ -54,7 +53,7 @@ fun MoodRow(o: Occurrence, name: String, onSeen: () -> Unit, onReply: () -> Unit
     val mood = o.mood ?: return
     ListItem(
         colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-        leadingContent = { Icon(moodIcon(mood, filled = true), null, tint = MaterialTheme.colorScheme.tertiary) },
+        leadingContent = { app.obey.ui.common.Diamond(app.obey.ui.common.DiamondState.Owed) },
         headlineContent = { Text("$name checked in feeling ${moodLabel(mood).lowercase()}") },
         supportingContent = {
             Text(
@@ -65,7 +64,7 @@ fun MoodRow(o: Occurrence, name: String, onSeen: () -> Unit, onReply: () -> Unit
         trailingContent = {
             Row {
                 IconButton(onClick = onSeen) { Icon(Icons.Outlined.Check, "Seen") }
-                FilledTonalIconButton(onClick = onReply) { Icon(Icons.AutoMirrored.Outlined.Chat, "Reply") }
+                TonalIconButton(onClick = onReply) { Icon(Icons.AutoMirrored.Outlined.Chat, "Reply") }
             }
         },
     )
@@ -76,7 +75,7 @@ fun MoodRow(o: Occurrence, name: String, onSeen: () -> Unit, onReply: () -> Unit
 fun SceneCheckRow(scene: app.obey.api.Scene, c: app.obey.api.SceneCheck, name: String, onSeen: () -> Unit, onReply: () -> Unit) {
     ListItem(
         colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-        leadingContent = { Icon(moodIcon(c.mood, filled = true), null, tint = MaterialTheme.colorScheme.tertiary) },
+        leadingContent = { app.obey.ui.common.Diamond(app.obey.ui.common.DiamondState.Owed) },
         headlineContent = { Text("$name feels ${moodLabel(c.mood).lowercase()} after ${scene.title.ifBlank { null }?.let { "“$it”" } ?: "the scene"}") },
         supportingContent = {
             Text(
@@ -87,7 +86,7 @@ fun SceneCheckRow(scene: app.obey.api.Scene, c: app.obey.api.SceneCheck, name: S
         trailingContent = {
             Row {
                 IconButton(onClick = onSeen) { Icon(Icons.Outlined.Check, "Seen") }
-                FilledTonalIconButton(onClick = onReply) { Icon(Icons.AutoMirrored.Outlined.Chat, "Reply") }
+                TonalIconButton(onClick = onReply) { Icon(Icons.AutoMirrored.Outlined.Chat, "Reply") }
             }
         },
     )
@@ -101,7 +100,7 @@ fun RedemptionRow(e: LedgerEntry, name: String, onRedeemed: () -> Unit) {
         leadingContent = { Icon(Icons.Outlined.Redeem, null, tint = MaterialTheme.colorScheme.primary) },
         headlineContent = { Text(e.note) },
         supportingContent = { Text("$name spent ${-e.delta} pts${e.consequenceTitle?.let { " to get out of $it" } ?: ""} · ${ago(e.createdAt)}") },
-        trailingContent = { FilledTonalButton(onClick = onRedeemed) { Text("Redeemed") } },
+        trailingContent = { TonalButton(onClick = onRedeemed) { Text("Redeemed") } },
     )
 }
 

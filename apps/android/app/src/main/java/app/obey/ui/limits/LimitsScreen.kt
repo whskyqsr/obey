@@ -18,6 +18,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
+import app.obey.ui.common.inkButtonColors
+import app.obey.ui.common.Eyebrow
 import app.obey.ui.common.BackLink
 import app.obey.ui.common.Diamond
 import app.obey.ui.common.DiamondState
@@ -61,7 +63,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilledTonalButton
+import app.obey.ui.common.TonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -283,11 +285,6 @@ private fun Key() {
     }
 }
 
-@Composable
-private fun Eyebrow(text: String, modifier: Modifier = Modifier) {
-    Text(text.uppercase(), style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.5.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = modifier)
-}
-
 /** Mockup 24: what you both want, what's worth a talk and what's off the table, then every answer as diamonds. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -342,7 +339,7 @@ fun LimitsScreen(onEdit: () -> Unit, vm: LimitsViewModel = hiltViewModel()) {
                     val l = s.value
                     if (mine == null) return@Column
                     status?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    if (mine.finishedAt == null) Button(onClick = { edit(null) }, colors = inkButton()) { Text(if (mine.rated > 0) "Carry on" else "Start") }
+                    if (mine.finishedAt == null) Button(onClick = { edit(null) }, colors = inkButtonColors()) { Text(if (mine.rated > 0) "Carry on" else "Start") }
                     if (both) {
                         val (off, want, talk) = together(l.items, mine.answers.orEmpty(), theirs?.answers.orEmpty())
                         PillGroup("You both want", want, Tone.Ink)
@@ -357,8 +354,6 @@ fun LimitsScreen(onEdit: () -> Unit, vm: LimitsViewModel = hiltViewModel()) {
     }
 }
 
-@Composable
-private fun inkButton() = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface, contentColor = MaterialTheme.colorScheme.surface)
 
 private enum class Tone { Ink, Outline, Accent }
 
@@ -527,7 +522,7 @@ fun LimitsEditScreen(onClose: () -> Unit, vm: LimitsViewModel = hiltViewModel())
                         Text(if (mine.finishedAt != null) "All saved" else "That's all of them", style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 40.dp))
                         Text("You've rated ${mine.rated} of ${items.size}.", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
                         Row(Modifier.padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Button(onClick = finish, enabled = !busy, colors = inkButton()) { Text(if (mine.finishedAt != null) "Done" else "Finish") }
+                            Button(onClick = finish, enabled = !busy, colors = inkButtonColors()) { Text(if (mine.finishedAt != null) "Done" else "Finish") }
                             OutlinedButton(onClick = { adding = true }) { Text("Add your own") }
                         }
                         if (items.isNotEmpty()) TextButton(onClick = { go(0) }, modifier = Modifier.padding(top = 8.dp)) { Text("Start again from the top") }
@@ -552,7 +547,7 @@ fun LimitsEditScreen(onClose: () -> Unit, vm: LimitsViewModel = hiltViewModel())
             onDismissRequest = { noting = null },
             title = { Text(noted.title) },
             text = { LettersField(note, { note = it.take(500) }, label = { Text("Note") }, placeholder = { Text("Only soft ones, and not for long") }, modifier = Modifier.fillMaxWidth()) },
-            confirmButton = { Button(onClick = { vm.answer(noted, answers[noted.key]?.rating, note.trim()); noting = null }, colors = inkButton()) { Text("Save") } },
+            confirmButton = { Button(onClick = { vm.answer(noted, answers[noted.key]?.rating, note.trim()); noting = null }, colors = inkButtonColors()) { Text("Save") } },
             dismissButton = { TextButton(onClick = { noting = null }) { Text("Cancel") } },
         )
     }
@@ -589,7 +584,7 @@ fun LimitsEditScreen(onClose: () -> Unit, vm: LimitsViewModel = hiltViewModel())
                         openAt = null
                         at = null
                     }
-                }, enabled = title.isNotBlank() && !busy, colors = inkButton()) { Text("Add") }
+                }, enabled = title.isNotBlank() && !busy, colors = inkButtonColors()) { Text("Add") }
             },
             dismissButton = { TextButton(onClick = { adding = false }) { Text("Cancel") } },
         )
