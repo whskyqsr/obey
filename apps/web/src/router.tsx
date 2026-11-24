@@ -80,7 +80,8 @@ const settingsSectionRoute = createRoute({
   component: function SettingsSectionRoute() {
     const { section } = settingsSectionRoute.useParams();
     const known = SETTINGS_SECTIONS.some((s) => s.id === section);
-    return <SettingsPage section={known ? (section as SettingsSection) : undefined} />;
+    // Account now lives at the bottom of You.
+    return <SettingsPage section={known ? (section as SettingsSection) : section === "account" ? "you" : undefined} />;
   },
 });
 

@@ -28,7 +28,6 @@ export const SETTINGS_SECTIONS = [
   { id: "notifications", label: "Notifications" },
   { id: "look", label: "Look and privacy" },
   { id: "features", label: "Features" },
-  { id: "account", label: "Account" },
 ] as const;
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]["id"];
 
@@ -182,11 +181,17 @@ function SettingsList() {
           <ValueRow label="Proof photos delete after" value={rel.proofDays ? PROOF_DAYS_SHORT[rel.proofDays] : "Never"} to="/dynamic/how" />
         </Rows>
 
-        <Eyebrow>Account</Eyebrow>
-        <Rows>
-          <ValueRow label="Account" value={<span className="max-w-44 truncate">{me.user.email ?? ""}</span>} to="/settings/account" />
-          {me.admin && <ValueRow label="Reports to review" to="/admin/reports" />}
-        </Rows>
+        {me.admin && (
+          <>
+            <Eyebrow>Staff</Eyebrow>
+            <Rows>
+              <ValueRow label="Reports to review" to="/admin/reports" />
+            </Rows>
+          </>
+        )}
+        <div className="mt-8">
+          <SignOutRow />
+        </div>
       </div>
       <RevealDialog open={confirmReveal} onClose={() => setConfirmReveal(false)} />
     </>
@@ -225,8 +230,6 @@ function SectionBody({ section }: { section: SettingsSection }) {
       return <LookSection />;
     case "features":
       return <FeaturesSection />;
-    case "account":
-      return <AccountSection />;
   }
 }
 
@@ -303,6 +306,10 @@ function YouSection() {
             { value: "mon", label: "Monday" },
           ]}
         />
+      </div>
+      <div className="mt-4">
+        <SignOutRow />
+        <DeleteAccount />
       </div>
     </div>
   );
@@ -441,28 +448,22 @@ function FeaturesSection() {
   );
 }
 
-function AccountSection() {
-  const { me } = useRel();
+/** How you're signed in, and Sign out. */
+function SignOutRow() {
   const qc = useQueryClient();
   const session = getSession();
   return (
-    <>
-      <div className="flex flex-wrap items-center gap-3 border-b border-outline-variant pb-4">
-        <div className="min-w-0 flex-1">
-          <div className="text-body-large text-on-surface">
-            {session?.kind === "dev"
-              ? "Dev sign-in"
-              : session?.kind === "firebase" && session.provider === "password"
-                ? "Signed in with email"
-                : "Signed in with Google"}
-          </div>
-          <div className="truncate text-body-medium text-on-surface-variant">{me.user.email ?? me.user.id}</div>
-        </div>
-        <Button variant="outlined" icon="logout" onClick={() => signOut().then(() => qc.clear())}>
-          Sign out
-        </Button>
+    <div className="flex flex-wrap items-center gap-3 border-y border-outline-variant py-4">
+      <div className="min-w-0 flex-1 text-body-large text-on-surface">
+        {session?.kind === "dev"
+          ? "Dev sign-in"
+          : session?.kind === "firebase" && session.provider === "password"
+            ? "Signed in with email"
+            : "Signed in with Google"}
       </div>
-      <DeleteAccount />
-    </>
+      <Button variant="outlined" icon="logout" onClick={() => signOut().then(() => qc.clear())}>
+        Sign out
+      </Button>
+    </div>
   );
 }

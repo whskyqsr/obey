@@ -106,7 +106,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, onOpenFeatures
     val session = (sessionState as? SessionState.Ready)?.session
 
     // Each group opens as its own page, as in the mockups; the list shows each setting's value.
-    var page by rememberSaveable { mutableStateOf<String?>(null) } // "you" | "notifications" | "privacy" | "features" | "account"
+    var page by rememberSaveable { mutableStateOf<String?>(null) } // "you" | "notifications" | "privacy" | "features"
     androidx.activity.compose.BackHandler(page != null) { page = null }
     val lockVm: app.obey.lock.AppLockViewModel = hiltViewModel()
     val lockOn by lockVm.on.collectAsStateWithLifecycle()
@@ -121,7 +121,6 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, onOpenFeatures
                             "notifications" -> "Notifications"
                             "privacy" -> "Privacy"
                             "features" -> "Features"
-                            "account" -> "Account"
                             else -> "Settings"
                         },
                     )
@@ -166,8 +165,14 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, onOpenFeatures
                             ValueRow("Proof photos delete after", rel.proofDays?.let { if (it == 1) "1 day" else "$it days" } ?: "Never", onClick = onOpenFeatures)
                         }
 
-                        SectionHeader("Account")
-                        ValueRow("Account", user.email) { page = "account" }
+                        Spacer(Modifier.height(24.dp))
+                        Hairline()
+                        ListItem(
+                            modifier = Modifier.clickable(onClick = vm::signOut),
+                            leadingContent = { Icon(Icons.AutoMirrored.Outlined.Logout, null) },
+                            headlineContent = { Text("Sign out") },
+                        )
+                        Hairline()
                         Spacer(Modifier.height(24.dp))
                     }
 
@@ -193,6 +198,49 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, onOpenFeatures
                                 ) { Text(label) }
                             }
                         }
+                        Spacer(Modifier.height(24.dp))
+                        Hairline()
+                        val method = when ((authState as? AuthState.Firebase)?.provider) {
+                            "password" -> "Signed in with email"
+                            "google.com" -> "Signed in with Google"
+                            else -> if (authState is AuthState.Dev) "Dev sign-in" else "Signed in"
+                        }
+                        if (vm.devAuthAllowed) {
+                            SectionHeader("Developer")
+                            Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("API: ${vm.apiBaseUrl}", style = MaterialTheme.typography.bodySmall)
+                                Text(
+                                    "Firebase: " + if (vm.firebaseAvailable) "configured" else "not configured (no google-services.json)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                                LettersField(
+                                    value = devField,
+                                    onValueChange = { devField = it.trim() },
+                                    label = { Text("Dev user id (X-Dev-User)") },
+                                    supportingText = { Text("Overrides Firebase. The API must run with DEV_AUTH=1.") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    TonalButton(onClick = { vm.setDevUser(devField) }, enabled = !busy && devField != devUserId.orEmpty()) {
+                                        Text("Apply")
+                                    }
+                                    if (devUserId != null) TextButton(onClick = { vm.setDevUser("") }) { Text("Clear") }
+                                }
+                            }
+                        }
+                        ListItem(
+                            modifier = Modifier.clickable(onClick = vm::signOut),
+                            leadingContent = { Icon(Icons.AutoMirrored.Outlined.Logout, null) },
+                            headlineContent = { Text("Sign out") },
+                            supportingContent = { Text(method) },
+                        )
+                        Hairline()
+                        ListItem(
+                            modifier = Modifier.clickable { dialog = "delete" },
+                            leadingContent = { Icon(Icons.Outlined.DeleteForever, null, tint = MaterialTheme.colorScheme.error) },
+                            headlineContent = { Text("Delete account", color = MaterialTheme.colorScheme.error) },
+                        )
                     }
 
                     "notifications" -> session?.let { s ->
@@ -234,53 +282,6 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, onOpenFeatures
                             )
                             Hairline()
                         }
-                    }
-
-                    "account" -> {
-                        if (user != null) {
-                            val method = when ((authState as? AuthState.Firebase)?.provider) {
-                                "password" -> "Signed in with email"
-                                "google.com" -> "Signed in with Google"
-                                else -> if (authState is AuthState.Dev) "Dev sign-in" else "Signed in"
-                            }
-                            ListItem(headlineContent = { Text(method) }, supportingContent = { user.email?.let { Text(it) } })
-                            Hairline()
-                        }
-                        if (vm.devAuthAllowed) {
-                            SectionHeader("Developer")
-                            Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("API: ${vm.apiBaseUrl}", style = MaterialTheme.typography.bodySmall)
-                                Text(
-                                    "Firebase: " + if (vm.firebaseAvailable) "configured" else "not configured (no google-services.json)",
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                                LettersField(
-                                    value = devField,
-                                    onValueChange = { devField = it.trim() },
-                                    label = { Text("Dev user id (X-Dev-User)") },
-                                    supportingText = { Text("Overrides Firebase. The API must run with DEV_AUTH=1.") },
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    TonalButton(onClick = { vm.setDevUser(devField) }, enabled = !busy && devField != devUserId.orEmpty()) {
-                                        Text("Apply")
-                                    }
-                                    if (devUserId != null) TextButton(onClick = { vm.setDevUser("") }) { Text("Clear") }
-                                }
-                            }
-                        }
-                        ListItem(
-                            modifier = Modifier.clickable(onClick = vm::signOut),
-                            leadingContent = { Icon(Icons.AutoMirrored.Outlined.Logout, null) },
-                            headlineContent = { Text("Sign out") },
-                        )
-                        Hairline()
-                        if (session != null) ListItem(
-                            modifier = Modifier.clickable { dialog = "delete" },
-                            leadingContent = { Icon(Icons.Outlined.DeleteForever, null, tint = MaterialTheme.colorScheme.error) },
-                            headlineContent = { Text("Delete account", color = MaterialTheme.colorScheme.error) },
-                        )
                     }
                 }
             }
