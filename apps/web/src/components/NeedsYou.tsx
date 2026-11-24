@@ -112,23 +112,20 @@ export function SceneCheckRow({ x: { scene, check } }: { x: SceneCheckFor }) {
 }
 
 /** A reward the sub spent points on, waiting for a Dominant to give it and mark it redeemed. */
-export function RedemptionRow({ e }: { e: LedgerEntry }) {
+/** A reward someone spent points on, as a sentence card (mockup 03): who, what, and one button to say it's been given. */
+export function RedemptionCard({ e }: { e: LedgerEntry }) {
   const { memberName } = useRel();
   const [marking, setMarking] = useState(false);
   return (
-    <div className="flex min-h-16 items-center gap-2 bg-surface-container-low py-2 pr-2 pl-1">
-      <span className="flex size-10 shrink-0 items-center justify-center">
-        <Icon name="redeem" className="text-primary" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="text-body-large text-on-surface">{e.note}</div>
-        <div className="text-body-medium text-on-surface-variant">
-          {memberName(e.userId)} spent {-e.delta} pts{e.consequenceTitle ? ` to get out of ${e.consequenceTitle}` : ""} · {ago(e.createdAt)}
-        </div>
+    <div className="flex flex-col gap-3">
+      <p className="text-body-large text-on-surface">
+        {memberName(e.userId)} spent {-e.delta} pts on <span className="font-medium">{e.note}</span>
+        {e.consequenceTitle ? ` to get out of ${e.consequenceTitle}` : ""}.
+        <span className="text-on-surface-variant"> {ago(e.createdAt)}</span>
+      </p>
+      <div>
+        <Button onClick={() => setMarking(true)}>Give it</Button>
       </div>
-      <Button variant="tonal" onClick={() => setMarking(true)}>
-        Redeemed
-      </Button>
       {marking && <RedeemedDialog e={e} onClose={() => setMarking(false)} />}
     </div>
   );

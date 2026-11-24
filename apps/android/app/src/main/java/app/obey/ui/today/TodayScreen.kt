@@ -400,11 +400,7 @@ fun TodayScreen(
                             title = "${plural(redemptions.size, "reward")} to give",
                             subtitle = redemptions.joinToString(", ") { it.note },
                             count = redemptions.size,
-                            body = {
-                                InboxRows {
-                                    redemptions.forEach { e -> RedemptionRow(e, session?.nameOf(e.userId) ?: "Your partner") { redeeming = e } }
-                                }
-                            },
+                            cards = redemptions.map { e -> e.id to @Composable { RedemptionCard(e, session?.nameOf(e.userId) ?: "Your partner") { redeeming = e } } },
                         ),
                     )
                     // Updates: nothing to decide, so each kind clears in one tap.
