@@ -16,7 +16,7 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MoreTime
 import androidx.compose.material.icons.outlined.Redeem
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import app.obey.ui.common.Button
 import app.obey.ui.common.TonalButton
 import app.obey.ui.common.TonalIconButton
 import androidx.compose.material3.Icon
@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import app.obey.api.DelayUsed
 import app.obey.api.LedgerEntry
@@ -92,16 +93,22 @@ fun SceneCheckRow(scene: app.obey.api.Scene, c: app.obey.api.SceneCheck, name: S
     )
 }
 
-/** A reward the sub spent points on, waiting for a Dominant to give it and mark it redeemed. */
+/** A reward someone spent points on, as a sentence card (mockup 03): who, what, and one button to say it's been given. */
 @Composable
-fun RedemptionRow(e: LedgerEntry, name: String, onRedeemed: () -> Unit) {
-    ListItem(
-        colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-        leadingContent = { Icon(Icons.Outlined.Redeem, null, tint = MaterialTheme.colorScheme.primary) },
-        headlineContent = { Text(e.note) },
-        supportingContent = { Text("$name spent ${-e.delta} pts${e.consequenceTitle?.let { " to get out of $it" } ?: ""} · ${ago(e.createdAt)}") },
-        trailingContent = { TonalButton(onClick = onRedeemed) { Text("Redeemed") } },
-    )
+fun RedemptionCard(e: LedgerEntry, name: String, onRedeemed: () -> Unit) {
+    androidx.compose.foundation.layout.Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
+        Text(
+            androidx.compose.ui.text.buildAnnotatedString {
+                append("$name spent ${-e.delta} pts on ")
+                withStyle(androidx.compose.ui.text.SpanStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium)) { append(e.note) }
+                append(e.consequenceTitle?.let { " to get out of $it" } ?: "")
+                append(".")
+                withStyle(androidx.compose.ui.text.SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append(" ${ago(e.createdAt)}") }
+            },
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        Button(onClick = onRedeemed) { Text("Give it") }
+    }
 }
 
 /** Marking a reward given, with an optional note to the sub; a "lets off" reward's consequence is excused then. */

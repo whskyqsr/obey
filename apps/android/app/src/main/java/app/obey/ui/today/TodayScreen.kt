@@ -28,7 +28,7 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.SentimentDissatisfied
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import app.obey.ui.common.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import app.obey.ui.common.TonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -400,11 +400,7 @@ fun TodayScreen(
                             title = "${plural(redemptions.size, "reward")} to give",
                             subtitle = redemptions.joinToString(", ") { it.note },
                             count = redemptions.size,
-                            body = {
-                                InboxRows {
-                                    redemptions.forEach { e -> RedemptionRow(e, session?.nameOf(e.userId) ?: "Your partner") { redeeming = e } }
-                                }
-                            },
+                            cards = redemptions.map { e -> e.id to @Composable { RedemptionCard(e, session?.nameOf(e.userId) ?: "Your partner") { redeeming = e } } },
                         ),
                     )
                     // Updates: nothing to decide, so each kind clears in one tap.

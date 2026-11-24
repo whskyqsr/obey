@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
+import app.obey.ui.common.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -75,7 +75,7 @@ fun SceneCards(data: TodayScenes, session: Session, busy: Boolean, onAftercareDo
                 theirs.forEach { p ->
                     val name = session.nameOf(p.userId)
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Eyebrow("$name's aftercare plan", color = c.primary)
+                        Eyebrow("$name's aftercare", color = c.primary)
                         Text("$name likes: " + listOf(p.needs.joinToString(", "), p.note).filter { it.isNotBlank() }.joinToString(". "), style = MaterialTheme.typography.bodyLarge)
                     }
                 }

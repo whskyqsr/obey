@@ -1,5 +1,7 @@
 package app.obey.ui.today
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -65,123 +67,83 @@ data class InboxGroup(
 internal fun plural(n: Int, one: String, many: String = one + "s") = "$n ${if (n == 1) one else many}"
 
 /**
- * Everything on Today that waits on this person, one row per kind with a count, so a busy day doesn't turn into a wall
- * of cards. Opening a row shows the same cards and actions as before; with only one kind waiting it starts open.
+ * Everything on Today that waits on this person (mockup 11): sentence cards, each with its own buttons. The greeting
+ * already says how many, so there's no heading or count. [heading] names the section for screen readers.
  */
 @Composable
 fun TodayInbox(heading: String, groups: List<InboxGroup>, busy: Boolean) {
-    SectionHeader("$heading · ${groups.sumOf { it.count }}")
-    // Letters: groups on hairlines, no filled cards.
-    Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        groups.forEach { g ->
-            key(g.key) { InboxRow(g, startOpen = groups.size == 1, busy = busy) }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        }
+    Box(Modifier.padding(top = 8.dp, bottom = 8.dp).semantics { contentDescription = "$heading · ${groups.sumOf { it.count }}" }) {
+        NeedsYouCards(groups, busy)
     }
 }
 
-/** A Dominant's decisions at the top of Today: a card each, its rows and buttons showing, no folding. */
+/** A Dominant's decisions at the top of Today (mockup 03): a card each, with its buttons showing. */
 @Composable
 fun NeedsYouCards(groups: List<InboxGroup>, busy: Boolean) {
-    val c = MaterialTheme.colorScheme
     Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         groups.forEach { g ->
             if (g.cards != null) {
-                g.cards.forEach { (k, card) ->
-                    key(g.key, k) {
-                        Surface(
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
-                            color = c.surfaceContainerLowest,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { androidx.compose.foundation.layout.Box(Modifier.padding(16.dp)) { card() } }
-                    }
-                }
+                g.cards.forEach { (k, card) -> key(g.key, k) { InboxSurface { Box(Modifier.padding(16.dp)) { card() } } } }
                 g.action?.let { (label, run) ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         OutlinedButton(onClick = run, enabled = !busy) { Text(label) }
                     }
                 }
-                return@forEach
-            }
-            key(g.key) {
-                Surface(
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
-                    color = c.surfaceContainerLowest,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
-                        if (g.body != null && g.onOpen == null) {
-                            g.body.invoke()
-                            g.action?.let { (label, run) ->
-                                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.End) {
-                                    OutlinedButton(onClick = run, enabled = !busy) { Text(label) }
-                                }
-                            }
-                        } else {
-                            InboxRow(g, startOpen = false, busy = busy)
-                        }
-                    }
-                }
+            } else {
+                key(g.key) { InboxCard(g, startOpen = groups.size == 1, busy = busy) }
             }
         }
     }
 }
 
 @Composable
-private fun InboxRow(g: InboxGroup, startOpen: Boolean, busy: Boolean) {
+private fun InboxSurface(content: @Composable () -> Unit) {
+    val c = MaterialTheme.colorScheme
+    Surface(
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+        color = c.surfaceContainerLowest,
+        border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant),
+        modifier = Modifier.fillMaxWidth(),
+        content = content,
+    )
+}
+
+/** A kind of thing waiting, as one card: what it is, a line under it, and a quiet link to open it or show the items. */
+@Composable
+private fun InboxCard(g: InboxGroup, startOpen: Boolean, busy: Boolean) {
     var toggled by rememberSaveable(g.key) { mutableStateOf(false) }
     val open = g.body != null && g.onOpen == null && toggled != startOpen
     val c = MaterialTheme.colorScheme
-    // The icon carries the tone on its own.
-    val tint = when (g.tone) {
-        InboxTone.Primary, InboxTone.Error -> c.primary
-        else -> c.onSurfaceVariant
-    }
-    Column(Modifier.fillMaxWidth()) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 64.dp)
-                .clickable {
-                    if (g.onOpen != null) {
-                        g.onOpen.invoke()
-                    } else {
-                        toggled = !toggled
+    InboxSurface {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text(g.title, style = MaterialTheme.typography.bodyLarge)
+                    if (!open && g.subtitle.isNotEmpty()) {
+                        Text(g.subtitle, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
-                Icon(g.icon, null, Modifier.size(22.dp), tint = tint)
-            }
-            Column(Modifier.weight(1f)) {
-                Text(g.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (!open && g.subtitle.isNotEmpty()) {
-                    Text(g.subtitle, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val link = when {
+                    g.onOpen != null -> "Open"
+                    g.body != null -> if (open) "Hide" else if (g.count > 1) "Show ${g.count}" else "Show"
+                    else -> null
+                }
+                if (link != null) {
+                    Text(
+                        link,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = c.primary,
+                        modifier = Modifier.clickable { if (g.onOpen != null) g.onOpen.invoke() else toggled = !toggled }.padding(vertical = 2.dp),
+                    )
                 }
             }
-            if (g.onOpen != null) {
-                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = c.onSurfaceVariant)
-            } else {
-                if (!open) {
-                    Surface(color = c.primary, contentColor = c.onPrimary, shape = CircleShape) {
-                        Text("${g.count}", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
-                    }
-                }
-                Icon(if (open) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, if (open) "Collapse" else "Expand", tint = c.onSurfaceVariant)
-            }
-        }
-        AnimatedVisibility(open) {
-            Column(Modifier.padding(bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                g.body?.invoke()
-                g.action?.let { (label, run) ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        OutlinedButton(onClick = run, enabled = !busy) { Text(label) }
+            AnimatedVisibility(open) {
+                Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    g.body?.invoke()
+                    g.action?.let { (label, run) ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            OutlinedButton(onClick = run, enabled = !busy) { Text(label) }
+                        }
                     }
                 }
             }

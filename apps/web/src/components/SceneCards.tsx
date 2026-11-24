@@ -41,7 +41,7 @@ export function SceneCards() {
         <div className="flex flex-col gap-4 rounded-md border border-primary bg-surface-container-lowest px-5 py-5">
           {theirs.map((p) => (
             <div key={p.userId}>
-              <h2 className="eyebrow text-primary">{memberName(p.userId)}’s aftercare plan</h2>
+              <h2 className="eyebrow text-primary">{memberName(p.userId)}’s aftercare</h2>
               <p className="mt-2 text-body-large whitespace-pre-wrap text-on-surface">
                 {memberName(p.userId)} likes: {likes(p)}
               </p>

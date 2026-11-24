@@ -544,12 +544,10 @@ export function Switch({ checked, onChange, label, help }: { checked: boolean; o
       >
         <span
           className={cx(
-            "absolute top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full transition-all",
-            checked ? "left-[23px] size-5 bg-surface text-on-surface" : "left-1 size-5 bg-outline-variant",
+            "absolute top-1/2 -translate-y-1/2 rounded-full transition-all",
+            checked ? "left-[23px] size-5 bg-surface" : "left-1 size-5 bg-outline-variant",
           )}
-        >
-          {checked && <Icon name="check" size={14} />}
-        </span>
+        />
       </button>
     </label>
   );

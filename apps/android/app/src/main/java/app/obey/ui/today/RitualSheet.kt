@@ -3,6 +3,18 @@ package app.obey.ui.today
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import android.widget.Toast
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import app.obey.ui.common.Eyebrow
+import app.obey.ui.common.inkButtonColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,14 +31,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
+import app.obey.ui.common.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -101,8 +111,8 @@ fun Occurrence.opensLabel(): String {
 }
 
 /**
- * The run view for a ritual: the next step large, the whole list under it, and one button that ticks the current
- * step and moves on. When the last one is done, Finish completes it; a ritual that needs proof hands over to the
+ * The run view for a ritual (mockup 16): one step at a time on the whole screen, one button that ticks it and moves on,
+ * and "Back a step" to untick the one before. When the last one is done, Finish completes it; a ritual that needs proof hands over to the
  * caller's Done sheet through [onNeedsProof] instead.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -121,79 +131,91 @@ fun RitualSheet(o: Occurrence, onDismiss: () -> Unit, onNeedsProof: ((Occurrence
     val index = current?.let { o.steps.indexOf(it) } ?: o.steps.size
     val ready = o.isOpen()
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Column(Modifier.padding(horizontal = 24.dp).navigationBarsPadding().verticalScroll(rememberScrollState())) {
-            Text(o.title, style = MaterialTheme.typography.headlineSmall)
-            Spacer(Modifier.height(16.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    o.steps.forEach { s ->
-                        Box(Modifier.weight(1f).height(4.dp).background(if (s.id in done) colors.primary else colors.surfaceContainerHighest, CircleShape))
+    val last = index == o.steps.lastIndex
+    val previous = if (index > 0) o.steps[index - 1] else null
+    val upNext = if (current != null) o.steps.getOrNull(index + 1) else null
+
+    // Mockup 16: the whole screen, one step at a time.
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Surface(color = colors.surface, contentColor = colors.onSurface, modifier = Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 24.dp)) {
+                Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterStart).offset(x = (-12).dp)) {
+                        Icon(Icons.Outlined.Close, contentDescription = if (current != null) "Later" else "Close")
                     }
-                }
-                Spacer(Modifier.width(12.dp))
-                Text("${minOf(index + 1, o.steps.size)} of ${o.steps.size}", style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
-            }
-            Spacer(Modifier.height(16.dp))
-            if (!ready) {
-                Text("This one ${o.opensLabel()}.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-                Spacer(Modifier.height(12.dp))
-            }
-            Surface(color = androidx.compose.ui.graphics.Color.Transparent, contentColor = colors.onSurface, border = androidx.compose.foundation.BorderStroke(1.dp, colors.primary), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
-                if (current != null) {
-                    Column(Modifier.padding(horizontal = 20.dp, vertical = 24.dp)) {
-                        Text("Step ${index + 1}", style = MaterialTheme.typography.labelLarge)
-                        Text(current.title, style = MaterialTheme.typography.headlineSmall)
-                    }
-                } else {
-                    Row(Modifier.padding(horizontal = 20.dp, vertical = 24.dp), verticalAlignment = Alignment.CenterVertically) {
-                        app.obey.ui.common.Diamond(app.obey.ui.common.DiamondState.Done, size = 18.dp)
-                        Spacer(Modifier.width(12.dp))
-                        Text("Every step done", style = MaterialTheme.typography.titleLarge)
-                    }
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            o.steps.forEachIndexed { i, s ->
-                val on = s.id in done
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .background(if (s == current) colors.surfaceContainer else androidx.compose.ui.graphics.Color.Transparent, MaterialTheme.shapes.medium)
-                        .clickable(enabled = ready) { vm.tick(o, s.id, !on) }
-                        .padding(horizontal = 8.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    app.obey.ui.common.Diamond(
-                        if (on) app.obey.ui.common.DiamondState.Done else app.obey.ui.common.DiamondState.Open,
-                        Modifier.padding(horizontal = 4.dp).semantics { contentDescription = if (on) "Done" else "Not done" },
-                    )
-                    Spacer(Modifier.width(12.dp))
                     Text(
-                        "${i + 1}. ${s.title}",
+                        "${o.title} · ${if (current != null) "step ${index + 1} of ${o.steps.size}" else "done"}",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = if (on) colors.onSurfaceVariant else colors.onSurface,
+                        color = colors.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 48.dp),
                     )
                 }
-            }
-            Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                TextButton(onClick = onDismiss) { Text(if (current != null) "Later" else "Close") }
-                if (current != null) {
-                    Button(onClick = { vm.tick(o, current.id, true) }, enabled = ready) {
-                        Text(if (index == o.steps.lastIndex) "Done" else "Done, next")
+                Spacer(Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    o.steps.forEachIndexed { i, _ ->
+                        Box(Modifier.weight(1f).height(3.dp).background(if (i <= index) colors.onSurface else colors.outlineVariant))
                     }
+                }
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 96.dp, bottom = 24.dp)) {
+                    if (current != null) {
+                        Eyebrow("Step ${stepWord(index + 1)}")
+                        Spacer(Modifier.height(12.dp))
+                        Text(current.title, style = MaterialTheme.typography.displaySmall)
+                    } else {
+                        Eyebrow(o.stepProgress)
+                        Spacer(Modifier.height(12.dp))
+                        Text("Every step done.", style = MaterialTheme.typography.displaySmall)
+                    }
+                    if (!ready) {
+                        Spacer(Modifier.height(16.dp))
+                        Text("This one ${o.opensLabel()}.", style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant)
+                    }
+                }
+                if (current != null) {
+                    Button(
+                        onClick = { vm.tick(o, current.id, true) },
+                        enabled = ready,
+                        colors = inkButtonColors(),
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                    ) { Text(if (last) "Done" else "Done, next") }
                 } else {
                     Button(
                         onClick = { if (o.needsDoneDialog && onNeedsProof != null) onNeedsProof(o) else vm.finish(o) },
                         enabled = !busy,
-                    ) {
-                        Text("Finish")
+                        colors = inkButtonColors(),
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                    ) { Text("Finish") }
+                }
+                Row(Modifier.fillMaxWidth().height(48.dp).padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (previous != null) {
+                        TextButton(onClick = { vm.tick(o, previous.id, false) }, modifier = Modifier.offset(x = (-12).dp)) {
+                            Text("‹ Back a step", style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant)
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    if (upNext != null) {
+                        Text(
+                            "Next: ${upNext.title}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = colors.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(start = 16.dp),
+                        )
                     }
                 }
             }
         }
     }
 }
+
+private val WORDS = listOf("one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve")
+/** "two" for 2, "13" past twelve. */
+private fun stepWord(n: Int) = WORDS.getOrNull(n - 1) ?: n.toString()
 
 /** A ritual's steps as a read-only checklist, under its row. */
 @Composable

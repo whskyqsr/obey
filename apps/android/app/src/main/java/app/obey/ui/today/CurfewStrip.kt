@@ -26,7 +26,7 @@ import androidx.compose.material.icons.outlined.EventBusy
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MoreTime
 import androidx.compose.material.icons.outlined.WavingHand
-import androidx.compose.material3.Button
+import app.obey.ui.common.Button
 import app.obey.ui.common.TonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton

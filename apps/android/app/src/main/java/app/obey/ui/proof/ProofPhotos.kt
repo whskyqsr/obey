@@ -28,7 +28,7 @@ import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import app.obey.ui.common.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -265,7 +265,7 @@ fun ProofBlurSetting(vm: ProofViewModel = hiltViewModel(key = "proof-settings"))
     androidx.compose.material3.ListItem(
         headlineContent = { Text("Blur proof photos") },
         trailingContent = {
-            androidx.compose.material3.Switch(
+            app.obey.ui.common.Switch(
                 checked = viewer?.revealProofs != true,
                 onCheckedChange = { blur -> if (!blur) confirm = true else vm.setReveal(false) },
             )
