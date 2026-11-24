@@ -4,6 +4,7 @@ import { errorMessage } from "../api/client";
 import type { Role } from "../api/types";
 import { Avatar } from "../components/Avatar";
 import { FirstRunPage, FirstRunTitle } from "../components/FirstRun";
+import { joinAs } from "../components/InviteRole";
 import { Button, Chip, Loading } from "../components/ui";
 import { clearPendingInvite } from "../lib/invite";
 import { ROLE_LABEL } from "../lib/relationship";
@@ -11,7 +12,6 @@ import { storage } from "../lib/storage";
 import { startWelcome } from "../lib/welcome";
 
 const ROLES: { value: Role; label: string }[] = (["dominant", "submissive", "switch"] as const).map((r) => ({ value: r, label: ROLE_LABEL[r] }));
-const article = (role: Role) => (role === "switch" ? "a Switch" : `the ${ROLE_LABEL[role]}`);
 
 /** An opened invite link, after sign-in: who it's from and what you'd be, then Accept or Not now. */
 export function AcceptInvite({ code, onDone }: { code: string; onDone(): void }) {
@@ -73,7 +73,7 @@ export function AcceptInvite({ code, onDone }: { code: string; onDone(): void })
       <div className="flex flex-col items-center pt-16">
         <Avatar userId="inviter" name={p.inviterName} version={null} size={84} />
         <h1 className="mt-6 font-serif text-[40px] leading-[1.1] text-on-surface">{p.inviterName} invited you.</h1>
-        <p className="mt-3 text-body-large text-on-surface-variant">{p.role ? `You'll join as ${article(p.role)}.` : "Choose your role to join."}</p>
+        <p className="mt-3 text-body-large text-on-surface-variant">{p.role ? joinAs(p.role) : "Choose your role to join."}</p>
         {!p.role && (
           <div className="mt-6 flex flex-wrap justify-center gap-2" role="radiogroup" aria-label="Your role">
             {ROLES.map((r) => (

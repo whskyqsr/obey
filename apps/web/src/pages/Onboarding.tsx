@@ -3,6 +3,7 @@ import { useCreateRelationship, useJoinRelationship } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { Role } from "../api/types";
 import { FirstRunPage, FirstRunTitle } from "../components/FirstRun";
+import { InviteRole, useInviteRole } from "../components/InviteRole";
 import { Button, Chip, SegmentedButtons, TextField, cx } from "../components/ui";
 import { parseInvite } from "../lib/invite";
 import { ROLE_LABEL } from "../lib/relationship";
@@ -53,11 +54,16 @@ export function Onboarding({ onDone, embedded }: { onDone?: (relationshipId: str
       ) : (
         <TextField label="Invite link or code" value={code} onChange={(e) => setCode(e.target.value)} autoCapitalize="characters" spellCheck={false} />
       )}
-      <div>
-        <div className="mb-2 text-label-large text-on-surface-variant">Your role</div>
-        <SegmentedButtons<Role> value={role} onChange={setRole} options={ROLES} className="w-full" />
-        {mode === "join" && <p className="mt-2 text-body-small text-on-surface-variant">If the invite already names your role, that's the one you get.</p>}
-      </div>
+      {mode === "create" ? (
+        <div>
+          <div className="mb-2 text-label-large text-on-surface-variant">Your role</div>
+          <SegmentedButtons<Role> value={role} onChange={setRole} options={ROLES} className="w-full" />
+        </div>
+      ) : (
+        <div className="-mt-3">
+          <InviteRole code={code} role={role} onRole={setRole} />
+        </div>
+      )}
       {m.error && <p className="text-body-medium text-error">{errorMessage(m.error)}</p>}
       <Button type="submit" busy={m.isPending} disabled={mode === "join" && code.trim().length < 4}>
         {mode === "create" ? "Create relationship" : "Join"}
@@ -79,6 +85,7 @@ function FirstRun() {
   const create = useCreateRelationship();
   const join = useJoinRelationship();
   const m = mode === "create" ? create : join;
+  const invite = useInviteRole(code);
   // The new dynamic opens first, and its setup steps follow.
   const done = (r: { id: string }) => {
     storage.set("obey.relationship", r.id);
@@ -97,7 +104,7 @@ function FirstRun() {
       actions={
         <>
           {m.error && <p className="text-body-medium text-error">{errorMessage(m.error)}</p>}
-          <Button busy={m.isPending} disabled={mode === "join" && code.trim().length < 4} onClick={go} className="h-12 w-full">
+          <Button busy={m.isPending} disabled={mode === "join" && (code.trim().length < 4 || invite.invalid)} onClick={go} className="h-12 w-full">
             Continue
           </Button>
         </>
@@ -129,18 +136,7 @@ function FirstRun() {
             autoCapitalize="characters"
             spellCheck={false}
           />
-          {mode === "join" && (
-            <>
-              <div className="mt-3 text-body-small text-on-surface-variant">Your role, if the invite leaves it to you</div>
-              <div className="mt-1 flex flex-wrap gap-2" role="radiogroup" aria-label="Your role">
-                {ROLES.map((r) => (
-                  <Chip key={r.value} plain selected={joinRole === r.value} onClick={() => setJoinRole(r.value)}>
-                    {r.label}
-                  </Chip>
-                ))}
-              </div>
-            </>
-          )}
+          {mode === "join" && <InviteRole code={code} role={joinRole} onRole={setJoinRole} />}
         </section>
       </div>
     </FirstRunPage>

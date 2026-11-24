@@ -280,6 +280,10 @@ data class Invite(val code: String, val expiresAt: String, val role: Role? = nul
     val link: String get() = "${app.obey.BuildConfig.WEB_URL.trimEnd('/')}/join/$code"
 }
 
+/** What an invite shows before it's accepted; [role] null leaves the role to the person joining. */
+@Serializable
+data class InvitePreview(val code: String, val relationshipId: String, val inviterName: String, val role: Role? = null, val alreadyMember: Boolean = false)
+
 /** An invite code from a pasted link or a bare code. */
 fun parseInviteCode(text: String): String {
     val t = text.trim()
