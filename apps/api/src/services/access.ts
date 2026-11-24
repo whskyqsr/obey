@@ -3,12 +3,13 @@ import { and, eq, sql } from "drizzle-orm";
 import type { Tx } from "../db/index.js";
 import { memberships, relationships } from "../db/schema.js";
 import { HttpError, forbidden, notFound } from "../errors.js";
+import { aiReachable } from "./aiAccess.js";
 
 /**
  * Whether the current request changes anything, set per request in app.ts. An ended dynamic stays readable, so every
  * membership check refuses writes to one without each route having to remember to.
  */
-export const requestScope = new AsyncLocalStorage<{ write: boolean }>();
+export const requestScope = new AsyncLocalStorage<{ write: boolean; ai?: boolean }>();
 
 export type Role = "dominant" | "submissive" | "switch";
 
@@ -35,6 +36,8 @@ export async function requireMember(db: Tx, relationshipId: string, userId: stri
     .innerJoin(relationships, eq(relationships.id, memberships.relationshipId))
     .where(and(eq(memberships.relationshipId, relationshipId), eq(memberships.userId, userId)));
   if (!row) throw notFound();
+  // A call an AI app makes (over MCP) only reaches a dynamic that allows it, and gets the same 404 as one you're not in.
+  if (requestScope.getStore()?.ai && !(await aiReachable(db, relationshipId))) throw notFound();
   if (row.endedAt && requestScope.getStore()?.write) throw new HttpError(409, "this dynamic has ended; it's kept read-only");
   if (row.members === 1 && !row.endedAt) return { ...row.m, role: "switch" as Role, solo: true };
   return { ...row.m, solo: false };

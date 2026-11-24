@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@fastify/cors": "^11.3.1",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@obey/contracts": "workspace:*",
     "@obey/recurrence": "workspace:*",
     "drizzle-orm": "^0.45.4",

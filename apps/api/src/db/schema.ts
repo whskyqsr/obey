@@ -73,6 +73,8 @@ export const memberships = pgTable(
     /** Location watching paused by this member: from, and until (null until they turn it back on). */
     locationPausedAt: ts("location_paused_at"),
     locationPausedUntil: ts("location_paused_until"),
+    /** This member lets AI apps (over MCP) reach the dynamic. Every member has to, see services/aiAccess.ts. */
+    aiAccess: boolean("ai_access").notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [primaryKey({ columns: [t.relationshipId, t.userId] }), index("memberships_user_idx").on(t.userId)],
@@ -1011,4 +1013,67 @@ export const chastityEvents = pgTable(
     taskId: uuid("task_id").references(() => taskSeries.id, { onDelete: "set null" }),
   },
   (t) => [index("chastity_events_lock_idx").on(t.lockId, t.createdAt)],
+);
+
+/** An AI app that registered itself to connect over MCP (OAuth dynamic client registration). Public clients only. */
+export const oauthClients = pgTable("oauth_clients", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  redirectUris: text("redirect_uris").array().notNull(),
+  createdAt: createdAt(),
+});
+
+/** A one-time code from the connect page, swapped for tokens within minutes. Stored as a hash. */
+export const oauthCodes = pgTable("oauth_codes", {
+  codeHash: text("code_hash").primaryKey(),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => oauthClients.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  redirectUri: text("redirect_uri").notNull(),
+  codeChallenge: text("code_challenge").notNull(),
+  scope: text("scope").notNull(),
+  expiresAt: ts("expires_at").notNull(),
+});
+
+/** One connected AI app for one person: its tokens (hashed), until it's disconnected or the refresh token runs out. */
+export const aiGrants = pgTable(
+  "ai_grants",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => oauthClients.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    scope: text("scope").notNull(),
+    accessHash: text("access_hash").notNull(),
+    accessExpiresAt: ts("access_expires_at").notNull(),
+    refreshHash: text("refresh_hash").notNull(),
+    refreshExpiresAt: ts("refresh_expires_at").notNull(),
+    createdAt: createdAt(),
+    lastUsedAt: ts("last_used_at"),
+    revokedAt: ts("revoked_at"),
+  },
+  (t) => [uniqueIndex("ai_grants_access_uq").on(t.accessHash), uniqueIndex("ai_grants_refresh_uq").on(t.refreshHash), index("ai_grants_user_idx").on(t.userId)],
+);
+
+/** Every MCP tool call: who, which app, which dynamic, which tool, and whether it went through. Never what was in it. */
+export const aiCalls = pgTable(
+  "ai_calls",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    grantId: uuid("grant_id").references(() => aiGrants.id, { onDelete: "set null" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    relationshipId: uuid("relationship_id").references(() => relationships.id, { onDelete: "cascade" }),
+    tool: text("tool").notNull(),
+    ok: boolean("ok").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("ai_calls_relationship_idx").on(t.relationshipId, t.createdAt), index("ai_calls_created_idx").on(t.createdAt)],
 );
