@@ -8,6 +8,7 @@ import { aiCalls, aiGrants } from "../db/schema.js";
 import { aiReachable, grantForAccessToken } from "../services/aiAccess.js";
 import { publicApiUrl } from "../routes/oauth.js";
 import { type Call, USER_ROUTES, failed, registerUserTools, text } from "./tools.js";
+import { WRITE_ROUTES, registerWriteTools } from "./writeTools.js";
 
 export const AI_INTERNAL_HEADER = "x-fealty-ai-internal";
 
@@ -15,7 +16,7 @@ export const AI_INTERNAL_HEADER = "x-fealty-ai-internal";
  * The app routes MCP tools may call, by method and route pattern. Anything not listed (photos, the keybox, location,
  * safe calls, settings, AI access itself) can't be reached by an AI app even by mistake.
  */
-const AI_ROUTES = new Set<string>([...USER_ROUTES]);
+const AI_ROUTES = new Set<string>([...USER_ROUTES, ...WRITE_ROUTES]);
 
 export const aiRouteAllowed = (method: string, routeUrl: string | undefined) => routeUrl !== undefined && AI_ROUTES.has(`${method} ${routeUrl}`);
 
@@ -32,7 +33,7 @@ interface MeBody {
   }[];
 }
 
-function buildServer(deps: Deps, grant: Grant, call: Call) {
+function buildServer(deps: Deps, grant: Grant, call: Call, touched: Set<string>) {
   const server = new McpServer(
     { name: "fealty", version: "1.0.0" },
     {
@@ -47,12 +48,16 @@ function buildServer(deps: Deps, grant: Grant, call: Call) {
     <A extends { relationshipId?: string }>(tool: string, run: (args: A) => Promise<CallToolResult>) =>
     async (args: A): Promise<CallToolResult> => {
       let result: CallToolResult;
+      touched.clear();
       try {
         result = await run(args);
       } catch {
         result = failed("Something went wrong in Fealty. Try again in a moment.");
       }
-      await deps.db.insert(aiCalls).values({ grantId: grant.id, userId: grant.userId, relationshipId: args.relationshipId ?? null, tool, ok: !result.isError, createdAt: deps.now() });
+      // One row per dynamic the call really reached (not the one it named), or one with none.
+      const base = { grantId: grant.id, userId: grant.userId, tool, ok: !result.isError, createdAt: deps.now() };
+      const rows = touched.size ? [...touched].map((relationshipId) => ({ ...base, relationshipId })) : [{ ...base, relationshipId: null }];
+      await deps.db.insert(aiCalls).values(rows);
       return result;
     };
 
@@ -91,6 +96,7 @@ function buildServer(deps: Deps, grant: Grant, call: Call) {
   );
 
   registerUserTools(server, call, logged);
+  registerWriteTools(server, call, logged);
   return server;
 }
 
@@ -109,6 +115,7 @@ export const mcpRoutes = (deps: Deps, opts: { internalSecret: string }) => async
     const now = deps.now();
     if (!grant.lastUsedAt || now.getTime() - grant.lastUsedAt.getTime() > 60_000) await deps.db.update(aiGrants).set({ lastUsedAt: now }).where(eq(aiGrants.id, grant.id));
 
+    const touched = new Set<string>();
     const call: Call = async (method, url, payload) => {
       const res = await app.inject({
         method,
@@ -116,10 +123,12 @@ export const mcpRoutes = (deps: Deps, opts: { internalSecret: string }) => async
         payload: payload as object | undefined,
         headers: { [AI_INTERNAL_HEADER]: opts.internalSecret, "x-ai-grant": grant.id },
       });
+      const reached = res.headers["x-ai-touched"];
+      if (typeof reached === "string") for (const id of reached.split(",")) touched.add(id);
       return { status: res.statusCode, body: res.body ? JSON.parse(res.body) : undefined };
     };
 
-    const server = buildServer(deps, grant, call);
+    const server = buildServer(deps, grant, call, touched);
     const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     await server.connect(transport);
     const headers = new Headers();
