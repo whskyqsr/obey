@@ -13,8 +13,8 @@ Last full sweep: 2026-11-24, web at 390px and 1440px, local seed data.
 
 | Area | Mockups | Phone (web <1024 + Android) | Desktop (web ≥1024) | What differs |
 |---|---|---|---|---|
-| Today, submissive | 01, 02, 10, 11, 41 | Close | Not matched | Phone: the partner's quoted word only shows when there is one. Desktop: the right panel ("At a glance" and a points box) isn't the mockup's plain partner column. |
-| Today, Dominant | 03, 12, desktop 13 | Close | Not matched | Desktop right panel should be the partner, their last journal entry, this week's numbers and what's coming up, all without boxes. |
+| Today, submissive | 01, 02, 10, 11, 41 | Close | Close (#114) | Phone: the partner's quoted word only shows when there is one. Desktop: the right column is the partner, their last journal entry, this week's numbers and what's coming up, without boxes. |
+| Today, Dominant | 03, 12, desktop 13 | Close | Close (#114) | Desktop right column matches. The header has a "+ New" button where the mockup shows an "N new task" key hint (the hints sit under the list). The streak counts days with nothing missed. |
 | Task page, history | 15, 57 | Close (#114) | Close (#114) | Back link reads "Back" because the page opens from several places; mockup says "‹ Today". Comments open from "Add a word" instead of always showing. Android has no "This week" diamond row yet. |
 | New task / editor | 04, 52–55, desktop 14 | Close | Close | Sentence builder with tappable parts, inline option panels, Also chips, How often sheet, desktop preview and next three. Quick deadlines live in the time panel rather than mockup 55's separate sheet. Android edits the title in a panel (no inline field in a sentence), has no reward picker or "Next" dates line (both were missing before), and there's no "Save as draft" anywhere because drafts don't exist. |
 | + menu | 17 | Not compared | — | |
