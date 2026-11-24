@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { AFTERCARE } from "@obey/contracts";
 import {
@@ -19,7 +19,7 @@ import { useOpenOnNew } from "../lib/newParam";
 import type { AftercarePlan, Scene, SceneSide } from "../api/types";
 import { CommentThread } from "../components/Comments";
 import { MOOD_LABELS, MoodPicker } from "../components/Mood";
-import { BackLink, Button, Chip, ErrorBox, Fab, Icon, Loading, OverflowMenu, PageHeader, SubHeader, TextArea, TextField, useSnackbar } from "../components/ui";
+import { BackLink, FormSheet, Button, Chip, ErrorBox, Fab, Icon, Loading, OverflowMenu, PageHeader, SubHeader, TextArea, TextField, useSnackbar } from "../components/ui";
 import { fmtDate, fmtDateTime, fromLocalInput, localDateOf, toLocalInput, today } from "../lib/dates";
 import { useReadOnly, useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
@@ -171,39 +171,6 @@ function AftercarePicker({ value, onChange }: { value: string[]; onChange(v: str
   );
 }
 
-/** A full-screen form with "Cancel · title · Save" across the top, as in mockup 76. */
-function FormSheet({
-  title,
-  onClose,
-  onSave,
-  saving,
-  canSave,
-  children,
-}: {
-  title: string;
-  onClose(): void;
-  onSave(): void;
-  saving: boolean;
-  canSave: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-surface" role="dialog" aria-modal aria-label={title}>
-      <div className="mx-auto flex w-full max-w-xl flex-col px-4 pb-10 md:px-6">
-        <div className="sticky top-0 z-10 grid h-16 grid-cols-[1fr_auto_1fr] items-center bg-surface">
-          <button type="button" onClick={onClose} className="justify-self-start text-body-large text-on-surface-variant">
-            Cancel
-          </button>
-          <h1 className="text-title-medium text-on-surface">{title}</h1>
-          <button type="button" disabled={!canSave || saving} onClick={onSave} className="justify-self-end text-body-large text-primary disabled:opacity-40">
-            Save
-          </button>
-        </div>
-        <div className="flex flex-col gap-6">{children}</div>
-      </div>
-    </div>
-  );
-}
 
 /** Logging a scene, or changing one. Kept short: only when is needed. */
 function SceneDialog({ scene, onClose }: { scene?: Scene; onClose(): void }) {

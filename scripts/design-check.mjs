@@ -26,7 +26,6 @@ const rules = [
     test: /\b(Card|ElevatedCard|OutlinedCard)\(/,
     allow: [
       "ui/stats/MonthReviewScreen.kt",
-      "ui/location/LocationScreens.kt",
       "ui/chastity/Chastity.kt",
       "ui/today/DayExtension.kt",
       "ui/onboarding/WelcomeScreen.kt",
@@ -37,7 +36,7 @@ const rules = [
     name: "Card on web (use hairlines)",
     files: web,
     test: /<Card\b/,
-    allow: ["pages/Welcome.tsx", "pages/Stats.tsx", "pages/LocationPage.tsx", "pages/Kits.tsx"],
+    allow: ["pages/Welcome.tsx", "pages/Stats.tsx", "pages/Kits.tsx"],
   },
   {
     name: "Raw colour on web (use theme tokens)",

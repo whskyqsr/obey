@@ -128,9 +128,12 @@ export function IconButton({
 /** An overflow menu (⋮). Items close it when chosen. */
 export function OverflowMenu({
   label = "More options",
+  icon = "more_horiz",
   items,
 }: {
   label?: string;
+  /** The trigger's icon, when the menu isn't just "more" (Location's pause). */
+  icon?: string;
   items: { label: string; icon: string; onClick(): void; danger?: boolean }[];
 }) {
   const [open, setOpen] = useState(false);
@@ -149,7 +152,7 @@ export function OverflowMenu({
   }, [open]);
   return (
     <div ref={ref} className="relative">
-      <IconButton icon="more_horiz" label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)} />
+      <IconButton icon={icon} label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)} />
       {open && (
         <div
           role="menu"
@@ -821,6 +824,40 @@ export function ErrorBox({ error, onRetry }: { error: unknown; onRetry?: () => v
           Retry
         </button>
       )}
+    </div>
+  );
+}
+
+/** A full-screen form with "Cancel · title · Save" across the top, as in mockup 76. */
+export function FormSheet({
+  title,
+  onClose,
+  onSave,
+  saving,
+  canSave,
+  children,
+}: {
+  title: string;
+  onClose(): void;
+  onSave(): void;
+  saving: boolean;
+  canSave: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-surface" role="dialog" aria-modal aria-label={title}>
+      <div className="mx-auto flex w-full max-w-xl flex-col px-4 pb-10 md:px-6">
+        <div className="sticky top-0 z-10 grid h-16 grid-cols-[1fr_auto_1fr] items-center bg-surface">
+          <button type="button" onClick={onClose} className="justify-self-start text-body-large text-on-surface-variant">
+            Cancel
+          </button>
+          <h1 className="text-title-medium text-on-surface">{title}</h1>
+          <button type="button" disabled={!canSave || saving} onClick={onSave} className="justify-self-end text-body-large text-primary disabled:opacity-40">
+            Save
+          </button>
+        </div>
+        <div className="flex flex-col gap-6">{children}</div>
+      </div>
     </div>
   );
 }

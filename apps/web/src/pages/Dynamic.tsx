@@ -305,7 +305,7 @@ export function DynamicPage() {
                 headline="Places"
                 supporting={isDom ? "Where location tasks can send someone" : "The places location tasks use"}
                 trailing={<Icon name="chevron_right" className="text-on-surface-variant" />}
-                onClick={() => navigate({ to: "/places" })}
+                onClick={() => navigate({ to: "/location" })}
               />
               {(isDom || curfew.data?.settings?.enabled) && (
                 <Row
