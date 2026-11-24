@@ -29,7 +29,7 @@ function useDismissed(key: string) {
 function TodayCard({ title, body, children }: { title: string; body: string; children: React.ReactNode }) {
   return (
     <div className="px-4 pb-4 md:px-6">
-      <div className="flex flex-col gap-2 rounded-xl bg-secondary-container px-4 py-4 text-on-secondary-container">
+      <div className="flex flex-col gap-2 rounded-md border border-primary bg-surface-container-lowest px-5 py-4 text-on-surface">
         <div className="text-title-medium">{title}</div>
         <p className="text-body-medium">{body}</p>
         <div className="mt-2 flex flex-wrap gap-2">{children}</div>

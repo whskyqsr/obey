@@ -609,7 +609,7 @@ function PendingRequests({ cards }: { cards: RescheduleRequest[][] }) {
         const single = rows.length === 1;
         const canDecide = isDom && !mine(r);
         return (
-          <div key={r.groupId ?? r.id} className="flex flex-col gap-3 rounded-md bg-tertiary-container p-4 text-on-tertiary-container">
+          <div key={r.groupId ?? r.id} className="flex flex-col gap-3 rounded-md border border-primary bg-surface-container-lowest px-5 py-4 text-on-surface">
             <div>
               <div className="text-title-medium">
                 {single && r.kind === "cancel" ? (
@@ -645,7 +645,7 @@ function PendingRequests({ cards }: { cards: RescheduleRequest[][] }) {
                   ))}
                 </ul>
               )}
-              {r.reason && <div className="mt-2 text-body-medium italic">“{r.reason}”</div>}
+              {r.reason && <div className="mt-2 font-serif text-[19px] leading-6 text-on-surface-variant italic">“{r.reason}”</div>}
             </div>
             {canDecide && (
               <div className="flex flex-wrap gap-2">
@@ -657,7 +657,7 @@ function PendingRequests({ cards }: { cards: RescheduleRequest[][] }) {
                     {r.kind === "cancel" ? "Reschedule instead" : "Other time"}
                   </Button>
                 )}
-                <Button variant="text" className="text-on-tertiary-container" disabled={decide.isPending} onClick={() => act(r, false, rows.length)}>
+                <Button variant="text" disabled={decide.isPending} onClick={() => act(r, false, rows.length)}>
                   Decline
                 </Button>
               </div>

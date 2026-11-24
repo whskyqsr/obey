@@ -32,7 +32,9 @@ export function TasksPage() {
     return (tasks.data ?? [])
       .filter((t) => !t.draft)
       .filter((t) => !needle || t.title.toLowerCase().includes(needle) || t.summary.toLowerCase().includes(needle))
-      .filter((t) => (filter === "mine" ? t.assigneeId === me.user.id : filter === "theirs" ? t.assigneeId !== me.user.id : filter === "paused" ? !t.active : true))
+      .filter((t) =>
+        filter === "mine" ? t.assigneeId === me.user.id : filter === "theirs" ? t.assigneeId !== me.user.id : filter === "paused" ? !t.active : true,
+      )
       .sort((a, b) => Number(b.active) - Number(a.active) || a.title.localeCompare(b.title));
   }, [tasks.data, q, filter, me.user.id]);
   const chip = (f: Exclude<Filter, null>, label: string) => (
@@ -45,9 +47,7 @@ export function TasksPage() {
     <>
       <PageHeader title="All tasks" tools={<IconButton icon="search" label="Search tasks" onClick={() => setSearching((v) => !v)} />} />
       <div className="flex flex-col gap-3 px-4 pb-2 md:px-6">
-        {(searching || q) && (
-          <TextField autoFocus placeholder="Search tasks" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search tasks" />
-        )}
+        {(searching || q) && <TextField autoFocus placeholder="Search tasks" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search tasks" />}
         <div className="flex flex-wrap gap-2">
           {isDom && others.length > 0 && chip("theirs", theirLabel)}
           {chip("mine", "Mine")}
@@ -59,7 +59,11 @@ export function TasksPage() {
       {tasks.error && <ErrorBox error={tasks.error} onRetry={() => tasks.refetch()} />}
       {tasks.data && !list.length && (
         <div className="px-4 md:px-6">
-          <Empty icon="checklist" title={q || filter ? "No matches" : "No tasks yet"} body={isDom ? "Start one with the + above." : "Nothing has been set for you yet."} />
+          <Empty
+            icon="checklist"
+            title={q || filter ? "No matches" : "No tasks yet"}
+            body={isDom ? "Start one with the + above." : "Nothing has been set for you yet."}
+          />
         </div>
       )}
       <ul className="px-4 md:px-6">
@@ -73,7 +77,9 @@ export function TasksPage() {
                 className="state-layer flex min-w-0 flex-1 items-center gap-3 py-3.5 text-left"
               >
                 <span className="min-w-0 flex-1">
-                  <span className={t.active ? "block truncate text-body-large text-on-surface" : "block truncate text-body-large text-on-surface-variant"}>{t.title}</span>
+                  <span className={t.active ? "block truncate text-body-large text-on-surface" : "block truncate text-body-large text-on-surface-variant"}>
+                    {t.title}
+                  </span>
                   <span className="block truncate text-body-medium text-on-surface-variant">
                     {t.summary}
                     {t.dueTime ? ` at ${fmtClock(t.dueTime)}` : ""}
@@ -104,7 +110,10 @@ function KitReview({ drafts }: { drafts: Task[] }) {
   const who = [...new Set(drafts.map((t) => memberName(t.assigneeId)))].join(" and ");
   const edit = (t: Task) => navigate({ to: "/tasks/$taskId/edit", params: { taskId: t.id } });
   return (
-    <section aria-label="From a kit" className="mx-4 mb-4 flex flex-col gap-3 rounded-xl bg-tertiary-container p-4 text-on-tertiary-container md:mx-6">
+    <section
+      aria-label="From a kit"
+      className="mx-4 mb-4 flex flex-col gap-3 rounded-md border border-primary bg-surface-container-lowest p-5 text-on-surface md:mx-6"
+    >
       <div>
         <h2 className="text-title-medium">Look these over before {who} gets them</h2>
         <p className="text-body-medium opacity-85">Added from a kit. Change or drop any of them, then send. {who} hears once, when you do.</p>
@@ -133,7 +142,12 @@ function KitReview({ drafts }: { drafts: Task[] }) {
         <Button
           icon="send"
           busy={send.isPending}
-          onClick={() => send.mutate(undefined, { onSuccess: (sent) => snack(`Sent ${sent.length} task${sent.length === 1 ? "" : "s"} to ${who}`), onError: (e) => snack(errorMessage(e)) })}
+          onClick={() =>
+            send.mutate(undefined, {
+              onSuccess: (sent) => snack(`Sent ${sent.length} task${sent.length === 1 ? "" : "s"} to ${who}`),
+              onError: (e) => snack(errorMessage(e)),
+            })
+          }
         >
           Send to {who}
         </Button>
@@ -147,7 +161,8 @@ function NowStatus({ occurrences, mine, onComplete }: { occurrences: Occurrence[
   const t = today();
   const countTap = useCountTap();
   const open = occurrences.find((o) => o.status === "pending" && (isOverdue(o) || localDateOf(new Date(o.dueAt)) === t));
-  if (open && isCounted(open)) return <CountRing o={open} onTap={mine && canCount(open, true, false) && !readyToSend(open) ? () => countTap(open) : undefined} disabled={!mine} />;
+  if (open && isCounted(open))
+    return <CountRing o={open} onTap={mine && canCount(open, true, false) && !readyToSend(open) ? () => countTap(open) : undefined} disabled={!mine} />;
   if (open && mine)
     return (
       <IconButton

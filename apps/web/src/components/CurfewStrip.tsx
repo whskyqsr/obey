@@ -23,23 +23,22 @@ import { Button, Chip, Dialog, Icon, IconButton, TextArea, TextField, cx, useSna
 
 type Tone = "neutral" | "soon" | "home" | "broken";
 
+/** Letters: a rule down the side carries the tone; the icon sits on paper. */
 const TONE: Record<Tone, { box: string; badge: string }> = {
-  neutral: { box: "bg-surface-container-high text-on-surface", badge: "text-on-surface" },
-  soon: { box: "bg-tertiary-container text-on-tertiary-container", badge: "bg-tertiary text-on-tertiary" },
-  home: { box: "bg-surface-container-high text-on-surface", badge: "bg-primary text-on-primary" },
-  broken: { box: "bg-error-container text-on-error-container", badge: "bg-error text-on-error" },
+  neutral: { box: "border-outline-variant", badge: "text-on-surface-variant" },
+  soon: { box: "border-primary", badge: "text-primary" },
+  home: { box: "border-on-surface", badge: "text-on-surface" },
+  broken: { box: "border-error", badge: "text-error" },
 };
 
 function Strip({ tone, icon, title, body, actions }: { tone: Tone; icon: string; title: string; body: string; actions?: ReactNode }) {
   const t = TONE[tone];
   return (
-    <div className={cx("flex items-center gap-4 rounded-xl px-4 py-3", t.box)}>
-      <span className={cx("flex size-12 shrink-0 items-center justify-center rounded-full", t.badge)}>
-        <Icon name={icon} filled={tone !== "neutral"} />
-      </span>
+    <div className={cx("flex items-center gap-4 border-l-2 py-1 pl-4 text-on-surface", t.box)}>
+      <Icon name={icon} className={cx("shrink-0", t.badge)} />
       <div className="min-w-0 flex-1">
-        <div className="text-title-medium">{title}</div>
-        <div className="text-body-medium opacity-80">{body}</div>
+        <div className="text-body-large">{title}</div>
+        <div className="text-body-medium text-on-surface-variant">{body}</div>
       </div>
       {actions}
     </div>
@@ -448,7 +447,7 @@ function Ask({ request }: { request: CurfewRequest }) {
     onError: (e: unknown) => snack(errorMessage(e)),
   });
   return (
-    <div className="flex flex-col gap-1.5 rounded-xl bg-secondary-container px-4 py-4 text-on-secondary-container">
+    <div className="flex flex-col gap-1.5 rounded-md border border-primary bg-surface-container-lowest px-5 py-4 text-on-surface">
       <div className="text-title-medium">
         {who} asks to be home by {fmtTime(request.untilAt)} {nightLabel(request.fromDueAt)}
       </div>
@@ -540,7 +539,7 @@ export function Clash({ clash }: { clash: CurfewClash }) {
   const fail = (e: unknown) => snack(errorMessage(e));
   const when = `${fmtDate(localDateOf(new Date(clash.eventStartsAt)))}, ${fmtTime(clash.eventStartsAt)} – ${fmtTime(clash.eventEndsAt)}`;
   return (
-    <div className="flex gap-4 rounded-xl bg-error-container/50 px-4 py-3 text-on-surface">
+    <div className="flex gap-4 border-l-2 border-error py-1 pl-4 text-on-surface">
       <Icon name="event_busy" className="mt-0.5 text-on-surface-variant" />
       <div className="min-w-0 flex-1">
         <div className="text-title-medium">{clash.eventTitle}</div>

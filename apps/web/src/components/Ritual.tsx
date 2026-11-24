@@ -5,7 +5,7 @@ import { errorMessage } from "../api/client";
 import { useRel } from "../lib/relationship";
 import { CompleteDialog, isOpen, opensLabel } from "./OccurrenceCard";
 import { useQuickComplete } from "./TaskRow";
-import { Button, Dialog, Icon, cx, useSnackbar } from "./ui";
+import { Button, Diamond, Dialog, Icon, cx, useSnackbar } from "./ui";
 
 export const isRitual = (o: Occurrence) => o.steps.length > 0;
 
@@ -95,14 +95,14 @@ export function RitualDialog({ o, open, onClose }: { o: Occurrence; open: boolea
           </div>
           {!ready && <p className="text-body-medium text-on-surface-variant">This one {opensLabel(o)}.</p>}
           {current ? (
-            <div className="rounded-lg bg-primary-container px-5 py-6 text-on-primary-container">
-              <div className="text-label-large opacity-80">Step {index + 1}</div>
-              <div className="mt-1 text-headline-small">{current.title}</div>
+            <div className="rounded-md border border-primary bg-surface-container-lowest px-5 py-6 text-on-surface">
+              <div className="eyebrow">Step {index + 1}</div>
+              <div className="mt-2 font-serif text-[28px] leading-9">{current.title}</div>
             </div>
           ) : (
-            <div className="flex items-center gap-3 rounded-lg bg-primary-container px-5 py-6 text-on-primary-container">
-              <Icon name="check_circle" filled size={32} />
-              <div className="text-title-large">Every step done</div>
+            <div className="flex items-center gap-4 border-y border-outline-variant py-6 text-on-surface">
+              <Diamond state="done" size={18} className="mx-1" />
+              <div className="font-serif text-[28px] leading-9">Every step done</div>
             </div>
           )}
           <ol className="flex flex-col">

@@ -132,7 +132,10 @@ export function useCountTap() {
       {
         onSuccess: (res) => {
           if (onMet && readyToSend(res) && !readyToSend(o)) return onMet();
-          snack(`${o.title}: ${countLine(res)}`, { label: "Undo", onClick: () => count.mutate({ id: o.id, by: -1 }, { onError: (e) => snack(errorMessage(e)) }) });
+          snack(`${o.title}: ${countLine(res)}`, {
+            label: "Undo",
+            onClick: () => count.mutate({ id: o.id, by: -1 }, { onError: (e) => snack(errorMessage(e)) }),
+          });
         },
         onError: (e) => snack(errorMessage(e)),
       },
@@ -148,7 +151,13 @@ export function CountSheet({ o, open, onClose }: { o: Occurrence; open: boolean;
   const state = countState(o, n);
   const left = o.countMin != null ? o.countMin - n : 0;
   const hint =
-    state === "over" ? `Over by ${n - o.countMax!}; it counts as failed` : left > 0 ? `${left} more to go` : o.countMin == null ? "Done at the deadline if it stays here" : "Done";
+    state === "over"
+      ? `Over by ${n - o.countMax!}; it counts as failed`
+      : left > 0
+        ? `${left} more to go`
+        : o.countMin == null
+          ? "Done at the deadline if it stays here"
+          : "Done";
   return (
     <Dialog
       open={open}
@@ -159,7 +168,11 @@ export function CountSheet({ o, open, onClose }: { o: Occurrence; open: boolean;
           <Button variant="text" onClick={onClose}>
             Cancel
           </Button>
-          <Button busy={count.isPending} disabled={n === o.count} onClick={() => count.mutate({ id: o.id, to: n }, { onSuccess: onClose, onError: (e) => snack(errorMessage(e)) })}>
+          <Button
+            busy={count.isPending}
+            disabled={n === o.count}
+            onClick={() => count.mutate({ id: o.id, to: n }, { onSuccess: onClose, onError: (e) => snack(errorMessage(e)) })}
+          >
             Save
           </Button>
         </>
@@ -175,7 +188,7 @@ export function CountSheet({ o, open, onClose }: { o: Occurrence; open: boolean;
             aria-label="One fewer"
             disabled={n === 0}
             onClick={() => setN(n - 1)}
-            className="state-layer flex size-14 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container disabled:opacity-40"
+            className="state-layer flex size-14 items-center justify-center rounded-full border border-outline-variant bg-surface-container-lowest text-on-surface disabled:opacity-40"
           >
             <Icon name="remove" />
           </button>
@@ -186,7 +199,7 @@ export function CountSheet({ o, open, onClose }: { o: Occurrence; open: boolean;
             type="button"
             aria-label="One more"
             onClick={() => setN(n + 1)}
-            className="state-layer flex size-14 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container"
+            className="state-layer flex size-14 items-center justify-center rounded-full border border-outline-variant bg-surface-container-lowest text-on-surface"
           >
             <Icon name="add" />
           </button>

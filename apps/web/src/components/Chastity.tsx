@@ -31,7 +31,10 @@ export function fmtSpan(ms: number) {
 export const fmtMinutes = (minutes: number) => fmtSpan(Math.abs(minutes) * MIN);
 
 /** Lock-time choices for a consequence or reward; "" means it doesn't touch the lock. */
-export const LOCK_TIME_OPTIONS = [{ value: "", label: "None" }, ...[60, 180, 360, 720, 1440, 2880, 4320, 10080].map((m) => ({ value: String(m), label: fmtMinutes(m) }))];
+export const LOCK_TIME_OPTIONS = [
+  { value: "", label: "None" },
+  ...[60, 180, 360, 720, 1440, 2880, 4320, 10080].map((m) => ({ value: String(m), label: fmtMinutes(m) })),
+];
 
 /** "Sat, Oct 25 at 8:00 PM" */
 export function fmtLockTime(iso: string) {
@@ -57,7 +60,9 @@ function Ring({ frac, icon }: { frac: number | null; icon: string }) {
     <div className="relative size-[72px] shrink-0">
       <svg viewBox="0 0 72 72" className="absolute inset-0 -rotate-90">
         <circle cx="36" cy="36" r={r} fill="none" stroke="var(--md-secondary-container)" strokeWidth="6" />
-        {frac !== null && <circle cx="36" cy="36" r={r} fill="none" stroke="var(--md-primary)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${c * frac} ${c}`} />}
+        {frac !== null && (
+          <circle cx="36" cy="36" r={r} fill="none" stroke="var(--md-primary)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${c * frac} ${c}`} />
+        )}
       </svg>
       <div className="absolute inset-0 flex items-center justify-center text-primary">
         <Icon name={icon} filled />
@@ -168,8 +173,8 @@ function LockUp({ l, relock }: { l: ChastityLock; relock?: boolean }) {
       {keybox && (
         <>
           <p className="text-body-medium">
-            Scramble the keybox to a new code without looking, then photograph it. You won't see the code until you're released. {memberName(l.keyholderId)} can see it any time,
-            and a Red safe call shows it to you at once.
+            Scramble the keybox to a new code without looking, then photograph it. You won't see the code until you're released. {memberName(l.keyholderId)} can
+            see it any time, and a Red safe call shows it to you at once.
           </p>
           <KeyboxPicker photo={photo} onPhoto={setPhoto} />
         </>
@@ -180,7 +185,10 @@ function LockUp({ l, relock }: { l: ChastityLock; relock?: boolean }) {
           disabled={keybox && !photo}
           busy={lockUp.isPending}
           onClick={() =>
-            lockUp.mutate({ lockId: l.id, photo: photo ?? undefined }, { onSuccess: () => snack(relock ? "Relocked" : "You're locked"), onError: (e) => snack(errorMessage(e)) })
+            lockUp.mutate(
+              { lockId: l.id, photo: photo ?? undefined },
+              { onSuccess: () => snack(relock ? "Relocked" : "You're locked"), onError: (e) => snack(errorMessage(e)) },
+            )
           }
         >
           {relock ? "I've relocked" : "I'm locked"}
@@ -200,7 +208,13 @@ function KeyboxDialog({ l, onClose }: { l: ChastityLock; onClose(): void }) {
   return (
     <Dialog open onClose={onClose} title="Keybox code" actions={<Button onClick={onClose}>Close</Button>}>
       <div className="flex min-h-40 items-center justify-center">
-        {url.isLoading ? <Spinner /> : url.data ? <img src={url.data} alt="Keybox code" className="max-h-[60dvh] w-full rounded-md object-contain" /> : "The photo couldn't load."}
+        {url.isLoading ? (
+          <Spinner />
+        ) : url.data ? (
+          <img src={url.data} alt="Keybox code" className="max-h-[60dvh] w-full rounded-md object-contain" />
+        ) : (
+          "The photo couldn't load."
+        )}
       </div>
     </Dialog>
   );
@@ -249,7 +263,9 @@ function AskDialog({ l, kind, onClose }: { l: ChastityLock; kind: "release" | "b
                 </Chip>
               ))}
             </div>
-            <p className="text-body-small">The lock's clock keeps running. When the break is over, you relock{l.keyMode === "keybox" ? " and seal a new code" : ""}.</p>
+            <p className="text-body-small">
+              The lock's clock keeps running. When the break is over, you relock{l.keyMode === "keybox" ? " and seal a new code" : ""}.
+            </p>
           </>
         )}
         <TextField label={`Tell ${name} why (optional)`} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
@@ -281,7 +297,10 @@ function TimeDialog({ l, sign, onClose }: { l: ChastityLock; sign: 1 | -1; onClo
             onClick={() =>
               change.mutate(
                 { lockId: l.id, minutes: sign * minutes, note: note.trim() || undefined },
-                { onSuccess: () => (onClose(), snack(sign > 0 ? `Added ${fmtMinutes(minutes)}` : `Took off ${fmtMinutes(minutes)}`)), onError: (e) => snack(errorMessage(e)) },
+                {
+                  onSuccess: () => (onClose(), snack(sign > 0 ? `Added ${fmtMinutes(minutes)}` : `Took off ${fmtMinutes(minutes)}`)),
+                  onError: (e) => snack(errorMessage(e)),
+                },
               )
             }
           >
@@ -365,7 +384,11 @@ function ReleaseDialog({ l, onClose }: { l: ChastityLock; onClose(): void }) {
           <Button variant="text" onClick={onClose}>
             Keep locked
           </Button>
-          <Button variant="text" busy={end.isPending} onClick={() => end.mutate(l.id, { onSuccess: () => (onClose(), snack("Released")), onError: (e) => snack(errorMessage(e)) })}>
+          <Button
+            variant="text"
+            busy={end.isPending}
+            onClick={() => end.mutate(l.id, { onSuccess: () => (onClose(), snack("Released")), onError: (e) => snack(errorMessage(e)) })}
+          >
             Release
           </Button>
         </>
@@ -387,7 +410,7 @@ function AskToAnswer({ e, l }: { e: ChastityEvent; l: ChastityLock }) {
   const answer = (approve: boolean, m?: number) =>
     decide.mutate({ askId: e.id, approve, minutes: m }, { onSuccess: () => setChanging(false), onError: (err) => snack(errorMessage(err)) });
   return (
-    <div className="flex flex-col gap-2 rounded-xl bg-secondary-container px-4 py-4 text-on-secondary-container">
+    <div className="flex flex-col gap-2 rounded-md border border-primary bg-surface-container-lowest px-5 py-4 text-on-surface">
       <div className="text-title-medium">{e.kind === "break" ? `${name} asked for a hygiene break` : `${name} asked to be released`}</div>
       <p className="text-body-medium">
         {e.kind === "break"
@@ -442,7 +465,7 @@ export function LockCard({ l, events, page = false }: { l: ChastityLock; events:
   if (l.status === "pending") {
     if (wearer && !readOnly)
       return (
-        <div className="flex flex-col gap-2 rounded-xl bg-secondary-container px-4 py-4 text-on-secondary-container">
+        <div className="flex flex-col gap-2 rounded-md border border-primary bg-surface-container-lowest px-5 py-4 text-on-surface">
           <div className="text-title-medium">
             {memberName(l.keyholderId)} wants you locked{l.minutes ? ` for ${fmtMinutes(l.minutes)}` : l.timeHidden ? "" : " until they release you"}
           </div>
@@ -681,7 +704,9 @@ export function StartLockDialog({ wearers, onClose }: { wearers: Member[]; onClo
           </p>
         </div>
         {timed && <Switch checked={hide} onChange={setHide} label={`Hide the time left from ${name}`} help={`${name} sees only that they're locked`} />}
-        <p className="text-body-small">You can add or take off time later, and consequences and rewards can too. A Red safe call always shows {name} the keybox code.</p>
+        <p className="text-body-small">
+          You can add or take off time later, and consequences and rewards can too. A Red safe call always shows {name} the keybox code.
+        </p>
       </div>
     </Dialog>
   );

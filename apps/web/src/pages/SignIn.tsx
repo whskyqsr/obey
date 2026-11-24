@@ -84,8 +84,9 @@ export function SignInPage() {
           </div>
         ) : (
           <form onSubmit={dev} className="flex flex-col gap-4">
-            <div className="rounded-md bg-tertiary-container p-3 text-body-medium text-on-tertiary-container">
-              Dev sign-in: no Firebase config is set, so requests send <code>X-Dev-User</code>. Start the API at <code>{API_URL}</code> with <code>DEV_AUTH=1</code>.
+            <div className="rounded-lg border border-outline-variant bg-surface-container p-3 text-body-medium text-on-surface-variant">
+              Dev sign-in: no Firebase config is set, so requests send <code>X-Dev-User</code>. Start the API at <code>{API_URL}</code> with{" "}
+              <code>DEV_AUTH=1</code>.
             </div>
             <TextField
               label="User id (UUID)"
