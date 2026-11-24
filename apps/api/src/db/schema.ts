@@ -525,6 +525,15 @@ export const calendarEvents = pgTable(
     allDay: boolean("all_day").notNull().default(false),
     withPartner: boolean("with_partner").notNull().default(false),
     noteMd: text("note_md"),
+    /** Plans made as one repeating plan share this id; each repeat is its own row. */
+    seriesId: uuid("series_id"),
+    /** How the series repeats, kept on every row so each one can say so. */
+    repeat: jsonb("repeat").$type<{ every: "day" | "week" | "2weeks" | "month"; until: string; timezone: string }>(),
+    /** Tasks of the people the plan involves that fall due during it are excused, once this is approved. */
+    pauseTasks: boolean("pause_tasks").notNull().default(false),
+    /** asked: waiting on a Dominant; approved: tasks pause; declined: they don't. Null when pauseTasks is off. */
+    pauseStatus: text("pause_status").$type<"asked" | "approved" | "declined">(),
+    pauseDecidedBy: uuid("pause_decided_by").references(() => users.id, { onDelete: "set null" }),
     /** Tasks someone said are fine alongside this plan; they no longer count as clashes. */
     dismissedIds: jsonb("dismissed_ids").$type<string[]>().notNull().default([]),
     /** Someone other than the author changed the plan (a Dominant moving its end); the author is told until they've seen it. */
@@ -536,7 +545,7 @@ export const calendarEvents = pgTable(
     createdAt: createdAt(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
-  (t) => [index("calendar_events_relationship_idx").on(t.relationshipId, t.startsAt)],
+  (t) => [index("calendar_events_relationship_idx").on(t.relationshipId, t.startsAt), index("calendar_events_series_idx").on(t.seriesId)],
 );
 
 /** A named spot a Dominant saved, for location tasks. Arriving inside the radius counts. */

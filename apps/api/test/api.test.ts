@@ -1673,6 +1673,77 @@ describe("calendar events", () => {
     expect((await dom.post(`/events/${together.body.id}/dismiss`, { occurrenceIds: [timed.id] })).body.conflictIds).toEqual([]);
     expect((await sub.get(`/relationships/${relId}/events?from=2026-10-16&to=2026-10-16`)).body.every((e: { conflictIds: string[] }) => !e.conflictIds.length)).toBe(true);
   });
+  it("makes each repeat of a repeating plan its own plan, at the same local time across DST", async () => {
+    const { sub, relId } = await ctx.pair();
+    const weekly = { every: "week", until: "2026-11-06", timezone: NY };
+    const made = await sub.post(`/relationships/${relId}/events`, { title: "Work", startsAt: "2026-10-16T19:00:00-04:00", endsAt: "2026-10-16T23:00:00-04:00", repeat: weekly });
+    expect(made.status).toBe(201);
+    expect(made.body).toMatchObject({ startsAt: "2026-10-16T23:00:00.000Z", repeat: weekly });
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Sub added a repeating plan on the calendar");
+    const list = async () => (await sub.get(`/relationships/${relId}/events?from=2026-10-15&to=2026-11-30`)).body as { id: string; startsAt: string; endsAt: string; seriesId: string }[];
+    const all = await list();
+    // Clocks go back on Nov 1 in New York; 7 PM stays 7 PM.
+    expect(all.map((e) => e.startsAt)).toEqual(["2026-10-16T23:00:00.000Z", "2026-10-23T23:00:00.000Z", "2026-10-30T23:00:00.000Z", "2026-11-07T00:00:00.000Z"]);
+    expect(new Set(all.map((e) => e.seriesId)).size).toBe(1);
+
+    // "This and later ones" carries the edit forward; earlier ones stay put.
+    const moved = await sub.patch(`/events/${all[1]!.id}`, { title: "Late shift", startsAt: "2026-10-23T20:00:00-04:00", endsAt: "2026-10-24T00:00:00-04:00", applyTo: "following" });
+    expect(moved.status).toBe(200);
+    const after = await list();
+    expect(after.map((e) => e.startsAt)).toEqual(["2026-10-16T23:00:00.000Z", "2026-10-24T00:00:00.000Z", "2026-10-31T00:00:00.000Z", "2026-11-07T01:00:00.000Z"]);
+    expect(after.at(-1)!.endsAt).toBe("2026-11-07T05:00:00.000Z");
+    // Just this one leaves the rest alone.
+    await sub.patch(`/events/${after[0]!.id}`, { title: "Off early" });
+    expect((await list()).map((e) => (e as unknown as { title: string }).title)).toEqual(["Off early", "Late shift", "Late shift", "Late shift"]);
+
+    expect((await sub.del(`/events/${after[2]!.id}?following=1`)).status).toBe(204);
+    expect((await list()).length).toBe(2);
+
+    // Too many repeats, or an end before the start, is refused.
+    const daily = { title: "Walk", startsAt: "2026-10-16T08:00:00-04:00", endsAt: "2026-10-16T09:00:00-04:00" };
+    expect((await sub.post(`/relationships/${relId}/events`, { ...daily, repeat: { every: "day", until: "2027-10-16", timezone: NY } })).status).toBe(400);
+    expect((await sub.post(`/relationships/${relId}/events`, { ...daily, repeat: { every: "day", until: "2026-10-15", timezone: NY } })).status).toBe(400);
+  });
+  it("pauses tasks during a plan once a Dominant says so, and excuses them", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    await dom.post(`/relationships/${relId}/tasks`, task(subId)); // 21:00 New York on the 16th
+    const occ = async () => (await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body[0];
+    const night = { title: "Night out", startsAt: "2026-10-16T19:00:00-04:00", endsAt: "2026-10-16T23:00:00-04:00", pauseTasks: true };
+
+    const asked = await sub.post(`/relationships/${relId}/events`, night);
+    expect(asked.body).toMatchObject({ pauseTasks: true, pauseStatus: "asked" });
+    expect(asked.body.conflictIds).toHaveLength(1);
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Sub added a plan on the calendar and asks to pause tasks during Night out");
+    expect((await dom.get(`/relationships/${relId}/events/pause-asks`)).body.map((e: { id: string }) => e.id)).toEqual([asked.body.id]);
+    expect((await sub.get(`/relationships/${relId}/events/pause-asks`)).body).toEqual([]);
+    expect((await sub.post(`/events/${asked.body.id}/pause`, { approve: true })).status).toBe(403);
+
+    const ok = await dom.post(`/events/${asked.body.id}/pause`, { approve: true });
+    expect(ok.body).toMatchObject({ pauseStatus: "approved", conflictIds: [] });
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Dom OK'd pausing your tasks during Night out");
+    expect((await dom.post(`/events/${asked.body.id}/pause`, { approve: false })).status).toBe(409);
+
+    // Moving it asks again; a Dominant's own paused plan needs no one's OK.
+    expect((await sub.patch(`/events/${asked.body.id}`, { endsAt: "2026-10-16T23:30:00-04:00" })).body.pauseStatus).toBe("asked");
+    await dom.post(`/events/${asked.body.id}/pause`, { approve: true });
+    expect((await dom.post(`/relationships/${relId}/events`, { ...night, title: "Dinner" })).body.pauseStatus).toBe("approved");
+
+    ctx.clock.now = new Date("2026-10-17T02:01:00Z");
+    await runJobs(ctx.db, ctx.notifier, ctx.clock.now, { materializeDays: 14, reminderLeadMinutes: 30 });
+    expect((await occ()).status).toBe("excused");
+    ctx.clock.now = new Date("2026-10-16T12:00:00Z");
+  });
+  it("leaves tasks due when a Dominant says no to pausing them", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    await dom.post(`/relationships/${relId}/tasks`, task(subId));
+    const asked = await sub.post(`/relationships/${relId}/events`, { title: "Night out", startsAt: "2026-10-16T19:00:00-04:00", endsAt: "2026-10-16T23:00:00-04:00", pauseTasks: true });
+    expect((await dom.post(`/events/${asked.body.id}/pause`, { approve: false })).body).toMatchObject({ pauseStatus: "declined" });
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Dom said no to pausing your tasks during Night out");
+    ctx.clock.now = new Date("2026-10-17T02:01:00Z");
+    await runJobs(ctx.db, ctx.notifier, ctx.clock.now, { materializeDays: 14, reminderLeadMinutes: 30 });
+    expect((await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body[0].status).toBe("missed");
+    ctx.clock.now = new Date("2026-10-16T12:00:00Z");
+  });
 
   describe("email verification", () => {
     it("keeps unconfirmed email sign-ups out until they verify, but lets them ask for the email", async () => {

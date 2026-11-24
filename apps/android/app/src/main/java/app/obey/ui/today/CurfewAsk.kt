@@ -266,6 +266,32 @@ fun PlanEndSheet(clash: CurfewClash, to: String, busy: Boolean, onDismiss: () ->
     }
 }
 
+/** A plan someone asked to pause their tasks during: pause them, or not. */
+@Composable
+fun PauseAskCard(event: CalendarEvent, onAnswer: (Boolean) -> Unit) {
+    val c = MaterialTheme.colorScheme
+    Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column {
+            Text(event.title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "${parseInstant(event.startsAt).local().format(planDay)}, ${formatTime(event.startsAt)} – ${formatTime(event.endsAt)}" +
+                    (event.repeat?.let { " · " + app.obey.ui.plans.repeatLine(it.every, java.time.LocalDate.parse(it.until)) } ?: ""),
+                style = MaterialTheme.typography.bodyMedium,
+                color = c.onSurfaceVariant,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            app.obey.ui.common.Button(onClick = { onAnswer(true) }) { Text("Pause them") }
+            androidx.compose.material3.OutlinedButton(
+                onClick = { onAnswer(false) },
+                shape = MaterialTheme.shapes.small,
+                border = androidx.compose.foundation.BorderStroke(1.dp, c.onSurface),
+                colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = c.onSurface),
+            ) { Text("Not now") }
+        }
+    }
+}
+
 /** One of my plans someone else changed, until I close it. */
 @Composable
 fun PlanChangeCard(event: CalendarEvent, name: String, onSeen: () -> Unit) {

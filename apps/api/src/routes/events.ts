@@ -1,12 +1,14 @@
-import { and, eq, gt, gte, isNotNull, isNull, lt, ne } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, isNotNull, isNull, lt, ne } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { moveLike } from "@obey/recurrence";
 import { calendarEventInput, plainDate } from "@obey/contracts";
 import type { Deps } from "../app.js";
 import type { Tx } from "../db/index.js";
 import { calendarEvents, curfewRequests, memberships, occurrences, relationships, taskSeries, users } from "../db/schema.js";
 import { HttpError, forbidden, notFound } from "../errors.js";
 import { canManage, requireMember } from "../services/access.js";
+import { repeatsOf } from "../services/plans.js";
 import { nightForPlan } from "../services/curfew.js";
 import { sendWithWords } from "../notify.js";
 
@@ -50,7 +52,12 @@ const eventDto = (e: Event, due: Due[]) => ({
   allDay: e.allDay,
   withPartner: e.withPartner,
   noteMd: e.noteMd,
-  conflictIds: clashes(e, due).map((o) => o.id),
+  seriesId: e.seriesId,
+  repeat: e.repeat ?? null,
+  pauseTasks: e.pauseTasks,
+  pauseStatus: e.pauseStatus ?? null,
+  // Tasks a plan has paused are excused, so they don't clash with it.
+  conflictIds: e.pauseStatus === "approved" ? [] : clashes(e, due).map((o) => o.id),
   changedBy: e.changedBy,
   previousEndsAt: e.previousEndsAt?.toISOString() ?? null,
   changeNote: e.changeNote,
@@ -83,17 +90,21 @@ export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   }
 
   /** Tells the partner, and says when the plan runs into their tasks so they can move them. */
-  async function tellPartners(e: Event, authorName: string, verb: "added" | "moved") {
+  async function tellPartners(e: Event, authorName: string, verb: "added" | "moved" | "changed", repeating = false) {
     const others = await db
       .select({ userId: memberships.userId })
       .from(memberships)
       .where(and(eq(memberships.relationshipId, e.relationshipId), ne(memberships.userId, e.authorId)));
     const due = clashes(e, await pendingBetween(db, e.relationshipId, e.startsAt, e.endsAt));
+    const asks = e.pauseStatus === "asked";
     for (const { userId } of others) {
-      const theirs = due.filter((o) => o.assigneeId === userId).length;
+      const theirs = asks || e.pauseStatus === "approved" ? 0 : due.filter((o) => o.assigneeId === userId).length;
+      const what = `${repeating ? "a repeating plan" : "a plan"} on the calendar`;
       await notifier.send([userId], {
         title: "Fealty",
-        body: `${authorName} ${verb} a plan on the calendar${theirs ? `; it overlaps ${theirs === 1 ? "one of your tasks" : `${theirs} of your tasks`}` : ""}`,
+        body: asks
+          ? `${authorName} ${verb} ${what} and asks to pause tasks during ${e.title}`
+          : `${authorName} ${verb} ${what}${theirs ? `; it overlaps ${theirs === 1 ? "one of your tasks" : `${theirs} of your tasks`}` : ""}`,
         data: { type: "event_changed", eventId: e.id },
       });
     }
@@ -118,23 +129,36 @@ export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   });
 
   app.post<{ Params: { id: string } }>("/relationships/:id/events", async (req, reply) => {
-    await requireMember(db, req.params.id, req.user.id);
+    const me = await requireMember(db, req.params.id, req.user.id);
     const body = calendarEventInput.parse(req.body);
-    const [e] = await db
+    const start = new Date(body.startsAt);
+    const end = new Date(body.endsAt);
+    const times = body.repeat ? repeatsOf(start, end, body.repeat) : [{ startsAt: start, endsAt: end }];
+    const seriesId = body.repeat ? crypto.randomUUID() : null;
+    // A Dominant's own pause needs no one's OK; anyone else's waits on a Dominant.
+    const pause = body.pauseTasks ? (canManage(me.role) ? { pauseStatus: "approved" as const, pauseDecidedBy: req.user.id } : { pauseStatus: "asked" as const, pauseDecidedBy: null }) : { pauseStatus: null, pauseDecidedBy: null };
+    const rows = await db
       .insert(calendarEvents)
-      .values({
-        relationshipId: req.params.id,
-        authorId: req.user.id,
-        title: body.title,
-        startsAt: new Date(body.startsAt),
-        endsAt: new Date(body.endsAt),
-        allDay: body.allDay,
-        withPartner: body.withPartner,
-        noteMd: body.noteMd?.trim() || null,
-      })
+      .values(
+        times.map((t) => ({
+          relationshipId: req.params.id,
+          authorId: req.user.id,
+          title: body.title,
+          startsAt: t.startsAt,
+          endsAt: t.endsAt,
+          allDay: body.allDay,
+          withPartner: body.withPartner,
+          noteMd: body.noteMd?.trim() || null,
+          seriesId,
+          repeat: body.repeat ?? null,
+          pauseTasks: body.pauseTasks,
+          ...pause,
+        })),
+      )
       .returning();
-    await tellPartners(e!, req.user.displayName, "added");
-    return reply.status(201).send(await withConflicts(e!));
+    const first = rows.reduce((a, b) => (b.startsAt < a.startsAt ? b : a));
+    await tellPartners(first, req.user.displayName, "added", rows.length > 1);
+    return reply.status(201).send(await withConflicts(first));
   });
 
   app.patch<{ Params: { id: string } }>("/events/:id", async (req) => {
@@ -183,7 +207,9 @@ export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       return withConflicts(e!);
     }
     const current = found;
-    // Validate the merged event, so moving only the start can't put it after the end.
+    const { applyTo, ...changes } = { applyTo: "one", ...(req.body as object) } as { applyTo?: unknown } & Record<string, unknown>;
+    const following = z.enum(["one", "following"]).nullish().parse(applyTo) === "following" && current.seriesId !== null;
+    // Validate the merged event, so moving only the start can't put it after the end. A plan's repeat is set when it's made.
     const body = calendarEventInput.parse({
       title: current.title,
       startsAt: current.startsAt.toISOString(),
@@ -191,29 +217,55 @@ export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       allDay: current.allDay,
       withPartner: current.withPartner,
       noteMd: current.noteMd,
-      ...(req.body as object),
+      pauseTasks: current.pauseTasks,
+      ...changes,
+      repeat: undefined,
     });
-    const [e] = await db
-      .update(calendarEvents)
-      .set({
-        title: body.title,
-        startsAt: new Date(body.startsAt),
-        endsAt: new Date(body.endsAt),
-        allDay: body.allDay,
-        withPartner: body.withPartner,
-        noteMd: body.noteMd?.trim() || null,
-        // The author's own edit settles any change made for them.
-        changedBy: null,
-        previousEndsAt: null,
-        changeSeenAt: null,
-        changeNote: null,
-        updatedAt: deps.now(),
-      })
-      .where(eq(calendarEvents.id, current.id))
-      .returning();
-    const moved = e!.startsAt.getTime() !== current.startsAt.getTime() || e!.endsAt.getTime() !== current.endsAt.getTime();
-    if (moved) await tellPartners(e!, req.user.displayName, "moved");
-    return withConflicts(e!);
+    const start = new Date(body.startsAt);
+    const end = new Date(body.endsAt);
+    const moved = start.getTime() !== current.startsAt.getTime() || end.getTime() !== current.endsAt.getTime();
+    // A paused plan that moves or takes in the partner is asked about again; a Dominant's own is fine as it is.
+    const reask = body.pauseTasks && (!current.pauseTasks || current.pauseStatus === "declined" || moved || body.withPartner !== current.withPartner);
+    const pause = !body.pauseTasks
+      ? { pauseStatus: null, pauseDecidedBy: null }
+      : canManage(m.role)
+        ? { pauseStatus: "approved" as const, pauseDecidedBy: req.user.id }
+        : reask
+          ? { pauseStatus: "asked" as const, pauseDecidedBy: null }
+          : {};
+    const shared = {
+      title: body.title,
+      allDay: body.allDay,
+      withPartner: body.withPartner,
+      noteMd: body.noteMd?.trim() || null,
+      pauseTasks: body.pauseTasks,
+      ...pause,
+      // The author's own edit settles any change made for them.
+      changedBy: null,
+      previousEndsAt: null,
+      changeSeenAt: null,
+      changeNote: null,
+      updatedAt: deps.now(),
+    };
+    const e = await db.transaction(async (tx) => {
+      const [e] = await tx.update(calendarEvents).set({ ...shared, startsAt: start, endsAt: end }).where(eq(calendarEvents.id, current.id)).returning();
+      if (following) {
+        const later = await tx
+          .select()
+          .from(calendarEvents)
+          .where(and(eq(calendarEvents.seriesId, current.seriesId!), gt(calendarEvents.startsAt, current.startsAt), ne(calendarEvents.id, current.id)));
+        const zone = current.repeat?.timezone ?? "UTC";
+        for (const r of later) {
+          await tx
+            .update(calendarEvents)
+            .set({ ...shared, startsAt: moveLike(r.startsAt, current.startsAt, start, zone), endsAt: moveLike(r.endsAt, current.endsAt, end, zone) })
+            .where(eq(calendarEvents.id, r.id));
+        }
+      }
+      return e!;
+    });
+    if (moved || (reask && e.pauseStatus === "asked")) await tellPartners(e, req.user.displayName, moved ? "moved" : "changed");
+    return withConflicts(e);
   });
 
   /** "That's fine": either partner keeps a clashing task as it is, and it stops counting as a clash. A "Just me" plan still clashes with tasks the partner may manage. */
@@ -257,9 +309,65 @@ export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     return reply.status(204).send();
   });
 
-  app.delete<{ Params: { id: string } }>("/events/:id", async (req, reply) => {
+  /** ?following=1 also removes the later plans of a repeating plan. */
+  app.delete<{ Params: { id: string }; Querystring: { following?: string } }>("/events/:id", async (req, reply) => {
     const e = await loadOwn(req.params.id, req.user.id);
-    await db.delete(calendarEvents).where(eq(calendarEvents.id, e.id));
+    if (req.query.following === "1" && e.seriesId) {
+      await db.delete(calendarEvents).where(and(eq(calendarEvents.seriesId, e.seriesId), gte(calendarEvents.startsAt, e.startsAt)));
+    } else {
+      await db.delete(calendarEvents).where(eq(calendarEvents.id, e.id));
+    }
     return reply.status(204).send();
+  });
+
+  /** Plans someone asked to pause their tasks during, for a Dominant to answer; one per repeating plan. */
+  app.get<{ Params: { id: string } }>("/relationships/:id/events/pause-asks", async (req) => {
+    const m = await requireMember(db, req.params.id, req.user.id);
+    if (!canManage(m.role)) return [];
+    const rows = await db
+      .select()
+      .from(calendarEvents)
+      .where(
+        and(
+          eq(calendarEvents.relationshipId, req.params.id),
+          eq(calendarEvents.pauseStatus, "asked"),
+          ne(calendarEvents.authorId, req.user.id),
+          gt(calendarEvents.endsAt, deps.now()),
+        ),
+      )
+      .orderBy(calendarEvents.startsAt);
+    const seen = new Set<string>();
+    return rows.filter((e) => (e.seriesId ? !seen.has(e.seriesId) && !!seen.add(e.seriesId) : true)).map((e) => eventDto(e, []));
+  });
+
+  /** A Dominant answers an ask to pause tasks during a plan; for a repeating plan, every repeat still asking. */
+  app.post<{ Params: { id: string } }>("/events/:id/pause", async (req) => {
+    const { approve } = z.object({ approve: z.boolean() }).parse(req.body);
+    if (!z.string().uuid().safeParse(req.params.id).success) throw notFound();
+    const [e] = await db.select().from(calendarEvents).where(eq(calendarEvents.id, req.params.id));
+    if (!e) throw notFound();
+    const m = await requireMember(db, e.relationshipId, req.user.id);
+    if (!canManage(m.role)) throw forbidden("only a Dominant can answer this");
+    if (e.authorId === req.user.id) throw forbidden("someone else answers your own ask");
+    if (e.pauseStatus !== "asked") throw new HttpError(409, "this has already been answered");
+    const ids = e.seriesId
+      ? (
+          await db
+            .select({ id: calendarEvents.id })
+            .from(calendarEvents)
+            .where(and(eq(calendarEvents.seriesId, e.seriesId), eq(calendarEvents.pauseStatus, "asked")))
+        ).map((r) => r.id)
+      : [e.id];
+    await db
+      .update(calendarEvents)
+      .set({ pauseStatus: approve ? "approved" : "declined", pauseDecidedBy: req.user.id, updatedAt: deps.now() })
+      .where(inArray(calendarEvents.id, ids));
+    await notifier.send([e.authorId], {
+      title: "Fealty",
+      body: approve ? `${req.user.displayName} OK'd pausing your tasks during ${e.title}` : `${req.user.displayName} said no to pausing your tasks during ${e.title}`,
+      data: { type: "event_changed", eventId: e.id },
+    });
+    const [updated] = await db.select().from(calendarEvents).where(eq(calendarEvents.id, e.id));
+    return withConflicts(updated!);
   });
 };

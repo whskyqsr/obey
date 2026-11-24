@@ -18,6 +18,7 @@ import app.obey.ui.plans.iso
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.PauseCircle
 import androidx.compose.material.icons.outlined.EventBusy
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Gavel
@@ -105,6 +106,7 @@ fun TodayScreen(
     var approvingOther by remember { mutableStateOf<app.obey.api.CurfewRequest?>(null) }
     var changingEnd by remember { mutableStateOf<app.obey.api.CurfewClash?>(null) }
     val planChanges by vm.planChanges.collectAsStateWithLifecycle()
+    val pauseAsks by vm.pauseAsks.collectAsStateWithLifecycle()
     val delays by vm.delays.collectAsStateWithLifecycle()
     val redemptions by vm.redemptions.collectAsStateWithLifecycle()
     val agreement by vm.agreement.collectAsStateWithLifecycle()
@@ -421,6 +423,17 @@ fun TodayScreen(
                             body = {
                                 delays.forEach { x -> DelayCard(x, session?.nameOf(x.requestedBy) ?: "Your partner") { vm.seenDelay(x) } }
                             },
+                        ),
+                    )
+                    if (pauseAsks.isNotEmpty()) add(
+                        InboxGroup(
+                            key = "pause",
+                            icon = Icons.Outlined.PauseCircle,
+                            tone = InboxTone.Tertiary,
+                            title = if (pauseAsks.map { it.authorId }.toSet().size == 1) "${nameOr(pauseAsks[0].authorId)} asks to pause tasks" else "Asks to pause tasks",
+                            subtitle = pauseAsks.joinToString(", ") { it.title },
+                            count = pauseAsks.size,
+                            body = { pauseAsks.forEach { e -> PauseAskCard(e) { approve -> vm.answerPause(e, approve) } } },
                         ),
                     )
                     if (planChanges.isNotEmpty()) add(

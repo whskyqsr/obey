@@ -191,21 +191,36 @@ class PlanViewModel @Inject constructor(
     }
 
     /** [ask] asks for that night's curfew to move to the plan's end once the plan is saved. */
-    fun save(id: String?, input: CalendarEventInput, ask: Pair<app.obey.api.CurfewCheckNight, String?>? = null, who: String = "", onSaved: (CalendarEvent) -> Unit) = action {
+    fun save(
+        id: String?,
+        input: CalendarEventInput,
+        ask: Pair<app.obey.api.CurfewCheckNight, String?>? = null,
+        who: String = "",
+        asksPause: Boolean = false,
+        onSaved: (CalendarEvent) -> Unit,
+    ) = action {
         val e = if (id == null) api.createEvent(sessions.requireRelationshipId(), input) else api.updateEvent(id, input)
         val done = if (id == null) "Plan added" else "Plan updated"
         if (ask != null) {
             api.askCurfew(sessions.requireRelationshipId(), app.obey.api.CurfewRequestInput(ask.first.occurrenceId, e.endsAt, ask.second, e.id))
             say("$done. Asked $who.")
-        } else if (e.conflictIds.isEmpty()) say(done)
+        } else if (asksPause && e.pauseStatus == "asked") say("$done. Asked $who.")
+        else if (e.conflictIds.isEmpty()) say(done)
         loadClashes(e)
         onSaved(e)
     }
 
-    fun delete(e: CalendarEvent, onDone: () -> Unit) = action {
-        api.deleteEvent(e.id)
-        say("Plan removed")
+    fun delete(e: CalendarEvent, following: Boolean = false, onDone: () -> Unit) = action {
+        api.deleteEvent(e.id, if (following) "1" else null)
+        say(if (following) "Plans removed" else "Plan removed")
         onDone()
+    }
+
+    /** A Dominant pausing the tasks during someone's plan, or not. */
+    fun answerPause(e: CalendarEvent, approve: Boolean, onDone: (CalendarEvent) -> Unit) = action {
+        val updated = api.answerPause(e.id, app.obey.api.PauseAnswerInput(approve))
+        say(if (approve) "Tasks paused" else "Tasks stay on")
+        onDone(updated)
     }
 
     /** Each clashing task its own way: kept as it is (the clash is dismissed), moved or called off, in one go. */
@@ -293,14 +308,31 @@ private data class Draft(
     val startDay: LocalDate,
     val endDay: LocalDate,
     val note: String,
+    /** "day", "week", "2weeks" or "month" until a date; set only on a new plan. */
+    val every: String? = null,
+    val until: LocalDate? = null,
+    val pause: Boolean = false,
+    /** Editing one plan of a repeating plan: just it, or it and the later ones. */
+    val following: Boolean = false,
 ) {
     val valid get() = title.isNotBlank() && if (allDay) !endDay.isBefore(startDay) else end.isAfter(start)
+    val firstDay: LocalDate get() = if (allDay) startDay else start.toLocalDate()
 
-    fun toInput(): CalendarEventInput {
+    fun times(): Pair<String, String> {
         val zone = ZoneId.systemDefault()
-        return if (allDay) CalendarEventInput(
-            title.trim(), startDay.atStartOfDay(zone).iso(), endDay.plusDays(1).atStartOfDay(zone).iso(), true, withPartner, note.trim().ifEmpty { null },
-        ) else CalendarEventInput(title.trim(), start.atZone(zone).iso(), end.atZone(zone).iso(), false, withPartner, note.trim().ifEmpty { null })
+        return if (allDay) startDay.atStartOfDay(zone).iso() to endDay.plusDays(1).atStartOfDay(zone).iso()
+        else start.atZone(zone).iso() to end.atZone(zone).iso()
+    }
+
+    fun toInput(isNew: Boolean, repeating: Boolean): CalendarEventInput {
+        val zone = ZoneId.systemDefault()
+        val (s, e) = times()
+        return CalendarEventInput(
+            title.trim(), s, e, allDay, withPartner, note.trim().ifEmpty { null },
+            pauseTasks = pause,
+            repeat = if (isNew && every != null && until != null) app.obey.api.PlanRepeat(every, until.toString(), zone.id) else null,
+            applyTo = if (repeating) (if (following) "following" else "one") else null,
+        )
     }
 
     companion object {
@@ -308,7 +340,10 @@ private data class Draft(
             if (e != null) {
                 val s = parseInstant(e.startsAt).local().toLocalDateTime()
                 val en = parseInstant(e.endsAt).local().toLocalDateTime()
-                return Draft(e.title, e.allDay, e.withPartner, s, en, e.firstDay(), e.lastDay(), e.noteMd.orEmpty())
+                return Draft(
+                    e.title, e.allDay, e.withPartner, s, en, e.firstDay(), e.lastDay(), e.noteMd.orEmpty(),
+                    every = e.repeat?.every, until = e.repeat?.until?.let(LocalDate::parse), pause = e.pauseTasks,
+                )
             }
             // Evening by default; later today if the evening has started.
             val hour = if (day == LocalDate.now()) maxOf(18, LocalTime.now().hour + 1) else 18
@@ -361,6 +396,7 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
             return
         }
         val c = MaterialTheme.colorScheme
+        var removing by remember { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = onDismiss,
             containerColor = c.surface,
@@ -368,14 +404,44 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(current.whenLabel() + if (current.withPartner) " · both of you" else "", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
+                    current.repeat?.let { Text(repeatLine(it.every, LocalDate.parse(it.until)), style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant) }
                     current.noteMd?.let { Text(it, Modifier.fillMaxWidth().drawBehind { drawRect(c.outlineVariant, size = androidx.compose.ui.geometry.Size(2.dp.toPx(), size.height)) }.padding(start = 12.dp)) }
+                    if (current.pauseTasks) {
+                        val line = when (current.pauseStatus) {
+                            "approved" -> "Tasks during it are paused."
+                            "asked" -> if (mine) "Waiting for $askWho to pause tasks during it." else "${session?.nameOf(current.authorId) ?: "They"} asks to pause tasks during it."
+                            else -> if (mine) "$askWho said no to pausing tasks during it." else "You said no to pausing tasks during it."
+                        }
+                        Text(line, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
+                    }
+                    if (!mine && session?.canManage == true && current.pauseStatus == "asked") {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            app.obey.ui.common.Button(onClick = { vm.answerPause(current, true) { saved = it; onChanged() } }, enabled = !busy) { Text("Pause them") }
+                            OutlinedButton(
+                                onClick = { vm.answerPause(current, false) { saved = it; onChanged() } },
+                                enabled = !busy,
+                                shape = MaterialTheme.shapes.small,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, c.onSurface),
+                                colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = c.onSurface),
+                            ) { Text("Not now") }
+                        }
+                    }
                     pending?.let { WaitingOn(askWho, it) }
+                    if (removing) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            app.obey.ui.common.Eyebrow("Remove")
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                app.obey.ui.common.LettersChip("This one", false, { vm.delete(current) { onChanged(); onDismiss() } })
+                                app.obey.ui.common.LettersChip("This and later ones", false, { vm.delete(current, following = true) { onChanged(); onDismiss() } })
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = { Button(onClick = onDismiss) { Text("Done") } },
             dismissButton = {
                 if (mine) Row {
-                    TextButton(onClick = { vm.delete(current) { onChanged(); onDismiss() } }, enabled = !busy) {
+                    TextButton(onClick = { if (current.seriesId != null) removing = !removing else vm.delete(current) { onChanged(); onDismiss() } }, enabled = !busy) {
                         Text("Remove", color = c.error)
                     }
                     TextButton(onClick = { draft = Draft.of(current, day); editing = true }) { Text("Edit", color = c.onSurface) }
@@ -398,6 +464,12 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
     val canAsk = n != null && draft.end.atZone(zone).toInstant().isBefore(parseInstant(n.endsAt))
     // Running past curfew asks by default (mockup 14); "End at" pulls the plan back to curfew instead.
     val willAsk = canAsk
+    // A submissive's pause waits on a Dominant, again whenever the plan moves or takes in the partner.
+    val (newStart, newEnd) = draft.times()
+    val moved = current != null && (parseInstant(current.startsAt) != parseInstant(newStart) || parseInstant(current.endsAt) != parseInstant(newEnd))
+    val asksPause = draft.pause && session?.canManage != true &&
+        (current == null || !current.pauseTasks || current.pauseStatus == "declined" || moved || current.withPartner != draft.withPartner)
+    var choosingRepeat by remember { mutableStateOf(false) }
     val c = MaterialTheme.colorScheme
     androidx.compose.ui.window.Dialog(
         onDismissRequest = { if (current == null) onDismiss() else editing = false },
@@ -428,7 +500,7 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
                         modifier = Modifier.weight(1.3f).height(48.dp),
                         onClick = {
                             val ask = if (willAsk && n != null) n to askReason.trim().ifEmpty { null } else null
-                            vm.save(current?.id, draft.toInput(), ask, askWho) { e ->
+                            vm.save(current?.id, draft.toInput(current == null, current?.seriesId != null), ask, askWho, asksPause) { e ->
                                 onChanged()
                                 if (e.conflictIds.isEmpty()) onDismiss()
                                 else {
@@ -438,7 +510,7 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
                                 }
                             }
                         },
-                    ) { Text(if (willAsk) "Save and ask $askWho" else "Save", maxLines = 1) }
+                    ) { Text(if (willAsk || asksPause) "Save and ask $askWho" else "Save", maxLines = 1) }
                 }
             },
         ) { padding ->
@@ -469,6 +541,22 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
                             },
                             check = true,
                         )
+                        if (current == null) app.obey.ui.common.LettersChip(
+                            if (draft.every != null && draft.until != null) repeatLine(draft.every!!, draft.until!!) else "Repeats",
+                            draft.every != null,
+                            { choosingRepeat = true },
+                            check = true,
+                        )
+                        app.obey.ui.common.LettersChip("Pause tasks during it", draft.pause, { draft = draft.copy(pause = !draft.pause) }, check = true)
+                    }
+                }
+                if (current?.seriesId != null) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        app.obey.ui.common.Eyebrow("Change")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            app.obey.ui.common.LettersChip("This one", !draft.following, { draft = draft.copy(following = false) })
+                            app.obey.ui.common.LettersChip("This and later ones", draft.following, { draft = draft.copy(following = true) })
+                        }
                     }
                 }
                 LettersField(
@@ -481,12 +569,38 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
         }
     }
 
+    if (choosingRepeat) {
+        AlertDialog(
+            onDismissRequest = { choosingRepeat = false },
+            containerColor = c.surface,
+            title = { Text("Repeats", style = MaterialTheme.typography.headlineSmall) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        EVERY.forEach { (k, label) ->
+                            app.obey.ui.common.LettersChip(label, draft.every == k, {
+                                val keep = draft.until?.takeIf { !it.isBefore(draft.firstDay) }
+                                draft = draft.copy(every = k, until = keep ?: draft.firstDay.plusDays(DEFAULT_RUN.getValue(k)))
+                            })
+                        }
+                    }
+                    draft.until?.let { u ->
+                        if (draft.every != null) TextButton(onClick = { picking = "until" }) { Text("Until ${formatDate(u)}", color = c.primary) }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { choosingRepeat = false }) { Text("Done", color = c.primary) } },
+            dismissButton = { TextButton(onClick = { draft = draft.copy(every = null, until = null); choosingRepeat = false }) { Text("Doesn't repeat", color = c.onSurface) } },
+        )
+    }
+
     when (val p = picking) {
-        "startDay", "endDay", "startDate", "endDate" -> {
+        "startDay", "endDay", "startDate", "endDate", "until" -> {
             val initial = when (p) {
                 "startDay" -> draft.startDay
                 "endDay" -> draft.endDay
                 "startDate" -> draft.start.toLocalDate()
+                "until" -> draft.until ?: draft.firstDay
                 else -> draft.end.toLocalDate()
             }
             val state = rememberDatePickerState(initialSelectedDateMillis = initial.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
@@ -500,6 +614,7 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
                                 "startDay" -> draft.copy(startDay = d, endDay = if (d.isAfter(draft.endDay)) d else draft.endDay)
                                 "endDay" -> draft.copy(endDay = d)
                                 "startDate" -> draft.moveStart(d.atTime(draft.start.toLocalTime()))
+                                "until" -> if (d.isBefore(draft.firstDay)) draft else draft.copy(until = d)
                                 else -> draft.copy(end = d.atTime(draft.end.toLocalTime()))
                             }
                         }
@@ -587,6 +702,13 @@ private class ClashPlan(items: List<Occurrence>, session: Session, private val e
 }
 
 /** "11:00" from "11:00 PM": a time whose half of the day is already plain. */
+private val EVERY = linkedMapOf("day" to "Every day", "week" to "Every week", "2weeks" to "Every 2 weeks", "month" to "Every month")
+/** How far a new repeat runs before they pick an end. */
+private val DEFAULT_RUN = mapOf("day" to 13L, "week" to 49L, "2weeks" to 98L, "month" to 151L)
+
+/** "Every week until Tue, Jan 12". */
+fun repeatLine(every: String, until: LocalDate) = "${EVERY[every] ?: "Repeats"} until ${formatDate(until)}"
+
 private fun shortTime(iso: String) = formatTime(iso).replace(Regex("[\\s\\u202f\\u00a0]?[AaPp]\\.?[Mm]\\.?$"), "")
 
 /** "today", "tomorrow", "Friday" within the week, else "Fri 4 Dec". */
