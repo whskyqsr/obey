@@ -183,8 +183,10 @@ fun LaterDay(day: LocalDate, items: List<Occurrence>, row: @Composable (Occurren
 fun EndedBanner(onOpen: () -> Unit) {
     androidx.compose.material3.Surface(
         onClick = onOpen,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -199,8 +201,10 @@ fun EndedBanner(onOpen: () -> Unit) {
 @Composable
 fun OfflineBanner(savedAt: java.time.Instant) {
     androidx.compose.material3.Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {

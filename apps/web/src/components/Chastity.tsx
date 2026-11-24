@@ -59,7 +59,7 @@ function Ring({ frac, icon }: { frac: number | null; icon: string }) {
   return (
     <div className="relative size-[72px] shrink-0">
       <svg viewBox="0 0 72 72" className="absolute inset-0 -rotate-90">
-        <circle cx="36" cy="36" r={r} fill="none" stroke="var(--md-secondary-container)" strokeWidth="6" />
+        <circle cx="36" cy="36" r={r} fill="none" stroke="var(--md-outline-variant)" strokeWidth="6" />
         {frac !== null && (
           <circle cx="36" cy="36" r={r} fill="none" stroke="var(--md-primary)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${c * frac} ${c}`} />
         )}
@@ -444,7 +444,7 @@ function AskToAnswer({ e, l }: { e: ChastityEvent; l: ChastityLock }) {
             Release
           </Button>
         )}
-        <Button variant="text" className="text-on-secondary-container" onClick={() => answer(false)}>
+        <Button variant="text" className="text-on-surface-variant" onClick={() => answer(false)}>
           {e.kind === "break" ? "Decline" : "Not yet"}
         </Button>
       </div>

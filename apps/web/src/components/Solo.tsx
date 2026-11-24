@@ -57,7 +57,7 @@ export function SoloCards() {
         body="Set your own tasks, rules and rewards. Invite a partner whenever you're ready, and everything you've set up comes with you."
       >
         <Button onClick={menu.invite}>Invite a partner</Button>
-        <Button variant="text" className="text-on-secondary-container" onClick={hideInvite}>
+        <Button variant="text" className="text-on-surface-variant" onClick={hideInvite}>
           Not now
         </Button>
       </TodayCard>
@@ -69,7 +69,7 @@ export function SoloCards() {
   const joiner = s && rel.members.find((m) => m.userId === s.joinerId);
   if (!s || setupGone || setter?.role !== "submissive" || !joiner || joiner.role === "submissive") return null;
   const got = (
-    <Button variant="text" className="text-on-secondary-container" onClick={hideSetup}>
+    <Button variant="text" className="text-on-surface-variant" onClick={hideSetup}>
       Got it
     </Button>
   );

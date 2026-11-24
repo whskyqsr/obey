@@ -204,7 +204,7 @@ export function RoleSwapCard() {
             </Button>
             <Button
               variant="text"
-              className="text-on-secondary-container"
+              className="text-on-surface-variant"
               busy={decline.isPending}
               onClick={() => decline.mutate(undefined, { onError: (e) => snack(errorMessage(e)) })}
             >

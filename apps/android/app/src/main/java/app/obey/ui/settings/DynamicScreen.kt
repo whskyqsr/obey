@@ -364,8 +364,10 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
 
                 if (rel.ended) {
                     Surface(
-                        color = c.surfaceContainerHigh,
-                        shape = MaterialTheme.shapes.large,
+                        color = c.surface,
+                        contentColor = c.onSurfaceVariant,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
                         modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
                     ) {
                         Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {

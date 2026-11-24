@@ -66,10 +66,8 @@ function LockScreen({ uid, onUnlock }: { uid: string; onUnlock(): void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-surface p-6">
-      <div className="flex size-16 items-center justify-center rounded-lg bg-primary-container text-on-primary-container">
-        <Icon name="lock" size={32} />
-      </div>
-      <h1 className="text-headline-small text-on-surface">Enter your PIN</h1>
+      <Icon name="lock" size={40} className="text-primary" />
+      <h1 className="font-serif text-[36px] leading-tight text-on-surface">Enter your PIN</h1>
       <form
         className="flex flex-col items-center gap-4"
         onSubmit={(e) => {

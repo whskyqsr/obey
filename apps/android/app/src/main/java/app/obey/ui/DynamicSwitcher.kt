@@ -88,7 +88,7 @@ private fun DynamicList(a: SwitcherActions, onPick: () -> Unit) {
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(if (on) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent)
+                    .background(if (on) MaterialTheme.colorScheme.surfaceContainer else androidx.compose.ui.graphics.Color.Transparent)
                     .clickable { onPick(); if (!on) a.select(r.id) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -105,7 +105,7 @@ private fun DynamicList(a: SwitcherActions, onPick: () -> Unit) {
                     )
                     Text(r.subtitle(me), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
-                if (on) Icon(Icons.Outlined.Check, "Current", tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                if (on) Icon(Icons.Outlined.Check, "Current", tint = MaterialTheme.colorScheme.onSurface)
             }
         }
         Row(

@@ -215,7 +215,7 @@ private fun lockLines(l: ChastityLock, now: Long): Lines {
 private fun Ring(frac: Float?, onBreak: Boolean) {
     val c = MaterialTheme.colorScheme
     Box(Modifier.size(72.dp), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(progress = { frac ?: 0f }, modifier = Modifier.size(72.dp), strokeWidth = 6.dp, trackColor = c.secondaryContainer, gapSize = 0.dp)
+        CircularProgressIndicator(progress = { frac ?: 0f }, modifier = Modifier.size(72.dp), strokeWidth = 6.dp, trackColor = c.outlineVariant, gapSize = 0.dp)
         Icon(if (onBreak) Icons.Filled.Shower else Icons.Filled.Lock, null, tint = c.primary)
     }
 }
