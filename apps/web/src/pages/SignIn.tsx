@@ -54,7 +54,7 @@ export function SignInPage() {
 
         {FIREBASE_ENABLED ? (
           <div className="flex flex-col gap-4">
-            <Button icon="login" onClick={() => run(signInWithGoogle)} disabled={busy} className="w-full">
+            <Button onClick={() => run(signInWithGoogle)} disabled={busy} className="h-12 w-full">
               Continue with Google
             </Button>
             <div className="flex items-center gap-3 text-body-small text-on-surface-variant">
@@ -71,13 +71,17 @@ export function SignInPage() {
             >
               <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
               <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
-              <div className="flex flex-wrap gap-2">
-                <Button variant="text" disabled={busy || !email.trim() || password.length < 6} onClick={() => run(() => createAccount(email, password))}>
-                  Create account
-                </Button>
-                <div className="flex-1" />
-                <Button type="submit" busy={busy} disabled={!email.trim() || !password}>
+              <div className="grid grid-cols-2 gap-3">
+                <Button type="submit" variant="outlined" busy={busy} disabled={!email.trim() || !password} className="h-12">
                   Sign in
+                </Button>
+                <Button
+                  variant="text"
+                  className="h-12"
+                  disabled={busy || !email.trim() || password.length < 6}
+                  onClick={() => run(() => createAccount(email, password))}
+                >
+                  Create account
                 </Button>
               </div>
             </form>
@@ -108,6 +112,16 @@ export function SignInPage() {
           </form>
         )}
         {error && <p className="mt-4 text-body-medium text-error">{error}</p>}
+        <p className="mt-8 text-center text-body-small text-on-surface-variant">
+          18+ only ·{" "}
+          <a href="https://fealty.me/privacy" className="hover:underline">
+            Privacy
+          </a>{" "}
+          ·{" "}
+          <a href="https://fealty.me/terms" className="hover:underline">
+            Terms
+          </a>
+        </p>
       </div>
     </div>
   );

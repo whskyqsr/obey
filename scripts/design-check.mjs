@@ -24,10 +24,7 @@ const rules = [
     name: "Card on Android (use hairlines)",
     files: android,
     test: /\b(Card|ElevatedCard|OutlinedCard)\(/,
-    allow: [
-      "ui/onboarding/WelcomeScreen.kt",
-      "ui/kits/KitsScreen.kt",
-    ],
+    allow: ["ui/kits/KitsScreen.kt"],
   },
   {
     name: "Material chip, segmented or tonal button on Android (use ChoiceChip, PillRow, TonalButton)",
@@ -39,7 +36,7 @@ const rules = [
     name: "Card on web (use hairlines)",
     files: web,
     test: /<Card\b/,
-    allow: ["pages/Welcome.tsx", "pages/Kits.tsx"],
+    allow: ["pages/Kits.tsx"],
   },
   {
     name: "Raw colour on web (use theme tokens)",

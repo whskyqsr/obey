@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { authErrorMessage, refreshVerification, resendVerification, signOut } from "../auth/session";
 import { errorMessage } from "../api/client";
+import { FirstRunPage, FirstRunTitle } from "../components/FirstRun";
 import { Button, Icon } from "../components/ui";
 
 /** Shown to email-and-password accounts until they click the link Firebase emailed them. */
@@ -41,28 +42,36 @@ export function VerifyEmailPage({ email, onVerified }: { email: string | null; o
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-surface-container-low p-4">
-      <div className="w-full max-w-md rounded-xl bg-surface p-8 shadow-elev-1">
-        <div className="mb-6 flex size-16 items-center justify-center rounded-lg bg-primary-container text-on-primary-container">
-          <Icon name="mark_email_unread" filled size={32} />
-        </div>
-        <h1 className="text-headline-medium text-on-surface">Check your email</h1>
-        <p className="mt-2 text-body-large text-on-surface-variant">
-          We sent a link to <span className="text-on-surface">{email ?? "your address"}</span>. Open it to confirm the address is yours, then come back here.
-        </p>
-        {note && <p className="mt-4 rounded-md bg-surface-container px-3 py-2 text-body-medium text-on-surface-variant">{note}</p>}
-        <div className="mt-8 flex flex-col gap-3">
-          <Button icon="check" busy={busy === "check"} disabled={busy !== null} onClick={() => void check()} className="w-full">
+    <FirstRunPage
+      actions={
+        <>
+          {note && <p className="text-body-medium text-on-surface-variant">{note}</p>}
+          <Button busy={busy === "check"} disabled={busy !== null} onClick={() => void check()} className="h-12 w-full">
             I've verified
           </Button>
-          <Button variant="outlined" icon="send" busy={busy === "resend"} disabled={busy !== null} onClick={() => void resend()} className="w-full">
-            Resend email
-          </Button>
-          <Button variant="text" onClick={() => void signOut()} className="w-full">
-            Use a different account
-          </Button>
-        </div>
+          <div className="flex items-center justify-between">
+            <button type="button" disabled={busy !== null} onClick={() => void resend()} className="py-2 text-body-large text-primary disabled:opacity-40">
+              Resend email
+            </button>
+            <button type="button" onClick={() => void signOut()} className="py-2 text-body-large text-on-surface-variant">
+              Use a different account
+            </button>
+          </div>
+        </>
+      }
+    >
+      <div className="pt-16">
+        <Icon name="drafts" size={40} className="mb-6 text-primary" />
+        <FirstRunTitle
+          sub={
+            <>
+              We sent a link to <span className="text-on-surface">{email ?? "your address"}</span>. Open it on any device, then come back here.
+            </>
+          }
+        >
+          Check your email.
+        </FirstRunTitle>
       </div>
-    </div>
+    </FirstRunPage>
   );
 }

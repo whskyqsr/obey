@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { useInvitePreview, useJoinRelationship, useMe } from "../api/hooks";
+import { useInvitePreview, useJoinRelationship } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { Role } from "../api/types";
-import { DynamicHero } from "../components/DynamicHero";
-import { Button, ErrorBox, Icon, Loading, SegmentedButtons } from "../components/ui";
+import { Avatar } from "../components/Avatar";
+import { FirstRunPage, FirstRunTitle } from "../components/FirstRun";
+import { Button, Chip, Loading } from "../components/ui";
 import { clearPendingInvite } from "../lib/invite";
 import { ROLE_LABEL } from "../lib/relationship";
 import { storage } from "../lib/storage";
@@ -15,7 +16,6 @@ const article = (role: Role) => (role === "switch" ? "a Switch" : `the ${ROLE_LA
 /** An opened invite link, after sign-in: who it's from and what you'd be, then Accept or Not now. */
 export function AcceptInvite({ code, onDone }: { code: string; onDone(): void }) {
   const preview = useInvitePreview(code);
-  const me = useMe();
   const join = useJoinRelationship();
   const [role, setRole] = useState<Role>("submissive");
 
@@ -33,47 +33,57 @@ export function AcceptInvite({ code, onDone }: { code: string; onDone(): void })
   }, [p]); // eslint-disable-line react-hooks/exhaustive-deps
   if (p?.alreadyMember) return null;
 
+  if (preview.isLoading)
+    return (
+      <FirstRunPage>
+        <Loading />
+      </FirstRunPage>
+    );
+  if (preview.error || !p)
+    return (
+      <FirstRunPage
+        actions={
+          <Button className="h-12 w-full" onClick={() => finish()}>
+            Continue
+          </Button>
+        }
+      >
+        <FirstRunTitle sub="It may have expired or already been accepted. Ask for a new link.">This invite can't be used.</FirstRunTitle>
+      </FirstRunPage>
+    );
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-surface-container-low p-4">
-      <div className="w-full max-w-md rounded-xl bg-surface p-8 shadow-elev-1">
-        {!p && <Icon name="mail" filled size={40} className="mb-4 text-primary" />}
-        {preview.isLoading && <Loading />}
-        {preview.error && (
-          <>
-            <h1 className="mb-4 text-headline-small text-on-surface">This invite can't be used</h1>
-            <ErrorBox error="It may have expired or already been accepted. Ask for a new link." />
-            <Button className="mt-6 w-full" onClick={() => finish()}>
-              Continue
-            </Button>
-          </>
-        )}
-        {p && (
-          <>
-            <DynamicHero
-              className="mb-8"
-              people={[{ userId: "inviter", displayName: p.inviterName, avatarVersion: null }, ...(me.data ? [{ ...me.data.user, userId: me.data.user.id }] : [])]}
-              title={`${p.inviterName} invited you`}
-              sub={p.role ? `You'll join their dynamic as ${article(p.role)}.` : "Choose your role to join their dynamic."}
-            />
-            {!p.role && (
-              <div className="mb-6">
-                <div className="mb-2 text-label-large text-on-surface-variant">Your role</div>
-                <SegmentedButtons<Role> value={role} onChange={setRole} options={ROLES} className="w-full" />
-              </div>
-            )}
-            {join.error && <p className="mb-4 text-body-medium text-error">{errorMessage(join.error)}</p>}
-            <div className="flex gap-2">
-              <Button variant="text" onClick={() => finish()}>
-                Not now
-              </Button>
-              <div className="flex-1" />
-              <Button busy={join.isPending} onClick={() => join.mutate({ code, role: p.role ? undefined : role }, { onSuccess: (r) => finish(r.id, true) })}>
-                Accept
-              </Button>
-            </div>
-          </>
+    <FirstRunPage
+      center
+      actions={
+        <>
+          {join.error && <p className="text-body-medium text-error">{errorMessage(join.error)}</p>}
+          <Button
+            className="h-12 w-full"
+            busy={join.isPending}
+            onClick={() => join.mutate({ code, role: p.role ? undefined : role }, { onSuccess: (r) => finish(r.id, true) })}
+          >
+            Accept
+          </Button>
+          <button type="button" onClick={() => finish()} className="py-2 text-body-large text-on-surface">
+            Not now
+          </button>
+        </>
+      }
+    >
+      <div className="flex flex-col items-center pt-16">
+        <Avatar userId="inviter" name={p.inviterName} version={null} size={84} />
+        <h1 className="mt-6 font-serif text-[40px] leading-[1.1] text-on-surface">{p.inviterName} invited you.</h1>
+        <p className="mt-3 text-body-large text-on-surface-variant">{p.role ? `You'll join as ${article(p.role)}.` : "Choose your role to join."}</p>
+        {!p.role && (
+          <div className="mt-6 flex flex-wrap justify-center gap-2" role="radiogroup" aria-label="Your role">
+            {ROLES.map((r) => (
+              <Chip key={r.value} plain selected={role === r.value} onClick={() => setRole(r.value)}>
+                {r.label}
+              </Chip>
+            ))}
+          </div>
         )}
       </div>
-    </div>
+    </FirstRunPage>
   );
 }

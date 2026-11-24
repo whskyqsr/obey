@@ -42,6 +42,6 @@ Last full sweep: 2026-11-24, web at 390px and 1440px, local seed data.
 | Safe call | 20, 42, 43 | Not compared | Not compared | |
 | Your dynamic | 30, 48, 88 | Matched (#113) | Matched | |
 | Settings, Features | 18, 19, 89–91, desktop 19 | Matched (#114) | Matched (#114) | |
-| Sign-in, onboarding, invites | 31–38 | Not compared | Not compared | |
+| Sign-in, onboarding, invites | 31–38 | Close | Close | No logo: the sign-in screen is the serif "Fealty" and tagline, Google in ink, Sign in / Create account side by side, and an 18+ · Privacy · Terms line. "Welcome." is two boxes (start, with role chips and a name, or join with a code) and one Continue. Setup is "N of M" with Back and Skip setup: what you'll use, the invite (code in serif, Copy link and Share; "Later" skips it), then kits as diamond rows and Keep it private. Android adds the discreet app icon there. Android has no accept-invite screen; it joins by code on "Welcome.". |
 | App lock, proof terms, reports | 39, 92, 93, desktop 17 | Not compared | Not compared | |
 | Android notifications, widgets | android 11, 12 | Not compared | — | |
