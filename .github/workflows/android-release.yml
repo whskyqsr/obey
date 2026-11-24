@@ -82,3 +82,19 @@ jobs:
           status: ${{ inputs.playStatus }}
           releaseName: ${{ inputs.versionName }} (${{ github.run_number }})
           whatsNewDirectory: ${{ inputs.releaseNotes != '' && format('{0}/whatsnew', runner.temp) || '' }}
+      # The APK to sideload: Play's own universal APK, signed with the app signing key, so the Play Store can update it later.
+      - name: Fetch Play-signed APK
+        if: env.HAS_PLAY_KEY == 'true'
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          pip install --quiet google-auth requests
+          mkdir -p build/apk
+          python3 ../../.github/scripts/play_universal_apk.py me.fealty ${{ github.run_number }} build/apk/fealty-${{ inputs.versionName }}.apk
+      - name: Upload Play-signed APK
+        if: env.HAS_PLAY_KEY == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fealty-apk-${{ inputs.versionName }}-${{ github.run_number }}
+          path: apps/android/build/apk/*.apk
+          if-no-files-found: error
