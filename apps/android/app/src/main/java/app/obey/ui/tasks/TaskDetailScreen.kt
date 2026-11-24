@@ -271,7 +271,8 @@ fun TaskDetailScreen(
                         val mine = o.assigneeId == session?.userId
                         OccurrenceRow(
                             o,
-                            if (mine) null else session?.nameOf(o.assigneeId),
+                            // The page already says whose task it is.
+                            null,
                             if (canManage && o.status == OccurrenceStatus.Submitted) {
                                 OccurrenceActions(onApprove = { vm.review(o, true) }, onReject = { sendingBack = o }, onComments = { commenting = o })
                             } else {

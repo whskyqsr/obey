@@ -13,7 +13,7 @@ import { RescheduleSheet } from "./RescheduleSheet";
 import { CountRing, CountSheet, canCount, countLine, isCounted, readyToSend, useCountTap } from "./Count";
 import { CheckInButton, PlaceRing, canCheckIn, isPlaced, placeLine, usePlaceLookup } from "./Location";
 import { StreakStrip } from "./StreakStrip";
-import { Badge, Button, Dialog, Icon, Spinner, TextArea, cx, useSnackbar } from "./ui";
+import { Badge, Button, Dialog, Diamond, type DiamondState, Icon, Spinner, TextArea, cx, useSnackbar } from "./ui";
 import { importPage } from "../lib/staleBuild";
 
 const MarkdownEditor = lazy(importPage(() => import("./MarkdownEditor").then((m) => ({ default: m.MarkdownEditor }))));
@@ -41,6 +41,14 @@ export function opensLabel(o: Occurrence) {
   if (!o.opensAt) return "opens later";
   const at = new Date(o.opensAt);
   return localDateOf(at) === today() ? `opens ${fmtTime(o.opensAt)}` : `opens ${fmtDateTime(o.opensAt)}`;
+}
+
+/** How a due date reads as a diamond. */
+export function diamondOf(o: Occurrence): DiamondState {
+  if (o.status === "completed") return "done";
+  if (o.status === "missed" || isOverdue(o)) return "owed";
+  if (o.status === "submitted") return "waiting";
+  return o.status === "pending" ? "open" : "off";
 }
 
 export function isOverdue(o: Occurrence, now = Date.now()) {
@@ -117,14 +125,17 @@ export function OccurrenceCard({ o, showDate, linkTask = true, plain }: { o: Occ
         </div>
       </div>
       {plain && (
-        <p className={cx("text-body-large", overdue ? "text-error" : "text-on-surface")}>
-          {allDay ? `${fmtDate(localDateOf(due))}, all day` : fmtDateTime(o.dueAt)}
-          <span className={overdue ? "" : "text-on-surface-variant"}>
-            {o.status === "pending" ? ` · ${fmtRelative(o.dueAt)}` : ` · ${overdue ? "Overdue" : o.leftAt ? "Left early" : status.label.toLowerCase()}`}
-            {!mine && ` · ${memberName(o.assigneeId)}`}
-            {o.rescheduled && " · moved"}
-          </span>
-        </p>
+        // The task's own page: a diamond and when it's due. The page already names the task and whose it is.
+        <div className="flex items-center gap-3">
+          <Diamond state={diamondOf(o)} />
+          <p className="text-body-large text-on-surface">
+            {allDay ? `${fmtDate(localDateOf(due))}, all day` : fmtDateTime(o.dueAt)}
+            <span className={overdue || o.status === "missed" ? "text-error" : "text-on-surface-variant"}>
+              {o.status === "pending" ? ` · ${fmtRelative(o.dueAt)}` : ` · ${overdue ? "Overdue" : o.leftAt ? "Left early" : status.label.toLowerCase()}`}
+              {o.rescheduled && " · moved"}
+            </span>
+          </p>
+        </div>
       )}
       {counted && (
         <div className="relative z-10 flex flex-col gap-2">
