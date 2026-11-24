@@ -30,8 +30,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.layout.positionInParent
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
@@ -259,21 +257,21 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
     var dialog by rememberSaveable { mutableStateOf(if (startInvite) "invite" else null) } // "relname" | "create" | "join" | "invite"
     val session = (sessionState as? SessionState.Ready)?.session
     var editingDate by remember { mutableStateOf<DynamicDate?>(null) }
-    val curfew by vm.curfew.collectAsStateWithLifecycle()
-    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
-        vm.loadCurfew()
-        onPauseOrDispose {}
-    }
 
     // People, other dynamics and leaving open as their own page, as in the mockups.
     var people by rememberSaveable { mutableStateOf(false) }
     androidx.activity.compose.BackHandler(people) { people = false }
+    // How it works (mockup 87): the app's own rules for this dynamic, on a page of its own. Settings' proof-photo row opens it directly.
+    var how by rememberSaveable { mutableStateOf(startFeatures) }
+    androidx.activity.compose.BackHandler(how) { how = false }
     val ended = session?.relationship?.ended == true
 
     Scaffold(
         topBar = {
             if (people) {
                 LargeTopAppBar(title = { Text("People") }, navigationIcon = { BackLink("Your dynamic") { people = false } })
+            } else if (how) {
+                LargeTopAppBar(title = { Text("How it works") }, navigationIcon = { BackLink("Your dynamic") { how = false } })
             } else {
                 TopAppBar(
                     title = {},
@@ -291,11 +289,10 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
         val me = rel.members.firstOrNull { it.userId == s.userId }
         val c = MaterialTheme.colorScheme
         Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-            // Opened from Settings' Features row: scroll to the switches once they're laid out.
             val scroll = rememberScrollState()
-            var featuresAt by remember { mutableStateOf<Int?>(null) }
-            LaunchedEffect(featuresAt) { if (startFeatures) featuresAt?.let { scroll.animateScrollTo(it) } }
-            if (people) {
+            if (how) {
+                HowItWorks(s, rel, busy, vm, onRename = { dialog = "relname" })
+            } else if (people) {
                 Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(rememberScrollState())) {
                     rel.members.forEach { m ->
                         ListItem(
@@ -451,120 +448,12 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
                 )
                 Hair()
 
-                if (rel.features.location) {
-                    SectionHeader("Location")
-                    ListItem(
-                        modifier = Modifier.clickable(onClick = onPlaces),
-                        leadingContent = { Icon(Icons.Outlined.LocationOn, null) },
-                        headlineContent = { Text("Places") },
-                        supportingContent = { Text(if (s.canManage) "Where location tasks can send someone" else "The places location tasks use") },
-                        trailingContent = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
-                    )
-                    Hair()
-                    if (s.canManage || curfew?.enabled == true) {
-                        ListItem(
-                            modifier = Modifier.clickable(onClick = onCurfew),
-                            leadingContent = { Icon(Icons.Outlined.Bedtime, null) },
-                            headlineContent = { Text("Curfew") },
-                            supportingContent = { Text(curfew?.takeIf { it.enabled }?.let { app.obey.ui.location.describeCurfew(it) } ?: "Off") },
-                            trailingContent = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
-                        )
-                        Hair()
-                    }
-                    if (me != null && me.role != Role.Dominant && !rel.ended) {
-                        ListItem(
-                            modifier = Modifier.clickable(onClick = onLocation),
-                            leadingContent = { Icon(Icons.Outlined.MyLocation, null) },
-                            headlineContent = { Text("Your location") },
-                            supportingContent = {
-                                Text(
-                                    when {
-                                        me.locationPaused -> "Paused"
-                                        me.locationStatus == app.obey.api.LocationStatus.Ready -> "On, only for tasks"
-                                        else -> "Not set up on your phone"
-                                    },
-                                )
-                            },
-                            trailingContent = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
-                        )
-                        Hair()
-                    }
-                }
-                SectionHeader("How it works")
                 ListItem(
-                    modifier = if (s.canManage) Modifier.clickable { dialog = "relname" } else Modifier,
-                    headlineContent = { Text("Name") },
-                    supportingContent = { Text(rel.name ?: "None set, so it shows ${rel.copy(name = null).title(s.userId)}") },
-                    trailingContent = { if (s.canManage) Icon(Icons.Outlined.Edit, "Name this relationship") },
+                    modifier = Modifier.clickable { how = true },
+                    headlineContent = { Text("How it works") },
+                    trailingContent = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
                 )
-                ListItem(
-                    headlineContent = { Text("Moving deadlines") },
-                    supportingContent = {
-                        Text(
-                            when (rel.reschedulePolicy) {
-                                ReschedulePolicy.DominantOnly -> "Dominant only"
-                                ReschedulePolicy.Request -> "Sub may request"
-                                ReschedulePolicy.Allowance -> "Weekly allowance: ${rel.weeklyDelayAllowance} free a week"
-                            },
-                        )
-                    },
-                )
-                if (s.canManage) {
-                    Row(
-                        Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        listOf(
-                            ReschedulePolicy.DominantOnly to "Only me",
-                            ReschedulePolicy.Request to "Sub asks, I approve",
-                            ReschedulePolicy.Allowance to "Free delays per week",
-                        ).forEach { (p, label) ->
-                            ChoiceChip(selected = rel.reschedulePolicy == p, onClick = { vm.updatePolicy(policy = p) }, label = { Text(label) })
-                        }
-                    }
-                    if (rel.reschedulePolicy == ReschedulePolicy.Allowance) {
-                        Box(Modifier.padding(horizontal = 16.dp)) {
-                            Stepper("", rel.weeklyDelayAllowance, "free delays a week", 0..50) { vm.updatePolicy(allowance = it) }
-                        }
-                    }
-                }
-
-                val sub = rel.members.firstOrNull { it.role == Role.Submissive }
-                ListItem(
-                    headlineContent = { Text("${sub?.displayName ?: "A submissive"} can write notes") },
-                    supportingContent = { Text("Their own notes. Yours stay read-only to them unless you let them edit one.") },
-                    trailingContent = { Switch(checked = rel.subNotes, onCheckedChange = vm::setSubNotes, enabled = s.canManage && !busy) },
-                )
-                var pickingProofDays by remember { mutableStateOf(false) }
-                ListItem(
-                    modifier = if (rel.ended) Modifier else Modifier.clickable { pickingProofDays = true },
-                    headlineContent = { Text("Keep proof photos") },
-                    supportingContent = { Text(rel.proofDays?.let(::proofDaysLabel) ?: "Until you delete them") },
-                )
-                if (pickingProofDays) {
-                    ProofDaysDialog(rel.proofDays, onDismiss = { pickingProofDays = false }) { vm.setProofDays(it); pickingProofDays = false }
-                }
-
-                SectionHeader("Features", Modifier.onGloballyPositioned { if (featuresAt == null) featuresAt = it.positionInParent().y.toInt() })
-                featureRows.forEach { (label, _, get, set) ->
-                    ListItem(
-                        headlineContent = { Text(label) },
-                        trailingContent = {
-                            Switch(
-                                checked = get(rel.features),
-                                onCheckedChange = { on -> vm.setFeatures(set(rel.features, on), if (on) "$label on" else "$label off") },
-                                enabled = s.canManage && !busy,
-                            )
-                        },
-                    )
-                }
-                Text(
-                    if (s.canManage) "Switched-off features are hidden for everyone here. Nothing is deleted."
-                    else "Only a Dominant can change how this dynamic works.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                )
+                Hair()
 
                 Spacer(Modifier.height(24.dp))
             }
@@ -644,6 +533,68 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
             confirmButton = {},
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
         )
+    }
+}
+
+/** Name, who moves deadlines, sub notes and how long proof photos stay: mockup 87. Only a Dominant changes them. */
+@Composable
+private fun HowItWorks(s: app.obey.data.Session, rel: Relationship, busy: Boolean, vm: SettingsViewModel, onRename: () -> Unit) {
+    val manage = s.canManage && !rel.ended
+    val subName = rel.members.firstOrNull { it.role == Role.Submissive }?.displayName ?: "The submissive"
+    var pickingProofDays by remember { mutableStateOf(false) }
+    Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(rememberScrollState())) {
+        if (!manage) {
+            Text(
+                if (rel.ended) "This dynamic has ended, so nothing here can change." else "Only a Dominant changes these.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+        }
+        ListItem(
+            modifier = if (manage) Modifier.clickable(onClick = onRename) else Modifier,
+            headlineContent = { Text("Name") },
+            supportingContent = { Text(rel.name ?: "None set, so it shows ${rel.copy(name = null).title(s.userId)}") },
+            trailingContent = { if (manage) Icon(Icons.Outlined.Edit, "Name this relationship") },
+        )
+        Hair()
+        SectionHeader("Moving deadlines")
+        listOf(
+            Triple(ReschedulePolicy.DominantOnly, "Dominant only", null),
+            Triple(ReschedulePolicy.Request, "$subName may ask", if (manage) "You approve or decline" else "A Dominant approves or declines"),
+            Triple(ReschedulePolicy.Allowance, "Weekly allowance", "Free delays each week, more need a yes"),
+        ).forEach { (p, label, supporting) ->
+            ListItem(
+                modifier = if (manage && rel.reschedulePolicy != p) Modifier.clickable { vm.updatePolicy(policy = p) } else Modifier,
+                leadingContent = { app.obey.ui.common.Diamond(if (rel.reschedulePolicy == p) app.obey.ui.common.DiamondState.Done else app.obey.ui.common.DiamondState.Open) },
+                headlineContent = { Text(label) },
+                supportingContent = supporting?.let { { Text(it) } },
+            )
+            Hair()
+        }
+        if (rel.reschedulePolicy == ReschedulePolicy.Allowance) {
+            Box(Modifier.padding(horizontal = 16.dp)) {
+                if (manage) Stepper("", rel.weeklyDelayAllowance, "free delays a week", 0..50) { vm.updatePolicy(allowance = it) }
+                else Text("${rel.weeklyDelayAllowance} free delays a week", style = MaterialTheme.typography.bodyLarge)
+            }
+        }
+        SectionHeader("Notes")
+        ListItem(
+            headlineContent = { Text("$subName can write their own notes") },
+            trailingContent = { Switch(checked = rel.subNotes, onCheckedChange = vm::setSubNotes, enabled = manage && !busy) },
+        )
+        Hair()
+        SectionHeader("Proof photos")
+        ListItem(
+            modifier = if (rel.ended) Modifier else Modifier.clickable { pickingProofDays = true },
+            overlineContent = { Text("Keep them") },
+            headlineContent = { Text(rel.proofDays?.let(::proofDaysLabel) ?: "Until you delete them") },
+        )
+        Hair()
+        Spacer(Modifier.height(24.dp))
+    }
+    if (pickingProofDays) {
+        ProofDaysDialog(rel.proofDays, onDismiss = { pickingProofDays = false }) { vm.setProofDays(it); pickingProofDays = false }
     }
 }
 
