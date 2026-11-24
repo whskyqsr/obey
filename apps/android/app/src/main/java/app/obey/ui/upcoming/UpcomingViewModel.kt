@@ -1,5 +1,6 @@
 package app.obey.ui.upcoming
 
+import app.obey.ui.today.skipLabel
 import androidx.lifecycle.viewModelScope
 import app.obey.api.CalendarEvent
 import app.obey.api.CompleteOccurrenceInput
@@ -152,7 +153,7 @@ class UpcomingViewModel @Inject constructor(
 
     fun skip(o: Occurrence) = action {
         val r = api.skip(o.id)
-        say(if (r.applied) "Skipped" else "Asked to skip “${o.title}”")
+        say(if (r.applied) (if (o.skipLabel(asks = false) == "Skip") "Skipped" else "Excused") else "Asked to ${o.skipLabel(asks = false).lowercase()} “${o.title}”")
         refresh()
     }
 

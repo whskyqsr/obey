@@ -470,7 +470,9 @@ function PlanEditor({
 
   const sentence = (
     <p className="font-serif text-[34px] leading-[1.3] tracking-[-0.01em] text-on-surface md:text-[44px]">
-      {draft.withPartner ? "We'll" : "I'll"} be at {what}{" "}
+      {/* "Me: Dinner, Tue from 7 to 9 PM", the task editor's shape, so any plan name reads right ("I'll be at Work trip" didn't). */}
+      {draft.withPartner ? "Us" : "Me"}: {what}
+      <span className="-ml-1">,</span>{" "}
       {draft.allDay ? (
         draft.startDay === draft.endDay ? (
           <>

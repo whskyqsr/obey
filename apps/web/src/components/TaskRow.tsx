@@ -11,7 +11,7 @@ import { RitualDialog, isRitual, stepProgress } from "./Ritual";
 import { RescheduleSheet } from "./RescheduleSheet";
 import { StreakStrip } from "./StreakStrip";
 import { useNoteAfter } from "./DecisionNote";
-import { useSkipOccurrence } from "./useSkipOccurrence";
+import { skipLabel, useSkipOccurrence } from "./useSkipOccurrence";
 import { useSwipe, type SwipeAction } from "./useSwipe";
 import { CountRing, CountSheet, canCount, countLine, isCounted, readyToSend, useCountTap } from "./Count";
 import { CheckInButton, PlaceRing, canCheckIn, isPlaced, placeLine, useCheckIn, usePlaceLookup } from "./Location";
@@ -113,7 +113,7 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
       : isDom && !mine && o.status === "missed"
         ? { label: "Excuse", run: excuse }
         : isDom && !mine && o.status === "pending"
-          ? { label: "Skip", run: () => skip(o) }
+          ? { label: skipLabel(o, true), run: () => skip(o) }
           : null;
   const end: SwipeAction | null =
     o.status === "pending" && (mine || isDom)
@@ -224,7 +224,7 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
         {!actions && o.status === "pending" && (mine || isDom) && (
           <IconButton
             icon="event_busy"
-            label={isDom ? "Skip" : "Ask to skip"}
+            label={skipLabel(o, isDom)}
             className="max-md:hidden md:opacity-0 md:group-hover/row:opacity-100 md:focus-visible:opacity-100"
             onClick={() => skip(o)}
           />

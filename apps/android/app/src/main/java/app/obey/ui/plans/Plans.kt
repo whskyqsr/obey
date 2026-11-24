@@ -741,9 +741,10 @@ private fun PlanSentence(draft: Draft, onTitle: (String) -> Unit, onPick: (Strin
     fun slot(t: String, key: String) = Text(t, style = style, modifier = underline.clickable { onPick(key) })
     val zone = ZoneId.systemDefault()
     FlowRow(horizontalArrangement = Arrangement.spacedBy(9.dp), verticalArrangement = Arrangement.spacedBy(0.dp)) {
-        word(if (draft.withPartner) "We'll" else "I'll")
-        word("be")
-        word("at")
+        // "Me: Dinner, Tue from 7 to 9 PM", the task editor's shape, so any plan name reads right.
+        word(if (draft.withPartner) "Us:" else "Me:")
+        // The comma sits right against the title, so it reads "Dinner," not "Dinner ,".
+        Row {
         Box(underline) {
             // The field is as wide as what's typed, like the web's.
             Text(draft.title.ifEmpty { "what" }, style = style.copy(color = androidx.compose.ui.graphics.Color.Transparent), modifier = Modifier.padding(end = 4.dp))
@@ -761,6 +762,8 @@ private fun PlanSentence(draft: Draft, onTitle: (String) -> Unit, onPick: (Strin
                     }
                 },
             )
+        }
+        Text(",", style = style)
         }
         if (draft.allDay) {
             if (draft.startDay == draft.endDay) {

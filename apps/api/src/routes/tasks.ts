@@ -691,14 +691,12 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     };
   });
 
-  // Undoing a Dominant's skip, straight after it: a called-off due date comes back as it was; an excused miss is missed again.
+  // Undoing a Dominant's skip or excuse, straight after it: the due date is open again, and if it's past due the
+  // usual job marks it missed (with its penalty) as it would have.
   app.post<{ Params: { id: string } }>("/occurrences/:id/unskip", async (req) => {
     const { occ, series, member } = await loadOccurrence(db, req.params.id, req.user.id);
     if (!canManage(member.role)) throw forbidden("only a Dominant can undo a skip");
-    if (occ.status === "excused") {
-      return occurrenceDto(await db.transaction((tx) => editOccurrence(tx, series, occ, req.user.id, { status: "missed" }, deps.now())), series);
-    }
-    if (occ.status !== "cancelled" || !occ.calledOff) throw new HttpError(409, `occurrence is ${occ.status}`);
+    if (occ.status !== "excused" && !(occ.status === "cancelled" && occ.calledOff)) throw new HttpError(409, `occurrence is ${occ.status}`);
     const [o] = await db
       .update(occurrences)
       .set({ status: "pending", calledOff: false, editedBy: req.user.id, editedAt: deps.now() })

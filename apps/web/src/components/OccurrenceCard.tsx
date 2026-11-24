@@ -6,7 +6,7 @@ import { errorMessage } from "../api/client";
 import { fmtDate, fmtDateTime, fmtRelative, fmtTime, localDateOf, today } from "../lib/dates";
 import { useReadOnly, useRel } from "../lib/relationship";
 import { Comments, SendBackDialog } from "./Comments";
-import { useSkipOccurrence } from "./useSkipOccurrence";
+import { skipLabel, useSkipOccurrence } from "./useSkipOccurrence";
 import { ProofPhotos } from "./Proof";
 import { MOOD_LABELS, MoodPicker } from "./Mood";
 import { RitualDialog, StepList, isRitual, stepProgress } from "./Ritual";
@@ -238,7 +238,7 @@ export function OccurrenceCard({ o, showDate, linkTask = true, plain }: { o: Occ
           )}
           {o.status === "pending" && (mine || isDom) && !readOnly && (
             <Button variant="outlined" onClick={() => skip(o)}>
-              {isDom ? "Skip" : "Ask to skip"}
+              {skipLabel(o, isDom)}
             </Button>
           )}
           {!commenting && o.commentCount === 0 && !readOnly && (

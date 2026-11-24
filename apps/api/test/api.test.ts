@@ -991,6 +991,12 @@ describe("rescheduling", () => {
     expect((await dom.post(`/occurrences/${next.id}/skip`, {})).status).toBe(409);
     expect((await sub.post(`/occurrences/${next.id}/unskip`, {})).status).toBe(403);
     expect((await dom.post(`/occurrences/${next.id}/unskip`, {})).body.status).toBe("pending");
+
+    // Past due but not yet marked missed: it reads as owed, so skipping it excuses it.
+    const was = ctx.clock.now;
+    ctx.clock.now = new Date("2026-10-20T01:30:00Z");
+    expect((await dom.post(`/occurrences/${next.id}/skip`, {})).body.occurrence.status).toBe("excused");
+    ctx.clock.now = was;
   });
 
   it("rejects deadlines in the past", async () => {

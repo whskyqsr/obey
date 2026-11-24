@@ -195,7 +195,7 @@ fun TodayScreen(
                     val start = when {
                         doneTap != null -> SwipeAction("Done", Icons.Outlined.Check, ink = true, run = doneTap)
                         isDom && !mineRow && missed -> SwipeAction("Excuse", Icons.Outlined.RemoveCircleOutline) { vm.excuse(o) }
-                        isDom && !mineRow && o.status == OccurrenceStatus.Pending -> SwipeAction("Skip", Icons.Outlined.EventBusy) { vm.skip(o) }
+                        isDom && !mineRow && o.status == OccurrenceStatus.Pending -> SwipeAction(o.skipLabel(asks = false), Icons.Outlined.EventBusy) { vm.skip(o) }
                         else -> null
                     }
                     // Left: more time on your own, and a Dominant moves anyone's, a miss included (moving it reopens it).
@@ -660,7 +660,8 @@ fun TodayScreen(
     LaunchedEffect(skipped) {
         val o = skipped ?: return@LaunchedEffect
         vm.skippedShown()
-        if (snackbar.showSnackbar("Skipped: ${o.title}", actionLabel = "Undo", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) vm.unskip(o)
+        val word = if (o.skipLabel(asks = false) == "Skip") "Skipped" else "Excused"
+        if (snackbar.showSnackbar("$word: ${o.title}", actionLabel = "Undo", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) vm.unskip(o)
     }
 
     commenting?.let { o -> CommentsSheet(o, onDismiss = { commenting = null }, onChanged = vm::refresh) }

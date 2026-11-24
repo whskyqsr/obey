@@ -216,7 +216,7 @@ fun OccurrenceRow(
                         }
                         if (occurrence.status == OccurrenceStatus.Pending) actions.onSkip?.let {
                             DropdownMenuItem(
-                                text = { Text(if (actions.skipAsks) "Ask to skip" else "Skip") },
+                                text = { Text(occurrence.skipLabel(asks = actions.skipAsks)) },
                                 leadingIcon = { Icon(Icons.Outlined.EventBusy, null) },
                                 onClick = { menu = false; it() },
                             )
@@ -241,6 +241,12 @@ fun OccurrenceRow(
           }
         },
     )
+}
+
+/** Skip while it's still to come; Excuse once it's past due, since it already shows as owed (the API excuses it then). */
+fun Occurrence.skipLabel(asks: Boolean): String {
+    val word = if (app.obey.ui.common.parseInstant(dueAt).isAfter(java.time.Instant.now())) "Skip" else "Excuse"
+    return if (asks) "Ask to ${word.lowercase()}" else word
 }
 
 /** How a task reads as a diamond: done, waiting on approval, owed (missed or overdue), excused, or still open. */

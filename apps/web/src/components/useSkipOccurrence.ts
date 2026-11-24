@@ -4,7 +4,18 @@ import { errorMessage } from "../api/client";
 import { useRel } from "../lib/relationship";
 import { useSnackbar } from "./ui";
 
-/** Skip one due date. A Dominant's applies at once with Undo in the snackbar; the assignee's asks a Dominant. */
+const pastDue = (o: Occurrence) => new Date(o.dueAt).getTime() <= Date.now();
+
+/** What skipping reads as for this due date: Skip while it's to come, Excuse once it's past due (it shows as owed). */
+export function skipLabel(o: Occurrence, isDom: boolean) {
+  const word = pastDue(o) ? "Excuse" : "Skip";
+  return isDom ? word : `Ask to ${word.toLowerCase()}`;
+}
+
+/**
+ * Skip one due date, or excuse it once it's past due (the API decides by the time). A Dominant's applies at once with
+ * Undo in the snackbar; the assignee's asks a Dominant.
+ */
 export function useSkipOccurrence() {
   const { rel } = useRel();
   const snack = useSnackbar();
@@ -12,13 +23,14 @@ export function useSkipOccurrence() {
   const unskip = useUnskip(rel.id);
   return (o: Occurrence) =>
     skip.mutate(o.id, {
-      onSuccess: (res) =>
-        res.applied
-          ? snack(`Skipped: ${o.title}`, {
-              label: "Undo",
-              onClick: () => unskip.mutate(o.id, { onError: (e) => snack(errorMessage(e)) }),
-            })
-          : snack(`Asked to skip “${o.title}”`),
+      onSuccess: (res) => {
+        const excuse = pastDue(o);
+        if (!res.applied) return snack(`Asked to ${excuse ? "excuse" : "skip"} “${o.title}”`);
+        snack(`${excuse ? "Excused" : "Skipped"}: ${o.title}`, {
+          label: "Undo",
+          onClick: () => unskip.mutate(o.id, { onError: (e) => snack(errorMessage(e)) }),
+        });
+      },
       onError: (e) => snack(errorMessage(e)),
     });
 }

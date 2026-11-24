@@ -573,7 +573,7 @@ class TodayViewModel @Inject constructor(
 
     fun skip(o: Occurrence) = action {
         val r = api.skip(o.id)
-        if (r.applied) _skipped.value = o else say("Asked to skip “${o.title}”")
+        if (r.applied) _skipped.value = o else say("Asked to ${o.skipLabel(asks = false).lowercase()} “${o.title}”")
         refresh()
     }
 

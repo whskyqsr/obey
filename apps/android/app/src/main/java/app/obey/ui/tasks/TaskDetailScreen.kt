@@ -1,5 +1,6 @@
 package app.obey.ui.tasks
 
+import app.obey.ui.today.skipLabel
 import androidx.compose.material.icons.outlined.AutoStories
 import app.obey.ui.comments.CommentsSheet
 import app.obey.ui.comments.SendBackDialog
@@ -163,7 +164,7 @@ class TaskDetailViewModel @Inject constructor(
 
     fun skip(o: Occurrence) = action {
         val r = api.skip(o.id)
-        say(if (r.applied) "Skipped" else "Asked to skip “${o.title}”")
+        say(if (r.applied) (if (o.skipLabel(asks = false) == "Skip") "Skipped" else "Excused") else "Asked to ${o.skipLabel(asks = false).lowercase()} “${o.title}”")
         refresh()
     }
 

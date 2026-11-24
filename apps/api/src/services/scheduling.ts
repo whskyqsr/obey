@@ -846,13 +846,17 @@ export async function requestGroupReschedule(
 
 /** Decides a request, or every pending request in its group. Returns the decided rows and their occurrences. */
 /**
- * Calls an occurrence off. One still to come is cancelled, so it drops out of Today and the calendar as if deleted
- * (the row stays so the series doesn't recreate it) and shows only in history. A missed one becomes excused, with any
- * miss consequence and points undone.
+ * Calls an occurrence off. One still to come is cancelled (skipped), so it drops out of Today and the calendar as if
+ * deleted (the row stays so the series doesn't recreate it) and shows only in history. One already past due, missed or
+ * still in its grace period, is excused instead, with any miss consequence and points undone.
  */
 export async function callOffOccurrence(db: Tx, series: Series, occ: Occurrence, editorId: string, now: Date): Promise<Occurrence> {
   if (occ.status === "missed") return editOccurrence(db, series, occ, editorId, { status: "excused" }, now);
   if (occ.status !== "pending") throw new HttpError(409, `occurrence is ${occ.status}`);
+  if (occ.dueAt.getTime() <= now.getTime()) {
+    const [excused] = await db.update(occurrences).set({ status: "excused", editedBy: editorId, editedAt: now }).where(eq(occurrences.id, occ.id)).returning();
+    return excused!;
+  }
   const [updated] = await db.update(occurrences).set({ status: "cancelled", calledOff: true, editedBy: editorId, editedAt: now }).where(eq(occurrences.id, occ.id)).returning();
   return updated!;
 }
