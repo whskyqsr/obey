@@ -48,21 +48,24 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
+/** What a swipe does: its word, its icon, and whether it's the ink one (Done) or a quiet one. */
+data class SwipeAction(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val ink: Boolean = false, val run: () -> Unit)
+
 /**
- * Swipe right to mark done, left for more time. The row springs back; the action runs and Done gets an
- * Undo snackbar. Tapping still works, and TalkBack gets the same two actions.
+ * A row that swipes, like Gmail: right for [start] (Done for your own, Skip or Excuse for a Dominant), left for [end]
+ * (More time or Reschedule). The row springs back; whatever the swipe started takes it from there.
  */
 @Composable
-fun SwipeableRow(o: Occurrence, onDone: (() -> Unit)?, onMoreTime: (() -> Unit)?, moreTimeLabel: String = "More time", content: @Composable () -> Unit) {
-    if (onDone == null && onMoreTime == null) {
+fun SwipeableRow(start: SwipeAction?, end: SwipeAction?, content: @Composable () -> Unit) {
+    if (start == null && end == null) {
         content()
         return
     }
     val state = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             when (value) {
-                SwipeToDismissBoxValue.StartToEnd -> onDone?.invoke()
-                SwipeToDismissBoxValue.EndToStart -> onMoreTime?.invoke()
+                SwipeToDismissBoxValue.StartToEnd -> start?.run?.invoke()
+                SwipeToDismissBoxValue.EndToStart -> end?.run?.invoke()
                 SwipeToDismissBoxValue.Settled -> Unit
             }
             false
@@ -71,30 +74,29 @@ fun SwipeableRow(o: Occurrence, onDone: (() -> Unit)?, onMoreTime: (() -> Unit)?
     val colors = MaterialTheme.colorScheme
     SwipeToDismissBox(
         state = state,
-        enableDismissFromStartToEnd = onDone != null,
-        enableDismissFromEndToStart = onMoreTime != null,
+        enableDismissFromStartToEnd = start != null,
+        enableDismissFromEndToStart = end != null,
         modifier = Modifier.semantics {
-            customActions = listOfNotNull(
-                onDone?.let { CustomAccessibilityAction("Mark done") { it(); true } },
-                onMoreTime?.let { CustomAccessibilityAction(moreTimeLabel) { it(); true } },
-            )
+            customActions = listOfNotNull(start, end).map { a -> CustomAccessibilityAction(a.label) { a.run(); true } }
         },
         backgroundContent = {
-            val toDone = state.dismissDirection == SwipeToDismissBoxValue.StartToEnd
+            val fromStart = state.dismissDirection == SwipeToDismissBoxValue.StartToEnd
+            val a = (if (fromStart) start else end) ?: return@SwipeToDismissBox
+            val fg = if (a.ink) colors.surface else colors.onSurface
             Row(
                 Modifier
                     .fillMaxSize()
-                    .background(if (toDone) colors.onSurface else colors.surfaceContainerHigh)
+                    .background(if (a.ink) colors.onSurface else colors.surfaceContainerHigh)
                     .padding(horizontal = 24.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = if (toDone) Arrangement.Start else Arrangement.End,
+                horizontalArrangement = if (fromStart) Arrangement.Start else Arrangement.End,
             ) {
-                if (toDone) {
-                    Icon(Icons.Outlined.Check, null, tint = colors.surface)
-                    Text("  Done", color = colors.surface, style = MaterialTheme.typography.labelLarge)
+                if (fromStart) {
+                    Icon(a.icon, null, tint = fg)
+                    Text("  ${a.label}", color = fg, style = MaterialTheme.typography.labelLarge)
                 } else {
-                    Text("$moreTimeLabel  ", color = colors.onSurface, style = MaterialTheme.typography.labelLarge)
-                    Icon(Icons.Outlined.MoreTime, null, tint = colors.onSurface)
+                    Text("${a.label}  ", color = fg, style = MaterialTheme.typography.labelLarge)
+                    Icon(a.icon, null, tint = fg)
                 }
             }
         },

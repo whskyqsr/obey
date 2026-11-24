@@ -17,6 +17,8 @@ import app.obey.ui.plans.firstDay
 import app.obey.ui.plans.iso
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.RemoveCircleOutline
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.PauseCircle
 import androidx.compose.material.icons.outlined.EventBusy
@@ -168,6 +170,8 @@ fun TodayScreen(
                     onReschedule = { rescheduling = o },
                     onEditTask = if (session?.canManage == true) ({ onEditTask(o.seriesId) }) else null,
                     onComments = { commenting = o },
+                    onSkip = if (o.status == OccurrenceStatus.Pending && (o.assigneeId == me || session?.canManage == true)) ({ vm.skip(o) }) else null,
+                    skipAsks = session?.canManage != true,
                     onCount = if (o.assigneeId == me && o.canCount(true, session?.canManage == true)) ({ if (o.readyToSend) noting = o else vm.count(o, by = 1) { noting = it } }) else null,
                     onCountHold = if (o.canCount(o.assigneeId == me, session?.canManage == true)) ({ counting = o }) else null,
                     onCheckIn = if (o.canCheckIn(o.assigneeId == me)) ({ vm.checkIn(o) }) else null,
@@ -180,17 +184,27 @@ fun TodayScreen(
                 val next = pickNext(d.today, me)
                 val restOfToday = (if (isDom) d.today.filter { it.id !in reviewIds && it.id !in missIds } else d.today).filter { it.id != next?.id }
                 fun row(o: Occurrence, actions: OccurrenceActions = actionsFor(o)): @Composable () -> Unit = {
-                    SwipeableRow(
-                        o,
-                        onDone = if (o.isPlaced) {
-                            if (o.canCheckIn(o.assigneeId == me)) ({ vm.checkIn(o) }) else null
-                        } else if (o.isCounted) {
-                            if (o.assigneeId == me && o.canCount(true, isDom)) ({ if (o.readyToSend) noting = o else vm.count(o, by = 1) { noting = it } }) else null
-                        } else if (o.assigneeId == me && o.status == OccurrenceStatus.Pending && o.isOpen()) ({ if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) }) else null,
-                        // A Dominant moves anyone's deadline the same way a sub asks for more time on their own.
-                        onMoreTime = if ((o.assigneeId == me || isDom) && o.status == OccurrenceStatus.Pending) ({ rescheduling = o }) else null,
-                        moreTimeLabel = if (o.assigneeId == me) "More time" else "Reschedule",
-                    ) {
+                    val mineRow = o.assigneeId == me
+                    val doneTap: (() -> Unit)? = if (o.isPlaced) {
+                        if (o.canCheckIn(mineRow)) ({ vm.checkIn(o) }) else null
+                    } else if (o.isCounted) {
+                        if (mineRow && o.canCount(true, isDom)) ({ if (o.readyToSend) noting = o else vm.count(o, by = 1) { noting = it } }) else null
+                    } else if (mineRow && o.status == OccurrenceStatus.Pending && o.isOpen()) ({ if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) }) else null
+                    val missed = o.status == OccurrenceStatus.Missed
+                    // Right: Done on your own; on someone else's, a Dominant skips it or, once missed, excuses it.
+                    val start = when {
+                        doneTap != null -> SwipeAction("Done", Icons.Outlined.Check, ink = true, run = doneTap)
+                        isDom && !mineRow && missed -> SwipeAction("Excuse", Icons.Outlined.RemoveCircleOutline) { vm.excuse(o) }
+                        isDom && !mineRow && o.status == OccurrenceStatus.Pending -> SwipeAction("Skip", Icons.Outlined.EventBusy) { vm.skip(o) }
+                        else -> null
+                    }
+                    // Left: more time on your own, and a Dominant moves anyone's, a miss included (moving it reopens it).
+                    val end = when {
+                        o.status == OccurrenceStatus.Pending && (mineRow || isDom) -> SwipeAction(if (mineRow) "More time" else "Reschedule", Icons.Outlined.MoreTime) { rescheduling = o }
+                        missed && isDom && !mineRow -> SwipeAction("Reschedule", Icons.Outlined.MoreTime) { rescheduling = o }
+                        else -> null
+                    }
+                    SwipeableRow(start, end) {
                         OccurrenceRow(o, nameFor(o), actions, onOpen = { onOpenTask(o.seriesId) }, streak = d.streaks[o.seriesId])
                     }
                 }
@@ -639,6 +653,14 @@ fun TodayScreen(
             duration = SnackbarDuration.Long,
         )
         if (result == SnackbarResult.ActionPerformed) vm.undoComplete(o)
+    }
+
+    // A Dominant's skip gets Undo too, since a swipe is easy to make by accident.
+    val skipped by vm.skipped.collectAsStateWithLifecycle()
+    LaunchedEffect(skipped) {
+        val o = skipped ?: return@LaunchedEffect
+        vm.skippedShown()
+        if (snackbar.showSnackbar("Skipped: ${o.title}", actionLabel = "Undo", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) vm.unskip(o)
     }
 
     commenting?.let { o -> CommentsSheet(o, onDismiss = { commenting = null }, onChanged = vm::refresh) }

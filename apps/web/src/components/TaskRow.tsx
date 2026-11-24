@@ -11,6 +11,8 @@ import { RitualDialog, isRitual, stepProgress } from "./Ritual";
 import { RescheduleSheet } from "./RescheduleSheet";
 import { StreakStrip } from "./StreakStrip";
 import { useNoteAfter } from "./DecisionNote";
+import { useSkipOccurrence } from "./useSkipOccurrence";
+import { useSwipe, type SwipeAction } from "./useSwipe";
 import { CountRing, CountSheet, canCount, countLine, isCounted, readyToSend, useCountTap } from "./Count";
 import { CheckInButton, PlaceRing, canCheckIn, isPlaced, placeLine, useCheckIn, usePlaceLookup } from "./Location";
 import { Button, Diamond, Icon, IconButton, cx, useSnackbar } from "./ui";
@@ -63,6 +65,10 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
   const canComplete = mine && o.status === "pending" && isOpen(o);
   const isToday = localDateOf(new Date(o.dueAt)) === today();
   const { current, ...link } = useContext(RowLink)?.(o.seriesId) ?? { to: "/tasks/$taskId", params: { taskId: o.seriesId } };
+  const skip = useSkipOccurrence();
+  const snack = useSnackbar();
+  const edit = useEditOccurrence(rel.id);
+  const noteAfter = useNoteAfter();
 
   const when = isAllDayDue(o.dueAt)
     ? showDate || !isToday
@@ -90,14 +96,56 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
     o.status === "pending" && isRitual(o) && o.stepsDone.length ? stepProgress(o) : null,
   ].filter(Boolean);
 
+  const doneTap = () => (isRitual(o) ? setRunning(true) : o.proofRequired || o.askMood || o.asksJournal ? setCompleting(true) : quickComplete(o));
+  const excuse = () =>
+    edit.mutate(
+      { id: o.id, change: { status: "excused" } },
+      {
+        onSuccess: () => noteAfter("Excused", { relId: rel.id, occurrenceId: o.id, to: memberName(o.assigneeId), about: `excusing “${o.title}”` }),
+        onError: (e) => snack(errorMessage(e)),
+      },
+    );
+  // Swipes, as on Android: right is Done on your own, and on someone else's a Dominant skips it or, once missed,
+  // excuses it; left is more time on your own, and a Dominant reschedules anyone's, a miss included.
+  const start: SwipeAction | null =
+    canComplete && !counted && !placed
+      ? { label: "Done", ink: true, run: doneTap }
+      : isDom && !mine && o.status === "missed"
+        ? { label: "Excuse", run: excuse }
+        : isDom && !mine && o.status === "pending"
+          ? { label: "Skip", run: () => skip(o) }
+          : null;
+  const end: SwipeAction | null =
+    o.status === "pending" && (mine || isDom)
+      ? { label: mine ? "More time" : "Reschedule", run: () => setRescheduling(true) }
+      : o.status === "missed" && isDom && !mine
+        ? { label: "Reschedule", run: () => setRescheduling(true) }
+        : null;
+  const swipe = useSwipe(start, end);
+
   return (
-    <div
-      data-row
-      className={cx(
-        "group/row state-layer state-row flex min-h-16 items-center gap-2 py-1 pr-1 pl-0 has-[a[data-card-link]:focus-visible]:outline-2 has-[a[data-card-link]:focus-visible]:-outline-offset-2 has-[a[data-card-link]:focus-visible]:outline-primary",
-        current && "bg-surface-container-lowest",
+    <div className="relative touch-pan-y overflow-hidden" {...swipe.handlers}>
+      {swipe.shown && (
+        <div
+          aria-hidden
+          className={cx(
+            "absolute inset-0 flex items-center px-6 text-label-large",
+            swipe.dx > 0 ? "justify-start" : "justify-end",
+            swipe.shown.ink ? "bg-on-surface text-surface" : "bg-surface-container-high text-on-surface",
+          )}
+        >
+          {swipe.shown.label}
+        </div>
       )}
-    >
+      <div
+        data-row
+        style={swipe.dx ? { transform: `translateX(${swipe.dx}px)` } : undefined}
+        className={cx(
+          "group/row state-layer state-row flex min-h-16 items-center gap-2 bg-surface py-1 pr-1 pl-0 has-[a[data-card-link]:focus-visible]:outline-2 has-[a[data-card-link]:focus-visible]:-outline-offset-2 has-[a[data-card-link]:focus-visible]:outline-primary",
+          !swipe.dx && "transition-transform",
+          current && "bg-surface-container-lowest",
+        )}
+      >
       <div className="relative z-10">
         {placed && o.status !== "completed" && o.status !== "excused" && o.status !== "submitted" ? (
           <PlaceRing o={o} onTap={checkable ? () => checkIn(o) : undefined} />
@@ -173,6 +221,14 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
             onClick={() => setRescheduling(true)}
           />
         )}
+        {!actions && o.status === "pending" && (mine || isDom) && (
+          <IconButton
+            icon="event_busy"
+            label={isDom ? "Skip" : "Ask to skip"}
+            className="max-md:hidden md:opacity-0 md:group-hover/row:opacity-100 md:focus-visible:opacity-100"
+            onClick={() => skip(o)}
+          />
+        )}
         {isToday && !showDate && !(o.arrivedAt && o.status === "pending") && (
           <span className={cx("px-1 text-body-medium tabular-nums", missed ? "text-error" : "text-on-surface-variant")}>{when}</span>
         )}
@@ -187,6 +243,7 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
       {completing && <CompleteDialog o={o} open onClose={() => setCompleting(false)} />}
       {running && <RitualDialog o={o} open onClose={() => setRunning(false)} />}
       {counting && <CountSheet o={o} open onClose={() => setCounting(false)} />}
+      </div>
     </div>
   );
 }

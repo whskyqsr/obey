@@ -733,7 +733,7 @@ function useClashes(event: CalendarEvent | null): { title: string; body: ReactNo
                   Move
                 </Chip>
                 <Chip plain selected={choice === "cancel"} onClick={() => setChoices((c) => ({ ...c, [o.id]: "cancel" }))}>
-                  {isDom ? "Call off" : "Ask off"}
+                  {isDom ? "Skip" : "Ask to skip"}
                 </Chip>
               </>
             )}

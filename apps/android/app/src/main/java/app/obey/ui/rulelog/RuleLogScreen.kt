@@ -179,7 +179,7 @@ fun RuleLogScreen(onBack: () -> Unit, onOpenTask: (String) -> Unit, vm: RuleLogV
             app.obey.api.OccurrenceStatus.Submitted -> return if (isDom) "needs your approval" else "sent for approval"
             app.obey.api.OccurrenceStatus.Missed -> "not done"
             app.obey.api.OccurrenceStatus.Excused -> "excused"
-            app.obey.api.OccurrenceStatus.Cancelled -> "called off"
+            app.obey.api.OccurrenceStatus.Cancelled -> "skipped"
             app.obey.api.OccurrenceStatus.Pending -> "owed"
         }
         return "${o.title.lowercase()} · $state"

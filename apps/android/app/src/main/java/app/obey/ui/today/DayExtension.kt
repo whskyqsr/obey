@@ -117,13 +117,13 @@ fun ExtensionRequestCard(
     /** "Reschedule instead": the Dominant picks a new deadline for one task. */
     onInstead: (RescheduleRequest) -> Unit = {},
 ) {
-    fun change(x: RescheduleRequest) = if (x.kind == "cancel") "Call off" else "${formatDateTime(x.fromDueAt)} → ${formatDateTime(x.toDueAt)}"
+    fun change(x: RescheduleRequest) = if (x.kind == "cancel") "Skip" else "${formatDateTime(x.fromDueAt)} → ${formatDateTime(x.toDueAt)}"
     val r = rows.first()
     val who = requester?.let { "$it asks" } ?: "You asked"
     app.obey.ui.common.AccentBox {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             if (rows.size == 1 && r.kind == "cancel") {
-                Text("$who to call off “${r.title}”", style = MaterialTheme.typography.titleMedium)
+                Text("$who to skip “${r.title}”", style = MaterialTheme.typography.titleMedium)
                 Text("Due ${formatDateTime(r.fromDueAt)}", style = MaterialTheme.typography.bodyMedium)
             } else if (rows.size == 1) {
                 val following = if (r.scope == RescheduleScope.Following) " (this and following)" else ""

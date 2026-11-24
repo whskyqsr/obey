@@ -50,7 +50,7 @@ private val HistoryEntry.label: String
         OccurrenceStatus.Completed -> "Done"
         OccurrenceStatus.Missed -> "Missed"
         OccurrenceStatus.Excused -> "Excused"
-        OccurrenceStatus.Cancelled -> "Called off"
+        OccurrenceStatus.Cancelled -> "Skipped"
         OccurrenceStatus.Submitted -> "Awaiting review"
         else -> status.name
     }

@@ -6,6 +6,7 @@ import { errorMessage } from "../api/client";
 import { fmtDate, fmtDateTime, fmtRelative, fmtTime, localDateOf, today } from "../lib/dates";
 import { useReadOnly, useRel } from "../lib/relationship";
 import { Comments, SendBackDialog } from "./Comments";
+import { useSkipOccurrence } from "./useSkipOccurrence";
 import { ProofPhotos } from "./Proof";
 import { MOOD_LABELS, MoodPicker } from "./Mood";
 import { RitualDialog, StepList, isRitual, stepProgress } from "./Ritual";
@@ -62,6 +63,7 @@ export function OccurrenceCard({ o, showDate, linkTask = true, plain }: { o: Occ
   const readOnly = useReadOnly();
   const snack = useSnackbar();
   const review = useReviewOccurrence(rel.id);
+  const skip = useSkipOccurrence();
   const edit = useEditOccurrence(rel.id);
   const [completing, setCompleting] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
@@ -232,6 +234,11 @@ export function OccurrenceCard({ o, showDate, linkTask = true, plain }: { o: Occ
           {o.status === "pending" && (
             <Button variant="outlined" onClick={() => setRescheduling(true)}>
               {mine ? "More time" : "Reschedule"}
+            </Button>
+          )}
+          {o.status === "pending" && (mine || isDom) && !readOnly && (
+            <Button variant="outlined" onClick={() => skip(o)}>
+              {isDom ? "Skip" : "Ask to skip"}
             </Button>
           )}
           {!commenting && o.commentCount === 0 && !readOnly && (

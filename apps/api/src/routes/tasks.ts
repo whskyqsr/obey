@@ -664,6 +664,49 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     };
   });
 
+  // Skipping one due date: it drops off Today and the calendar but stays in the task's history (a miss becomes excused).
+  // A Dominant's skip applies at once; the assignee's goes to a Dominant, like asking for more time.
+  app.post<{ Params: { id: string } }>("/occurrences/:id/skip", async (req) => {
+    const { occ, series, member, rel } = await loadOccurrence(db, req.params.id, req.user.id);
+    const result = await db.transaction((tx) =>
+      requestPlanReschedule(tx, rel, [{ series, occ, action: "cancel" }], { userId: req.user.id, role: member.role }, undefined, deps.now(), deps.materializeDays),
+    );
+    if (result.asked) {
+      await notifier.send(await managers(db, rel.id, req.user.id), {
+        title: "Fealty",
+        body: `${req.user.displayName} asked to skip “${series.title}”`,
+        data: { type: "reschedule_requested", requestId: result.requests[0]!.id },
+      });
+    } else if (series.assigneeId !== req.user.id) {
+      await notifier.send([series.assigneeId], {
+        title: "Fealty",
+        body: `${req.user.displayName} skipped “${series.title}” for you`,
+        data: { type: "rescheduled", occurrenceId: occ.id },
+      });
+    }
+    return {
+      applied: result.asked === 0,
+      request: rescheduleDto(result.requests[0]!, series.title),
+      occurrence: occurrenceDto(result.occurrences[0]!, series),
+    };
+  });
+
+  // Undoing a Dominant's skip, straight after it: a called-off due date comes back as it was; an excused miss is missed again.
+  app.post<{ Params: { id: string } }>("/occurrences/:id/unskip", async (req) => {
+    const { occ, series, member } = await loadOccurrence(db, req.params.id, req.user.id);
+    if (!canManage(member.role)) throw forbidden("only a Dominant can undo a skip");
+    if (occ.status === "excused") {
+      return occurrenceDto(await db.transaction((tx) => editOccurrence(tx, series, occ, req.user.id, { status: "missed" }, deps.now())), series);
+    }
+    if (occ.status !== "cancelled" || !occ.calledOff) throw new HttpError(409, `occurrence is ${occ.status}`);
+    const [o] = await db
+      .update(occurrences)
+      .set({ status: "pending", calledOff: false, editedBy: req.user.id, editedAt: deps.now() })
+      .where(eq(occurrences.id, occ.id))
+      .returning();
+    return occurrenceDto(o!, series);
+  });
+
   // "More time for the whole day": one request covering several of the actor's occurrences.
   app.post<{ Params: { id: string } }>("/relationships/:id/reschedules/day", async (req) => {
     const body = rescheduleDayInput.parse(req.body);
@@ -814,7 +857,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       decideReschedule(tx, request, req.user.id, approve, deps.now(), deps.materializeDays, { dueAt: dueAt ? new Date(dueAt) : undefined, item }),
     );
     const n = results.length;
-    const what = request.kind === "cancel" && n === 1 ? "calling off your task" : `your extension${n > 1 ? ` for ${n} tasks` : ""}`;
+    const what = request.kind === "cancel" && n === 1 ? "skipping your task" : `your extension${n > 1 ? ` for ${n} tasks` : ""}`;
     const push = {
       title: "Fealty",
       body: dueAt && approve ? `${req.user.displayName} rescheduled your task instead` : `${req.user.displayName} ${approve ? "OK'd" : "said no to"} ${what}`,

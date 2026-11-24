@@ -46,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -425,7 +426,9 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
                 },
             ) { padding ->
                 // Only the bar's space is reserved here; each screen's own Scaffold handles the top insets.
-                val bottomOnly = androidx.compose.foundation.layout.PaddingValues(bottom = padding.calculateBottomPadding())
+                // The strip the + rises into is left to the page, so content runs under it rather than ending at a line.
+                val rise = if (showBar && newItems.isNotEmpty()) TAB_BAR_RISE else 0.dp
+                val bottomOnly = androidx.compose.foundation.layout.PaddingValues(bottom = (padding.calculateBottomPadding() - rise).coerceAtLeast(0.dp))
                 Box(Modifier.padding(bottomOnly).consumeWindowInsets(bottomOnly)) { host() }
             }
         }
@@ -441,6 +444,9 @@ private fun SafeCallFrame(vm: SafeCallViewModel, call: SafeCall?, content: @Comp
     }
 }
 
+/** How far the + stands above the tab bar's line. */
+private val TAB_BAR_RISE = 25.dp
+
 /** The ink + that starts anything new: a rounded square raised through the bar's top line, in a notch of the page colour. */
 @Composable
 private fun NewButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
@@ -454,9 +460,10 @@ private fun NewButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
 /** The phone's tab bar: Today, Week and Us as words in the serif, the current one in ink under a diamond, then +. */
 @Composable
 private fun TabBar(tabs: List<TopLevel>, selected: (TopLevel) -> Boolean, onClick: (TopLevel) -> Unit, onNew: (() -> Unit)?) {
-    // The + rises 20dp above the line, so the bar keeps a strip above it; content never scrolls under the button.
-    Box(Modifier.background(MaterialTheme.colorScheme.surface).windowInsetsPadding(WindowInsets.navigationBars).fillMaxWidth().height(if (onNew != null) 94.dp else 69.dp)) {
-      Column(Modifier.align(Alignment.BottomStart).fillMaxWidth()) {
+    // The + rises above the line. The strip it rises into stays see-through, so a page scrolls on under the button
+    // instead of stopping at a hard edge (the page's own scaffold padding only reserves the bar below the line).
+    Box(Modifier.fillMaxWidth()) {
+      Column(Modifier.padding(top = if (onNew != null) TAB_BAR_RISE else 0.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface).windowInsetsPadding(WindowInsets.navigationBars)) {
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Row(Modifier.fillMaxWidth().height(68.dp).padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
             // Grouped on the left, the way the mockup has them, with + on its own at the right.

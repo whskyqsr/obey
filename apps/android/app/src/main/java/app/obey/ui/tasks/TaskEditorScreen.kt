@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -158,7 +159,8 @@ fun TaskEditorScreen(onDone: () -> Unit, onKits: (() -> Unit)? = null, vm: TaskE
 
     Scaffold(
         topBar = {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            // A hand-made bar, so it has to keep clear of the status bar itself (TopAppBar does this on its own).
+            Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f)) {
                     TextButton(onClick = onDone) { Text("Cancel", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
@@ -223,15 +225,19 @@ fun TaskEditorScreen(onDone: () -> Unit, onKits: (() -> Unit)? = null, vm: TaskE
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                 ) {
                     val parts = buildList<Any> {
-                        if (!solo && members.size > 1) add(Panel.Who to who) else add(who)
-                        add(" will ")
-                        add(Panel.Title to form.title.ifBlank { "do what" })
-                        if (form.counted) { add(" "); add(Panel.Count to bounds) }
+                        // "For Alyssa: Tidying, every day by 9 PM": the title stands as a name, so it reads right
+                        // whether it's a chore ("Dishes") or an order ("Write lines").
+                        val whom = if (who == "You") "you" else who
+                        add("For ")
+                        if (!solo && members.size > 1) add(Panel.Who to whom) else add(whom)
+                        add(": ")
+                        add(Panel.Title to form.title.ifBlank { "what" })
+                        if (form.counted) { add(", "); add(Panel.Count to bounds) }
                         val quick = form.quick
                         if (quick != null) {
-                            add(" "); add(Panel.Time to "in ${quickLabel(quick)}"); add(".")
+                            add(", "); add(Panel.Time to "in ${quickLabel(quick)}"); add(".")
                         } else {
-                            add(" "); add(Panel.Often to if (once) "once" else oftenPhrase(describe(schedule)))
+                            add(", "); add(Panel.Often to if (once) "once" else oftenPhrase(describe(schedule)))
                             add(" by "); add(Panel.Time to if (form.allDay) "the end of the day" else form.dueTime.format(timeFmt))
                             add(if (once) (if (form.start == LocalDate.now() || form.start == LocalDate.now().plusDays(1)) ", " else ", on ") else ", starting ")
                             add(Panel.Start to dayPhrase(form.start)); add(".")

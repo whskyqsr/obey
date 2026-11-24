@@ -69,7 +69,7 @@ fun UsScreen(items: List<UsItem>, switcher: SwitcherActions, onDynamic: () -> Un
             )
         },
     ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 88.dp)) {
             DynamicSwitcherHero(switcher)
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

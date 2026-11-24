@@ -340,10 +340,11 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
 
   const sentence = (
     <p className="font-serif text-[34px] leading-[1.25] tracking-[-0.01em] text-on-surface md:text-[44px] lg:text-[52px] lg:leading-[1.2]">
-      {!solo && rel.members.length > 1 ? slot("who", mine ? "You" : who, "Who it's for") : mine ? "You" : who} will{" "}
+      {/* "For Alyssa: Tidying, every day by 9 PM": the title stands as a name, so it reads right whether it's a chore or an order. */}
+      For {!solo && rel.members.length > 1 ? slot("who", mine ? "you" : who, "Who it's for") : mine ? "you" : who}:{" "}
       <span className="inline-grid max-w-full align-baseline">
         <span aria-hidden className="invisible col-start-1 row-start-1 overflow-hidden pr-1 whitespace-pre">
-          {form.title || "do what"}
+          {form.title || "what"}
         </span>
         <input
           aria-label="Title"
@@ -351,7 +352,7 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
           size={1}
           value={form.title}
           onChange={(e) => set({ title: e.target.value })}
-          placeholder="do what"
+          placeholder="what"
           maxLength={200}
           required
           readOnly={readOnly}
@@ -359,7 +360,9 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
           className="col-start-1 row-start-1 w-full min-w-[4ch] border-b-[1.5px] border-primary bg-transparent p-0 text-inherit outline-none placeholder:text-on-surface-variant/50"
         />
       </span>
-      {form.counted && <> {slot("count", bounds, "How many")}</>}
+      {/* The comma tucks in against the title's caret room, so it doesn't read as " ,". */}
+      <span className="-ml-1">,</span>
+      {form.counted && <> {slot("count", bounds, "How many")},</>}
       {form.quick ? (
         <> {slot("time", `in ${quickLabel(form.quick)}`, "When it's due")}.</>
       ) : (

@@ -150,6 +150,12 @@ class UpcomingViewModel @Inject constructor(
         refresh()
     }
 
+    fun skip(o: Occurrence) = action {
+        val r = api.skip(o.id)
+        say(if (r.applied) "Skipped" else "Asked to skip “${o.title}”")
+        refresh()
+    }
+
     fun reschedule(o: Occurrence, input: RescheduleInput) = action {
         val r = api.reschedule(o.id, input)
         say(if (r.applied) "Rescheduled" else "Extension requested; waiting for approval")

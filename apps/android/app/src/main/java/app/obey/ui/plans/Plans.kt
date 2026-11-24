@@ -858,7 +858,7 @@ private fun ClashSheet(
                             app.obey.ui.common.LettersChip("Keep", plan.choiceOf(o) == ClashChoice.Keep, { form.choices[o.id] = ClashChoice.Keep })
                             if (plan.canMove(o)) {
                                 app.obey.ui.common.LettersChip("Move", plan.choiceOf(o) == ClashChoice.Move, { form.choices[o.id] = ClashChoice.Move })
-                                app.obey.ui.common.LettersChip(if (plan.isDom) "Call off" else "Ask off", plan.choiceOf(o) == ClashChoice.Cancel, { form.choices[o.id] = ClashChoice.Cancel })
+                                app.obey.ui.common.LettersChip(if (plan.isDom) "Skip" else "Ask to skip", plan.choiceOf(o) == ClashChoice.Cancel, { form.choices[o.id] = ClashChoice.Cancel })
                             }
                         }
                         if (plan.choiceOf(o) == ClashChoice.Move) {

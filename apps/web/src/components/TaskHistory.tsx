@@ -14,7 +14,7 @@ const LABEL: Record<HistoryEntry["status"], { label: string; tone: "primary" | "
   completed: { label: "Done", tone: "primary" },
   missed: { label: "Missed", tone: "error" },
   excused: { label: "Excused", tone: "neutral" },
-  cancelled: { label: "Called off", tone: "neutral" },
+  cancelled: { label: "Skipped", tone: "neutral" },
 };
 
 /** `2026-10-16T21:30` in the browser's zone, for <input type="datetime-local">. */

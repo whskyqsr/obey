@@ -161,6 +161,12 @@ class TaskDetailViewModel @Inject constructor(
         refresh()
     }
 
+    fun skip(o: Occurrence) = action {
+        val r = api.skip(o.id)
+        say(if (r.applied) "Skipped" else "Asked to skip “${o.title}”")
+        refresh()
+    }
+
     fun reschedule(o: Occurrence, input: RescheduleInput) = action {
         val r = api.reschedule(o.id, input)
         say(if (r.applied) "Moved to ${formatDue(r.occurrence.dueAt)}" else "Extension requested; waiting for approval")
@@ -282,6 +288,8 @@ fun TaskDetailScreen(
                                     onReschedule = { rescheduling = o },
                                     // A Dominant settles a miss here too: excuse it, or move it, which reopens it.
                                     onExcuseInMenu = if (canManage && !mine && o.status == OccurrenceStatus.Missed) ({ vm.excuse(o) }) else null,
+                                    onSkip = if (o.status == OccurrenceStatus.Pending && (mine || canManage)) ({ vm.skip(o) }) else null,
+                                    skipAsks = !canManage,
                                     onComments = { commenting = o },
                                     onCount = if (mine && o.canCount(true, canManage)) ({ if (o.readyToSend) noting = o else vm.count(o, by = 1) { noting = it } }) else null,
                                     onCountHold = if (o.canCount(mine, canManage)) ({ counting = o }) else null,
