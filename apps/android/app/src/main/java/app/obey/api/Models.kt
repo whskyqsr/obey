@@ -1641,21 +1641,39 @@ data class ChastityPhotoAsk(val taskId: String)
 
 /** One item of the limits list: from the starter list, or added by one of the two of them. */
 @Serializable
-data class LimitItem(val key: String, val category: String, val title: String, val custom: Boolean = false, val createdBy: String? = null)
+data class LimitItem(
+    val key: String,
+    val category: String,
+    val title: String,
+    val custom: Boolean = false,
+    val createdBy: String? = null,
+    /** What each side means, said to the person answering; "{name}" is their partner. */
+    val sentences: LimitSentences = LimitSentences(),
+)
+
+/** "sub": with their partner in charge; "dom": with them in charge. Items people add say just that. */
+@Serializable
+data class LimitSentences(val sub: String = "With {name} in charge", val dom: String = "With you in charge")
+
+/** One person's answers for each side, by item key. */
+@Serializable
+data class LimitSides(val dom: Map<String, LimitAnswer> = emptyMap(), val sub: Map<String, LimitAnswer> = emptyMap()) {
+    operator fun get(side: String) = if (side == "dom") dom else sub
+}
 
 /** One person's answer: "love", "like", "curious", "soft" or "hard" (null when they only left a note). */
 @Serializable
 data class LimitAnswer(val rating: String? = null, val note: String = "")
 
-/** A person's progress, and their answers by item key: always your own, a partner's once everyone has finished. */
+/** A person's progress, and their answers for each side: always your own, a partner's once everyone has finished. */
 @Serializable
-data class LimitPerson(val userId: String, val finishedAt: String? = null, val updatedAt: String? = null, val rated: Int = 0, val answers: Map<String, LimitAnswer>? = null)
+data class LimitPerson(val userId: String, val finishedAt: String? = null, val updatedAt: String? = null, val rated: Int = 0, val sides: LimitSides? = null)
 
 @Serializable
 data class LimitList(val items: List<LimitItem>, val people: List<LimitPerson>)
 
 @Serializable
-data class LimitAnswerInput(val rating: String?, val note: String)
+data class LimitAnswerInput(val rating: String?, val note: String, val side: String)
 
 @Serializable
 data class LimitItemInput(val category: String, val title: String)
