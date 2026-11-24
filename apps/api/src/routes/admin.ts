@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { Deps } from "../app.js";
-import { occurrences, proofPhotos, reports, users } from "../db/schema.js";
+import { memberships, occurrences, proofPhotos, relationships, reports, users } from "../db/schema.js";
 import { notFound } from "../errors.js";
 import { usageSince } from "../services/usage.js";
 
@@ -52,6 +52,38 @@ export const adminRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     requireAdmin(req);
     const days = Math.min(366, Math.max(1, Number(req.query.days) || 90));
     return (await usageSince(db, deps.now(), days)).map((r) => ({ day: r.day, kind: r.kind, count: r.count }));
+  });
+
+  /** One account by email, for support: when it joined, how many dynamics, and reports. Nothing from inside a dynamic. */
+  app.get<{ Querystring: { email?: string } }>("/admin/accounts", async (req) => {
+    requireAdmin(req);
+    const email = (req.query.email ?? "").trim().toLowerCase();
+    if (!email) return [];
+    const found = await db
+      .select({ id: users.id, displayName: users.displayName, email: users.email, createdAt: users.createdAt })
+      .from(users)
+      .where(eq(sql`lower(${users.email})`, email));
+    return Promise.all(
+      found.map(async (u) => {
+        const [counts] = await db
+          .select({
+            live: sql<number>`count(*) filter (where ${relationships.endedAt} is null)::int`,
+            ended: sql<number>`count(*) filter (where ${relationships.endedAt} is not null)::int`,
+          })
+          .from(memberships)
+          .innerJoin(relationships, eq(relationships.id, memberships.relationshipId))
+          .where(eq(memberships.userId, u.id));
+        const [about] = await db.select({ open: sql<number>`count(*) filter (where ${reports.resolvedAt} is null)::int`, all: sql<number>`count(*)::int` }).from(reports).where(eq(reports.subjectId, u.id));
+        const [filed] = await db.select({ all: sql<number>`count(*)::int` }).from(reports).where(eq(reports.reporterId, u.id));
+        return {
+          ...u,
+          createdAt: u.createdAt.toISOString(),
+          dynamics: { live: counts!.live, ended: counts!.ended },
+          reportsAbout: { open: about!.open, all: about!.all },
+          reportsFiled: filed!.all,
+        };
+      }),
+    );
   });
 
   /** A reported photo, for the person reviewing the report. */

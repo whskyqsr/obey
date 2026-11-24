@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import cors from "@fastify/cors";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { ZodError, type ZodType } from "zod";
@@ -7,6 +8,12 @@ import type { users } from "./db/schema.js";
 import { HttpError } from "./errors.js";
 import type { Notifier } from "./notify.js";
 import { requestScope } from "./services/access.js";
+import { AI_INTERNAL_HEADER, aiRouteAllowed, mcpRoutes } from "./mcp/server.js";
+import { oauthRoutes } from "./routes/oauth.js";
+import { aiAccessRoutes } from "./routes/aiAccess.js";
+import { aiGrants, users as usersTable } from "./db/schema.js";
+import { eq, getTableColumns } from "drizzle-orm";
+import { SCOPE_STAFF } from "./services/aiAccess.js";
 import { adminRoutes } from "./routes/admin.js";
 import { commentRoutes } from "./routes/comments.js";
 import { limitRoutes } from "./routes/limits.js";
@@ -49,6 +56,10 @@ export interface Deps {
   geocode?: Geocoder;
   /** Satellite tiles for the place picker (Esri), when there's a key. Tests pass a stub fetch. */
   imagery?: { key: string; fetchTile?: FetchTile; fetchCredit?: FetchCredit } | null;
+  /** The web app, where the connect page for AI apps lives (APP_URL). */
+  appUrl?: string;
+  /** This API's public address (API_URL); worked out from each request when unset. */
+  apiUrl?: string;
   logger?: boolean;
 }
 
@@ -68,6 +79,8 @@ declare module "fastify" {
     allowUnverified?: boolean;
     /** Checks its own signed link instead of the sign-in header (map tiles, which can't send one). */
     signedLink?: boolean;
+    /** Checks its own credentials or none (OAuth and MCP endpoints), instead of the sign-in header. */
+    ownAuth?: boolean;
   }
 }
 
@@ -83,11 +96,44 @@ export function buildApp(deps: Deps) {
   app.decorateRequest("user", null as unknown as User);
   app.decorateRequest("admin", false);
   app.decorateRequest("email", null);
+  // MCP tools call the app's own routes in-process, as the person who connected the AI app. This secret marks those
+  // calls; it never leaves the process, so nothing from outside can pass for one.
+  const internalSecret = randomBytes(32).toString("base64url");
+  const aiGrantOf = (req: FastifyRequest) => (req.headers[AI_INTERNAL_HEADER] === internalSecret ? (req.headers["x-ai-grant"] as string | undefined) : undefined);
+  // OAuth's token endpoint takes form posts.
+  app.addContentTypeParser("application/x-www-form-urlencoded", { parseAs: "string" }, (_req, body, done) => {
+    done(null, Object.fromEntries(new URLSearchParams(body as string)));
+  });
   const admins = new Set((deps.adminEmails ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean));
   // Callback style so the rest of the request runs inside the scope.
-  app.addHook("onRequest", (req, _reply, done) => requestScope.run({ write: !["GET", "HEAD", "OPTIONS"].includes(req.method) }, done));
+  app.addHook("onRequest", (req, _reply, done) => {
+    const write = !["GET", "HEAD", "OPTIONS"].includes(req.method);
+    requestScope.run(aiGrantOf(req) !== undefined ? { write, ai: true, touched: new Set<string>() } : { write }, done);
+  });
+  // An AI call reports back which dynamics it touched, so the MCP layer logs the right one.
+  app.addHook("onSend", async (_req, reply) => {
+    const touched = requestScope.getStore()?.touched;
+    if (touched?.size) reply.header("x-ai-touched", [...touched].join(","));
+  });
   app.addHook("onRequest", async (req: FastifyRequest) => {
-    if (req.method === "OPTIONS" || req.url === "/health" || req.routeOptions.config.signedLink) return;
+    if (req.method === "OPTIONS" || req.url === "/health" || req.routeOptions.config.signedLink || req.routeOptions.config.ownAuth) return;
+    const grantId = aiGrantOf(req);
+    if (grantId !== undefined) {
+      // Only the routes MCP tools use; everything else (photos, location, settings, AI access itself) stays app-only.
+      if (!aiRouteAllowed(req.method, req.routeOptions.url)) throw new HttpError(404, "not found");
+      const { avatar: _a, ...cols } = getTableColumns(usersTable);
+      const [row] = await deps.db
+        .select({ user: cols, scope: aiGrants.scope })
+        .from(aiGrants)
+        .innerJoin(usersTable, eq(usersTable.id, aiGrants.userId))
+        .where(eq(aiGrants.id, grantId));
+      if (!row) throw new HttpError(401, "sign in required");
+      req.user = row.user;
+      req.email = row.user.email;
+      // Staff rights need the staff scope and an address still on the list, checked on every call.
+      req.admin = row.scope.split(" ").includes(SCOPE_STAFF) && row.user.email !== null && admins.has(row.user.email.toLowerCase());
+      return;
+    }
     const identity = await deps.authenticate(req);
     if (identity.unverified && !req.routeOptions.config.allowUnverified) throw new HttpError(403, "verify your email", { code: "email_unverified" });
     req.user = await upsertUser(deps.db, identity);
@@ -128,5 +174,8 @@ export function buildApp(deps: Deps) {
   app.register(chastityRoutes(deps));
   app.register(verificationRoutes(deps));
   app.register(imageryRoutes(deps));
+  app.register(oauthRoutes(deps));
+  app.register(aiAccessRoutes(deps));
+  app.register(mcpRoutes(deps, { internalSecret }));
   return app;
 }
