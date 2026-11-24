@@ -64,3 +64,23 @@ export async function pruneAi(db: Tx, now: Date) {
   const monthAgo = new Date(now.getTime() - 30 * 86_400_000);
   await db.delete(aiGrants).where(or(and(isNotNull(aiGrants.revokedAt), lt(aiGrants.revokedAt, monthAgo)), lt(aiGrants.refreshExpiresAt, monthAgo)));
 }
+
+/**
+ * Apps we recognise by where their sign-in codes go, which only the app itself can receive. A name is whatever the app
+ * typed when it registered, so it never earns a known app's mark on its own.
+ */
+const KNOWN_APPS: { kind: "claude" | "chatgpt"; name: string; hosts: string[] }[] = [
+  { kind: "claude", name: "Claude", hosts: ["claude.ai", "claude.com"] },
+  { kind: "chatgpt", name: "ChatGPT", hosts: ["chatgpt.com", "chat.openai.com"] },
+];
+
+export function knownApp(redirectUris: string[]) {
+  const hosts = redirectUris.map((u) => {
+    try {
+      return new URL(u).hostname;
+    } catch {
+      return "";
+    }
+  });
+  return KNOWN_APPS.find((k) => hosts.length > 0 && hosts.every((h) => k.hosts.includes(h))) ?? null;
+}

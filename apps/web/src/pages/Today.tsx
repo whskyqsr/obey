@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { AiAccessAsk } from "../components/AiAccessAsk";
 import { useNavigate } from "@tanstack/react-router";
 import { usePendingReschedules } from "../api/hooks";
 import type { Occurrence } from "../api/types";
@@ -110,6 +111,7 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
             {/* The Next block counts down on its own, so the separate countdown is only for what it doesn't cover. */}
             <CountdownCard skip={next?.id} />
             <RoleSwapCard />
+            <AiAccessAsk />
             <SoloCards />
             <ChastityToday />
             <CurfewStrip />

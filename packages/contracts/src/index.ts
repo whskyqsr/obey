@@ -99,6 +99,8 @@ export const member = z.object({
   locationPausedUntil: z.string().nullable().default(null),
   /** Whether their notifications may carry a partner's own words, so a Dominant knows if a reminder in their words gets through. */
   notifyDetails: z.boolean().default(false),
+  /** Whether they allow AI apps into this dynamic. AI apps reach it only once every member does. */
+  aiAccess: z.boolean().default(false),
 });
 /** A Dominant and a submissive trading roles, asked for or under way. Roles in `members` are already swapped while it's active. */
 export const roleSwap = z.object({
@@ -1464,3 +1466,23 @@ export const chastityAskInput = z.object({ kind: z.enum(["release", "break"]), m
 export const chastityDecideInput = z.object({ approve: z.boolean(), minutes: breakMinutes.optional(), note: z.string().trim().max(500).optional() });
 /** Asking the wearer for a photo: a task with photo proof, due when the keyholder says. */
 export const chastityPhotoAskInput = z.object({ dueAt: z.string().datetime({ offset: true }), timezone: z.string().min(1) });
+
+/** What AI access looks like for a dynamic: who has allowed it, the apps connected by its members, and their recent calls. */
+export const aiApp = z.object({
+  id,
+  userId: id,
+  app: z.string(),
+  /** A recognised app, which picks its mark. */
+  kind: z.enum(["claude", "chatgpt"]).nullable(),
+  connectedAt: z.string(),
+  lastUsedAt: z.string().nullable(),
+});
+export const aiAccess = z.object({
+  reachable: z.boolean(),
+  members: z.array(z.object({ userId: id, allowed: z.boolean() })),
+  apps: z.array(aiApp),
+  calls: z.array(z.object({ tool: z.string(), userId: id, ok: z.boolean(), app: z.string(), kind: z.enum(["claude", "chatgpt"]).nullable(), at: z.string() })),
+});
+export type AiApp = z.infer<typeof aiApp>;
+export type AiAccess = z.infer<typeof aiAccess>;
+export const aiAccessInput = z.object({ allowed: z.boolean() });

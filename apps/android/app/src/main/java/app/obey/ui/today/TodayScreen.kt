@@ -500,6 +500,7 @@ fun TodayScreen(
                     offlineSince?.let { at -> item(key = "offline") { OfflineBanner(at) } }
                     if (session?.readOnly == true) item(key = "ended") { EndedBanner(onOpenSettings) }
                     if (session?.relationship?.roleSwap != null) item(key = "role-swap") { app.obey.ui.roles.RoleSwapCard(session) }
+                    if (session?.relationship?.members?.any { it.userId != session.userId && it.aiAccess } == true) item(key = "ai-ask") { app.obey.ui.settings.AiAccessAsk(session) }
                     if (session?.readOnly != true) {
                         item(key = "countdown") {
                             val other = session?.partners?.firstOrNull()
