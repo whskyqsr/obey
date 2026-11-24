@@ -283,7 +283,7 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
             } else {
                 TopAppBar(
                     title = {},
-                    navigation = { BackLink("Us", onBack) },
+                    navigationIcon = { BackLink("Us", onBack) },
                     actions = {
                         if (!ended) IconButton(onClick = { vm.clearInvite(); dialog = "invite" }) { Icon(Icons.Outlined.PersonAdd, "Invite someone") }
                     },
