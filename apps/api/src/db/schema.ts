@@ -165,7 +165,7 @@ export const limitItems = pgTable(
   (t) => [index("limit_items_relationship_idx").on(t.relationshipId)],
 );
 
-/** One person's answer for one item of the limits list, for themselves in their own role. Skipped items have no row. */
+/** One person's answer for one item of the limits list, for one side: "dom" with them in charge, "sub" with their partner in charge. Skipped sides have no row. */
 export const limitRatings = pgTable(
   "limit_ratings",
   {
@@ -177,11 +177,12 @@ export const limitRatings = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     /** A starter item's key, or a limit_items id. */
     itemKey: text("item_key").notNull(),
+    side: text("side", { enum: ["dom", "sub"] }).notNull(),
     rating: text("rating", { enum: ["love", "like", "curious", "soft", "hard"] }),
     note: text("note").notNull().default(""),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.relationshipId, t.userId, t.itemKey] })],
+  (t) => [primaryKey({ columns: [t.relationshipId, t.userId, t.itemKey, t.side] })],
 );
 
 /** When someone said they'd finished their limits list; partners' answers show once everyone has. */

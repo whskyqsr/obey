@@ -1,4 +1,14 @@
-import { LIMIT_STARTERS, type LimitAnswer, type LimitList, allFeatures, limitAnswerInput, limitItemInput } from "@obey/contracts";
+import {
+  LIMIT_OWN_SENTENCES,
+  LIMIT_STARTERS,
+  type LimitAnswer,
+  type LimitList,
+  type LimitSide,
+  type Role,
+  allFeatures,
+  limitAnswerInput,
+  limitItemInput,
+} from "@obey/contracts";
 import { and, asc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -10,9 +20,21 @@ import { requireMember } from "../services/access.js";
 const STARTER_KEYS = new Set(LIMIT_STARTERS.map((s) => s.key));
 
 /**
- * The limits list: a starter list plus items the two of them add, each rated by each person for themselves (love, like,
- * curious, soft or hard limit). Your own answers are always yours to see; a partner's show once everyone has finished,
- * so nobody answers to match.
+ * The side someone answers on by default: their own role's, or for a switch the side opposite their partner's role.
+ * A switch with no such partner has no usual side, so an answer without a side goes to both.
+ */
+export function usualSides(role: Role, partnerRole: Role | undefined): LimitSide[] {
+  if (role === "dominant") return ["dom"];
+  if (role === "submissive") return ["sub"];
+  if (partnerRole === "dominant") return ["sub"];
+  if (partnerRole === "submissive") return ["dom"];
+  return ["dom", "sub"];
+}
+
+/**
+ * The limits list: a starter list plus items the two of them add, each rated by each person both ways round (love, like,
+ * curious, soft or hard limit), once with them in charge and once with their partner in charge. Your own answers are
+ * always yours to see; a partner's show once everyone has finished, so nobody answers to match.
  */
 export const limitListRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   const { db, notifier } = deps;
@@ -24,7 +46,10 @@ export const limitListRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     return m;
   }
 
-  const members = (relationshipId: string) => db.select({ userId: memberships.userId }).from(memberships).where(eq(memberships.relationshipId, relationshipId));
+  const members = (relationshipId: string) =>
+    db.select({ userId: memberships.userId, role: memberships.role }).from(memberships).where(eq(memberships.relationshipId, relationshipId));
+  const sidesFor = (people: { userId: string; role: Role }[], userId: string) =>
+    usualSides(people.find((p) => p.userId === userId)!.role, people.find((p) => p.userId !== userId)?.role);
 
   app.get<{ Params: { id: string } }>("/relationships/:id/limit-list", async (req): Promise<LimitList> => {
     await requireLimits(req.params.id, req.user.id);
@@ -36,8 +61,19 @@ export const limitListRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       db.select().from(limitFinished).where(eq(limitFinished.relationshipId, relId)),
     ]);
     const items = [
-      ...LIMIT_STARTERS.map((s) => ({ ...s, custom: false, createdBy: null })),
-      ...custom.map((c) => ({ key: c.id, category: c.category, title: c.title, custom: true, createdBy: c.createdBy })),
+      ...LIMIT_STARTERS.map((s) => ({
+        ...s,
+        custom: false,
+        createdBy: null,
+      })),
+      ...custom.map((c) => ({
+        key: c.id,
+        category: c.category,
+        title: c.title,
+        custom: true,
+        createdBy: c.createdBy,
+        sentences: { ...LIMIT_OWN_SENTENCES },
+      })),
     ];
     const live = new Set(items.map((i) => i.key));
     const everyoneDone = people.every((p) => finished.some((f) => f.userId === p.userId));
@@ -45,14 +81,18 @@ export const limitListRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       items,
       people: people.map((p) => {
         const mine = ratings.filter((r) => r.userId === p.userId && live.has(r.itemKey) && (r.rating || r.note));
-        const answers: Record<string, LimitAnswer> = Object.fromEntries(mine.map((r) => [r.itemKey, { rating: r.rating, note: r.note }]));
+        const side = (x: LimitSide): Record<string, LimitAnswer> =>
+          Object.fromEntries(mine.filter((r) => r.side === x).map((r) => [r.itemKey, { rating: r.rating, note: r.note }]));
+        const sides = { dom: side("dom"), sub: side("sub") };
         const last = mine.reduce<Date | null>((a, r) => (!a || r.updatedAt > a ? r.updatedAt : a), null);
+        const shown = p.userId === req.user.id || everyoneDone;
         return {
           userId: p.userId,
           finishedAt: finished.find((f) => f.userId === p.userId)?.finishedAt.toISOString() ?? null,
           updatedAt: last?.toISOString() ?? null,
-          rated: mine.filter((r) => r.rating).length,
-          answers: p.userId === req.user.id || everyoneDone ? answers : null,
+          rated: new Set(mine.filter((r) => r.rating).map((r) => r.itemKey)).size,
+          answers: shown ? sides[sidesFor(people, p.userId)[0]!] : null,
+          sides: shown ? sides : null,
         };
       }),
     };
@@ -72,13 +112,32 @@ export const limitListRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     }
     const body = limitAnswerInput.parse(req.body);
     const now = deps.now();
-    if (!body.rating && !body.note)
-      await db.delete(limitRatings).where(and(eq(limitRatings.relationshipId, req.params.id), eq(limitRatings.userId, req.user.id), eq(limitRatings.itemKey, key)));
-    else
-      await db
-        .insert(limitRatings)
-        .values({ relationshipId: req.params.id, userId: req.user.id, itemKey: key, rating: body.rating, note: body.note, updatedAt: now })
-        .onConflictDoUpdate({ target: [limitRatings.relationshipId, limitRatings.userId, limitRatings.itemKey], set: { rating: body.rating, note: body.note, updatedAt: now } });
+    const sides = body.side ? [body.side] : sidesFor(await members(req.params.id), req.user.id);
+    for (const side of sides) {
+      const row = and(
+        eq(limitRatings.relationshipId, req.params.id),
+        eq(limitRatings.userId, req.user.id),
+        eq(limitRatings.itemKey, key),
+        eq(limitRatings.side, side),
+      );
+      if (!body.rating && !body.note) await db.delete(limitRatings).where(row);
+      else
+        await db
+          .insert(limitRatings)
+          .values({
+            relationshipId: req.params.id,
+            userId: req.user.id,
+            itemKey: key,
+            side,
+            rating: body.rating,
+            note: body.note,
+            updatedAt: now,
+          })
+          .onConflictDoUpdate({
+            target: [limitRatings.relationshipId, limitRatings.userId, limitRatings.itemKey, limitRatings.side],
+            set: { rating: body.rating, note: body.note, updatedAt: now },
+          });
+    }
     return { rating: body.rating, note: body.note };
   });
 
@@ -87,8 +146,23 @@ export const limitListRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const body = limitItemInput.parse(req.body);
     const count = await db.select({ id: limitItems.id }).from(limitItems).where(eq(limitItems.relationshipId, req.params.id));
     if (count.length >= 200) throw new HttpError(409, "that's as many as the list holds");
-    const [row] = await db.insert(limitItems).values({ relationshipId: req.params.id, category: body.category, title: body.title, createdBy: req.user.id }).returning();
-    return reply.status(201).send({ key: row!.id, category: row!.category, title: row!.title, custom: true, createdBy: row!.createdBy });
+    const [row] = await db
+      .insert(limitItems)
+      .values({
+        relationshipId: req.params.id,
+        category: body.category,
+        title: body.title,
+        createdBy: req.user.id,
+      })
+      .returning();
+    return reply.status(201).send({
+      key: row!.id,
+      category: row!.category,
+      title: row!.title,
+      custom: true,
+      createdBy: row!.createdBy,
+      sentences: { ...LIMIT_OWN_SENTENCES },
+    });
   });
 
   app.delete<{ Params: { id: string; key: string } }>("/relationships/:id/limit-list/items/:key", async (req, reply) => {
@@ -109,7 +183,14 @@ export const limitListRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   app.put<{ Params: { id: string } }>("/relationships/:id/limit-list/finished", async (req) => {
     await requireLimits(req.params.id, req.user.id);
     const relId = req.params.id;
-    await db.insert(limitFinished).values({ relationshipId: relId, userId: req.user.id, finishedAt: deps.now() }).onConflictDoNothing();
+    await db
+      .insert(limitFinished)
+      .values({
+        relationshipId: relId,
+        userId: req.user.id,
+        finishedAt: deps.now(),
+      })
+      .onConflictDoNothing();
     const people = await members(relId);
     const finished = await db.select().from(limitFinished).where(eq(limitFinished.relationshipId, relId));
     const others = people.map((p) => p.userId).filter((id) => id !== req.user.id);
