@@ -308,7 +308,10 @@ export function LimitsEditPage() {
             return (
               <section key={side} className="mt-7">
                 <div className="flex items-baseline gap-4">
-                  <h2 className="min-w-0 flex-1 text-body-large text-on-surface">{text}</h2>
+                  <h2 className="min-w-0 flex-1 text-body-large text-on-surface">
+                    {text}
+                    {side !== usual && <span className="ml-2 text-body-medium text-on-surface-variant">Optional</span>}
+                  </h2>
                   <button type="button" onClick={() => setNoting({ item, side })} className="text-label-large text-primary">
                     {a?.note ? "Change the note" : "Add a note"}
                   </button>
