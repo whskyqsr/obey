@@ -47,6 +47,8 @@ Once Jake decides how something looks or behaves, apply it everywhere the same s
 - No explainers under names or settings (2026-11-23).
 - Form fields are label-above Letters fields with one hairline (2026-11-23).
 - Deleting an item returns to its list, never back through history to wherever it was opened from (Notes, 2026-11-23).
+- The overflow menu is a horizontal ⋯, as in every mockup (2026-11-24).
+- Plans are marked with an accent rule and say whose they are ("Kitten's plan"), not a colour per person (mockup 13, 2026-11-24).
 
 Pixel perfection isn't the goal. Once the big gaps in `design/STATUS.md` are closed, there will be a consistency pass across every screen: same headers, same row styles, same buttons and same spacing for the same jobs.
 
