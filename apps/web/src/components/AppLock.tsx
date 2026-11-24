@@ -154,12 +154,7 @@ export function AppLockSetting({ uid }: { uid: string }) {
   const [setting, setSetting] = useState(false);
   return (
     <div className="py-1">
-      <Switch
-        checked={!!config}
-        onChange={(on) => (on ? setSetting(true) : (clearPin(uid), snack("App lock off")))}
-        label="Lock with a PIN"
-        help="Only on this browser. Signing out removes it."
-      />
+      <Switch checked={!!config} onChange={(on) => (on ? setSetting(true) : (clearPin(uid), snack("App lock off")))} label="Lock with a PIN" />
       {config && (
         <div className="flex flex-col gap-3 pb-3">
           <div className="text-body-medium text-on-surface-variant">Lock again when you've been away</div>

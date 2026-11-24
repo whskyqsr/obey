@@ -56,7 +56,6 @@ fun QuietHoursSetting(saved: QuietHours?, enabled: Boolean, onChange: (start: St
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Quiet hours", style = MaterialTheme.typography.bodyLarge)
-                    Text("Notifications still arrive, just without sound or vibration.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
                 }
                 Switch(checked = saved != null, enabled = enabled, onCheckedChange = { on -> if (on) onChange(start, end) else onChange(null, null) })
             }

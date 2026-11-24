@@ -25,12 +25,7 @@ export function QuietHoursSetting() {
 
   return (
     <div className="border-b border-outline-variant py-1">
-      <Switch
-        checked={!!saved}
-        onChange={(on) => save(on ? { ...draft, timezone: zone() } : null)}
-        label="Quiet hours"
-        help="Notifications still arrive, just without sound or vibration."
-      />
+      <Switch checked={!!saved} onChange={(on) => save(on ? { ...draft, timezone: zone() } : null)} label="Quiet hours" />
       {saved && (
         <div className="flex flex-wrap items-end gap-3 pb-2">
           <TextField label="From" type="time" value={draft.start} onChange={(e) => change({ start: e.target.value })} className="w-36" />

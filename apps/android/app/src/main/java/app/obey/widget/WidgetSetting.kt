@@ -78,7 +78,6 @@ fun WidgetSetting(vm: WidgetSettingViewModel = hiltViewModel()) {
                 Spacer(Modifier.width(36.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Mark done from the widget", style = MaterialTheme.typography.bodyLarge)
-                    Text("Tasks that need proof, steps, a mood or an entry still open the app", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
                 }
                 Switch(checked = tick, onCheckedChange = vm::setTick)
             }

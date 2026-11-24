@@ -1,4 +1,4 @@
-import { Suspense, lazy, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useLibrary, useSaveLibraryItem } from "../api/hooks";
 import { errorMessage } from "../api/client";
@@ -102,12 +102,19 @@ export function NotesPage({ kind, selected }: { kind: "note" | "journal"; select
       (notes.data ?? [])
         .filter((n) => n.kind === kind)
         .filter((n) => !tag || n.tags.includes(tag))
-        .filter((n) => !needle || n.title.toLowerCase().includes(needle) || n.bodyMd.toLowerCase().includes(needle) || n.tags.some((t) => t.toLowerCase().includes(needle)))
+        .filter(
+          (n) =>
+            !needle ||
+            n.title.toLowerCase().includes(needle) ||
+            n.bodyMd.toLowerCase().includes(needle) ||
+            n.tags.some((t) => t.toLowerCase().includes(needle)),
+        )
         // The journal reads as a timeline; notes keep pinned ones on top.
-        .sort((a, b) => (kind === "journal" ? b.createdAt.localeCompare(a.createdAt) : Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt)))
+        .sort((a, b) =>
+          kind === "journal" ? b.createdAt.localeCompare(a.createdAt) : Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt),
+        )
     );
   }, [notes.data, q, tag, kind]);
-
 
   // A note's line under its title: who can see it, who else can change it, when it last changed.
   const noteMeta = (n: Note) =>
@@ -134,7 +141,11 @@ export function NotesPage({ kind, selected }: { kind: "note" | "journal"; select
   );
 
   const empty = notes.data && !list.length && (
-    <Empty icon={copy.icon} title={q || tag ? "Nothing matches" : copy.empty} body={q || tag ? undefined : canWrite ? "Start one with the + above." : undefined} />
+    <Empty
+      icon={copy.icon}
+      title={q || tag ? "Nothing matches" : copy.empty}
+      body={q || tag ? undefined : canWrite ? "Start one with the + above." : undefined}
+    />
   );
 
   const noteRow = (n: Note, current?: boolean) => (
@@ -153,6 +164,12 @@ export function NotesPage({ kind, selected }: { kind: "note" | "journal"; select
     </button>
   );
 
+  // A blank page shown on /notes moves to /notes/new first, so saving it doesn't swap the editor out mid-sentence.
+  const blank = split && !selected && !list.length && canWrite && !!notes.data && !q && !tag;
+  useEffect(() => {
+    if (blank) void navigate({ to: "/notes/$noteId", params: { noteId: "new" }, replace: true });
+  }, [blank, navigate]);
+
   if (split) {
     // The open note: the one in the address, else the top of the list (or a blank one to write in when there are none).
     const current = selected ?? list[0]?.id ?? (canWrite && notes.data && !q && !tag ? "new" : undefined);
@@ -162,14 +179,27 @@ export function NotesPage({ kind, selected }: { kind: "note" | "journal"; select
           <div className="flex items-center gap-2">
             <h1 className="min-w-0 flex-1 text-display-small text-on-surface">{copy.title}</h1>
             {canWrite && !rel.endedAt && (
-              <button type="button" onClick={newEntry} aria-label={copy.fab} title={copy.fab} className="state-layer flex size-11 items-center justify-center rounded-md bg-on-surface text-surface">
+              <button
+                type="button"
+                onClick={newEntry}
+                aria-label={copy.fab}
+                title={copy.fab}
+                className="state-layer flex size-11 items-center justify-center rounded-md bg-on-surface text-surface"
+              >
                 <Icon name="add" />
               </button>
             )}
           </div>
           <label className="mt-4 flex h-11 items-center gap-2 border-b border-outline-variant text-on-surface-variant">
             <Icon name="search" size={20} />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" aria-label={copy.search} type="search" className="min-w-0 flex-1 bg-transparent text-body-large text-on-surface outline-none placeholder:text-on-surface-variant" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search"
+              aria-label={copy.search}
+              type="search"
+              className="min-w-0 flex-1 bg-transparent text-body-large text-on-surface outline-none placeholder:text-on-surface-variant"
+            />
           </label>
           {tagChips && <div className="mt-3">{tagChips}</div>}
           {notes.isLoading && <Loading />}
@@ -207,12 +237,21 @@ export function NotesPage({ kind, selected }: { kind: "note" | "journal"; select
         tools={
           <>
             <IconButton icon="search" label={copy.search} onClick={() => setSearching((v) => !v)} />
-            {kind === "journal" && <IconButton icon="show_chart" label={chart ? "Hide the mood chart" : "Show the mood chart"} aria-pressed={chart} onClick={() => setChart(!chart)} />}
+            {kind === "journal" && (
+              <IconButton
+                icon="show_chart"
+                label={chart ? "Hide the mood chart" : "Show the mood chart"}
+                aria-pressed={chart}
+                onClick={() => setChart(!chart)}
+              />
+            )}
           </>
         }
       />
       <div className="flex flex-col gap-3 px-4 pb-4 md:px-6">
-        {(searching || q) && <TextField autoFocus placeholder={copy.search} value={q} onChange={(e) => setQ(e.target.value)} aria-label={copy.search} type="search" />}
+        {(searching || q) && (
+          <TextField autoFocus placeholder={copy.search} value={q} onChange={(e) => setQ(e.target.value)} aria-label={copy.search} type="search" />
+        )}
         {kind === "journal" && chart && !q && !tag && <MoodCard />}
         {tagChips}
       </div>
@@ -261,7 +300,11 @@ export function NotesPage({ kind, selected }: { kind: "note" | "journal"; select
             <button type="button" onClick={newEntry} className="min-w-0 flex-1 truncate text-left font-serif text-[22px] text-on-surface-variant italic">
               Write tonight's entry…
             </button>
-            <button type="button" onClick={newEntry} className="shrink-0 rounded-full border border-outline-variant px-4 py-1.5 text-label-large text-on-surface-variant">
+            <button
+              type="button"
+              onClick={newEntry}
+              className="shrink-0 rounded-full border border-outline-variant px-4 py-1.5 text-label-large text-on-surface-variant"
+            >
               Mood
             </button>
           </div>

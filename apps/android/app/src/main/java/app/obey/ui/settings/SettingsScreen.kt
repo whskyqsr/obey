@@ -218,10 +218,8 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, onOpenFeatures
 
                     "features" -> session?.relationship?.let { rel ->
                         val canChange = session.canManage && !rel.ended
-                        val others = session.partners.joinToString(" and ") { it.displayName }
-                        Text(
-                            (if (others.isNotEmpty()) "For you and $others. " else "") + "Anything off is hidden for everyone; nothing is deleted. Tasks and notes are always on." +
-                                if (canChange) "" else " Only a Dominant can change these.",
+                        if (!canChange) Text(
+                            if (rel.ended) "This dynamic has ended, so nothing here can change." else "Only a Dominant can change these.",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -332,7 +330,6 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, onOpenFeatures
                         value = name,
                         onValueChange = { name = it.take(40) },
                         singleLine = true,
-                        supportingText = { Text("This is what your partner sees in the app and in notifications.") },
                     )
                 },
                 confirmButton = {

@@ -272,14 +272,7 @@ function YouSection() {
         />
       </div>
       <div className="flex items-end gap-3">
-        <TextField
-          label="Name"
-          value={displayName}
-          onChange={(e) => setDisplayName(e.target.value)}
-          maxLength={40}
-          help="What your partner sees in the app and in notifications."
-          className="min-w-0 flex-1"
-        />
+        <TextField label="Name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={40} className="min-w-0 flex-1" />
         {displayName.trim() && displayName.trim() !== me.user.displayName && (
           <Button
             busy={updateMe.isPending}
@@ -397,7 +390,6 @@ function LookSection() {
           </button>
         ))}
       </div>
-      <p className="mt-2 text-body-small text-on-surface-variant">Paper and ink stay the same. The accent marks what needs you.</p>
       <Eyebrow>Privacy</Eyebrow>
       <Rows>
         {session && <AppLockSetting uid={session.uid} />}
@@ -405,7 +397,6 @@ function LookSection() {
           checked={!me.user.revealProofs}
           onChange={(blur) => (blur ? updateMe.mutate({ revealProofs: false }, { onError: (e) => snack(errorMessage(e)) }) : setConfirmReveal(true))}
           label="Blur proof photos"
-          help="On: photos stay blurred until you open one."
         />
       </Rows>
       <RevealDialog open={confirmReveal} onClose={() => setConfirmReveal(false)} />
@@ -415,17 +406,17 @@ function LookSection() {
 
 /** The dynamic's feature switches; also on Your dynamic. */
 function FeaturesSection() {
-  const { rel, features, isDom, partners } = useRel();
+  const { rel, features, isDom } = useRel();
   const update = useUpdateRelationship(rel.id);
   const snack = useSnackbar();
   const canChange = isDom && !rel.endedAt;
-  const others = partners.map((p) => p.displayName).join(" and ");
   return (
     <>
-      <p className="pb-2 text-body-large text-on-surface-variant">
-        {others ? `For you and ${others}. ` : ""}Anything off is hidden for everyone; nothing is deleted. Tasks and notes are always on.
-        {!canChange && (rel.endedAt ? " This dynamic has ended, so nothing here can change." : " Only a Dominant can change these.")}
-      </p>
+      {!canChange && (
+        <p className="pb-2 text-body-large text-on-surface-variant">
+          {rel.endedAt ? "This dynamic has ended, so nothing here can change." : "Only a Dominant can change these."}
+        </p>
+      )}
       <Rows>
         {FEATURE_ROWS.map((f) => (
           <Switch

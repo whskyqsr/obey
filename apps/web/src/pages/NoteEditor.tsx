@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { useDeleteLibraryItem, useLibrary, useSaveLibraryItem } from "../api/hooks";
+import { keys, useDeleteLibraryItem, useLibrary, useSaveLibraryItem } from "../api/hooks";
+import { useQueryClient } from "@tanstack/react-query";
 import { errorMessage } from "../api/client";
 import type { Note, NoteInput } from "../api/types";
 import { MarkdownEditor } from "../components/MarkdownEditor";
@@ -44,6 +45,7 @@ function NotePage({ note }: { note?: Note }) {
   const isAuthor = !note || note.authorId === me.user.id;
   const sub = rel.members.find((m) => m.role === "submissive");
   const back = useBack(() => navigate({ to: "/notes" }));
+  const qc = useQueryClient();
 
   const [form, setForm] = useState<NoteInput>(() => ({
     kind: "note",
@@ -77,6 +79,8 @@ function NotePage({ note }: { note?: Note }) {
       if (!id.current && saved?.id) {
         id.current = saved.id;
         adopted.set(saved.id, "new");
+        // The list learns of it now, so nothing shows the new note as missing while it refetches.
+        qc.setQueryData<Note[]>(keys.library(rel.id, "notes"), (list) => (list && !list.some((n) => n.id === saved.id) ? [saved as Note, ...list] : list));
         void navigate({ to: "/notes/$noteId", params: { noteId: saved.id }, replace: true });
       }
       setStatus("saved");
@@ -159,7 +163,8 @@ function NotePage({ note }: { note?: Note }) {
                 del.mutate(note.id, {
                   onSuccess: () => {
                     snack("Note deleted");
-                    back();
+                    // Back to the notes list, wherever the note was opened from.
+                    void navigate({ to: "/notes", replace: true });
                   },
                   onError: (e) => snack(errorMessage(e)),
                 });
@@ -246,6 +251,7 @@ function NotePage({ note }: { note?: Note }) {
           rows={1}
           readOnly={!canEdit}
           aria-label="Title"
+          data-field
           className="mt-4 field-sizing-content w-full resize-none bg-transparent font-serif text-[46px] leading-[1.1] tracking-[-0.01em] text-on-surface outline-none placeholder:text-on-surface-variant/50 md:text-[56px]"
         />
         <p className="mt-1 text-body-small text-on-surface-variant">{meta.join(" · ")}</p>
@@ -332,7 +338,10 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
   function togglePin() {
     const next = !form.pinned;
     setForm((f) => ({ ...f, pinned: next }));
-    save.mutate({ id: note!.id, input: { ...form, pinned: next } }, { onSuccess: () => snack(next ? "Pinned" : "Unpinned"), onError: (e) => snack(errorMessage(e)) });
+    save.mutate(
+      { id: note!.id, input: { ...form, pinned: next } },
+      { onSuccess: () => snack(next ? "Pinned" : "Unpinned"), onError: (e) => snack(errorMessage(e)) },
+    );
   }
 
   const deleteButton = note && note.authorId === me.user.id && (
@@ -359,7 +368,9 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
         <header className="sticky top-0 z-20 flex h-14 items-center gap-1 bg-surface px-2 md:px-4">
           <IconButton icon="arrow_back" label="Back" onClick={back} />
           <div className="flex-1" />
-          {isAuthor && canEdit && kind === "note" && <IconButton icon="push_pin" filled={form.pinned} label={form.pinned ? "Unpin" : "Pin"} onClick={togglePin} />}
+          {isAuthor && canEdit && kind === "note" && (
+            <IconButton icon="push_pin" filled={form.pinned} label={form.pinned ? "Unpin" : "Pin"} onClick={togglePin} />
+          )}
           {deleteButton}
           {canEdit && (
             <Button onClick={() => setEditing(true)} icon="edit">
@@ -423,7 +434,9 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
           }}
         />
         <div className="flex-1" />
-        {isAuthor && kind === "note" && <IconButton icon="push_pin" filled={form.pinned} label={form.pinned ? "Unpin" : "Pin"} onClick={() => set({ pinned: !form.pinned })} />}
+        {isAuthor && kind === "note" && (
+          <IconButton icon="push_pin" filled={form.pinned} label={form.pinned ? "Unpin" : "Pin"} onClick={() => set({ pinned: !form.pinned })} />
+        )}
         {deleteButton}
         {canEdit && (
           <Button onClick={submit} busy={save.isPending} disabled={!dirty && !!note} icon="save">
@@ -454,16 +467,18 @@ function Editor({ note, kind }: { note?: Note; kind: "note" | "journal" }) {
             />
             {form.kind === "journal" && (
               <div className="flex items-center gap-1" role="radiogroup" aria-label="Mood">
-                {["sentiment_very_dissatisfied", "sentiment_dissatisfied", "sentiment_neutral", "sentiment_satisfied", "sentiment_very_satisfied"].map((icon, i) => (
-                  <IconButton
-                    key={icon}
-                    icon={icon}
-                    label={`Mood ${i + 1}`}
-                    filled={form.mood === i + 1}
-                    variant={form.mood === i + 1 ? "tonal" : "standard"}
-                    onClick={() => set({ mood: form.mood === i + 1 ? null : i + 1 })}
-                  />
-                ))}
+                {["sentiment_very_dissatisfied", "sentiment_dissatisfied", "sentiment_neutral", "sentiment_satisfied", "sentiment_very_satisfied"].map(
+                  (icon, i) => (
+                    <IconButton
+                      key={icon}
+                      icon={icon}
+                      label={`Mood ${i + 1}`}
+                      filled={form.mood === i + 1}
+                      variant={form.mood === i + 1 ? "tonal" : "standard"}
+                      onClick={() => set({ mood: form.mood === i + 1 ? null : i + 1 })}
+                    />
+                  ),
+                )}
               </div>
             )}
           </div>

@@ -68,7 +68,6 @@ fun AppLockSetting(vm: AppLockViewModel = hiltViewModel()) {
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text("App lock", style = MaterialTheme.typography.bodyLarge)
-                    Text("Ask for your fingerprint, face or screen lock to open the app", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
                 }
                 Switch(
                     checked = on,

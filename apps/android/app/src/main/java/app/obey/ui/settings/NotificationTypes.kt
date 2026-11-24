@@ -60,15 +60,9 @@ fun NotificationTypes(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Show your partner's words", style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        "A reminder written for you, or the line sent with \"I'm home\", shows in the notification. Off, notifications only say who did what, so nothing personal is on your lock screen.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.onSurfaceVariant,
-                    )
                 }
                 Switch(checked = details, enabled = enabled, onCheckedChange = onDetails)
             }
-            Text("Someone joining or leaving your dynamic always comes through.", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
         }
     }
 }
