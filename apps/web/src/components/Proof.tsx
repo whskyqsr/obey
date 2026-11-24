@@ -3,7 +3,7 @@ import type { Occurrence, ProofPhoto, ReportReason } from "../api/types";
 import { useAcceptProofTerms, useAddProofPhoto, useDeleteProofPhoto, useProofPhotoUrl, useProofPhotos, useReport } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { useRel } from "../lib/relationship";
-import { Button, Checkbox, Dialog, Icon, Select, Spinner, TextArea, cx, useSnackbar } from "./ui";
+import { Button, Checkbox, Diamond, Dialog, Icon, Select, Spinner, TextArea, cx, useSnackbar } from "./ui";
 
 /**
  * Shrinks a photo to at most `max` px on its long side and re-encodes it as JPEG. Re-encoding drops the camera's
@@ -27,35 +27,35 @@ export function ProofTermsDialog({ open, onClose, onAccepted }: { open: boolean;
   const [adult, setAdult] = useState(false);
   const [rules, setRules] = useState(false);
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      title="Before your first photo"
-      actions={
-        <>
-          <Button variant="text" onClick={onClose}>
-            Not now
-          </Button>
-          <Button
-            disabled={!adult || !rules}
-            busy={accept.isPending}
-            onClick={() => accept.mutate(undefined, { onSuccess: () => onAccepted(), onError: (e) => snack(errorMessage(e)) })}
-          >
-            Agree
-          </Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-3">
-        <p>Proof photos are seen only by the people in this dynamic. You can delete yours at any time, and either of you can report a photo.</p>
-        <p>
-          Never share anything showing someone under 18, anyone who hasn't agreed to be in it, or anything illegal. Breaking these rules gets an account
-          removed.
+    <Dialog open={open} onClose={onClose} title={<span className="font-serif text-[32px] leading-tight">Before your first photo</span>}>
+      <div className="flex flex-col gap-4 pb-4">
+        <p className="text-body-large">
+          Proof photos are only for you and your partner. They're blurred until opened and deleted after the time your dynamic set.
         </p>
-        <div className="flex flex-col gap-1 text-on-surface">
-          <Checkbox checked={adult} onChange={setAdult} label="I'm 18 or older" />
-          <Checkbox checked={rules} onChange={setRules} label="I'll follow these rules" />
+        <ul className="flex flex-col gap-1.5 text-body-large text-on-surface">
+          {["Only photos of yourself, with consent", "Nothing illegal, nobody under 18", "Either of you can report a photo to the Fealty team"].map((t) => (
+            <li key={t} className="flex gap-3">
+              <Icon name="check" size={18} className="mt-1 shrink-0 text-primary" />
+              {t}
+            </li>
+          ))}
+        </ul>
+        <div className="flex flex-col text-on-surface">
+          <div className="border-b border-outline-variant py-2">
+            <Checkbox checked={adult} onChange={setAdult} label="I'm 18 or older" />
+          </div>
+          <div className="border-b border-outline-variant py-2">
+            <Checkbox checked={rules} onChange={setRules} label="I'll follow these rules" />
+          </div>
         </div>
+        <Button
+          className="h-12 w-full"
+          disabled={!adult || !rules}
+          busy={accept.isPending}
+          onClick={() => accept.mutate(undefined, { onSuccess: () => onAccepted(), onError: (e) => snack(errorMessage(e)) })}
+        >
+          Agree
+        </Button>
       </div>
     </Dialog>
   );
@@ -134,8 +134,8 @@ function Viewer({ photo, onClose }: { photo: ProofPhoto; onClose(): void }) {
 }
 
 const REASONS: { value: ReportReason; label: string }[] = [
-  { value: "minor", label: "Shows someone under 18" },
   { value: "non_consensual", label: "Shared without someone's consent" },
+  { value: "minor", label: "Shows someone under 18" },
   { value: "illegal", label: "Something illegal" },
   { value: "other", label: "Something else" },
 ];
@@ -146,16 +146,31 @@ export function ReportDialog({ subjectId, photoId, onClose }: { subjectId: strin
   const [reason, setReason] = useState<ReportReason>("other");
   const [details, setDetails] = useState("");
   return (
-    <Dialog
-      open
-      onClose={onClose}
-      title={photoId ? "Report this photo" : "Report"}
-      actions={
-        <>
-          <Button variant="text" onClick={onClose}>
+    <Dialog open onClose={onClose} title={<span className="font-serif text-[32px] leading-tight">What's wrong?</span>}>
+      <div className="flex flex-col pb-4">
+        <p className="-mt-2 mb-2">Reports go to the Fealty team, not to your partner.</p>
+        {REASONS.map((r) => (
+          <button
+            key={r.value}
+            type="button"
+            role="radio"
+            aria-checked={reason === r.value}
+            onClick={() => setReason(r.value)}
+            className="state-layer flex items-center gap-4 border-b border-outline-variant py-3.5 text-left text-body-large text-on-surface"
+          >
+            <Diamond state={reason === r.value ? "done" : "open"} size={16} className="shrink-0" />
+            {r.label}
+          </button>
+        ))}
+        <div className="mt-4">
+          <TextArea label="Anything else (optional)" value={details} onChange={(e) => setDetails(e.target.value)} maxLength={1000} rows={2} />
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <Button variant="outlined" className="h-12" onClick={onClose}>
             Cancel
           </Button>
           <Button
+            className="h-12"
             busy={report.isPending}
             onClick={() =>
               report.mutate(
@@ -172,19 +187,7 @@ export function ReportDialog({ subjectId, photoId, onClose }: { subjectId: strin
           >
             Report
           </Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-4">
-        <p>Reports go to the Fealty team, not to your partner.</p>
-        <Select label="What's wrong?" value={reason} onChange={(e) => setReason(e.target.value as ReportReason)}>
-          {REASONS.map((r) => (
-            <option key={r.value} value={r.value}>
-              {r.label}
-            </option>
-          ))}
-        </Select>
-        <TextArea label="Anything else (optional)" value={details} onChange={(e) => setDetails(e.target.value)} maxLength={1000} rows={2} />
+        </div>
       </div>
     </Dialog>
   );
