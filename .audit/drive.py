@@ -75,8 +75,9 @@ def run(who, uid):
     if who == "sub":
         tap("Today")
         if tap("New", desc=True) and tap("Plan", wait=3):
-            adb("shell", "input", "text", "the%sgym"); time.sleep(1)
-            if tap("Repeats", wait=2): shot("sub-repeat-dialog"); tap("Done", wait=1.5)
+            tap("what", wait=1); adb("shell", "input", "text", "the%sgym"); time.sleep(1); back()
+            if tap("Repeats", wait=2):
+                tap("Every week", wait=1.5); shot("sub-repeat-dialog"); tap("Done", wait=1.5)
             tap("Pause tasks during it", wait=1)
             shot("sub-plan-editor-repeat")
             tap("Save and ask", exact=False, wait=4)
@@ -88,6 +89,7 @@ def run(who, uid):
             scroll()
         shot("dom-today-pauseask")
         if tap("asks to pause tasks", exact=False, wait=2): shot("dom-pauseask-open")
+        home(); tap("Week", wait=3); shot("dom-week")
 import traceback
 for who, uid in [("sub", "22222222-2222-4222-8222-222222222222"), ("dom", "11111111-1111-4111-8111-111111111111")]:
     try: run(who, uid)
