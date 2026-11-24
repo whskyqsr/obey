@@ -35,6 +35,10 @@ def tap(label, desc=False, exact=True, wait=2.5):
 def shot(name):
     with open(f"{OUT}/{name}.png", "wb") as f: f.write(adb("exec-out", "screencap", "-p").stdout)
     print("shot", name)
+def home():
+    adb("shell", "am", "start", "-n", f"{PKG}/app.obey.MainActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"); time.sleep(3); anr()
+    if not find("Today"): adb("shell", "monkey", "-p", PKG, "-c", "android.intent.category.LAUNCHER", "1"); time.sleep(4)
+    tap("Today", wait=1.5)
 def back(): adb("shell", "input", "keyevent", "4"); time.sleep(1.5)
 def scroll(): adb("shell", "input", "swipe", "540", "1700", "540", "500", "400"); time.sleep(1.2)
 def signin(uid):
@@ -70,30 +74,35 @@ def run(who, uid):
     tap("Today")
     if tap("New", desc=True): shot(f"{who}-plus")
     if tap("Plan", wait=3):
-        adb("shell", "input", "text", "dinner%swith%sfriends"); time.sleep(1); adb("shell", "input", "keyevent", "111"); time.sleep(1)
-        shot(f"{who}-plan-editor"); back(); back()
-    tap("Today")
+        shot(f"{who}-plan-editor-empty")
+        adb("shell", "input", "text", "dinner%swith%sfriends"); time.sleep(1.5)
+        shot(f"{who}-plan-editor")
+    home()
     tap("Week"); shot(f"{who}-week")
     for d in range(7):
         if tap(str(__import__("datetime").date.today().day + d - 1), wait=1.5): pass
     shot(f"{who}-week-open")
-    if tap("Off work", exact=False, wait=3): shot(f"{who}-plan-open"); back()
-    if who == "sub" and tap("Dinner with Jess", exact=False, wait=3): shot("sub-clash"); back()
-    if tap("Show the month", desc=True): shot(f"{who}-month"); back()
-    tap("Us"); shot(f"{who}-us")
+    if tap("Off work", exact=False, wait=3): shot(f"{who}-plan-open")
+    if who == "sub":
+        home(); tap("Week")
+        for _ in range(3):
+            if find("Dinner with Jess", exact=False): break
+            scroll()
+        if tap("Dinner with Jess", exact=False, wait=3): shot("sub-clash")
+    home(); tap("Week")
+    if tap("Show the month", desc=True): shot(f"{who}-month")
+    home(); tap("Us"); shot(f"{who}-us")
     tap("Us")
     if not find("Chastity"): scroll()
     if tap("Chastity", wait=3):
         shot(f"{who}-chastity"); scroll(); shot(f"{who}-chastity-2")
-        if who == "dom" and tap("Lock", exact=False, wait=2): shot("dom-lock-sheet"); back()
-        back()
-    tap("Us")
+        if who == "dom" and tap("Lock", exact=False, wait=2): shot("dom-lock-sheet")
+    home(); tap("Us")
     if tap("Settings", desc=True, wait=3):
         shot(f"{who}-settings")
-        if tap("Privacy", wait=3): shot(f"{who}-privacy"); scroll(); shot(f"{who}-privacy-2"); back()
-        back()
+        if tap("Privacy", wait=3): shot(f"{who}-privacy"); scroll(); shot(f"{who}-privacy-2")
     if who == "sub":
-        tap("Today")
+        home()
         if tap("Safe word", desc=True, wait=3):
             shot("sub-safecall")
             if tap("Red", wait=3): shot("sub-safered"); tap("I'm okay now", wait=2)
