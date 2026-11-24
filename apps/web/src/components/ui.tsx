@@ -751,7 +751,7 @@ export function PageHeader({
         <div className={cx("-mx-2 flex min-h-10 items-center gap-1", !tools && !hand && "md:hidden")}>
           <div className="min-w-0 flex-1 md:hidden">
             {menu?.lead === "switcher" && <DynamicSwitcher chip />}
-            {menu?.lead === "back" && <BackLink label="Us" onClick={() => void navigate({ to: "/us" })} />}
+            {menu?.lead === "back" && <BackLink label={menu.back?.label ?? "Us"} onClick={menu.back?.go ?? (() => void navigate({ to: "/us" }))} />}
           </div>
           <div className="hidden flex-1 md:block" />
           {tools}
