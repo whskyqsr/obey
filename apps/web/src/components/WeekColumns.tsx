@@ -1,7 +1,7 @@
 import type { CalendarEvent, Occurrence } from "../api/types";
 import { fmtDate, fmtTime, isAllDayDue, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
-import { planPeople } from "../lib/planColors";
+import { planPeople, planTone } from "../lib/planColors";
 import { isOverdue } from "./OccurrenceCard";
 import { Diamond, type DiamondState, cx } from "./ui";
 
@@ -163,7 +163,7 @@ export function WeekColumns({
               {s.after && <span className="ml-auto text-label-small text-on-surface-variant">›</span>}
             </span>
             {/* The line runs across every day the plan covers. */}
-            <span aria-hidden className="mt-1 block h-[1.5px] bg-primary" />
+            <span aria-hidden className={cx("mt-1 block h-0.5", planTone(s.e, rel).dot)} />
           </button>
         );
       })}
@@ -174,7 +174,7 @@ export function WeekColumns({
             x.kind === "task" ? (
               task(x.o)
             ) : (
-              <div key={x.e.id} className="my-1 border-l-2 border-primary pl-2">
+              <div key={x.e.id} className={cx("my-1 border-l-2 pl-2", planTone(x.e, rel).rule)}>
                 <button type="button" onClick={() => onOpenEvent(x.e)} className="state-layer -ml-2 block w-[calc(100%+0.5rem)] py-0.5 pl-2 text-left">
                   <span className="line-clamp-2 block text-body-small break-words text-on-surface">{x.e.title}</span>
                   <span className="block text-label-small text-on-surface-variant">{[span(x.e), whose(x.e)].filter(Boolean).join(" · ")}</span>

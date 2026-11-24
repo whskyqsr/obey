@@ -1,4 +1,5 @@
 import { ReviewCard } from "./ReviewCard";
+import { planTone } from "../lib/planColors";
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import {
@@ -701,11 +702,12 @@ function usePlanClashes() {
 }
 
 function PlanClashes({ clashing }: { clashing: CalendarEvent[] }) {
+  const { rel } = useRel();
   const [open, setOpen] = useState<CalendarEvent | null>(null);
   return (
     <div className="flex flex-col gap-3">
       {clashing.map((e) => (
-        <div key={e.id} className="flex items-center gap-3 border-l-2 border-primary py-1 pl-4">
+        <div key={e.id} className={cx("flex items-center gap-3 border-l-2 py-1 pl-4", planTone(e, rel).rule)}>
           <div className="min-w-0 flex-1">
             <div className="truncate text-body-large text-on-surface">{e.title}</div>
             <div className="text-body-medium text-on-surface-variant">

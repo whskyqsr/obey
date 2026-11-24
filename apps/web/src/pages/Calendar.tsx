@@ -11,7 +11,7 @@ import { WeekColumns } from "../components/WeekColumns";
 import { addDays, addMonths, daysBetween, fmtDate, fmtMonth, fmtTime, localDateOf, monthGrid, startOfWeek, today } from "../lib/dates";
 import { storage } from "../lib/storage";
 import { useRel } from "../lib/relationship";
-import { planPeople } from "../lib/planColors";
+import { planPeople, planTone } from "../lib/planColors";
 import type { WeekStart } from "../api/types";
 
 type View = "week" | "month";
@@ -301,7 +301,7 @@ function EventItem({ e, onOpen, large }: { e: CalendarEvent; onOpen(): void; lar
         : (rel.members.find((m) => m.userId === e.authorId)?.displayName ?? "Them");
   return (
     <button type="button" onClick={onOpen} className={cx("state-layer flex w-full text-left", large ? "border-b border-outline-variant py-3" : "py-1")}>
-      <span className={cx("min-w-0 flex-1 border-l-2 border-primary", large ? "pl-4" : "pl-2")}>
+      <span className={cx("min-w-0 flex-1 border-l-2", planTone(e, rel).rule, large ? "pl-4" : "pl-2")}>
         <span className={cx("line-clamp-2 block break-words text-on-surface", large ? "text-body-large" : "text-body-small")}>{e.title}</span>
         <span className={cx("block text-on-surface-variant", large ? "text-body-medium" : "text-label-small")}>
           {[

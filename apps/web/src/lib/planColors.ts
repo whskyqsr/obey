@@ -1,14 +1,14 @@
 import type { CalendarEvent, Relationship } from "../api/types";
 
 /** Tailwind classes for a plan's colour, written out in full so Tailwind finds them. */
-export type PlanTone = { bg: string; text: string; dot: string };
+export type PlanTone = { bg: string; text: string; dot: string; rule: string };
 
-const BOTH: PlanTone = { bg: "bg-tertiary-container", text: "text-on-tertiary-container", dot: "bg-tertiary" };
+const BOTH: PlanTone = { bg: "bg-tertiary-container", text: "text-on-tertiary-container", dot: "bg-tertiary", rule: "border-tertiary" };
 const PEOPLE: PlanTone[] = [
-  { bg: "bg-plan-1-container", text: "text-on-plan-1-container", dot: "bg-plan-1" },
-  { bg: "bg-plan-2-container", text: "text-on-plan-2-container", dot: "bg-plan-2" },
-  { bg: "bg-plan-3-container", text: "text-on-plan-3-container", dot: "bg-plan-3" },
-  { bg: "bg-plan-4-container", text: "text-on-plan-4-container", dot: "bg-plan-4" },
+  { bg: "bg-plan-1-container", text: "text-on-plan-1-container", dot: "bg-plan-1", rule: "border-plan-1" },
+  { bg: "bg-plan-2-container", text: "text-on-plan-2-container", dot: "bg-plan-2", rule: "border-plan-2" },
+  { bg: "bg-plan-3-container", text: "text-on-plan-3-container", dot: "bg-plan-3", rule: "border-plan-3" },
+  { bg: "bg-plan-4-container", text: "text-on-plan-4-container", dot: "bg-plan-4", rule: "border-plan-4" },
 ];
 
 const ROLE_ORDER = { dominant: 0, switch: 1, submissive: 2 } as const;
