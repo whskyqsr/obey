@@ -6,5 +6,10 @@
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "design-check": "node scripts/design-check.mjs"
+  },
+  "pnpm": {
+    "overrides": {
+      "@esbuild-kit/core-utils>esbuild": "^0.25.12"
+    }
   }
 }
