@@ -42,9 +42,12 @@ jobs:
           name: lint-report
           path: apps/android/app/build/reports/lint-results-debug.html
           if-no-files-found: ignore
-      - name: Upload debug APK
+      # The test APK people install by hand: named for the app, not the build type.
+      - name: Name the APK
+        run: mkdir -p build/apk && cp app/build/outputs/apk/debug/*.apk build/apk/fealty.apk
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: obey-debug-apk
-          path: apps/android/app/build/outputs/apk/debug/*.apk
+          name: fealty-apk
+          path: apps/android/build/apk/fealty.apk
           if-no-files-found: ignore

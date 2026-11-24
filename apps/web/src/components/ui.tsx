@@ -19,28 +19,13 @@ import { useMenu } from "../lib/menu";
 import { DynamicSwitcher } from "./DynamicSwitcher";
 import { useReadOnly } from "../lib/relationship";
 
-export const cx = (...c: (string | false | null | undefined)[]) =>
-  c.filter(Boolean).join(" ");
+export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
 // ---------- Icon (Material Symbols Rounded, light weight)
 
-export function Icon({
-  name,
-  filled,
-  className,
-  size,
-}: {
-  name: string;
-  filled?: boolean;
-  className?: string;
-  size?: number;
-}) {
+export function Icon({ name, filled, className, size }: { name: string; filled?: boolean; className?: string; size?: number }) {
   return (
-    <span
-      aria-hidden
-      className={cx("icon", filled && "filled", className)}
-      style={size ? { fontSize: size } : undefined}
-    >
+    <span aria-hidden className={cx("icon", filled && "filled", className)} style={size ? { fontSize: size } : undefined}>
       {name}
     </span>
   );
@@ -51,15 +36,7 @@ export function Icon({
 export type DiamondState = "open" | "done" | "owed" | "waiting" | "off";
 
 /** A diamond in the state of a task: open, done (filled ink), owed or missed (accent), waiting (half), off (muted). */
-export function Diamond({
-  state = "open",
-  size = 14,
-  className,
-}: {
-  state?: DiamondState;
-  size?: number;
-  className?: string;
-}) {
+export function Diamond({ state = "open", size = 14, className }: { state?: DiamondState; size?: number; className?: string }) {
   return (
     <span
       aria-hidden
@@ -68,8 +45,7 @@ export function Diamond({
         state === "open" && "border-on-surface",
         state === "done" && "border-on-surface bg-on-surface",
         state === "owed" && "border-primary bg-primary-container",
-        state === "waiting" &&
-          "border-on-surface bg-[linear-gradient(135deg,var(--md-on-surface)_50%,transparent_50%)]",
+        state === "waiting" && "border-on-surface bg-[linear-gradient(135deg,var(--md-on-surface)_50%,transparent_50%)]",
         state === "off" && "border-outline",
         className,
       )}
@@ -84,12 +60,10 @@ type Variant = "filled" | "tonal" | "outlined" | "text" | "elevated" | "danger";
 const VARIANTS: Record<Variant, string> = {
   // Letters: ink is the main action, a hairline the second, the accent stays for what needs attention.
   filled: "bg-on-surface text-surface",
-  tonal:
-    "border border-outline-variant bg-surface-container-lowest text-on-surface",
+  tonal: "border border-outline-variant bg-surface-container-lowest text-on-surface",
   outlined: "border border-on-surface text-on-surface",
   text: "text-primary px-3",
-  elevated:
-    "border border-outline-variant bg-surface-container-lowest text-on-surface",
+  elevated: "border border-outline-variant bg-surface-container-lowest text-on-surface",
   danger: "bg-error text-on-error",
 };
 
@@ -99,15 +73,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   busy?: boolean;
 }
 
-export function Button({
-  variant = "filled",
-  icon,
-  busy,
-  className,
-  children,
-  disabled,
-  ...rest
-}: ButtonProps) {
+export function Button({ variant = "filled", icon, busy, className, children, disabled, ...rest }: ButtonProps) {
   return (
     <button
       type="button"
@@ -121,11 +87,7 @@ export function Button({
         className,
       )}
     >
-      {busy ? (
-        <Spinner size={18} />
-      ) : icon ? (
-        <Icon name={icon} size={18} />
-      ) : null}
+      {busy ? <Spinner size={18} /> : icon ? <Icon name={icon} size={18} /> : null}
       {children}
     </button>
   );
@@ -154,8 +116,7 @@ export function IconButton({
         "state-layer inline-flex size-10 shrink-0 items-center justify-center rounded-full disabled:opacity-40",
         variant === "standard" && "text-on-surface",
         variant === "filled" && "bg-on-surface text-surface",
-        variant === "tonal" &&
-          "border border-outline-variant bg-surface-container-lowest text-on-surface",
+        variant === "tonal" && "border border-outline-variant bg-surface-container-lowest text-on-surface",
         className,
       )}
     >
@@ -167,9 +128,12 @@ export function IconButton({
 /** An overflow menu (⋮). Items close it when chosen. */
 export function OverflowMenu({
   label = "More options",
+  icon = "more_horiz",
   items,
 }: {
   label?: string;
+  /** The trigger's icon, when the menu isn't just "more" (Location's pause). */
+  icon?: string;
   items: { label: string; icon: string; onClick(): void; danger?: boolean }[];
 }) {
   const [open, setOpen] = useState(false);
@@ -177,12 +141,7 @@ export function OverflowMenu({
   useEffect(() => {
     if (!open) return;
     const close = (e: Event) => {
-      if (
-        e instanceof KeyboardEvent
-          ? e.key === "Escape"
-          : !ref.current?.contains(e.target as Node)
-      )
-        setOpen(false);
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !ref.current?.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("pointerdown", close);
     document.addEventListener("keydown", close);
@@ -193,17 +152,11 @@ export function OverflowMenu({
   }, [open]);
   return (
     <div ref={ref} className="relative">
-      <IconButton
-        icon="more_vert"
-        label={label}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-      />
+      <IconButton icon={icon} label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)} />
       {open && (
         <div
           role="menu"
-          className="absolute top-full right-0 z-30 mt-1 min-w-44 overflow-hidden rounded-md border border-outline-variant bg-surface-container-lowest py-1 shadow-elev-2"
+          className="absolute top-full right-0 z-40 mt-1 min-w-44 overflow-hidden rounded-md border border-outline-variant bg-surface-container-lowest py-1 shadow-elev-2"
         >
           {items.map((it) => (
             <button
@@ -214,16 +167,9 @@ export function OverflowMenu({
                 setOpen(false);
                 it.onClick();
               }}
-              className={cx(
-                "state-layer flex h-12 w-full items-center gap-3 px-3 text-left text-label-large",
-                it.danger ? "text-error" : "text-on-surface",
-              )}
+              className={cx("state-layer flex h-12 w-full items-center gap-3 px-3 text-left text-label-large", it.danger ? "text-error" : "text-on-surface")}
             >
-              <Icon
-                name={it.icon}
-                size={20}
-                className={it.danger ? "" : "text-on-surface-variant"}
-              />
+              <Icon name={it.icon} size={20} className={it.danger ? "" : "text-on-surface-variant"} />
               {it.label}
             </button>
           ))}
@@ -287,25 +233,22 @@ export function Fab({
     return (
       <>
         {createPortal(
-          <IconButton
-            icon={icon === "edit" ? "add" : icon}
-            label={label}
-            onClick={onClick}
-            className={cx("md:hidden", className)}
-          />,
+          <IconButton icon={icon === "edit" ? "add" : icon} label={label} onClick={onClick} className={cx("md:hidden", className)} />,
           slots.narrow,
         )}
         {createPortal(
           <button
             type="button"
             onClick={onClick}
+            aria-label={label}
             className={cx(
               "state-layer inline-flex h-10 items-center gap-2 rounded-md border border-on-surface px-4 text-label-large text-on-surface",
               className,
             )}
           >
             <Icon name="add" size={18} />
-            {label}
+            {/* "New rule" and "New protocol" share one header; a plain "New" keeps it from changing width between tabs. */}
+            {label.startsWith("New ") ? "New" : label}
           </button>,
           slots.wide,
         )}
@@ -360,10 +303,8 @@ export function Card({
       className={cx(
         "block w-full rounded-lg p-4 text-left",
         // Letters: a card is a sheet of paper with a hairline, never a filled block.
-        variant === "filled" &&
-          "border border-outline-variant bg-surface-container-lowest",
-        variant === "elevated" &&
-          "border border-outline-variant bg-surface-container-lowest",
+        variant === "filled" && "border border-outline-variant bg-surface-container-lowest",
+        variant === "elevated" && "border border-outline-variant bg-surface-container-lowest",
         variant === "outlined" && "border border-outline-variant bg-surface",
         onClick && "state-layer cursor-pointer",
         className,
@@ -398,30 +339,18 @@ export function Chip({
       aria-pressed={onClick ? !!selected : undefined}
       className={cx(
         "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-label-large",
-        selected
-          ? "border-on-surface bg-surface-container-lowest text-on-surface"
-          : "border-outline-variant text-on-surface-variant",
+        selected ? "border-on-surface bg-surface-container-lowest text-on-surface" : "border-outline-variant text-on-surface-variant",
         onClick && "state-layer",
         className,
       )}
     >
-      {selected && onClick && !plain ? (
-        <Icon name="check" size={18} />
-      ) : icon ? (
-        <Icon name={icon} size={18} />
-      ) : null}
+      {selected && onClick && !plain ? <Icon name="check" size={18} /> : icon ? <Icon name={icon} size={18} /> : null}
       {children}
     </Comp>
   );
 }
 
-export function Badge({
-  children,
-  tone = "primary",
-}: {
-  children: ReactNode;
-  tone?: "primary" | "error" | "tertiary" | "neutral";
-}) {
+export function Badge({ children, tone = "primary" }: { children: ReactNode; tone?: "primary" | "error" | "tertiary" | "neutral" }) {
   return (
     <span
       className={cx(
@@ -450,13 +379,7 @@ export function SegmentedButtons<T extends string>({
   className?: string;
 }) {
   return (
-    <div
-      role="radiogroup"
-      className={cx(
-        "inline-flex h-10 gap-0.5 rounded-full border border-outline-variant p-[3px]",
-        className,
-      )}
-    >
+    <div role="radiogroup" className={cx("inline-flex h-10 gap-0.5 rounded-full border border-outline-variant p-[3px]", className)}>
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -481,9 +404,7 @@ export function SegmentedButtons<T extends string>({
 }
 
 export function Divider({ className }: { className?: string }) {
-  return (
-    <hr className={cx("border-0 border-t border-outline-variant", className)} />
-  );
+  return <hr className={cx("border-0 border-t border-outline-variant", className)} />;
 }
 
 export function ListItem({
@@ -506,24 +427,13 @@ export function ListItem({
     <Comp
       type={onClick ? "button" : undefined}
       onClick={onClick}
-      className={cx(
-        "flex w-full items-center gap-4 px-4 py-3 text-left",
-        onClick && "state-layer",
-      )}
+      className={cx("flex w-full items-center gap-4 px-4 py-3 text-left", onClick && "state-layer")}
     >
       {leading}
       <div className="min-w-0 flex-1">
-        {overline && (
-          <div className="text-label-medium text-on-surface-variant">
-            {overline}
-          </div>
-        )}
+        {overline && <div className="text-label-medium text-on-surface-variant">{overline}</div>}
         <div className="text-body-large text-on-surface">{headline}</div>
-        {supporting && (
-          <div className="text-body-medium text-on-surface-variant">
-            {supporting}
-          </div>
-        )}
+        {supporting && <div className="text-body-medium text-on-surface-variant">{supporting}</div>}
       </div>
       {trailing}
     </Comp>
@@ -536,19 +446,7 @@ export function ListItem({
 const fieldBox =
   "peer w-full rounded-none border-0 border-b border-outline-variant bg-transparent px-0 text-body-large text-on-surface outline-none transition-colors placeholder:text-on-surface-variant/60 hover:border-outline focus:border-on-surface focus:shadow-[0_1px_0_var(--md-on-surface)] disabled:opacity-40";
 
-function FieldShell({
-  label,
-  id,
-  children,
-  help,
-  error,
-}: {
-  label?: string;
-  id: string;
-  children: ReactNode;
-  help?: string;
-  error?: string;
-}) {
+function FieldShell({ label, id, children, help, error }: { label?: string; id: string; children: ReactNode; help?: string; error?: string }) {
   return (
     <div className="flex flex-col gap-1">
       {label && (
@@ -557,16 +455,7 @@ function FieldShell({
         </label>
       )}
       <div className="relative">{children}</div>
-      {(error || help) && (
-        <div
-          className={cx(
-            "text-body-small",
-            error ? "text-error" : "text-on-surface-variant",
-          )}
-        >
-          {error || help}
-        </div>
-      )}
+      {(error || help) && <div className={cx("text-body-small", error ? "text-error" : "text-on-surface-variant")}>{error || help}</div>}
     </div>
   );
 }
@@ -586,12 +475,7 @@ export function TextField({
   return (
     <div className={className}>
       <FieldShell label={label} id={id} help={help} error={error}>
-        <input
-          id={id}
-          data-field
-          {...rest}
-          className={cx(fieldBox, "h-10", error && "border-error")}
-        />
+        <input id={id} data-field {...rest} className={cx(fieldBox, "h-10", error && "border-error")} />
       </FieldShell>
     </div>
   );
@@ -630,42 +514,22 @@ export function Select({
   return (
     <div className={className}>
       <FieldShell label={label} id={id} help={help}>
-        <select
-          id={id}
-          data-field
-          {...rest}
-          className={cx(fieldBox, "h-10 appearance-none pr-8")}
-        >
+        <select id={id} data-field {...rest} className={cx(fieldBox, "h-10 appearance-none pr-8")}>
           {children}
         </select>
-        <Icon
-          name="arrow_drop_down"
-          className="pointer-events-none absolute top-2 right-0 text-on-surface-variant"
-        />
+        <Icon name="arrow_drop_down" className="pointer-events-none absolute top-2 right-0 text-on-surface-variant" />
       </FieldShell>
     </div>
   );
 }
 
-export function Switch({
-  checked,
-  onChange,
-  label,
-  help,
-}: {
-  checked: boolean;
-  onChange(v: boolean): void;
-  label: ReactNode;
-  help?: ReactNode;
-}) {
+export function Switch({ checked, onChange, label, help }: { checked: boolean; onChange(v: boolean): void; label: ReactNode; help?: ReactNode }) {
   const id = useId();
   return (
     <label htmlFor={id} className="flex cursor-pointer items-center gap-4 py-2">
       <div className="min-w-0 flex-1">
         <div className="text-body-large text-on-surface">{label}</div>
-        {help && (
-          <div className="text-body-medium text-on-surface-variant">{help}</div>
-        )}
+        {help && <div className="text-body-medium text-on-surface-variant">{help}</div>}
       </div>
       <button
         id={id}
@@ -675,17 +539,13 @@ export function Switch({
         onClick={() => onChange(!checked)}
         className={cx(
           "relative h-7 w-12 shrink-0 rounded-full border transition-colors",
-          checked
-            ? "border-on-surface bg-on-surface"
-            : "border-outline bg-surface-container-lowest",
+          checked ? "border-on-surface bg-on-surface" : "border-outline bg-surface-container-lowest",
         )}
       >
         <span
           className={cx(
             "absolute top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full transition-all",
-            checked
-              ? "left-[23px] size-5 bg-surface text-on-surface"
-              : "left-1 size-5 bg-outline-variant",
+            checked ? "left-[23px] size-5 bg-surface text-on-surface" : "left-1 size-5 bg-outline-variant",
           )}
         >
           {checked && <Icon name="check" size={14} />}
@@ -695,23 +555,10 @@ export function Switch({
   );
 }
 
-export function Checkbox({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange(v: boolean): void;
-  label: ReactNode;
-}) {
+export function Checkbox({ checked, onChange, label }: { checked: boolean; onChange(v: boolean): void; label: ReactNode }) {
   return (
     <label className="flex cursor-pointer items-center gap-3 py-1 text-body-large">
-      <input
-        type="checkbox"
-        className="diamond"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-      />
+      <input type="checkbox" className="diamond" checked={checked} onChange={(e) => onChange(e.target.checked)} />
       {label}
     </label>
   );
@@ -723,7 +570,6 @@ export function Dialog({
   open,
   onClose,
   title,
-  icon,
   children,
   actions,
   sheetOnMobile = true,
@@ -731,7 +577,6 @@ export function Dialog({
   open: boolean;
   onClose(): void;
   title?: ReactNode;
-  icon?: string;
   children: ReactNode;
   actions?: ReactNode;
   /** On small screens render as a modal bottom sheet. */
@@ -742,14 +587,11 @@ export function Dialog({
   closeRef.current = onClose;
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) =>
-      e.key === "Escape" && closeRef.current();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && closeRef.current();
     document.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    ref.current
-      ?.querySelector<HTMLElement>("input,textarea,select,button")
-      ?.focus();
+    ref.current?.querySelector<HTMLElement>("input,textarea,select,button")?.focus();
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
@@ -757,16 +599,8 @@ export function Dialog({
   }, [open]);
   if (!open) return null;
   return createPortal(
-    <div
-      className={cx(
-        "fixed inset-0 z-50 flex justify-center",
-        sheetOnMobile ? "items-end md:items-center" : "items-center p-4",
-      )}
-    >
-      <div
-        className="absolute inset-0 animate-fade-in bg-scrim/40"
-        onClick={onClose}
-      />
+    <div className={cx("fixed inset-0 z-50 flex justify-center", sheetOnMobile ? "items-end md:items-center" : "items-center p-4")}>
+      <div className="absolute inset-0 animate-fade-in bg-scrim/40" onClick={onClose} />
       <div
         ref={ref}
         role="dialog"
@@ -779,32 +613,12 @@ export function Dialog({
             : "max-w-[560px] animate-fade-in rounded-xl border",
         )}
       >
-        {sheetOnMobile && (
-          <div className="mx-auto mt-3 h-1 w-8 rounded-full bg-outline-variant md:hidden" />
-        )}
+        {sheetOnMobile && <div className="mx-auto mt-3 h-1 w-8 rounded-full bg-outline-variant md:hidden" />}
         <div className="overflow-y-auto px-6 pt-6 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {icon && (
-            <Icon
-              name={icon}
-              className="mb-4 block text-center text-on-surface-variant"
-            />
-          )}
-          {title && (
-            <h2
-              className={cx("mb-4 text-headline-small", icon && "text-center")}
-            >
-              {title}
-            </h2>
-          )}
-          <div className="text-body-medium text-on-surface-variant">
-            {children}
-          </div>
+          {title && <h2 className="mb-4 text-headline-small">{title}</h2>}
+          <div className="text-body-medium text-on-surface-variant">{children}</div>
         </div>
-        {actions && (
-          <div className="flex flex-wrap justify-end gap-2 px-6 pt-2 pb-6">
-            {actions}
-          </div>
-        )}
+        {actions && <div className="flex flex-wrap justify-end gap-2 px-6 pt-2 pb-6">{actions}</div>}
       </div>
     </div>,
     document.body,
@@ -814,9 +628,7 @@ export function Dialog({
 // ---------- Snackbar
 
 type SnackAction = { label: string; onClick(): void };
-const SnackContext = createContext<(msg: string, action?: SnackAction) => void>(
-  () => {},
-);
+const SnackContext = createContext<(msg: string, action?: SnackAction) => void>(() => {});
 
 export function SnackbarProvider({ children }: { children: ReactNode }) {
   const [msg, setMsg] = useState<{
@@ -824,11 +636,7 @@ export function SnackbarProvider({ children }: { children: ReactNode }) {
     key: number;
     action?: SnackAction;
   } | null>(null);
-  const show = useCallback(
-    (text: string, action?: SnackAction) =>
-      setMsg({ text, key: Date.now(), action }),
-    [],
-  );
+  const show = useCallback((text: string, action?: SnackAction) => setMsg({ text, key: Date.now(), action }), []);
   useEffect(() => {
     if (!msg) return;
     const t = setTimeout(() => setMsg(null), msg.action ? 6000 : 4000);
@@ -857,11 +665,7 @@ export function SnackbarProvider({ children }: { children: ReactNode }) {
                 {msg.action.label}
               </button>
             ) : (
-              <button
-                type="button"
-                className="text-label-large text-inverse-primary"
-                onClick={() => setMsg(null)}
-              >
+              <button type="button" className="text-label-large text-inverse-primary" onClick={() => setMsg(null)}>
                 Dismiss
               </button>
             )}
@@ -878,19 +682,9 @@ export const useSnackbar = () => useContext(SnackContext);
 
 /** A secondary page's header: back, then the title, with optional actions at the end. Main pages use PageHeader. */
 /** A text link back to where you came from, as in the mockups: "‹ Us". */
-export function BackLink({
-  label,
-  onClick,
-}: {
-  label: string;
-  onClick(): void;
-}) {
+export function BackLink({ label, onClick }: { label: string; onClick(): void }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="state-layer -ml-1 flex h-10 items-center gap-1 rounded-md pr-2 text-body-large text-on-surface-variant"
-    >
+    <button type="button" onClick={onClick} className="state-layer -ml-1 flex h-10 items-center gap-1 rounded-md pr-2 text-body-large text-on-surface-variant">
       <Icon name="chevron_left" size={22} />
       {label}
     </button>
@@ -901,17 +695,7 @@ export function BackLink({
  * A page opened from another one: a way back named for where it goes, the page's icons on the right, and the title in
  * the serif below.
  */
-export function SubHeader({
-  title,
-  onBack,
-  back = "Back",
-  actions,
-}: {
-  title: ReactNode;
-  onBack(): void;
-  back?: string;
-  actions?: ReactNode;
-}) {
+export function SubHeader({ title, onBack, back = "Back", actions }: { title: ReactNode; onBack(): void; back?: string; actions?: ReactNode }) {
   return (
     <header className="px-4 pt-3 pb-4 md:px-6 md:pt-6">
       <div className="-mx-2 flex min-h-10 items-center gap-1 px-2">
@@ -922,9 +706,7 @@ export function SubHeader({
         <HeaderSlot />
       </div>
       <div className="mt-2 flex items-end gap-2">
-        <h1 className="min-w-0 flex-1 text-display-small text-on-surface md:text-display-medium">
-          {title}
-        </h1>
+        <h1 className="min-w-0 flex-1 text-display-small text-on-surface md:text-display-medium">{title}</h1>
         <HeaderSlot wide />
       </div>
     </header>
@@ -966,20 +748,10 @@ export function PageHeader({
   return (
     <>
       <header className="px-4 pt-3 pb-4 md:px-6 md:pt-6">
-        <div
-          className={cx(
-            "-mx-2 flex min-h-10 items-center gap-1",
-            !tools && !hand && "md:hidden",
-          )}
-        >
+        <div className={cx("-mx-2 flex min-h-10 items-center gap-1", !tools && !hand && "md:hidden")}>
           <div className="min-w-0 flex-1 md:hidden">
             {menu?.lead === "switcher" && <DynamicSwitcher chip />}
-            {menu?.lead === "back" && (
-              <BackLink
-                label="Us"
-                onClick={() => void navigate({ to: "/us" })}
-              />
-            )}
+            {menu?.lead === "back" && <BackLink label="Us" onClick={() => void navigate({ to: "/us" })} />}
           </div>
           <div className="hidden flex-1 md:block" />
           {tools}
@@ -988,14 +760,16 @@ export function PageHeader({
         </div>
         <div className="mt-2 flex items-end gap-2 md:mt-0">
           <div className="min-w-0 flex-1">
-            <h1 className={hero ? "mt-4 font-serif text-[52px] leading-[1.05] tracking-[-0.01em] text-on-surface" : "text-display-small text-on-surface md:text-display-medium"}>
+            <h1
+              className={
+                hero
+                  ? "mt-4 font-serif text-[52px] leading-[1.05] tracking-[-0.01em] text-on-surface"
+                  : "text-display-small text-on-surface md:text-display-medium"
+              }
+            >
               {title}
             </h1>
-            {subtitle && (
-              <p className={hero ? "mt-3 text-body-large text-on-surface-variant" : "mt-1 text-body-medium text-on-surface-variant"}>
-                {subtitle}
-              </p>
-            )}
+            {subtitle && <p className={hero ? "mt-3 text-body-large text-on-surface-variant" : "mt-1 text-body-medium text-on-surface-variant"}>{subtitle}</p>}
           </div>
           {actions && <div className="flex items-center gap-1">{actions}</div>}
           <HeaderSlot wide />
@@ -1006,15 +780,7 @@ export function PageHeader({
   );
 }
 
-export function Section({
-  title,
-  children,
-  action,
-}: {
-  title: ReactNode;
-  children: ReactNode;
-  action?: ReactNode;
-}) {
+export function Section({ title, children, action }: { title: ReactNode; children: ReactNode; action?: ReactNode }) {
   return (
     <section className="px-4 pb-6 md:px-6">
       <div className="mb-2 flex items-center gap-2">
@@ -1026,26 +792,12 @@ export function Section({
   );
 }
 
-export function Empty({
-  icon,
-  title,
-  body,
-  action,
-}: {
-  icon: string;
-  title: string;
-  body?: ReactNode;
-  action?: ReactNode;
-}) {
+export function Empty({ icon, title, body, action }: { icon: string; title: string; body?: ReactNode; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center gap-2 border-y border-outline-variant px-6 py-10 text-center">
       <Icon name={icon} size={32} className="text-outline" />
       <div className="text-title-large text-on-surface">{title}</div>
-      {body && (
-        <div className="max-w-sm text-body-medium text-on-surface-variant">
-          {body}
-        </div>
-      )}
+      {body && <div className="max-w-sm text-body-medium text-on-surface-variant">{body}</div>}
       {action && <div className="mt-2">{action}</div>}
     </div>
   );
@@ -1059,28 +811,50 @@ export function Loading() {
   );
 }
 
-export function ErrorBox({
-  error,
-  onRetry,
-}: {
-  error: unknown;
-  onRetry?: () => void;
-}) {
+export function ErrorBox({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   return (
     <div className="m-4 flex items-start gap-3 rounded-lg bg-error-container p-4 text-on-error-container">
       <Icon name="error" />
-      <div className="flex-1 text-body-medium">
-        {error instanceof Error ? error.message : String(error)}
-      </div>
+      <div className="flex-1 text-body-medium">{error instanceof Error ? error.message : String(error)}</div>
       {onRetry && (
-        <button
-          type="button"
-          className="text-label-large underline"
-          onClick={onRetry}
-        >
+        <button type="button" className="text-label-large underline" onClick={onRetry}>
           Retry
         </button>
       )}
+    </div>
+  );
+}
+
+/** A full-screen form with "Cancel · title · Save" across the top, as in mockup 76. */
+export function FormSheet({
+  title,
+  onClose,
+  onSave,
+  saving,
+  canSave,
+  children,
+}: {
+  title: string;
+  onClose(): void;
+  onSave(): void;
+  saving: boolean;
+  canSave: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-surface" role="dialog" aria-modal aria-label={title}>
+      <div className="mx-auto flex w-full max-w-xl flex-col px-4 pb-10 md:px-6">
+        <div className="sticky top-0 z-10 grid h-16 grid-cols-[1fr_auto_1fr] items-center bg-surface">
+          <button type="button" onClick={onClose} className="justify-self-start text-body-large text-on-surface-variant">
+            Cancel
+          </button>
+          <h1 className="text-title-medium text-on-surface">{title}</h1>
+          <button type="button" disabled={!canSave || saving} onClick={onSave} className="justify-self-end text-body-large text-primary disabled:opacity-40">
+            Save
+          </button>
+        </div>
+        <div className="flex flex-col gap-6">{children}</div>
+      </div>
     </div>
   );
 }

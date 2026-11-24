@@ -7,8 +7,8 @@ import { useRel } from "../lib/relationship";
 import type { SceneCheckFor } from "../lib/today";
 import { SceneComments } from "../pages/Scenes";
 import { ReplyDialog } from "./Comments";
-import { MOOD_LABELS, MOODS } from "./Mood";
-import { Button, Dialog, Icon, IconButton, TextField, useSnackbar } from "./ui";
+import { MOOD_LABELS } from "./Mood";
+import { Button, Diamond, Dialog, Icon, IconButton, TextField, useSnackbar } from "./ui";
 
 /** A low check-in in a Dominant's Needs you: what they said, a reply in its comments, or just "seen". */
 export function MoodRow({ o }: { o: Occurrence }) {
@@ -21,7 +21,7 @@ export function MoodRow({ o }: { o: Occurrence }) {
   return (
     <div className="flex min-h-16 items-center gap-2 bg-surface-container-low py-2 pr-2 pl-1">
       <span className="flex size-10 shrink-0 items-center justify-center">
-        <Icon name={MOODS[o.mood! - 1]!} filled className="text-tertiary" />
+        <Diamond state="owed" />
       </span>
       <div className="min-w-0 flex-1">
         <div className="text-body-large text-on-surface">
@@ -62,7 +62,7 @@ export function SceneCheckRow({ x: { scene, check } }: { x: SceneCheckFor }) {
   return (
     <div className="flex min-h-16 items-center gap-2 bg-surface-container-low py-2 pr-2 pl-1">
       <span className="flex size-10 shrink-0 items-center justify-center">
-        <Icon name={MOODS[check.mood - 1]!} filled className="text-tertiary" />
+        <Diamond state="owed" />
       </span>
       <div className="min-w-0 flex-1">
         <div className="text-body-large text-on-surface">
@@ -83,14 +83,15 @@ export function SceneCheckRow({ x: { scene, check } }: { x: SceneCheckFor }) {
         icon="check"
         label="Seen"
         disabled={seen.isPending}
-        onClick={() => seen.mutate({ sceneId: scene.id, userId: check.userId }, { onSuccess: () => snack("Marked seen"), onError: (e) => snack(errorMessage(e)) })}
+        onClick={() =>
+          seen.mutate({ sceneId: scene.id, userId: check.userId }, { onSuccess: () => snack("Marked seen"), onError: (e) => snack(errorMessage(e)) })
+        }
       />
       <IconButton icon="chat" label="Reply" variant="tonal" onClick={() => setReplying(true)} />
       {replying && (
         <Dialog
           open
           onClose={() => setReplying(false)}
-          icon="chat"
           title={`${who} is feeling ${feeling}`}
           actions={
             <Button variant="text" onClick={() => setReplying(false)}>
@@ -143,7 +144,6 @@ export function RedeemedDialog({ e, onClose }: { e: LedgerEntry; onClose(): void
     <Dialog
       open
       onClose={onClose}
-      icon="redeem"
       title={`Redeem “${e.note}”`}
       actions={
         <>

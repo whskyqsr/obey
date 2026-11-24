@@ -30,7 +30,7 @@ import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
+import app.obey.ui.common.TonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -92,6 +92,7 @@ fun TodayScreen(
     onOpenAgreement: (edit: Boolean) -> Unit = {},
     onOpenRules: () -> Unit = {},
     onOpenProtocol: (String) -> Unit = {},
+    onOpenScene: (String) -> Unit = {},
     vm: TodayViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -553,7 +554,7 @@ fun TodayScreen(
                         }
                     }
                     if (session != null) scenes?.let { t ->
-                        item(key = "scenes") { app.obey.ui.scenes.SceneCards(t, session, busy, onAftercareDone = vm::aftercareDone, onCheck = vm::checkInOnScene) }
+                        item(key = "scenes") { app.obey.ui.scenes.SceneCards(t, session, busy, onAftercareDone = vm::aftercareDone, onOpen = onOpenScene, onCheck = vm::checkInOnScene) }
                     }
                     if (isDom) items(curfew?.requests.orEmpty(), key = { "ask-${it.id}" }) { r ->
                         CurfewAskCard(
@@ -600,7 +601,7 @@ fun TodayScreen(
                     }
                     if (mine.size > 1) {
                         item(key = "a-day") {
-                            FilledTonalButton(onClick = { dayTasks = mine }, modifier = Modifier.padding(horizontal = 16.dp)) {
+                            TonalButton(onClick = { dayTasks = mine }, modifier = Modifier.padding(horizontal = 16.dp)) {
                                 Icon(Icons.Outlined.MoreTime, contentDescription = null)
                                 Text("  More time for today")
                             }

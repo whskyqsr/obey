@@ -1,166 +1,223 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import type { AgreementDrift, AgreementSection, AgreementSectionInput, AgreementVersion } from "../api/types";
-import { useAgree, useAgreement, useAgreementTemplate, useAgreementVersion, useProposeAgreement, useRequestAgreementChanges, useWithdrawAgreement } from "../api/hooks";
+import {
+  useAgree,
+  useAgreement,
+  useLibrary,
+  useAgreementTemplate,
+  useAgreementVersion,
+  useProposeAgreement,
+  useRequestAgreementChanges,
+  useWithdrawAgreement,
+} from "../api/hooks";
 import { errorMessage } from "../api/client";
-import { Badge, Button, Checkbox, Dialog, ErrorBox, Icon, IconButton, Loading, OverflowMenu, PageHeader, TextArea, TextField, cx, useSnackbar } from "../components/ui";
-import { fmtDate, localDateOf } from "../lib/dates";
+import {
+  BackLink,
+  Button,
+  Checkbox,
+  Dialog,
+  ErrorBox,
+  Icon,
+  IconButton,
+  Loading,
+  OverflowMenu,
+  PageHeader,
+  TextArea,
+  TextField,
+  useSnackbar,
+} from "../components/ui";
+import { fmtDate, localDateOf, today } from "../lib/dates";
 import { useReadOnly, useRel } from "../lib/relationship";
 
-const ICONS: Record<string, string> = { why: "favorite", limits: "block", safewords: "health_and_safety", rules: "gavel", protocols: "fact_check" };
-const sectionIcon = (s: { id: string; kind: string }) => ICONS[s.kind === "text" ? s.id : s.kind] ?? (/^(dom|sub)-/.test(s.id) ? "person" : "article");
-const day = (iso: string) => fmtDate(localDateOf(new Date(iso)), { month: "short", day: "numeric", year: "numeric" });
+/** "Oct 12", with the year only when it isn't this one. */
+const day = (iso: string) => {
+  const d = localDateOf(new Date(iso));
+  return fmtDate(d, d.slice(0, 4) === today().slice(0, 4) ? { month: "short", day: "numeric" } : { month: "short", day: "numeric", year: "numeric" });
+};
 const toInput = (s: AgreementSection): AgreementSectionInput => ({ id: s.id, kind: s.kind, title: s.title, body: s.body, noteId: s.noteId });
-const isOpen = (v: AgreementVersion) => v.status === "proposed" || v.status === "changes_requested";
 
 type View = { kind: "page" } | { kind: "review" } | { kind: "versions" } | { kind: "version"; id: string };
 
-/** The agreement: the version in force, the open proposal, and the editor for proposing changes. */
+/** Mockup 23: the version in force, and an open proposal with what changed. */
 export function AgreementPage() {
-  const { rel, me } = useRel();
+  const { rel } = useRel();
   const q = useAgreement(rel.id);
   const readOnly = useReadOnly();
-  const [view, setView] = useState<View | null>(null);
+  const [view, setView] = useState<View>({ kind: "page" });
   const [editing, setEditing] = useState<"edit" | "template" | "blank" | null>(null);
   if (q.isLoading) return <Loading />;
   if (q.error || !q.data) return <ErrorBox error={q.error} onRetry={() => q.refetch()} />;
   const { current, proposal, drift } = q.data;
-  const waitingOnMe = !!proposal && proposal.status === "proposed" && !proposal.agreements.some((a) => a.userId === me.user.id);
-  // Someone with a proposal to answer lands on it.
-  const v = view ?? (waitingOnMe ? { kind: "review" } : { kind: "page" });
 
-  if (editing) return <Editor base={editing === "edit" ? (proposal ?? current) : null} start={editing} proposal={proposal} current={current} onClose={() => setEditing(null)} />;
-  if (v.kind === "review" && proposal) return <Review v={proposal} current={current} onBack={() => setView({ kind: "page" })} onEdit={() => setEditing("edit")} />;
-  if (v.kind === "versions") return <Versions onBack={() => setView({ kind: "page" })} onOpen={(id) => setView({ kind: "version", id })} />;
-  if (v.kind === "version") return <PastVersion id={v.id} onBack={() => setView({ kind: "versions" })} />;
+  if (editing)
+    return (
+      <Editor base={editing === "edit" ? (proposal ?? current) : null} start={editing} proposal={proposal} current={current} onClose={() => setEditing(null)} />
+    );
+  if (view.kind === "review" && proposal)
+    return <Review v={proposal} current={current} onBack={() => setView({ kind: "page" })} onEdit={() => setEditing("edit")} />;
+  if (view.kind === "versions")
+    return <Versions onBack={() => setView({ kind: "page" })} onOpen={(id) => setView(id === proposal?.id ? { kind: "review" } : { kind: "version", id })} />;
+  if (view.kind === "version") return <PastVersion id={view.id} onBack={() => setView({ kind: "versions" })} />;
 
   return (
     <>
-      <PageHeader title="Agreement" subtitle={current ? `Version ${current.number} · agreed ${day(current.agreedAt!)}` : proposal ? "Nothing agreed yet" : "Not written yet"} />
-      <div className="flex flex-col gap-4 px-4 pb-8 md:px-6">
-        {proposal && <ProposalBanner v={proposal} onRead={() => setView({ kind: "review" })} onEdit={() => setEditing("edit")} />}
-        {current && !proposal && drift.length > 0 && <DriftBanner drift={drift} onPropose={readOnly ? undefined : () => setEditing("edit")} />}
-        {current ? (
+      <PageHeader
+        title="Agreement"
+        subtitle={current ? `Version ${current.number} is in force, agreed ${day(current.agreedAt!)}.` : proposal ? "Nothing agreed yet." : "Not written yet."}
+        tools={(current || proposal) && <IconButton icon="history" label="Versions" onClick={() => setView({ kind: "versions" })} />}
+      />
+      <div className="flex max-w-3xl flex-col gap-8 px-4 pb-12 md:px-6">
+        {proposal && <ProposalBanner v={proposal} current={current} onRead={() => setView({ kind: "review" })} onEdit={() => setEditing("edit")} />}
+        {proposal && current && <WhatChanged v={proposal} onReadAll={() => setView({ kind: "review" })} />}
+        {current && !proposal && drift.length > 0 && <DriftNote drift={drift} onPropose={readOnly ? undefined : () => setEditing("edit")} />}
+        {current && !proposal && (
           <>
             <Body v={current} />
             <Signatures v={current} />
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <Button variant="text" icon="history" onClick={() => setView({ kind: "versions" })}>
-                Versions
-              </Button>
-              {!readOnly && !proposal && (
-                <Button variant="tonal" icon="edit" onClick={() => setEditing("edit")}>
+            {!readOnly && (
+              <div>
+                <Button variant="tonal" onClick={() => setEditing("edit")}>
                   Propose changes
                 </Button>
-              )}
-            </div>
+              </div>
+            )}
           </>
-        ) : (
-          !proposal && (
-            <div className="border border-outline-variant flex flex-col items-start gap-3 rounded-xl p-5">
-              <Icon name="handshake" size={32} className="text-primary" />
-              <h2 className="text-headline-small">Write down what you've agreed</h2>
-              <p className="text-body-medium text-on-surface-variant">
-                One page you both sign: why you're doing this, what each of you will do, limits, safewords, and your rules and protocols. Either of you can propose changes later,
-                and a new version only counts once you both agree.
-              </p>
-              {!readOnly && (
-                <>
-                  <Button onClick={() => setEditing("template")}>Start from our template</Button>
-                  <Button variant="text" onClick={() => setEditing("blank")}>
-                    Start blank
-                  </Button>
-                </>
-              )}
-            </div>
-          )
+        )}
+        {!current && !proposal && !readOnly && (
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={() => setEditing("template")}>Start from our template</Button>
+            <Button variant="text" onClick={() => setEditing("blank")}>
+              Start blank
+            </Button>
+          </div>
         )}
       </div>
     </>
   );
 }
 
+/** The changed sections of a proposal, marked, then the unchanged ones named in a line. */
+function WhatChanged({ v, onReadAll }: { v: AgreementVersion; onReadAll(): void }) {
+  const changed = v.sections.filter((s) => s.change !== "same");
+  const same = v.sections.filter((s) => s.change === "same").map((s) => (s.kind === "text" ? s.title : `${s.items.length} ${s.kind}`));
+  return (
+    <>
+      {(changed.length > 0 || v.removed.length > 0) && (
+        <section>
+          <h2 className="eyebrow">What changed</h2>
+          <div className="mt-3 flex flex-col gap-6">
+            {changed.map((s) => (
+              <SectionView key={s.id} s={s} marked bare={changed.length === 1} />
+            ))}
+            {v.removed.map((t) => (
+              <p key={t} className="font-serif text-[24px] leading-8 text-on-surface-variant line-through">
+                {t}
+              </p>
+            ))}
+          </div>
+        </section>
+      )}
+      {same.length > 0 && (
+        <section>
+          <h2 className="eyebrow">Unchanged</h2>
+          <p className="mt-2 text-body-large text-on-surface-variant">{same.join(", ")}</p>
+          <button type="button" onClick={onReadAll} className="mt-2 text-label-large text-primary">
+            Read all of version {v.number}
+          </button>
+        </section>
+      )}
+    </>
+  );
+}
+
 /** Rules or protocols changed after the version in force was written, so what's signed no longer matches them. */
-function DriftBanner({ drift, onPropose }: { drift: AgreementDrift[]; onPropose?(): void }) {
+function DriftNote({ drift, onPropose }: { drift: AgreementDrift[]; onPropose?(): void }) {
   const { rel } = useRel();
   const what = [...new Set(drift.map((d) => (d.kind === "rules" ? "Rules" : "Protocols")))].join(" and ");
   const line = (verb: AgreementDrift["verb"]) => drift.filter((d) => d.verb === verb).map((d) => d.title);
   const added = line("added"),
     removed = line("removed");
   return (
-    <div className="border border-outline-variant flex flex-col gap-1 rounded-xl px-4 py-3 text-on-surface">
-      <div className="flex items-center gap-2 text-title-medium">
-        <Icon name="published_with_changes" />
-        {what} changed since you {rel.members.length > 2 ? "all" : "both"} signed
-      </div>
-      {added.length > 0 && <div className="text-body-medium opacity-85">Added: {added.join(", ")}</div>}
-      {removed.length > 0 && <div className="text-body-medium opacity-85">Removed: {removed.join(", ")}</div>}
+    <section className="border-y border-outline-variant py-4">
+      <p className="text-body-large text-on-surface">
+        {what} changed since you {rel.members.length > 2 ? "all" : "both"} signed.
+      </p>
+      {added.length > 0 && <p className="text-body-medium text-on-surface-variant">Added: {added.join(", ")}</p>}
+      {removed.length > 0 && <p className="text-body-medium text-on-surface-variant">Removed: {removed.join(", ")}</p>}
       {onPropose && (
-        <div className="mt-2">
-          <Button icon="edit" onClick={onPropose}>
-            Propose an update
-          </Button>
-        </div>
+        <button type="button" onClick={onPropose} className="mt-2 text-label-large text-primary">
+          Propose an update
+        </button>
       )}
-    </div>
+    </section>
   );
 }
 
-/** What's happening with the open proposal, from where the viewer stands. */
-function ProposalBanner({ v, onRead, onEdit }: { v: AgreementVersion; onRead(): void; onEdit(): void }) {
+/** The open proposal from where the viewer stands, with what they can do about it. */
+function ProposalBanner({ v, current, onRead, onEdit }: { v: AgreementVersion; current: AgreementVersion | null; onRead(): void; onEdit(): void }) {
   const { rel, me, memberName, partners } = useRel();
   const snack = useSnackbar();
   const withdraw = useWithdrawAgreement(rel.id);
   const readOnly = useReadOnly();
+  const [agreeing, setAgreeing] = useState(false);
+  const [asking, setAsking] = useState(false);
   const mine = v.proposedBy === me.user.id;
+  const agreed = v.agreements.some((a) => a.userId === me.user.id);
   const waiting = partners.filter((p) => !v.agreements.some((a) => a.userId === p.userId)).map((p) => p.displayName);
   const by = memberName(v.proposedBy);
-  const tone = "flex flex-col gap-1 rounded-xl bg-tertiary-container px-4 py-3 text-on-tertiary-container";
-  if (v.status === "changes_requested" && v.feedback)
-    return (
-      <div className={tone}>
-        <div className="text-title-medium">
-          {v.feedback.userId === me.user.id ? `You asked ${by} for changes to version ${v.number}` : `${memberName(v.feedback.userId)} asked for changes to version ${v.number}`}
-        </div>
-        <div className="text-body-medium italic opacity-85">“{v.feedback.note}”</div>
-        {!readOnly && (
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Button variant="tonal" onClick={onRead}>
-              Read it
+  const all = rel.members.length > 2 ? "all" : "both";
+  const stays = current ? ` Version ${current.number} stays in force until you ${all} agree.` : "";
+  return (
+    <div className="rounded-lg border border-outline-variant bg-surface-container-lowest p-6">
+      {v.status === "changes_requested" && v.feedback ? (
+        <>
+          <p className="text-body-large text-on-surface">
+            {v.feedback.userId === me.user.id ? "You" : memberName(v.feedback.userId)} asked for changes to <b className="font-semibold">version {v.number}</b>.
+            {stays}
+          </p>
+          <p className="mt-2 font-serif text-[22px] leading-8 text-on-surface italic">“{v.feedback.note}”</p>
+        </>
+      ) : (
+        <>
+          <p className="text-body-large text-on-surface">
+            {mine ? "You" : by} proposed <b className="font-semibold">version {v.number}</b>.{stays}
+            {mine && waiting.length > 0 && ` Waiting for ${waiting.join(" and ")}.`}
+          </p>
+          {v.note && <p className="mt-2 font-serif text-[22px] leading-8 text-on-surface italic">“{v.note}”</p>}
+        </>
+      )}
+      {!readOnly && (
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          {!mine && v.status === "proposed" && !agreed && <Button onClick={() => setAgreeing(true)}>Agree</Button>}
+          {!mine && v.status === "proposed" && (
+            <Button variant="outlined" onClick={() => setAsking(true)}>
+              Ask for changes
             </Button>
-            <Button variant="text" icon="edit" onClick={onEdit}>
+          )}
+          {(mine || v.status === "changes_requested") && (
+            <Button variant="outlined" onClick={onEdit}>
               Edit
             </Button>
-          </div>
-        )}
-      </div>
-    );
-  return (
-    <div className={tone}>
-      <div className="text-title-medium">{mine ? `You proposed version ${v.number}` : `${by} proposed version ${v.number}`}</div>
-      <div className="text-body-medium opacity-85">{waiting.length ? `Waiting for ${waiting.join(" and ")}` : `Waiting for you`}</div>
-      {v.note && <div className="text-body-medium italic opacity-85">“{v.note}”</div>}
-      {!readOnly && (
-        <div className="mt-2 flex flex-wrap gap-2">
-          <Button variant="tonal" onClick={onRead}>
-            Read it
-          </Button>
+          )}
+          {!current && (
+            <Button variant="text" onClick={onRead}>
+              Read it
+            </Button>
+          )}
           {mine && (
-            <>
-              <Button variant="text" icon="edit" onClick={onEdit}>
-                Edit
-              </Button>
-              <Button
-                variant="text"
-                busy={withdraw.isPending}
-                onClick={() => withdraw.mutate(v.id, { onSuccess: () => snack("Proposal withdrawn"), onError: (e) => snack(errorMessage(e)) })}
-              >
-                Withdraw
-              </Button>
-            </>
+            <Button
+              variant="text"
+              busy={withdraw.isPending}
+              onClick={() => withdraw.mutate(v.id, { onSuccess: () => snack("Proposal withdrawn"), onError: (e) => snack(errorMessage(e)) })}
+            >
+              Withdraw
+            </Button>
           )}
         </div>
       )}
+      {agreeing && <AgreeDialog v={v} current={current} onClose={() => setAgreeing(false)} onDone={() => {}} />}
+      {asking && <AskChangesDialog v={v} current={current} onClose={() => setAsking(false)} onDone={() => {}} />}
     </div>
   );
 }
@@ -180,18 +237,18 @@ function Lines({ s, marked }: { s: AgreementSection; marked: boolean }) {
     const t = bullets ? l.text : l.text.replace(/^- /, "");
     if (!marked || l.op === "same") return t;
     return l.op === "add" ? (
-      <span className="rounded-xs bg-[color-mix(in_srgb,#2e7d32_16%,transparent)] px-0.5">{t}</span>
+      <span className="bg-tertiary-container px-1 [box-decoration-break:clone]">{t}</span>
     ) : (
-      <span className="text-error line-through opacity-80">{t}</span>
+      <span className="text-on-surface-variant line-through">{t}</span>
     );
   };
   return (
     <>
       {groups.map((g, i) =>
         g.list ? (
-          <ul key={i} className="flex list-disc flex-col gap-1 pl-5">
+          <ul key={i} className="flex flex-col gap-1">
             {g.lines.map((l, j) => (
-              <li key={j}>{text(l)}</li>
+              <li key={j}>– {text(l)}</li>
             ))}
           </ul>
         ) : (
@@ -202,160 +259,113 @@ function Lines({ s, marked }: { s: AgreementSection; marked: boolean }) {
   );
 }
 
-function SectionView({ s, marked }: { s: AgreementSection; marked: boolean }) {
+function SectionView({ s, marked, bare }: { s: AgreementSection; marked: boolean; bare?: boolean }) {
   const { features } = useRel();
   return (
-    <section className="flex flex-col gap-1.5">
-      <h3 className="flex items-center gap-2 text-title-medium">
-        <Icon name={sectionIcon(s)} size={20} className="text-primary" />
-        {s.title}
-        {marked && s.change === "new" && <Badge tone="tertiary">New</Badge>}
-      </h3>
-      <Lines s={s} marked={marked} />
+    <section className="flex flex-col gap-2">
+      {!bare && (
+        <h3 className="eyebrow">
+          {s.title}
+          {marked && s.change === "new" ? " · new" : ""}
+        </h3>
+      )}
+      <div className="flex flex-col gap-3 font-serif text-[24px] leading-[34px] text-on-surface">
+        <Lines s={s} marked={marked} />
+      </div>
       {s.noteId && s.noteTitle && (
-        <Link to="/notes/$noteId" params={{ noteId: s.noteId }} className="flex items-center gap-1 self-start text-label-large text-primary">
-          <Icon name="sticky_note_2" size={18} /> {s.noteTitle}
+        <Link to="/notes/$noteId" params={{ noteId: s.noteId }} className="flex items-center gap-1.5 self-start text-body-large text-on-surface-variant">
+          <Icon name="link" size={18} /> {s.noteTitle}
         </Link>
       )}
       {s.kind === "text" && s.id === "limits" && features.limits && (
-        <Link to="/limits" className="flex items-center gap-1 self-start text-label-large text-primary">
-          <Icon name="tune" size={18} /> Your limits list
+        <Link to="/limits" className="flex items-center gap-1.5 self-start text-body-large text-on-surface-variant">
+          <Icon name="link" size={18} /> Your limits list
         </Link>
       )}
-      {s.kind !== "text" && (
-        <div className="text-body-small text-on-surface-variant">
-          {s.items.length ? `From ${s.kind === "rules" ? "Rules" : "Protocols"}, as of this version` : `No ${s.kind} yet`}
-        </div>
-      )}
+      {s.kind !== "text" && !s.items.length && <p className="text-body-large text-on-surface-variant">No {s.kind} yet</p>}
     </section>
   );
 }
 
 /** The whole page of a version, optionally with what changed marked. */
-function Body({ v, marked = false, only }: { v: AgreementVersion; marked?: boolean; only?: Set<string> }) {
-  const sections = only ? v.sections.filter((s) => only.has(s.id)) : v.sections;
+function Body({ v, marked = false }: { v: AgreementVersion; marked?: boolean }) {
   return (
-    <div className="border border-outline-variant flex flex-col gap-5 rounded-xl p-4 text-body-large md:p-5">
-      {sections.map((s) => (
+    <div className="flex flex-col gap-8">
+      {v.sections.map((s) => (
         <SectionView key={s.id} s={s} marked={marked} />
       ))}
       {marked &&
         v.removed.map((t) => (
-          <section key={t} className="flex items-center gap-2 text-title-medium text-error line-through opacity-80">
-            <Icon name="article" size={20} />
+          <p key={t} className="eyebrow line-through">
             {t}
-          </section>
+          </p>
         ))}
-      {v.reviewBy && !only && (
-        <section className="flex flex-col gap-1.5">
-          <h3 className="flex items-center gap-2 text-title-medium">
-            <Icon name="event_repeat" size={20} className="text-primary" />
-            Review
-          </h3>
-          <p>We'll read this again together by {fmtDate(v.reviewBy, { month: "short", day: "numeric", year: "numeric" })}.</p>
+      {v.reviewBy && (
+        <section className="flex flex-col gap-2">
+          <h3 className="eyebrow">Review</h3>
+          <p className="font-serif text-[24px] leading-[34px] text-on-surface">
+            We'll read this again together by {fmtDate(v.reviewBy, { month: "short", day: "numeric", year: "numeric" })}.
+          </p>
         </section>
       )}
     </div>
   );
 }
 
-/** One tile per person: their name in a signature hand once they've agreed. */
+/** Each person on a hairline: their name in the serif italic once they've agreed. */
 function Signatures({ v }: { v: AgreementVersion }) {
   const { rel } = useRel();
   return (
-    <div className="grid grid-cols-2 gap-3">
-      {rel.members.map((m) => {
-        const a = v.agreements.find((x) => x.userId === m.userId);
-        return (
-          <div key={m.userId} className="border border-outline-variant flex flex-col gap-0.5 rounded-lg px-3 py-3">
-            <span className="text-body-small text-on-surface-variant">Agreed by</span>
-            {a ? (
-              <span className="font-serif text-title-large italic">{m.displayName}</span>
-            ) : (
-              <span className="text-body-medium text-on-surface-variant">Waiting for {m.displayName}</span>
-            )}
-            <span className="text-body-small text-on-surface-variant">{a ? day(a.agreedAt) : " "}</span>
-          </div>
-        );
-      })}
-    </div>
+    <section>
+      <h3 className="eyebrow">Agreed by</h3>
+      <div className="mt-2 divide-y divide-outline-variant border-y border-outline-variant">
+        {rel.members.map((m) => {
+          const a = v.agreements.find((x) => x.userId === m.userId);
+          return (
+            <div key={m.userId} className="flex items-baseline gap-3 py-3">
+              {a ? (
+                <span className="min-w-0 flex-1 font-serif text-[26px] text-on-surface italic">{m.displayName}</span>
+              ) : (
+                <span className="min-w-0 flex-1 text-body-large text-on-surface-variant">Waiting for {m.displayName}</span>
+              )}
+              {a && <span className="text-body-medium text-on-surface-variant">{day(a.agreedAt)}</span>}
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
-/** Reading a proposal: what changed first, then agree or ask for changes. */
+/** Reading a proposal in full, with what changed marked. */
 function Review({ v, current, onBack, onEdit }: { v: AgreementVersion; current: AgreementVersion | null; onBack(): void; onEdit(): void }) {
-  const { me, memberName } = useRel();
-  const readOnly = useReadOnly();
-  const [all, setAll] = useState(!current);
-  const [agreeing, setAgreeing] = useState(false);
-  const [asking, setAsking] = useState(false);
-  const changed = new Set(v.sections.filter((s) => s.change !== "same").map((s) => s.id));
-  const unchanged = v.sections.length - changed.size;
-  const mine = v.proposedBy === me.user.id;
-  const agreed = v.agreements.some((a) => a.userId === me.user.id);
+  const { memberName } = useRel();
   const by = memberName(v.proposedBy);
   return (
-    <>
-      <PageHeader
-        title={
-          <span className="flex items-center gap-1">
-            <IconButton icon="arrow_back" label="Back" onClick={onBack} />
-            Agreement
-          </span>
-        }
-        subtitle={`Version ${v.number}, proposed by ${by === "You" ? "you" : by} ${day(v.proposedAt)}`}
-      />
-      <div className="flex flex-col gap-4 px-4 pb-8 md:px-6">
-        {current && (
-          <div className="flex flex-col gap-1 rounded-xl bg-tertiary-container px-4 py-3 text-on-tertiary-container">
-            <div className="text-title-medium">
-              {v.changes} change{v.changes === 1 ? "" : "s"} from version {current.number}
-            </div>
-            {v.note && (
-              <div className="text-body-medium italic opacity-85">
-                {by}: “{v.note}”
-              </div>
-            )}
-          </div>
-        )}
-        {v.feedback && (
-          <div className="border-l-2 border-outline-variant px-4 py-1 text-body-medium">
-            {memberName(v.feedback.userId)} asked for changes: <span className="italic">“{v.feedback.note}”</span>
-          </div>
-        )}
-        <Body v={v} marked={!!current} only={all ? undefined : changed} />
-        {!all && unchanged > 0 && (
-          <Button variant="text" icon="unfold_more" className="self-start" onClick={() => setAll(true)}>
-            {unchanged} section{unchanged === 1 ? "" : "s"} unchanged · Show all
-          </Button>
-        )}
-        <Signatures v={v} />
-        {!readOnly && (
-          <div className="flex flex-wrap justify-end gap-2">
-            {mine ? (
-              <Button variant="tonal" icon="edit" onClick={onEdit}>
-                Edit
-              </Button>
-            ) : (
-              <>
-                {v.status === "proposed" && (
-                  <Button variant="outlined" onClick={() => setAsking(true)}>
-                    Ask for changes
-                  </Button>
-                )}
-                {!agreed && (
-                  <Button icon="handshake" onClick={() => setAgreeing(true)}>
-                    Agree
-                  </Button>
-                )}
-              </>
-            )}
-          </div>
-        )}
+    <SubPage back="Agreement" onBack={onBack} title={`Version ${v.number}`} subtitle={`Proposed by ${by === "You" ? "you" : by} ${day(v.proposedAt)}`}>
+      <ProposalBanner v={v} current={current} onRead={() => {}} onEdit={onEdit} />
+      {v.feedback && v.status !== "changes_requested" && (
+        <p className="border-l-2 border-outline-variant pl-4 text-body-large text-on-surface-variant">
+          {memberName(v.feedback.userId)} asked for changes: <span className="font-serif italic">“{v.feedback.note}”</span>
+        </p>
+      )}
+      <Body v={v} marked={!!current} />
+      <Signatures v={v} />
+    </SubPage>
+  );
+}
+
+/** A page under Agreement: "‹ Agreement", a serif title and a line under it. */
+function SubPage({ back, onBack, title, subtitle, children }: { back: string; onBack(): void; title: string; subtitle?: string; children: ReactNode }) {
+  return (
+    <div className="flex max-w-3xl flex-col px-4 pt-3 pb-12 md:px-6 md:pt-6">
+      <div className="-mx-2">
+        <BackLink label={back} onClick={onBack} />
       </div>
-      {agreeing && <AgreeDialog v={v} current={current} onClose={() => setAgreeing(false)} onDone={onBack} />}
-      {asking && <AskChangesDialog v={v} current={current} onClose={() => setAsking(false)} onDone={onBack} />}
-    </>
+      <h1 className="mt-3 font-serif text-[56px] leading-[60px] text-on-surface">{title}</h1>
+      {subtitle && <p className="mt-2 text-body-large text-on-surface-variant">{subtitle}</p>}
+      <div className="mt-8 flex flex-col gap-8">{children}</div>
+    </div>
   );
 }
 
@@ -369,7 +379,6 @@ function AgreeDialog({ v, current, onClose, onDone }: { v: AgreementVersion; cur
     <Dialog
       open
       onClose={onClose}
-      icon="handshake"
       title={`Agree to version ${v.number}?`}
       actions={
         <>
@@ -416,7 +425,6 @@ function AskChangesDialog({ v, current, onClose, onDone }: { v: AgreementVersion
     <Dialog
       open
       onClose={onClose}
-      icon="rate_review"
       title="Ask for changes"
       actions={
         <>
@@ -455,56 +463,50 @@ function AskChangesDialog({ v, current, onClose, onDone }: { v: AgreementVersion
   );
 }
 
+/** Mockup 75: every version on hairlines, the open one to review, the rest to read. */
 function Versions({ onBack, onOpen }: { onBack(): void; onOpen(id: string): void }) {
-  const { rel, memberName, partners } = useRel();
+  const { rel, me, memberName } = useRel();
   const q = useAgreement(rel.id);
   const by = (id: string | null) => memberName(id).replace(/^You$/, "you");
+  const versions = q.data?.versions ?? [];
+  const short = (iso: string) => fmtDate(localDateOf(new Date(iso)), { month: "short", day: "numeric" });
   return (
-    <>
-      <PageHeader
-        title={
-          <span className="flex items-center gap-1">
-            <IconButton icon="arrow_back" label="Back" onClick={onBack} />
-            Versions
-          </span>
-        }
-        subtitle="Agreement"
-      />
-      <div className="flex flex-col gap-3 px-4 pb-8 md:px-6">
-        <div className="border border-outline-variant flex flex-col overflow-hidden rounded-xl">
-          {q.data?.versions.map((v, i) => (
-            <button
-              key={v.id}
-              onClick={() => onOpen(v.id)}
-              className={cx("state-layer flex items-center gap-4 px-4 py-3 text-left", i > 0 && "border-t border-surface-container-highest")}
-            >
-              <Icon
-                name={v.status === "agreed" ? "verified" : v.status === "superseded" ? "history" : "pending"}
-                filled={v.status === "agreed"}
-                className={v.status === "agreed" ? "text-primary" : v.status === "superseded" ? "text-on-surface-variant" : "text-tertiary"}
-              />
+    <SubPage back="Agreement" onBack={onBack} title="Versions" subtitle="Old versions stay readable, with what changed in each.">
+      <div className="-mt-4 divide-y divide-outline-variant border-b border-outline-variant">
+        {versions.map((v, i) => {
+          const open = v.status === "proposed" || v.status === "changes_requested";
+          const full = q.data?.proposal?.id === v.id ? q.data.proposal : null;
+          const waitingOnMe = !!full && full.status === "proposed" && full.proposedBy !== me.user.id && !full.agreements.some((a) => a.userId === me.user.id);
+          // A superseded version ran from its own agreement to the next one's.
+          const until = versions
+            .slice(0, i)
+            .reverse()
+            .find((x) => x.agreedAt)?.agreedAt;
+          const line = open
+            ? `Proposed by ${by(v.proposedBy)} · ${v.status === "changes_requested" ? "changes asked for" : waitingOnMe ? "waiting on you" : "waiting"}`
+            : v.status === "agreed"
+              ? `In force since ${short(v.agreedAt!)} · agreed by ${rel.members.length > 2 ? "everyone" : "both"}`
+              : v.agreedAt
+                ? `${short(v.agreedAt)} – ${until ? short(until) : "replaced"}`
+                : `Proposed by ${by(v.proposedBy)} ${short(v.proposedAt)}`;
+          return (
+            <div key={v.id} className="flex items-center gap-4 py-5">
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2 text-title-medium">
-                  Version {v.number}
-                  {v.status === "agreed" && <Badge>In force</Badge>}
-                  {(v.status === "proposed" || v.status === "changes_requested") && (
-                    <Badge tone="tertiary">{v.status === "changes_requested" ? "Changes asked for" : `Waiting for ${partners.map((p) => p.displayName).join(" and ")}`}</Badge>
-                  )}
-                </div>
-                <div className="text-body-medium text-on-surface-variant">
-                  {v.agreedAt
-                    ? `Agreed by ${rel.members.length > 2 ? "everyone" : "both"} ${day(v.agreedAt)} · proposed by ${by(v.proposedBy)}`
-                    : `Proposed by ${by(v.proposedBy)} ${day(v.proposedAt)}`}
-                  {v.number > 1 && ` · ${v.changes} change${v.changes === 1 ? "" : "s"}`}
-                </div>
+                <div className="font-serif text-[30px] leading-9 text-on-surface">Version {v.number}</div>
+                <div className="text-body-large text-on-surface-variant">{line}</div>
               </div>
-              <Icon name="chevron_right" />
-            </button>
-          ))}
-        </div>
-        <p className="text-body-small text-on-surface-variant">Old versions stay readable, with what changed in each.</p>
+              {waitingOnMe ? (
+                <Button onClick={() => onOpen(v.id)}>Review</Button>
+              ) : (
+                <button type="button" onClick={() => onOpen(v.id)} className="text-label-large text-primary">
+                  Read
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
-    </>
+    </SubPage>
   );
 }
 
@@ -512,39 +514,28 @@ function PastVersion({ id, onBack }: { id: string; onBack(): void }) {
   const q = useAgreementVersion(id);
   const v = q.data;
   return (
-    <>
-      <PageHeader
-        title={
-          <span className="flex items-center gap-1">
-            <IconButton icon="arrow_back" label="Back" onClick={onBack} />
-            {v ? `Version ${v.number}` : "Version"}
-          </span>
-        }
-        subtitle={v ? (v.agreedAt ? `Agreed ${day(v.agreedAt)}` : `Proposed ${day(v.proposedAt)}`) : undefined}
-      />
-      <div className="flex flex-col gap-4 px-4 pb-8 md:px-6">
-        {q.isLoading && <Loading />}
-        {q.error && <ErrorBox error={q.error} onRetry={() => q.refetch()} />}
-        {v && (
-          <>
-            {v.number > 1 && v.changes > 0 && (
-              <p className="text-body-medium text-on-surface-variant">
-                {v.changes} change{v.changes === 1 ? "" : "s"} from the version before, marked below.
-              </p>
-            )}
-            <Body v={v} marked={v.number > 1} />
-            <Signatures v={v} />
-          </>
-        )}
-      </div>
-    </>
+    <SubPage
+      back="Versions"
+      onBack={onBack}
+      title={v ? `Version ${v.number}` : "Version"}
+      subtitle={v ? (v.agreedAt ? `Agreed ${day(v.agreedAt)}` : `Proposed ${day(v.proposedAt)}`) : undefined}
+    >
+      {q.isLoading && <Loading />}
+      {q.error && <ErrorBox error={q.error} onRetry={() => q.refetch()} />}
+      {v && (
+        <>
+          <Body v={v} marked={v.number > 1} />
+          <Signatures v={v} />
+        </>
+      )}
+    </SubPage>
   );
 }
 
 let nextId = 0;
 const freshId = () => `s-${Date.now().toString(36)}-${nextId++}`;
 
-/** Proposing a version: every section editable, Rules and Protocols pulled in as they stand. */
+/** Mockup 74: proposing a version, each section an eyebrow over its words; Rules and Protocols come in as they stand. */
 function Editor({
   base,
   start,
@@ -562,6 +553,8 @@ function Editor({
   const snack = useSnackbar();
   const propose = useProposeAgreement(rel.id);
   const template = useAgreementTemplate(rel.id, start === "template");
+  const rules = useLibrary(rel.id, "rules", features.rules);
+  const protocols = useLibrary(rel.id, "protocols", features.protocols);
   const [sections, setSections] = useState<AgreementSectionInput[] | null>(
     base ? base.sections.map(toInput) : start === "blank" ? [{ id: "why", kind: "text", title: "Why we're doing this", body: "", noteId: null }] : null,
   );
@@ -581,6 +574,7 @@ function Editor({
   };
   const has = (kind: string) => list?.some((s) => s.kind === kind);
   const valid = !!list?.length && list.every((s) => s.title.trim());
+  const count = (kind: "rules" | "protocols") => (kind === "rules" ? rules.data : protocols.data)?.length;
   const send = () =>
     list &&
     propose.mutate(
@@ -595,28 +589,31 @@ function Editor({
     );
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col">
-      <div className="flex h-16 items-center gap-2 px-2 md:px-4">
-        <IconButton icon="close" label="Close" onClick={onClose} />
-        <h1 className="flex-1 text-title-large">Version {number}</h1>
-        <Button busy={propose.isPending} disabled={!valid} onClick={send}>
-          Send to {names}
-        </Button>
+      <div className="grid h-16 grid-cols-[1fr_auto_1fr] items-center px-4 md:px-6">
+        <button type="button" onClick={onClose} className="justify-self-start text-body-large text-on-surface-variant">
+          Cancel
+        </button>
+        <h1 className="text-title-medium text-on-surface">Propose version {number}</h1>
+        <button
+          type="button"
+          disabled={!valid || propose.isPending}
+          onClick={send}
+          className="justify-self-end text-body-large text-primary disabled:opacity-40"
+        >
+          Send
+        </button>
       </div>
-      <div className="flex flex-col gap-3 px-4 pb-10 md:px-6">
-        <p className="text-body-medium text-on-surface-variant">
-          Changes take effect once you {rel.members.length > 2 ? "all" : "both"} agree.{current ? ` Until then version ${current.number} stays in force.` : ""}
-        </p>
+      <div className="flex flex-col gap-7 px-4 pb-12 md:px-6">
         {!list && <Loading />}
         {list?.map((s, i) => (
-          <div key={s.id} className="flex flex-col gap-3 rounded-lg border border-outline-variant bg-surface p-3">
+          <section key={s.id} className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
-              <Icon name={sectionIcon(s)} size={20} className="text-primary" />
               <input
                 aria-label="Section title"
                 value={s.title}
                 maxLength={80}
                 onChange={(e) => update(i, { title: e.target.value })}
-                className="min-w-0 flex-1 bg-transparent text-title-medium outline-none"
+                className="eyebrow min-w-0 flex-1 bg-transparent outline-none"
               />
               <OverflowMenu
                 items={[
@@ -628,44 +625,65 @@ function Editor({
               />
             </div>
             {s.kind === "text" ? (
-              <TextArea
-                aria-label={s.title}
-                rows={Math.min(10, Math.max(3, s.body.split("\n").length + 2))}
-                value={s.body}
-                maxLength={5000}
-                placeholder="Start a line with - for a bullet"
-                onChange={(e) => update(i, { body: e.target.value })}
-              />
+              <>
+                {s.id === "limits" && features.limits && (
+                  <Link to="/limits" className="flex items-center gap-1.5 self-start text-body-large text-on-surface-variant">
+                    <Icon name="link" size={18} /> Links to your limits list
+                  </Link>
+                )}
+                <textarea
+                  aria-label={s.title}
+                  rows={1}
+                  value={s.body}
+                  maxLength={5000}
+                  placeholder="Start a line with - for a bullet"
+                  onChange={(e) => update(i, { body: e.target.value })}
+                  className="min-h-[68px] w-full resize-none bg-transparent font-serif text-[24px] [field-sizing:content] leading-[34px] text-on-surface outline-none placeholder:text-on-surface-variant"
+                />
+              </>
             ) : (
-              <p className="text-body-medium text-on-surface-variant">
-                The current list from {s.kind === "rules" ? "Rules" : "Protocols"}. Edit them in{" "}
+              <p className="text-body-large text-on-surface-variant">
+                {count(s.kind) ?? "The"} {s.kind === "rules" ? (count(s.kind) === 1 ? "rule" : "rules") : count(s.kind) === 1 ? "protocol" : "protocols"}, taken
+                from{" "}
                 <Link to={s.kind === "rules" ? "/rules" : "/protocols"} className="text-primary">
                   {s.kind === "rules" ? "Rules" : "Protocols"}
-                </Link>
-                .
+                </Link>{" "}
+                when you send
               </p>
             )}
-            {s.noteId && <div className="text-body-small text-on-surface-variant">Links to a note</div>}
-          </div>
+            {s.noteId && <div className="text-body-medium text-on-surface-variant">Links to a note</div>}
+          </section>
         ))}
         {list && (
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outlined" icon="add" onClick={() => set([...list, { id: freshId(), kind: "text", title: "New section", body: "", noteId: null }])}>
-              Add a section
-            </Button>
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            <button
+              type="button"
+              onClick={() => set([...list, { id: freshId(), kind: "text", title: "New section", body: "", noteId: null }])}
+              className="text-label-large text-primary"
+            >
+              + Add a section
+            </button>
             {features.rules && !has("rules") && (
-              <Button variant="text" icon="gavel" onClick={() => set([...list, { id: "rules", kind: "rules", title: "Rules", body: "", noteId: null }])}>
-                Add the rules
-              </Button>
+              <button
+                type="button"
+                onClick={() => set([...list, { id: "rules", kind: "rules", title: "Rules", body: "", noteId: null }])}
+                className="text-label-large text-primary"
+              >
+                + Add the rules
+              </button>
             )}
             {features.protocols && !has("protocols") && (
-              <Button variant="text" icon="fact_check" onClick={() => set([...list, { id: "protocols", kind: "protocols", title: "Protocols", body: "", noteId: null }])}>
-                Add the protocols
-              </Button>
+              <button
+                type="button"
+                onClick={() => set([...list, { id: "protocols", kind: "protocols", title: "Protocols", body: "", noteId: null }])}
+                className="text-label-large text-primary"
+              >
+                + Add the protocols
+              </button>
             )}
           </div>
         )}
-        <TextField label="Review by (optional)" type="date" value={reviewBy} onChange={(e) => setReviewBy(e.target.value)} className="w-52" />
+        <TextField label="Review by (optional)" type="date" value={reviewBy} onChange={(e) => setReviewBy(e.target.value)} className="max-w-xs" />
         <TextArea label={`What changed, for ${names}`} value={note} maxLength={500} rows={2} onChange={(e) => setNote(e.target.value)} />
       </div>
     </div>

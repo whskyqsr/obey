@@ -13,7 +13,6 @@ export function NoteHistory({ note, open, onClose }: { note: Note; open: boolean
     <Dialog
       open={open}
       onClose={onClose}
-      icon="history"
       title="Edit history"
       actions={
         <Button variant="text" onClick={onClose}>

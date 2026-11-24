@@ -14,9 +14,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import app.obey.ui.common.PillSegment
+import app.obey.ui.common.PillRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -61,14 +60,13 @@ fun AppLockSetting(vm: AppLockViewModel = hiltViewModel()) {
     val on by vm.on.collectAsStateWithLifecycle()
     val after by vm.after.collectAsStateWithLifecycle()
     val colors = MaterialTheme.colorScheme
-    Surface(color = colors.surfaceContainerLow, shape = MaterialTheme.shapes.large, modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Lock, null, tint = colors.primary)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text("App lock", style = MaterialTheme.typography.bodyLarge)
-                    Text("Ask for your fingerprint, face or screen lock to open the app", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
                 }
                 Switch(
                     checked = on,
@@ -85,9 +83,9 @@ fun AppLockSetting(vm: AppLockViewModel = hiltViewModel()) {
             }
             if (on) {
                 Text("Lock again when you've been away", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                PillRow(Modifier.fillMaxWidth()) {
                     AFTER.forEachIndexed { i, (seconds, label) ->
-                        SegmentedButton(selected = after == seconds, onClick = { vm.setAfter(seconds) }, shape = SegmentedButtonDefaults.itemShape(i, AFTER.size)) { Text(label) }
+                        PillSegment(selected = after == seconds, onClick = { vm.setAfter(seconds) }) { Text(label) }
                     }
                 }
             }

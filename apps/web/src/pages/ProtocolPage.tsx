@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { useDeleteLibraryItem, useLibrary, useSaveLibraryItem } from "../api/hooks";
+import { useDeleteLibraryItem, useLibrary, useRuleLog, useSaveLibraryItem, useTasks } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { Protocol } from "../api/types";
 import { MarkdownEditor } from "../components/MarkdownEditor";
-import { Button, ErrorBox, Icon, IconButton, Loading, Select, useSnackbar } from "../components/ui";
+import { BackLink, Button, ErrorBox, IconButton, Loading, OverflowMenu, Select, useSnackbar } from "../components/ui";
+import { fmtDate, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
 import { useConfirm } from "../lib/useConfirm";
-import { sortRules } from "./Rules";
+import { roman, sortRules } from "./Rules";
 
 /** One protocol, full page: formatted for reading, with the notes editor for a Dominant. */
 export function ProtocolPage({ protocolId }: { protocolId: string }) {
@@ -65,49 +66,44 @@ function ProtocolView({ protocol }: { protocol?: Protocol }) {
     setEditing(false);
   }
 
-  const deleteButton = protocol && isDom && (
-    <IconButton
-      icon="delete"
-      label="Delete"
-      onClick={() =>
-        confirm(`Delete protocol “${protocol.title}”?`, () =>
-          del.mutate(protocol.id, {
-            onSuccess: () => {
-              snack("Protocol deleted");
-              back();
-            },
-            onError: (e) => snack(errorMessage(e)),
-          }),
-        )
-      }
-    />
-  );
+  const remove = () =>
+    protocol &&
+    confirm(`Delete protocol “${protocol.title}”?`, () =>
+      del.mutate(protocol.id, {
+        onSuccess: () => {
+          snack("Protocol deleted");
+          // Deleting returns to the list, never back through history.
+          void navigate({ to: "/protocols", replace: true });
+        },
+        onError: (e) => snack(errorMessage(e)),
+      }),
+    );
 
   if (protocol && !editing) {
     return (
       <div className="flex flex-col">
-        <header className="sticky top-0 z-20 flex h-14 items-center gap-1 bg-surface px-2 md:px-4">
-          <IconButton icon="arrow_back" label="Back" onClick={back} />
-          <div className="flex-1" />
-          {deleteButton}
-          {isDom && (
-            <Button onClick={() => setEditing(true)} icon="edit">
-              Edit
-            </Button>
-          )}
+        <header className="sticky top-0 z-20 flex h-14 max-w-3xl items-center gap-1 bg-surface px-4 md:px-6 lg:px-16">
+          <div className="flex-1">
+            <BackLink label="Protocols" onClick={() => void navigate({ to: "/protocols" })} />
+          </div>
+          {isDom && <IconButton icon="edit" label="Edit" onClick={() => setEditing(true)} />}
+          {isDom && <OverflowMenu items={[{ label: "Delete", icon: "delete", danger: true, onClick: remove }]} />}
         </header>
-        <article className="flex flex-col gap-3 px-4 pb-10 md:px-6">
-          <h1 className="text-headline-medium text-on-surface">{form.title}</h1>
+        <article className="flex max-w-3xl flex-col px-4 pb-10 md:px-6 lg:px-16">
+          <h1 className="mt-2 font-serif text-[46px] leading-[1.05] text-on-surface md:text-[56px]">{form.title}</h1>
           {ruleIndex >= 0 && (
-            <span className="flex items-center gap-1 text-label-large text-primary">
-              <Icon name="gavel" size={18} /> Rule {ruleIndex + 1}: {rules[ruleIndex]!.title}
-            </span>
+            <p className="mt-2 text-body-medium text-on-surface-variant">
+              Spells out rule {roman(ruleIndex + 1)}: {rules[ruleIndex]!.title}.
+            </p>
           )}
-          {form.bodyMd ? (
-            <MarkdownEditor value={form.bodyMd} onChange={() => {}} editable={false} bare />
-          ) : (
-            <p className="text-body-medium text-on-surface-variant">No details yet.</p>
-          )}
+          <div className="mt-4">
+            {form.bodyMd ? (
+              <MarkdownEditor value={form.bodyMd} onChange={() => {}} editable={false} letters />
+            ) : (
+              <p className="text-body-medium text-on-surface-variant">Nothing written yet.</p>
+            )}
+          </div>
+          <Broken protocolId={protocol.id} />
         </article>
         {confirmEl}
       </div>
@@ -117,29 +113,30 @@ function ProtocolView({ protocol }: { protocol?: Protocol }) {
   return (
     <div className="flex flex-col">
       {/* h-14 matches the formatting toolbar's sticky offset (top-14) in MarkdownEditor. */}
-      <header className="sticky top-0 z-20 flex h-14 items-center gap-1 bg-surface px-2 md:px-4">
-        <IconButton
-          icon={protocol ? "close" : "arrow_back"}
-          label={protocol ? "Stop editing" : "Back"}
+      <header className="sticky top-0 z-20 flex h-14 max-w-3xl items-center gap-1 bg-surface px-4 md:px-6 lg:px-16">
+        <button
+          type="button"
+          className="state-layer -ml-2 h-10 rounded-md px-2 text-body-large text-on-surface-variant"
           onClick={() => {
             const leave = protocol ? discard : back;
             if (dirty) confirm("Discard unsaved changes?", leave);
             else leave();
           }}
-        />
+        >
+          Cancel
+        </button>
         <div className="flex-1" />
-        {deleteButton}
-        <Button onClick={submit} busy={save.isPending} disabled={!form.title.trim() || (!dirty && !!protocol)} icon="save">
+        <Button onClick={submit} busy={save.isPending} disabled={!form.title.trim() || (!dirty && !!protocol)}>
           Save
         </Button>
       </header>
-      <div className="flex flex-col gap-4 px-4 pb-10 md:px-6">
+      <div className="flex max-w-3xl flex-col gap-4 px-4 pb-10 md:px-6 lg:px-16">
         <input
           value={form.title}
           onChange={(e) => set({ title: e.target.value })}
-          placeholder="Protocol name, e.g. Hydration"
+          placeholder="Name it"
           maxLength={200}
-          className="w-full bg-transparent text-headline-medium text-on-surface outline-none placeholder:text-on-surface-variant/60"
+          className="w-full bg-transparent font-serif text-[40px] leading-tight text-on-surface outline-none placeholder:text-on-surface-variant/60"
         />
         {rules.length > 0 && (
           <Select label="Spells out a rule (optional)" value={form.ruleId ?? ""} onChange={(e) => set({ ruleId: e.target.value || null })} className="max-w-md">
@@ -151,9 +148,37 @@ function ProtocolView({ protocol }: { protocol?: Protocol }) {
             ))}
           </Select>
         )}
-        <MarkdownEditor value={form.bodyMd} onChange={(bodyMd) => set({ bodyMd })} placeholder="What's expected, and when and how it's done." />
+        <MarkdownEditor value={form.bodyMd} onChange={(bodyMd) => set({ bodyMd })} placeholder="What's expected, and when and how it's done." letters />
       </div>
       {confirmEl}
     </div>
+  );
+}
+
+/** "Broken this month": this protocol's rule log entries since the 1st, with the consequence each one got. */
+function Broken({ protocolId }: { protocolId: string }) {
+  const { rel, features } = useRel();
+  const log = useRuleLog(rel.id);
+  const tasks = useTasks(rel.id);
+  const month = today().slice(0, 7);
+  const entries = (log.data ?? []).filter((e) => e.protocolId === protocolId && e.occurredOn.startsWith(month));
+  if (!features.rules || !entries.length) return null;
+  return (
+    <section className="mt-8">
+      <h2 className="eyebrow mb-1">Broken this month</h2>
+      {entries.map((e) => (
+        <div key={e.id} className="flex items-center gap-4 border-b border-outline-variant py-3 last:border-b-0">
+          <div className="min-w-0 flex-1">
+            <div className="text-body-large text-on-surface">{fmtDate(e.occurredOn, { weekday: "short", month: "short", day: "numeric" })}</div>
+            {e.note && <div className="text-body-medium text-on-surface-variant">{e.note}</div>}
+          </div>
+          {e.consequenceTaskId && (
+            <span className="shrink-0 text-body-medium text-on-surface-variant">
+              {tasks.data?.find((t) => t.id === e.consequenceTaskId)?.title.toLowerCase() ?? "consequence"}
+            </span>
+          )}
+        </div>
+      ))}
+    </section>
   );
 }

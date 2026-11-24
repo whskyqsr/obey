@@ -1,5 +1,15 @@
 package app.obey.ui.scenes
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.draw.clip
+import app.obey.api.AftercarePlan
+import app.obey.api.AftercarePlanInput
+import app.obey.ui.common.Eyebrow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -72,13 +82,23 @@ class ScenesViewModel @Inject constructor(private val api: ObeyApi, private val 
     private val _state = MutableStateFlow<Load<List<Scene>>>(Load.Loading)
     val state: StateFlow<Load<List<Scene>>> = _state.asStateFlow()
 
+    private val _plans = MutableStateFlow<List<AftercarePlan>>(emptyList())
+    val plans: StateFlow<List<AftercarePlan>> = _plans.asStateFlow()
+
     fun load() {
         val rel = sessions.requireRelationshipId()
+        viewModelScope.launch { runCatching { api.aftercarePlans(rel) }.onSuccess { _plans.value = it } }
         viewModelScope.launch {
             val result = loadCatching { api.scenes(rel) }
             // A reload that fails keeps the list on screen.
             if (result is Load.Ready || _state.value !is Load.Ready) _state.value = result
         }
+    }
+
+    fun savePlan(input: AftercarePlanInput, done: () -> Unit) = action {
+        val saved = api.saveAftercarePlan(sessions.requireRelationshipId(), input)
+        _plans.value = _plans.value.map { if (it.userId == saved.userId) saved else it }
+        done()
     }
 
     fun log(input: SceneInput, done: (Scene) -> Unit) = action {
@@ -88,7 +108,7 @@ class ScenesViewModel @Inject constructor(private val api: ObeyApi, private val 
     }
 }
 
-/** Scenes, newest first: each one's safeword, aftercare and how far each person has got with their side. */
+/** Mockup 77: your aftercare plan at the top, then each scene on a hairline, newest first. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScenesScreen(onOpenSettings: () -> Unit, onOpen: (String) -> Unit, onAftercare: () -> Unit, vm: ScenesViewModel = hiltViewModel()) {
@@ -98,12 +118,18 @@ fun ScenesScreen(onOpenSettings: () -> Unit, onOpen: (String) -> Unit, onAfterca
         onPauseOrDispose { }
     }
     val state by vm.state.collectAsStateWithLifecycle()
+    val plans by vm.plans.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     MessageEffect(message, snackbar, vm::messageShown)
     val session = vm.session ?: return
+    val c = MaterialTheme.colorScheme
     var logging by remember { mutableStateOf(false) }
+    var editingPlan by remember { mutableStateOf<AftercarePlan?>(null) }
+    val mine = plans.firstOrNull { it.userId == session.userId }
+    val others = plans.filter { it.userId != session.userId && (it.needs.isNotEmpty() || it.note.isNotBlank()) }
+    val names = andList(session.partners.map { it.displayName })
 
     Scaffold(
         topBar = {
@@ -111,7 +137,6 @@ fun ScenesScreen(onOpenSettings: () -> Unit, onOpen: (String) -> Unit, onAfterca
                 title = { Text("Scenes") },
                 navigationIcon = { MenuButton() },
                 actions = {
-                    IconButton(onClick = onAftercare) { Icon(Icons.Outlined.VolunteerActivism, "Aftercare") }
                     if (!session.readOnly) IconButton(onClick = { logging = true }) { Icon(Icons.Outlined.Add, "Log a scene") }
                     SafeWordAction()
                 },
@@ -119,23 +144,45 @@ fun ScenesScreen(onOpenSettings: () -> Unit, onOpen: (String) -> Unit, onAfterca
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        when (val s = state) {
-            Load.Loading -> LoadingBox(Modifier.padding(padding))
-            is Load.Failed -> ErrorBox(s.message, vm::load, Modifier.padding(padding))
-            is Load.Ready -> if (s.value.isEmpty()) {
-                EmptyBox(
-                    "No scenes yet",
-                    "Log one afterwards: what you did, whether a safeword was called and the aftercare given. Each of you then writes how it went.",
-                    Modifier.padding(padding),
-                    icon = Icons.Outlined.AutoAwesome,
-                )
-            } else {
-                LazyColumn(
-                    Modifier.padding(padding).fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+        LazyColumn(Modifier.padding(padding).fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp)) {
+            item { Text("Only your dynamic sees these.", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant) }
+            if (mine != null) item {
+                Column(
+                    Modifier.padding(top = 20.dp).fillMaxWidth().clip(MaterialTheme.shapes.medium).background(c.surfaceContainerLowest)
+                        .border(1.dp, c.outlineVariant, MaterialTheme.shapes.medium).padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    items(s.value, key = { it.id }) { scene -> SceneCard(scene, session, vm.avatars) { onOpen(scene.id) } }
+                    Eyebrow("Your aftercare plan")
+                    PlanText(mine, "Not written yet.")
+                    if (!session.readOnly) {
+                        Text(
+                            (if (mine.updatedAt != null) "Edit" else "Write yours") + if (names.isNotEmpty()) " · $names ${if (session.partners.size == 1) "sees" else "see"} this after each scene" else "",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = c.primary,
+                            modifier = Modifier.clickable { editingPlan = mine },
+                        )
+                    }
+                }
+            }
+            if (others.isNotEmpty()) item {
+                Text(
+                    others.joinToString(" · ") { "${session.nameOf(it.userId)}'s aftercare plan" } + " ›",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = c.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 16.dp).clickable(onClick = onAftercare),
+                )
+            }
+            when (val s = state) {
+                Load.Loading -> item { LoadingBox(Modifier.padding(top = 32.dp)) }
+                is Load.Failed -> item { ErrorBox(s.message, vm::load) }
+                is Load.Ready -> if (s.value.isEmpty()) {
+                    item { Text("No scenes yet.", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant, modifier = Modifier.padding(top = 24.dp)) }
+                } else {
+                    item { Spacer(Modifier.height(12.dp)) }
+                    itemsIndexed(s.value, key = { _, it -> it.id }) { i, scene ->
+                        if (i > 0) HorizontalDivider(color = c.outlineVariant)
+                        SceneRow(scene, session) { onOpen(scene.id) }
+                    }
                 }
             }
         }
@@ -149,45 +196,32 @@ fun ScenesScreen(onOpenSettings: () -> Unit, onOpen: (String) -> Unit, onAfterca
             }
         }
     }
+    editingPlan?.let { p -> PlanSheet(p, busy, onDismiss = { editingPlan = null }) { vm.savePlan(it) { editingPlan = null } } }
 }
 
-/** A scene in the list: when, the safeword, its name, the aftercare given, and where each person is with their side. */
-@OptIn(ExperimentalLayoutApi::class)
+/** A plan's needs joined by middots, then its note. */
 @Composable
-private fun SceneCard(s: Scene, session: Session, avatars: AvatarLoader, onClick: () -> Unit) {
+internal fun PlanText(plan: AftercarePlan, empty: String) {
     val c = MaterialTheme.colorScheme
-    SceneSurface(onClick = onClick) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(whenOf(s), style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant, modifier = Modifier.weight(1f))
-            SafewordBadge(s.safeword)
-        }
-        Text(sceneName(s), style = MaterialTheme.typography.titleLarge)
-        Tags(s.aftercare)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            session.relationship?.members.orEmpty().forEach { m ->
-                val side = s.sides.firstOrNull { it.userId == m.userId }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Person(m.userId, session, avatars)
-                    Spacer(Modifier.width(6.dp))
-                    when {
-                        side != null -> MoodMark(side.mood)
-                        m.userId in s.shared -> {
-                            Icon(Icons.Filled.CheckCircle, null, Modifier.size(18.dp), tint = c.primary)
-                            Spacer(Modifier.width(4.dp))
-                            Text("Shared", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
-                        }
-                        else -> {
-                            Icon(Icons.Outlined.Schedule, null, Modifier.size(18.dp), tint = c.onSurfaceVariant)
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                if (m.userId == session.userId) "Add your side" else "${m.displayName} hasn't yet",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = c.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
-        }
+    if (plan.needs.isEmpty() && plan.note.isBlank()) {
+        Text(empty, style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
+        return
+    }
+    if (plan.needs.isNotEmpty()) Text(plan.needs.joinToString(" · ") { cap(it) }, style = MaterialTheme.typography.bodyLarge)
+    if (plan.note.isNotBlank()) Text(plan.note, style = MaterialTheme.typography.bodyLarge)
+}
+
+/** A scene on a hairline: its name in the serif, then when, the safeword and where the sides are. */
+@Composable
+private fun SceneRow(s: Scene, session: Session, onClick: () -> Unit) {
+    val mineShared = session.userId in s.shared
+    val line = listOfNotNull(
+        shortDay(s),
+        if (s.safeword != "none") safewordLine(s.safeword) else null,
+        if (mineShared && s.shared.size >= 2) "both sides shared" else if (mineShared) "waiting on theirs" else "your side missing",
+    ).joinToString(" · ")
+    Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(sceneName(s), style = MaterialTheme.typography.headlineSmall)
+        Text(line, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

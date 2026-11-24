@@ -27,7 +27,7 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MoreTime
 import androidx.compose.material.icons.outlined.WavingHand
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalButton
+import app.obey.ui.common.TonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +48,7 @@ import app.obey.api.OccurrenceStatus
 import app.obey.ui.common.formatTime
 import app.obey.ui.common.local
 import app.obey.ui.common.parseInstant
+import app.obey.ui.common.sideRule
 import java.time.Duration
 import java.time.Instant
 import java.time.format.DateTimeFormatter
@@ -57,30 +58,24 @@ private enum class Tone { Neutral, Soon, Home, Broken }
 @Composable
 private fun Strip(tone: Tone, icon: ImageVector, title: String, body: String, actions: @Composable () -> Unit = {}) {
     val c = MaterialTheme.colorScheme
-    val (box, onBox) = when (tone) {
-        Tone.Soon -> c.tertiaryContainer to c.onTertiaryContainer
-        Tone.Broken -> c.errorContainer to c.onErrorContainer
-        else -> c.surfaceContainerHigh to c.onSurface
+    // Letters: a rule down the side carries the tone; the icon sits on paper.
+    val (rule, tint) = when (tone) {
+        Tone.Soon -> c.primary to c.primary
+        Tone.Home -> c.onSurface to c.onSurface
+        Tone.Broken -> c.error to c.error
+        Tone.Neutral -> c.outlineVariant to c.onSurfaceVariant
     }
-    val badge: Pair<Color, Color>? = when (tone) {
-        Tone.Soon -> c.tertiary to c.onTertiary
-        Tone.Home -> c.primary to c.onPrimary
-        Tone.Broken -> c.error to c.onError
-        Tone.Neutral -> null
-    }
-    Surface(color = box, contentColor = onBox, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-        Row(Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(48.dp).clip(CircleShape).let { if (badge != null) it.background(badge.first) else it },
-                contentAlignment = Alignment.Center,
-            ) { Icon(icon, null, tint = badge?.second ?: onBox) }
-            Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                Text(body, style = MaterialTheme.typography.bodyMedium, color = onBox.copy(alpha = 0.8f))
-            }
-            actions()
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).sideRule(rule).padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, tint = tint)
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(body, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
         }
+        actions()
     }
 }
 
@@ -135,7 +130,7 @@ fun CurfewStrip(
                 if (told != null) "Told $askWho at ${formatTime(told)} · stay in until $until" else "Let $askWho know you're in · stay until $until",
             ) {
                 if (told == null) {
-                    FilledTonalButton(onClick = onTell) {
+                    TonalButton(onClick = onTell) {
                         Icon(Icons.Outlined.WavingHand, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("Tell $askWho")
@@ -156,7 +151,7 @@ fun CurfewStrip(
                 },
             ) {
                 if (told != null) {
-                    FilledTonalButton(onClick = onReply) {
+                    TonalButton(onClick = onReply) {
                         Icon(Icons.AutoMirrored.Outlined.Chat, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("Reply")
@@ -173,7 +168,7 @@ fun CurfewStrip(
         !mine -> Strip(Tone.Neutral, Icons.Outlined.Bedtime, if (started) "Curfew started at $due" else "Curfew at $due", "$name isn't home yet · in until $until")
         night.canTap && !started -> Strip(Tone.Neutral, Icons.Outlined.Bedtime, "Curfew at $due", "Stay in until $until$waiting$note") {
             onMoreTime?.let { IconButton(onClick = it) { Icon(Icons.Outlined.MoreTime, "More time") } }
-            FilledTonalButton(onClick = onHome) {
+            TonalButton(onClick = onHome) {
                 Icon(Icons.Outlined.Home, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("I'm home")
@@ -188,7 +183,7 @@ fun CurfewStrip(
                 (if (waiting.isNotEmpty()) "Be home by $due$waiting" else "Be home by $due, stay in until $until") + note,
             ) {
                 onMoreTime?.let {
-                    FilledTonalButton(onClick = it) {
+                    TonalButton(onClick = it) {
                         Icon(Icons.Outlined.MoreTime, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("More time")
@@ -205,12 +200,8 @@ private val clashDay = DateTimeFormatter.ofPattern("EEE, MMM d")
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CurfewClashCard(clash: CurfewClash, onExcuse: () -> Unit, onChangeEnd: () -> Unit, onLeave: () -> Unit) {
-    Surface(
-        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
-        shape = RoundedCornerShape(24.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(Modifier.padding(16.dp)) {
+    Box(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().sideRule(MaterialTheme.colorScheme.error).padding(vertical = 2.dp)) {
             Icon(Icons.Outlined.EventBusy, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {

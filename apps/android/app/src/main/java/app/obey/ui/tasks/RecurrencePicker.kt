@@ -4,6 +4,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import app.obey.ui.common.LettersChip
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
@@ -13,18 +16,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.EventRepeat
 import androidx.compose.material.icons.outlined.Remove
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -49,7 +45,7 @@ private val dayLetters = mapOf(
     Weekday.FR to "F", Weekday.SA to "S", Weekday.SU to "S",
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun RecurrencePicker(
     draft: RecurrenceDraft,
@@ -59,13 +55,9 @@ fun RecurrencePicker(
     weekStart: java.time.DayOfWeek = java.time.DayOfWeek.SUNDAY,
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             RepeatKind.entries.forEach { kind ->
-                FilterChip(
-                    selected = draft.kind == kind && draft.passthrough == null,
-                    onClick = { onChange(draft.copy(kind = kind, passthrough = null)) },
-                    label = { Text(kind.label) },
-                )
+                LettersChip(kind.label, draft.kind == kind && draft.passthrough == null, { onChange(draft.copy(kind = kind, passthrough = null)) })
             }
         }
 
@@ -89,18 +81,15 @@ fun RecurrencePicker(
                     onChange(draft.copy(interval = it))
                 }
                 // Shortcuts, so a yearly task is one tap rather than eleven.
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(3 to "Quarterly", 6 to "Twice a year", 12 to "Yearly").forEach { (n, label) ->
-                        FilterChip(selected = draft.interval == n, onClick = { onChange(draft.copy(interval = n)) }, label = { Text(label) })
+                        LettersChip(label, draft.interval == n, { onChange(draft.copy(interval = n)) })
                     }
                 }
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    MonthlyMode.entries.forEachIndexed { i, mode ->
-                        SegmentedButton(
-                            selected = draft.monthlyMode == mode,
-                            onClick = { onChange(draft.copy(monthlyMode = mode)) },
-                            shape = SegmentedButtonDefaults.itemShape(i, MonthlyMode.entries.size),
-                        ) { Text(mode.label) }
+                Text("Monthly on", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MonthlyMode.entries.forEach { mode ->
+                        LettersChip(mode.label, draft.monthlyMode == mode, { onChange(draft.copy(monthlyMode = mode)) })
                     }
                 }
                 when (draft.monthlyMode) {
@@ -115,9 +104,9 @@ fun RecurrencePicker(
                         }
                     }
                     MonthlyMode.NthWeekday -> {
-                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(1 to "1st", 2 to "2nd", 3 to "3rd", 4 to "4th", 5 to "5th", -1 to "Last").forEach { (n, label) ->
-                                FilterChip(selected = draft.nth == n, onClick = { onChange(draft.copy(nth = n)) }, label = { Text(label) })
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(1 to "First", 2 to "Second", 3 to "Third", 4 to "Fourth", 5 to "Fifth", -1 to "Last").forEach { (n, label) ->
+                                LettersChip(label, draft.nth == n, { onChange(draft.copy(nth = n)) })
                             }
                         }
                         WeekdayToggles(weekStart, selected = setOf(draft.nthWeekday), onToggle = { onChange(draft.copy(nthWeekday = it)) })
@@ -136,7 +125,7 @@ fun RecurrencePicker(
                 Column(Modifier.weight(1f)) {
                     Text("Count from when it's done", style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        "On: the next one is due after the last is completed, so finishing late moves the rest. Off: it stays on a fixed schedule.",
+                        "The next one is due after finishing",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -145,16 +134,11 @@ fun RecurrencePicker(
             }
         }
 
-        Card(colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.Transparent), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-            Row(Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.EventRepeat, contentDescription = null)
-                Text(
-                    describe(draft.toSchedule(start)) + if (draft.kind == RepeatKind.Once && draft.passthrough == null) " on ${app.obey.ui.common.formatDate(start)}" else ", starting ${app.obey.ui.common.formatDate(start)}",
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(start = 12.dp),
-                )
-            }
-        }
+        Text(
+            describe(draft.toSchedule(start)) + if (draft.kind == RepeatKind.Once && draft.passthrough == null) " on ${app.obey.ui.common.formatDate(start)}" else ", starting ${app.obey.ui.common.formatDate(start)}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -168,8 +152,9 @@ private fun WeekdayToggles(weekStart: java.time.DayOfWeek, selected: Set<Weekday
             val on = d in selected
             Surface(
                 shape = CircleShape,
-                color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
-                contentColor = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                color = if (on) MaterialTheme.colorScheme.onSurface else androidx.compose.ui.graphics.Color.Transparent,
+                contentColor = if (on) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant,
+                border = if (on) null else androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier
                     .weight(1f)
                     .aspectRatio(1f)

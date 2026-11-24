@@ -11,7 +11,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import app.obey.ui.common.ChoiceChip
 import androidx.compose.material3.OutlinedButton
 import app.obey.ui.common.LettersField
 import androidx.compose.material3.Text
@@ -63,9 +63,9 @@ fun AssignConsequenceDialog(consequence: Consequence, assigneeId: String, chasti
                     Text("This adds ${app.obey.ui.chastity.fmtMinutes(lockTime)} to their lock straight away. It needs a running lock with an end time.")
                 } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = date == today, onClick = { date = today }, label = { Text("Today") })
-                    FilterChip(selected = date == today.plusDays(1), onClick = { date = today.plusDays(1) }, label = { Text("Tomorrow") })
-                    FilterChip(
+                    ChoiceChip(selected = date == today, onClick = { date = today }, label = { Text("Today") })
+                    ChoiceChip(selected = date == today.plusDays(1), onClick = { date = today.plusDays(1) }, label = { Text("Tomorrow") })
+                    ChoiceChip(
                         selected = date.isAfter(today.plusDays(1)),
                         onClick = { pickDate = true },
                         label = { Text(if (date.isAfter(today.plusDays(1))) formatDate(date) else "Pick a day") },

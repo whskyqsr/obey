@@ -1,5 +1,17 @@
 package app.obey.ui.agreement
 
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.height
+import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import app.obey.ui.common.inkButtonColors
+import app.obey.ui.common.Eyebrow
+import app.obey.ui.common.BackLink
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -38,7 +50,7 @@ import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.HourglassTop
 import androidx.compose.material.icons.outlined.Key
-import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PublishedWithChanges
 import androidx.compose.material.icons.outlined.RemoveCircleOutline
@@ -53,7 +65,7 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
+import app.obey.ui.common.TonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -343,11 +355,11 @@ private fun AgreementContent(onOpenSettings: () -> Unit, onOpenNote: (String) ->
             }
         }
         a == null -> null
-        shown == "versions" -> "Agreement"
+        shown == "versions" -> "Old versions stay readable, with what changed in each."
         shown == "review" -> a.proposal?.let { "Version ${it.number}, proposed by ${if (it.proposedBy == me) "you" else proposer(it, session)} ${relDay(it.proposedAt)}" }
-        a.current != null -> a.current.let { c -> "Version ${c.number}" + (c.agreedAt?.let { " · agreed ${relDay(it)}" } ?: "") }
-        a.proposal != null -> "Not agreed yet"
-        else -> "Not written yet"
+        a.current != null -> a.current.let { c -> "Version ${c.number} is in force" + (c.agreedAt?.let { ", agreed ${relDay(it)}" } ?: "") + "." }
+        a.proposal != null -> "Nothing agreed yet."
+        else -> "Not written yet."
     }
 
     Scaffold(
@@ -361,12 +373,17 @@ private fun AgreementContent(onOpenSettings: () -> Unit, onOpenNote: (String) ->
                 },
                 navigationIcon = {
                     if (version != null || shown != "main") {
-                        IconButton(onClick = { if (version != null) { vm.closeVersion() } else { page = "main" } }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") }
+                        BackLink(if (version != null) "Versions" else "Agreement") { if (version != null) { vm.closeVersion() } else { page = "main" } }
                     } else {
                         MenuButton()
                     }
                 },
-                actions = { SafeWordAction() },
+                actions = {
+                    if (version == null && shown == "main" && (a?.current != null || a?.proposal != null)) {
+                        IconButton(onClick = { page = "versions" }) { Icon(Icons.Outlined.History, "Versions") }
+                    }
+                    SafeWordAction()
+                },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -384,7 +401,7 @@ private fun AgreementContent(onOpenSettings: () -> Unit, onOpenNote: (String) ->
                         is Load.Failed -> ErrorBox(v.message, vm::retryVersion, Modifier.padding(padding))
                         is Load.Ready -> Column(body, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                             val prev = previousAgreed(ag, v.value.number)
-                            if (v.value.note.isNotBlank()) NoteBanner(null, "${proposer(v.value, session)}: “${v.value.note}”")
+                            if (v.value.note.isNotBlank()) NoteBanner(null, "“${v.value.note}”")
                             PageCard(v.value, marked = prev != null, onlyChanged = false, prevNumber = prev, onOpenNote = onOpenNote)
                             Signatures(v.value, session)
                         }
@@ -392,7 +409,7 @@ private fun AgreementContent(onOpenSettings: () -> Unit, onOpenNote: (String) ->
                 } else {
                     Column(body, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         when (shown) {
-                            "versions" -> VersionList(ag, session) { vm.openVersion(it) }
+                            "versions" -> VersionList(ag, session) { id -> if (id == ag.proposal?.id) page = "review" else vm.openVersion(id) }
                             "review" -> ag.proposal?.let { p ->
                                 Review(
                                     p,
@@ -409,6 +426,8 @@ private fun AgreementContent(onOpenSettings: () -> Unit, onOpenNote: (String) ->
                                 ag,
                                 session,
                                 onOpenNote = onOpenNote,
+                                onAgree = { ag.proposal?.let { agreeing = it } },
+                                onAsk = { ag.proposal?.let { asking = it } },
                                 onRead = { page = "review" },
                                 onEdit = { editFrom(ag) },
                                 onWithdraw = { ag.proposal?.let { withdrawing = it } },
@@ -452,6 +471,8 @@ private fun Main(
     a: Agreement,
     session: Session,
     onOpenNote: (String) -> Unit,
+    onAgree: () -> Unit,
+    onAsk: () -> Unit,
     onRead: () -> Unit,
     onEdit: () -> Unit,
     onWithdraw: () -> Unit,
@@ -459,132 +480,125 @@ private fun Main(
     onTemplate: () -> Unit,
     onBlank: () -> Unit,
 ) {
-    a.proposal?.let { ProposalBanner(it, session, onRead, onEdit, onWithdraw) }
-    if (a.current != null && a.proposal == null && a.drift.isNotEmpty()) DriftBanner(a, session, onEdit)
+    a.proposal?.let { p ->
+        ProposalBanner(p, a.current?.number, session, onAgree, onAsk, onRead, onEdit, onWithdraw)
+        if (a.current != null) WhatChanged(p, onOpenNote, onRead)
+    }
+    if (a.current != null && a.proposal == null && a.drift.isNotEmpty()) DriftNote(a, session, onEdit)
     val cur = a.current
     when {
-        cur != null -> {
+        cur != null && a.proposal == null -> {
             PageCard(cur, marked = false, onlyChanged = false, prevNumber = null, onOpenNote = onOpenNote)
             Signatures(cur, session)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onVersions) {
-                    Icon(Icons.Outlined.History, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Versions")
-                }
-                if (!session.readOnly) {
-                    FilledTonalButton(onClick = onEdit) {
-                        Icon(Icons.Outlined.Edit, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Propose changes")
-                    }
-                }
-            }
+            if (!session.readOnly) OutlinedButton(onClick = onEdit) { Text("Propose changes") }
         }
-        a.proposal == null -> EmptyCard(session.readOnly, onTemplate, onBlank)
-        else -> TextButton(onClick = onVersions) {
-            Icon(Icons.Outlined.History, null, Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Versions")
+        cur == null && a.proposal == null && !session.readOnly -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(onClick = onTemplate, colors = inkButtonColors()) { Text("Start from our template") }
+            TextButton(onClick = onBlank) { Text("Start blank") }
         }
+        else -> Unit
     }
 }
 
+
+
+/** The sections a proposal changes, marked, then the unchanged ones named in a line (mockup 23). */
 @Composable
-private fun EmptyCard(readOnly: Boolean, onTemplate: () -> Unit, onBlank: () -> Unit) {
+private fun WhatChanged(p: AgreementVersion, onOpenNote: (String) -> Unit, onReadAll: () -> Unit) {
     val c = MaterialTheme.colorScheme
-    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Icon(Icons.Outlined.Handshake, null, Modifier.size(32.dp), tint = c.primary)
-            Text("Write down what you've agreed", style = MaterialTheme.typography.headlineSmall)
-            Text(
-                "One page you both sign: why you're doing this, what each of you will do, limits, safewords, and your rules and protocols. " +
-                    "Either of you can propose changes later, and a new version only counts once you both agree.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = c.onSurfaceVariant,
-            )
-            if (!readOnly) {
-                Button(onClick = onTemplate) { Text("Start from our template") }
-                TextButton(onClick = onBlank) { Text("Start blank") }
-            }
+    val changed = p.sections.filter { it.change != "same" }
+    val same = p.sections.filter { it.change == "same" }.map { if (it.kind == "text") it.title else plural(it.items.size, it.kind.removeSuffix("s")) }
+    if (changed.isNotEmpty() || p.removed.isNotEmpty()) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Eyebrow("What changed")
+            changed.forEach { s -> key(s.id) { SectionView(s, marked = true, prevNumber = null, onOpenNote = onOpenNote) } }
+            p.removed.forEach { t -> Text(t, style = serifBody, color = c.onSurfaceVariant, textDecoration = TextDecoration.LineThrough) }
+        }
+    }
+    if (same.isNotEmpty()) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Eyebrow("Unchanged")
+            Text(same.joinToString(", "), style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
+            TextButton(onClick = onReadAll, contentPadding = PaddingValues(0.dp)) { Text("Read all of version ${p.number}", color = c.primary) }
         }
     }
 }
 
 /** Rules or protocols changed after the version in force was written, so what's signed no longer matches them. */
 @Composable
-private fun DriftBanner(a: Agreement, session: Session, onPropose: () -> Unit) {
+private fun DriftNote(a: Agreement, session: Session, onPropose: () -> Unit) {
     val what = a.drift.map { if (it.kind == "rules") "Rules" else "Protocols" }.distinct().joinToString(" and ")
     val everyone = if (session.partners.size > 1) "all" else "both"
     fun titles(verb: String) = a.drift.filter { it.verb == verb }.joinToString(", ") { it.title }
     val c = MaterialTheme.colorScheme
-    Surface(color = androidx.compose.ui.graphics.Color.Transparent, contentColor = c.onSurface, border = androidx.compose.foundation.BorderStroke(1.dp, c.primary), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.PublishedWithChanges, null)
-                Text("$what changed since you $everyone signed", style = MaterialTheme.typography.titleMedium)
-            }
-            titles("added").ifEmpty { null }?.let { Text("Added: $it", style = MaterialTheme.typography.bodyMedium) }
-            titles("removed").ifEmpty { null }?.let { Text("Removed: $it", style = MaterialTheme.typography.bodyMedium) }
-            if (!session.readOnly) {
-                Button(onClick = onPropose, modifier = Modifier.padding(top = 8.dp)) {
-                    Icon(Icons.Outlined.Edit, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Propose an update")
-                }
-            }
-        }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        HorizontalDivider(color = c.outlineVariant)
+        Text("$what changed since you $everyone signed.", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 12.dp))
+        titles("added").ifEmpty { null }?.let { Text("Added: $it", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant) }
+        titles("removed").ifEmpty { null }?.let { Text("Removed: $it", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant) }
+        if (!session.readOnly) TextButton(onClick = onPropose, contentPadding = PaddingValues(0.dp)) { Text("Propose an update", color = c.primary) }
+        HorizontalDivider(color = c.outlineVariant)
     }
 }
 
-/** The open proposal, at the top of the agreement: what it needs from you, or who it's waiting for. */
+/** The open proposal, on the one box the mockup keeps: what it needs from you, or who it's waiting for. */
 @Composable
-private fun ProposalBanner(p: AgreementVersion, session: Session, onRead: () -> Unit, onEdit: () -> Unit, onWithdraw: () -> Unit) {
+private fun ProposalBanner(
+    p: AgreementVersion,
+    inForce: Int?,
+    session: Session,
+    onAgree: () -> Unit,
+    onAsk: () -> Unit,
+    onRead: () -> Unit,
+    onEdit: () -> Unit,
+    onWithdraw: () -> Unit,
+) {
     val me = session.userId
     val mine = p.proposedBy == me
     val agreed = p.agreements.any { it.userId == me }
     val asked = p.status == "changes_requested"
-    val askedBy = p.feedback?.userId?.let { if (it == me) "You" else session.nameOf(it) } ?: "Someone"
-    val title = when {
-        mine && asked -> "$askedBy asked for changes"
-        mine -> "Waiting for ${waitingFor(p, session)}"
-        asked && p.feedback?.userId == me -> "You asked for changes"
-        agreed -> "You agreed to version ${p.number}"
-        else -> "${proposer(p, session)} proposed version ${p.number}"
+    val everyone = if (session.partners.size > 1) "all" else "both"
+    val stays = inForce?.let { " Version $it stays in force until you $everyone agree." } ?: ""
+    val text = buildAnnotatedString {
+        if (asked) {
+            append(p.feedback?.userId?.let { if (it == me) "You" else session.nameOf(it) } ?: "Someone")
+            append(" asked for changes to ")
+        } else {
+            append(if (mine) "You" else proposer(p, session))
+            append(" proposed ")
+        }
+        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append("version ${p.number}") }
+        append(".$stays")
+        if (mine && !asked) append(" Waiting for ${waitingFor(p, session)}.")
+        if (agreed && !mine) append(" You've agreed; waiting for ${waitingFor(p, session)}.")
     }
-    val note = when {
-        asked -> p.feedback?.note
-        mine -> null
-        agreed -> null
-        else -> p.note
-    }?.takeIf { it.isNotBlank() }
-    val sub = when {
-        mine && !asked -> "You proposed version ${p.number} ${relDay(p.proposedAt)}."
-        agreed -> "Waiting for ${waitingFor(p, session)}."
-        else -> null
-    }
+    val quote = (if (asked) p.feedback?.note else p.note)?.takeIf { it.isNotBlank() }
     val c = MaterialTheme.colorScheme
-    Surface(color = androidx.compose.ui.graphics.Color.Transparent, contentColor = c.onSurface, border = androidx.compose.foundation.BorderStroke(1.dp, c.primary), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            sub?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-            note?.let { Text("“$it”", style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic) }
-            if (!session.readOnly) {
-                Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (mine) {
-                        Button(onClick = onEdit) { Text("Edit") }
-                        TextButton(onClick = onRead) { Text("Read it") }
-                        TextButton(onClick = onWithdraw) { Text("Withdraw") }
-                    } else {
-                        Button(onClick = onRead) { Text("Read it") }
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.surfaceContainerLowest).border(1.dp, c.outlineVariant, RoundedCornerShape(12.dp)).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(text, style = MaterialTheme.typography.bodyLarge)
+        quote?.let { Text("“$it”", style = serifBody.copy(fontStyle = FontStyle.Italic)) }
+        if (!session.readOnly) {
+            Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                when {
+                    !mine && p.status == "proposed" && !agreed -> {
+                        Button(onClick = onAgree, colors = inkButtonColors()) { Text("Agree") }
+                        OutlinedButton(onClick = onAsk) { Text("Ask for changes") }
                     }
+                    mine || asked -> {
+                        OutlinedButton(onClick = onEdit) { Text("Edit") }
+                        if (mine) TextButton(onClick = onWithdraw) { Text("Withdraw") }
+                    }
+                    else -> TextButton(onClick = onRead) { Text("Read it") }
                 }
             }
         }
     }
 }
 
-/** A proposal to read: what changed since the version in force, who has agreed, and agreeing or asking for changes. */
+/** A proposal to read in full, with what changed marked. */
 @Composable
 private fun Review(
     p: AgreementVersion,
@@ -596,132 +610,55 @@ private fun Review(
     onEdit: () -> Unit,
     onWithdraw: () -> Unit,
 ) {
-    val me = session.userId
     val prev = previousAgreed(a, p.number)
-    val heading = if (prev == null) "The first version of your agreement" else "${plural(p.changes, "change")} from version $prev"
-    NoteBanner(heading, p.note.takeIf { it.isNotBlank() }?.let { "${if (p.proposedBy == me) "You" else proposer(p, session)}: “$it”" })
-    if (p.status == "changes_requested") {
-        p.feedback?.takeIf { it.note.isNotBlank() }?.let { f ->
-            val who = f.userId?.let { if (it == me) "You" else session.nameOf(it) } ?: "Someone"
-            NoteBanner("$who asked for changes", "“${f.note}”")
-        }
-    }
-    PageCard(p, marked = prev != null, onlyChanged = prev != null, prevNumber = prev, onOpenNote = onOpenNote)
+    ProposalBanner(p, a.current?.number, session, onAgree, onAsk, {}, onEdit, onWithdraw)
+    PageCard(p, marked = prev != null, onlyChanged = false, prevNumber = prev, onOpenNote = onOpenNote)
     Signatures(p, session)
-    if (session.readOnly) return
-    val mine = p.proposedBy == me
-    val agreed = p.agreements.any { it.userId == me }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
-        if (mine) {
-            TextButton(onClick = onWithdraw) { Text("Withdraw") }
-            FilledTonalButton(onClick = onEdit) {
-                Icon(Icons.Outlined.Edit, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Edit")
-            }
-        } else if (!agreed) {
-            OutlinedButton(onClick = onAsk) { Text("Ask for changes") }
-            Button(onClick = onAgree) {
-                Icon(Icons.Outlined.Handshake, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Agree")
-            }
-        }
-    }
 }
 
-/** The tertiary banner over a proposal: how much changed, and the proposer's note. */
+/** The proposer's note, quoted in the serif. */
 @Composable
 private fun NoteBanner(heading: String?, note: String?) {
     if (heading == null && note == null) return
-    val c = MaterialTheme.colorScheme
-    Surface(color = androidx.compose.ui.graphics.Color.Transparent, contentColor = c.onSurface, border = androidx.compose.foundation.BorderStroke(1.dp, c.primary), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            heading?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
-            note?.let { Text(it, style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic) }
-        }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        heading?.let { Eyebrow(it) }
+        note?.let { Text(it, style = serifBody.copy(fontStyle = FontStyle.Italic)) }
     }
 }
 
-private fun sectionIcon(s: AgreementSection): ImageVector {
-    val t = s.title.trim().lowercase()
-    return when {
-        s.kind == "rules" -> Icons.Outlined.Gavel
-        s.kind == "protocols" -> Icons.Outlined.FactCheck
-        t.startsWith("why") -> Icons.Outlined.FavoriteBorder
-        t.startsWith("what ") && t.endsWith(" will do") -> Icons.Outlined.Person
-        "limit" in t -> Icons.Outlined.Block
-        "safeword" in t || "safe word" in t -> Icons.Outlined.Key
-        "review" in t -> Icons.Outlined.EventRepeat
-        else -> Icons.AutoMirrored.Outlined.Notes
-    }
-}
+private val serifBody @Composable get() = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp, lineHeight = 31.sp)
 
 /** A section's lines as they stand, with nothing marked. */
 private fun plainLines(s: AgreementSection): List<AgreementLine> =
     (if (s.kind == "text") s.body.split("\n").map { it.trimEnd() }.filter { it.isNotBlank() } else s.items).map { AgreementLine("same", it) }
 
-/** Lines added since the version before, in a green tint. */
-private val AddedTint = Color(0x332E7D32)
-
-/** The whole page in one card; [marked] shows what was added and removed, [onlyChanged] folds away the sections that didn't change. */
+/** The whole page as eyebrowed sections; [marked] shows what was added and removed, [onlyChanged] folds away the sections that didn't change. */
 @Composable
 private fun PageCard(v: AgreementVersion, marked: Boolean, onlyChanged: Boolean, prevNumber: Int?, onOpenNote: (String) -> Unit) {
     val c = MaterialTheme.colorScheme
     var showAll by rememberSaveable(v.id) { mutableStateOf(false) }
     val unchanged = v.sections.count { it.change == "same" }
     val sections = if (onlyChanged && !showAll) v.sections.filter { it.change != "same" } else v.sections
-    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            sections.forEach { s -> key(s.id) { SectionView(s, marked, prevNumber, onOpenNote) } }
-            if (marked) {
-                v.removed.forEach { t ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.RemoveCircleOutline, null, Modifier.size(20.dp), tint = c.error)
-                        Spacer(Modifier.width(12.dp))
-                        Text(t, style = MaterialTheme.typography.titleMedium, color = c.error, textDecoration = TextDecoration.LineThrough)
-                    }
-                }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(28.dp)) {
+        sections.forEach { s -> key(s.id) { SectionView(s, marked, prevNumber, onOpenNote) } }
+        if (marked) v.removed.forEach { t -> Text(t.uppercase(), style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.5.sp), color = c.onSurfaceVariant, textDecoration = TextDecoration.LineThrough) }
+        v.reviewBy?.let { date ->
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Eyebrow("Review")
+                Text("We'll read this again together by ${plainDate(date)}.", style = serifBody)
             }
-            v.reviewBy?.let { date ->
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SectionTitle(Icons.Outlined.EventRepeat, "Review")
-                    Text("We'll read this again together by ${plainDate(date)}.", style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-            if (onlyChanged && unchanged > 0) {
-                Row(
-                    Modifier.fillMaxWidth().clickable { showAll = !showAll }.padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Outlined.UnfoldMore, null, Modifier.size(20.dp), tint = c.onSurfaceVariant)
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        if (showAll) "Show only what changed" else "${plural(unchanged, "section")} unchanged · Show all",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = c.onSurfaceVariant,
-                    )
-                }
-            }
-            if (sections.isEmpty() && !(marked && v.removed.isNotEmpty()) && v.reviewBy == null) {
-                Text("Nothing on the page itself changed.", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
+        }
+        if (onlyChanged && unchanged > 0) {
+            TextButton(onClick = { showAll = !showAll }, contentPadding = PaddingValues(0.dp)) {
+                Text(if (showAll) "Show only what changed" else "${plural(unchanged, "section")} unchanged · Show all", color = c.primary)
             }
         }
     }
 }
 
 @Composable
-private fun SectionTitle(icon: ImageVector, title: String, tag: String? = null) {
-    val c = MaterialTheme.colorScheme
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, Modifier.size(20.dp), tint = c.primary)
-        Spacer(Modifier.width(12.dp))
-        Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f, fill = false))
-        tag?.let {
-            Spacer(Modifier.width(8.dp))
-            Text(it, style = MaterialTheme.typography.labelSmall, color = c.tertiary)
-        }
-    }
+private fun SectionTitle(title: String, tag: String? = null) {
+    Eyebrow(title + (tag?.let { " · $it" } ?: ""))
 }
 
 @Composable
@@ -730,7 +667,7 @@ private fun SectionView(s: AgreementSection, marked: Boolean, prevNumber: Int?, 
     val lines = if (marked) s.lines else plainLines(s)
     val list = s.kind != "text"
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        SectionTitle(sectionIcon(s), s.title, if (marked && s.change == "new") "NEW" else null)
+        SectionTitle(s.title, if (marked && s.change == "new") "new" else null)
         val noteId = s.noteId
         val noteTitle = s.noteTitle
         if (noteId != null && noteTitle != null) {
@@ -747,9 +684,9 @@ private fun SectionView(s: AgreementSection, marked: Boolean, prevNumber: Int?, 
         if (s.kind == "text" && s.id == "limits" && LocalFeatures.current.limits) {
             val open = LocalOpenLimits.current
             TextButton(onClick = open, contentPadding = PaddingValues(horizontal = 0.dp)) {
-                Icon(Icons.Outlined.Tune, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Your limits list")
+                Icon(Icons.Outlined.Link, null, Modifier.size(18.dp), tint = c.onSurfaceVariant)
+                Spacer(Modifier.width(6.dp))
+                Text("Your limits list", color = c.onSurfaceVariant)
             }
         }
         if (list) {
@@ -774,100 +711,89 @@ private fun LineView(l: AgreementLine, list: Boolean) {
     val text = if (!list && l.text.startsWith("- ")) l.text.removePrefix("- ") else l.text
     val added = l.op == "add"
     val removed = l.op == "del"
-    Text(
-        text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = if (removed) c.error else c.onSurface,
-        textDecoration = if (removed) TextDecoration.LineThrough else null,
-        modifier = Modifier
-            .padding(start = if (bullet) 32.dp else 0.dp)
-            .then(if (added) Modifier.background(AddedTint, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp) else Modifier),
-    )
+    Row {
+        if (bullet) Text("– ", style = serifBody, color = if (removed) c.onSurfaceVariant else c.onSurface)
+        Text(
+            text,
+            style = serifBody,
+            color = if (removed) c.onSurfaceVariant else c.onSurface,
+            textDecoration = if (removed) TextDecoration.LineThrough else null,
+            modifier = if (added) Modifier.background(c.tertiaryContainer).padding(horizontal = 4.dp) else Modifier,
+        )
+    }
 }
 
-/** "Agreed by" tiles, one per person in the dynamic. */
+/** Each person on a hairline: their name in the serif italic once they've agreed. */
 @Composable
 private fun Signatures(v: AgreementVersion, session: Session) {
     val c = MaterialTheme.colorScheme
     val members = session.relationship?.members.orEmpty()
     if (members.isEmpty()) return
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column {
+        Eyebrow("Agreed by")
+        Spacer(Modifier.height(8.dp))
+        HorizontalDivider(color = c.outlineVariant)
         members.forEach { m ->
             val sig = v.agreements.firstOrNull { it.userId == m.userId }
-            Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.weight(1f)) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Agreed by", style = MaterialTheme.typography.labelMedium, color = c.onSurfaceVariant)
-                    if (sig != null) {
-                        Text(m.displayName, style = MaterialTheme.typography.titleLarge, fontFamily = FontFamily.Serif, fontStyle = FontStyle.Italic, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(signedDay(sig.agreedAt), style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
-                    } else {
-                        Text("Waiting for ${m.displayName}", style = MaterialTheme.typography.bodyLarge, fontFamily = FontFamily.Serif, color = c.onSurfaceVariant)
-                    }
+            Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (sig != null) {
+                    Text(m.displayName, style = serifBody.copy(fontStyle = FontStyle.Italic, fontSize = 24.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Text(signedDay(sig.agreedAt), style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
+                } else {
+                    Text("Waiting for ${m.displayName}", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
                 }
             }
+            HorizontalDivider(color = c.outlineVariant)
         }
     }
 }
 
+/** Mockup 75: every version on hairlines, the open one to review, the rest to read. */
 @Composable
 private fun VersionList(a: Agreement, session: Session, onOpen: (String) -> Unit) {
     val c = MaterialTheme.colorScheme
     if (a.versions.isEmpty()) {
-        Text("No versions yet.", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
+        Text("No versions yet.", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
         return
     }
     val everyone = if ((session.relationship?.members?.size ?: 0) > 2) "everyone" else "both"
-    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
-        Column {
-            a.versions.forEach { s -> key(s.id) { VersionRow(s, a, session, everyone) { onOpen(s.id) } } }
+    Column {
+        a.versions.forEachIndexed { i, s ->
+            key(s.id) {
+                // A replaced version ran from its own agreement to the next one's.
+                val until = a.versions.take(i).lastOrNull { it.agreedAt != null }?.agreedAt
+                VersionRow(s, a, session, everyone, until) { onOpen(s.id) }
+            }
+            HorizontalDivider(color = c.outlineVariant)
         }
     }
-    Text("Old versions stay readable, with what changed in each.", style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
 }
 
 @Composable
-private fun VersionRow(s: AgreementVersionSummary, a: Agreement, session: Session, everyone: String, onClick: () -> Unit) {
+private fun VersionRow(s: AgreementVersionSummary, a: Agreement, session: Session, everyone: String, until: String?, onClick: () -> Unit) {
     val c = MaterialTheme.colorScheme
     val who = s.proposedBy?.let { if (it == session.userId) "you" else session.nameOf(it) } ?: "a former member"
-    val tag = when (s.status) {
-        "agreed" -> "IN FORCE"
-        "changes_requested" -> "CHANGES ASKED FOR"
-        "proposed" -> a.proposal?.takeIf { it.id == s.id }?.let { "WAITING FOR ${waitingFor(it, session).uppercase()}" } ?: "WAITING"
-        else -> null
+    val needsMe = a.proposal?.takeIf { it.id == s.id }?.let { agreementNeedsMe(it, session) && it.proposedBy != session.userId } == true
+    val short = DateTimeFormatter.ofPattern("MMM d")
+    val agreedAt = s.agreedAt
+    val line = when {
+        s.status in OPEN -> "Proposed by $who · " + when {
+            s.status == "changes_requested" -> "changes asked for"
+            needsMe -> "waiting on you"
+            else -> a.proposal?.takeIf { it.id == s.id }?.let { "waiting for ${waitingFor(it, session)}" } ?: "waiting"
+        }
+        s.status == "agreed" -> "In force since ${agreedAt?.let { dayOf(it).format(short) } ?: ""} · agreed by $everyone"
+        agreedAt != null -> "${dayOf(agreedAt).format(short)} – ${until?.let { dayOf(it).format(short) } ?: "replaced"}"
+        else -> "Proposed by $who ${relDay(s.proposedAt)}"
     }
-    val line = if (s.status in OPEN || s.agreedAt == null) {
-        "Proposed by $who ${relDay(s.proposedAt)} · ${plural(s.changes, "change")}"
-    } else {
-        "Agreed by $everyone ${s.agreedAt?.let { relDay(it) } ?: ""} · proposed by $who"
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Version ${s.number}", style = MaterialTheme.typography.headlineSmall)
+            Text(line, style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
+        }
+        if (needsMe) Button(onClick = onClick, colors = inkButtonColors()) { Text("Review") }
+        else Text("Read", style = MaterialTheme.typography.labelLarge, color = c.primary)
     }
-    ListItem(
-        colors = ListItemDefaults.colors(containerColor = c.surfaceContainerLow),
-        modifier = Modifier.clickable(onClick = onClick),
-        leadingContent = {
-            Icon(
-                when (s.status) {
-                    "agreed" -> Icons.Outlined.CheckCircle
-                    "proposed", "changes_requested" -> Icons.Outlined.HourglassTop
-                    else -> Icons.Outlined.History
-                },
-                null,
-                tint = if (s.status == "agreed") c.primary else c.onSurfaceVariant,
-            )
-        },
-        headlineContent = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Version ${s.number}")
-                tag?.let {
-                    Spacer(Modifier.width(8.dp))
-                    Surface(color = c.tertiaryContainer, contentColor = c.onTertiaryContainer, shape = RoundedCornerShape(4.dp)) {
-                        Text(it, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
-                    }
-                }
-            }
-        },
-        supportingContent = { Text(line) },
-        trailingContent = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
-    )
 }
 
 /** Writing a version: every section, a review date, and a line for the others about what changed. */
@@ -911,25 +837,18 @@ private fun AgreementEditor(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Scaffold(
             topBar = {
-                LargeTopAppBar(
-                    title = { Text("Version ${start.number}") },
-                    navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.Outlined.Close, "Close") } },
-                    actions = {
-                        Button(onClick = ::send, enabled = ok && !busy, modifier = Modifier.padding(end = 8.dp)) { Text("Send to $other", maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                    },
+                CenterAlignedTopAppBar(
+                    title = { Text("Propose version ${start.number}", style = MaterialTheme.typography.titleMedium) },
+                    navigationIcon = { TextButton(onClick = onDismiss) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } },
+                    actions = { TextButton(onClick = ::send, enabled = ok && !busy) { Text("Send", color = MaterialTheme.colorScheme.primary) } },
                 )
             },
             snackbarHost = { SnackbarHost(snackbar) },
         ) { padding ->
             Column(
                 Modifier.padding(padding).fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
             ) {
-                Text(
-                    "Changes take effect once you both agree." + (inForce?.let { " Until then version $it stays in force." } ?: ""),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
                 sections.forEachIndexed { i, s ->
                     key(s.id) {
                         SectionEditor(
@@ -944,10 +863,8 @@ private fun AgreementEditor(
                         )
                     }
                 }
-                OutlinedButton(onClick = { sections = sections + DraftSection("s-" + UUID.randomUUID().toString().take(8), "text", "", "", null) }, enabled = sections.size < 30) {
-                    Icon(Icons.Outlined.Add, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Add a section")
+                TextButton(onClick = { sections = sections + DraftSection("s-" + UUID.randomUUID().toString().take(8), "text", "", "", null) }, enabled = sections.size < 30, contentPadding = PaddingValues(0.dp)) {
+                    Text("+ Add a section", color = MaterialTheme.colorScheme.primary)
                 }
                 Box {
                     LettersField(
@@ -1001,56 +918,64 @@ private fun SectionEditor(
 ) {
     val c = MaterialTheme.colorScheme
     var menu by remember { mutableStateOf(false) }
-    Surface(shape = MaterialTheme.shapes.large, color = c.surface, border = BorderStroke(1.dp, c.outlineVariant), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val titleStyle = MaterialTheme.typography.titleMedium
-                BasicTextField(
-                    value = s.title,
-                    onValueChange = { onChange(s.copy(title = it.take(80))) },
-                    textStyle = titleStyle.copy(color = c.onSurface),
-                    cursorBrush = SolidColor(c.primary),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                    decorationBox = { inner ->
-                        Box {
-                            if (s.title.isEmpty()) Text("Section title", style = titleStyle, color = c.onSurfaceVariant)
-                            inner()
-                        }
-                    },
-                )
-                Box {
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "Section options") }
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(text = { Text("Move up") }, onClick = { menu = false; onMove(-1) }, enabled = canMoveUp)
-                        DropdownMenuItem(text = { Text("Move down") }, onClick = { menu = false; onMove(1) }, enabled = canMoveDown)
-                        DropdownMenuItem(text = { Text("Remove") }, onClick = { menu = false; onRemove() }, enabled = canRemove)
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            val titleStyle = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.5.sp, color = c.onSurfaceVariant)
+            BasicTextField(
+                value = s.title,
+                onValueChange = { onChange(s.copy(title = it.take(80))) },
+                textStyle = titleStyle,
+                cursorBrush = SolidColor(c.primary),
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+                decorationBox = { inner ->
+                    Box {
+                        if (s.title.isEmpty()) Text("SECTION TITLE", style = titleStyle)
+                        inner()
                     }
+                },
+            )
+            Box {
+                IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreHoriz, "Section options", tint = c.onSurfaceVariant) }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text("Move up") }, onClick = { menu = false; onMove(-1) }, enabled = canMoveUp)
+                    DropdownMenuItem(text = { Text("Move down") }, onClick = { menu = false; onMove(1) }, enabled = canMoveDown)
+                    DropdownMenuItem(text = { Text("Remove") }, onClick = { menu = false; onRemove() }, enabled = canRemove)
                 }
             }
-            val listText = when (s.kind) {
-                "rules" -> "The current list from Rules" + (counts.first?.let { ", ${plural(it, "rule")}" } ?: "") + ". Edit them in Rules."
-                "protocols" -> "The current list from Protocols" + (counts.second?.let { ", ${plural(it, "protocol")}" } ?: "") + ". Edit them in Protocols."
-                else -> null
+        }
+        val listText = when (s.kind) {
+            "rules" -> (counts.first?.let { plural(it, "rule") } ?: "The rules") + ", taken from Rules when you send"
+            "protocols" -> (counts.second?.let { plural(it, "protocol") } ?: "The protocols") + ", taken from Protocols when you send"
+            else -> null
+        }
+        if (listText != null) {
+            Text(listText, style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
+        } else {
+            if (s.id == "limits" && LocalFeatures.current.limits) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(Icons.Outlined.Link, null, Modifier.size(18.dp), tint = c.onSurfaceVariant)
+                    Text("Links to your limits list", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
+                }
             }
-            if (listText != null) {
-                Text(listText, style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant, modifier = Modifier.padding(end = 12.dp))
-            } else {
-                LettersField(
-                    s.body,
-                    { onChange(s.copy(body = it.take(5000))) },
-                    placeholder = { Text("Start a line with “- ” for a bullet") },
-                    minLines = 2,
-                    modifier = Modifier.fillMaxWidth().padding(end = 12.dp),
-                )
-            }
-            if (s.noteId != null) {
-                Text(
-                    "Links to the note ${s.noteTitle ?: "it points to"}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = c.onSurfaceVariant,
-                )
-            }
+            val bodyStyle = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp, lineHeight = 31.sp, color = c.onSurface)
+            BasicTextField(
+                value = s.body,
+                onValueChange = { onChange(s.copy(body = it.take(5000))) },
+                textStyle = bodyStyle,
+                cursorBrush = SolidColor(c.primary),
+                minLines = 2,
+                modifier = Modifier.fillMaxWidth(),
+                decorationBox = { inner ->
+                    Box {
+                        if (s.body.isEmpty()) Text("Start a line with “- ” for a bullet", style = bodyStyle.copy(color = c.onSurfaceVariant))
+                        inner()
+                    }
+                },
+            )
+        }
+        if (s.noteId != null) {
+            Text("Links to the note ${s.noteTitle ?: "it points to"}", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
         }
     }
 }

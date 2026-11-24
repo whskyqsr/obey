@@ -1,6 +1,10 @@
 package app.obey.ui.scenes
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material3.HorizontalDivider
+import app.obey.ui.common.Eyebrow
+import app.obey.ui.common.FormScreen
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -109,42 +113,24 @@ fun AftercareScreen(onBack: () -> Unit, vm: AftercareViewModel = hiltViewModel()
         when (val s = state) {
             Load.Loading -> LoadingBox(Modifier.padding(padding))
             is Load.Failed -> ErrorBox(s.message, vm::load, Modifier.padding(padding))
-            is Load.Ready -> Column(
-                Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(
-                    "What each of you needs afterwards. It's shown to the others when a scene is logged.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                // The others' first, then mine.
-                s.value.sortedBy { it.userId == me }.forEach { p ->
+            is Load.Ready -> Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
+                // Mine first, then the others'.
+                s.value.sortedBy { it.userId != me }.forEachIndexed { i, p ->
                     val isMe = p.userId == me
-                    SceneSurface {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Person(p.userId, session, vm.avatars, size = 28.dp)
-                            Spacer(Modifier.width(8.dp))
-                            Text(if (isMe) "${session.me.user.displayName} (you)" else session.nameOf(p.userId), style = MaterialTheme.typography.titleMedium)
-                        }
-                        Tags(p.needs)
-                        if (p.note.isNotBlank()) Text(p.note, style = MaterialTheme.typography.bodyLarge)
-                        if (p.needs.isEmpty() && p.note.isBlank()) {
-                            Text(if (isMe) "You haven't written yours yet." else "Not written yet.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
+                    if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Column(Modifier.fillMaxWidth().padding(vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Eyebrow(if (isMe) "Your aftercare plan" else "${session.nameOf(p.userId)}'s aftercare plan")
+                        PlanText(p, if (isMe) "You haven't written yours yet." else "Not written yet.")
                         p.updatedAt?.let { at ->
-                            Text(
-                                "Updated ${formatDateTime(at)}" + if (isMe) "" else " · only ${session.nameOf(p.userId)} edits this",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            Text("Updated ${formatDateTime(at)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         if (isMe && !session.readOnly) {
-                            OutlinedButton(onClick = { editing = p }) {
-                                Icon(Icons.Outlined.Edit, null, Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text(if (p.updatedAt != null) "Edit yours" else "Write yours")
-                            }
+                            Text(
+                                if (p.updatedAt != null) "Edit" else "Write yours",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.clickable { editing = p },
+                            )
                         }
                     }
                 }
@@ -155,25 +141,13 @@ fun AftercareScreen(onBack: () -> Unit, vm: AftercareViewModel = hiltViewModel()
     editing?.let { p -> PlanSheet(p, busy, onDismiss = { editing = null }) { vm.save(it) { editing = null } } }
 }
 
-/** Writing my aftercare plan: the same chips as logging a scene, and a note. */
-@OptIn(ExperimentalMaterial3Api::class)
+/** Writing my aftercare plan: the same pills as logging a scene, and a note. */
 @Composable
-private fun PlanSheet(plan: AftercarePlan, busy: Boolean, onDismiss: () -> Unit, onSave: (AftercarePlanInput) -> Unit) {
+internal fun PlanSheet(plan: AftercarePlan, busy: Boolean, onDismiss: () -> Unit, onSave: (AftercarePlanInput) -> Unit) {
     var needs by remember { mutableStateOf(plan.needs) }
     var note by remember { mutableStateOf(plan.note) }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Column(
-            Modifier.imePadding().verticalScroll(rememberScrollState()).padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Icon(Icons.Outlined.VolunteerActivism, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("Your aftercare", style = MaterialTheme.typography.headlineSmall)
-            AftercarePicker(needs) { needs = it }
-            LettersField(note, { note = it.take(1000) }, label = { Text("Anything else (optional)") }, minLines = 3, modifier = Modifier.fillMaxWidth())
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                TextButton(onClick = onDismiss) { Text("Cancel") }
-                Button(onClick = { onSave(AftercarePlanInput(needs, note.trim())) }, enabled = !busy) { Text("Save") }
-            }
-        }
+    FormScreen("Your aftercare", onCancel = onDismiss, onSave = { onSave(AftercarePlanInput(needs, note.trim())) }, canSave = !busy) {
+        AftercarePicker(needs) { needs = it }
+        LettersField(note, { note = it.take(1000) }, label = { Text("Anything else (optional)") }, minLines = 2, modifier = Modifier.fillMaxWidth())
     }
 }

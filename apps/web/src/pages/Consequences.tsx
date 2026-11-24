@@ -102,14 +102,22 @@ export function ConsequencesPage() {
         fields={fields}
         initial={
           current
-            ? { title: current.title, bodyMd: current.bodyMd, severity: String(current.severity), lockMinutes: current.lockMinutes ? String(current.lockMinutes) : "" }
+            ? {
+                title: current.title,
+                bodyMd: current.bodyMd,
+                severity: String(current.severity),
+                lockMinutes: current.lockMinutes ? String(current.lockMinutes) : "",
+              }
             : { title: "", bodyMd: "", severity: "1", lockMinutes: "" }
         }
         busy={save.isPending}
         onClose={() => setEditing(null)}
         onDelete={
           current
-            ? () => confirm(`Delete “${current.title}”?`, () => del.mutate(current.id, { onSuccess: () => setEditing(null), onError: (e) => snack(errorMessage(e)) }))
+            ? () =>
+                confirm(`Delete “${current.title}”?`, () =>
+                  del.mutate(current.id, { onSuccess: () => setEditing(null), onError: (e) => snack(errorMessage(e)) }),
+                )
             : undefined
         }
         onSubmit={(v) =>
@@ -174,7 +182,6 @@ function AssignDialog({ consequence, onClose }: { consequence: Consequence; onCl
     <Dialog
       open
       onClose={onClose}
-      icon="assignment_late"
       title={`Assign “${consequence.title}”`}
       actions={
         <>
@@ -199,7 +206,9 @@ function AssignDialog({ consequence, onClose }: { consequence: Consequence; onCl
         )}
         <TextArea label="Reason (optional)" value={form.reason} onChange={(e) => set({ reason: e.target.value })} maxLength={2000} rows={2} />
         {lockTime ? (
-          <p className="text-body-medium text-on-surface-variant">This adds {fmtMinutes(lockTime)} to their lock straight away. It needs a running lock with an end time.</p>
+          <p className="text-body-medium text-on-surface-variant">
+            This adds {fmtMinutes(lockTime)} to their lock straight away. It needs a running lock with an end time.
+          </p>
         ) : (
           <>
             <div className="flex flex-wrap items-start gap-4">

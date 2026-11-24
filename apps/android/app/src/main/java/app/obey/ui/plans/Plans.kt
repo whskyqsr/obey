@@ -3,6 +3,7 @@ package app.obey.ui.plans
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -27,16 +28,15 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import app.obey.ui.common.ChoiceChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import app.obey.ui.common.LettersField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import app.obey.ui.common.PillSegment
+import app.obey.ui.common.PillRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -52,6 +52,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -220,68 +221,57 @@ class PlanViewModel @Inject constructor(
     }
 }
 
-/** A plan in a day's list: an event icon, its title, and when on that day. */
+/** A plan in a day's list: an accent rule down its side, its title, and when and whose. [tone] is kept for callers. */
 @Composable
-fun PlanRow(e: CalendarEvent, day: LocalDate, who: String?, tone: PlanTone, onOpen: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    ListItem(
-        modifier = Modifier.clickable(onClick = onOpen),
-        leadingContent = { Icon(Icons.Outlined.Event, null, tint = tone.dot) },
-        headlineContent = { Text(e.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        supportingContent = { Text(listOfNotNull(e.dayLabel(day), who).joinToString(" · ")) },
-        trailingContent = if (e.conflictIds.isNotEmpty()) ({ Icon(Icons.Outlined.WarningAmber, "Overlaps a task", tint = colors.error) }) else null,
-        colors = ListItemDefaults.colors(containerColor = colors.surface),
-    )
+fun PlanRow(e: CalendarEvent, day: LocalDate, who: String?, @Suppress("UNUSED_PARAMETER") tone: PlanTone, onOpen: () -> Unit) {
+    PlanLine(e.title, listOfNotNull(e.dayLabel(day), who?.let { "$it's plan" }, if (e.conflictIds.isNotEmpty()) "overlaps ${if (e.conflictIds.size == 1) "a task" else "${e.conflictIds.size} tasks"}" else null).joinToString(" · "), e.conflictIds.isNotEmpty(), onOpen)
 }
 
-/** A short tinted bar for all-day and multi-day plans, shown above a day's tasks. */
+/** An all-day or multi-day plan above a day's tasks, ruled the same way as [PlanRow]. */
 @Composable
-fun PlanChip(e: CalendarEvent, day: LocalDate, tone: PlanTone, onOpen: () -> Unit, modifier: Modifier = Modifier) {
-    val colors = MaterialTheme.colorScheme
-    Surface(
-        onClick = onOpen,
-        color = tone.container,
-        contentColor = tone.onContainer,
-        shape = RoundedCornerShape(8.dp),
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.Event, null, Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(e.title, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            Text(
-                if (e.allDay && e.firstDay() == e.lastDay()) "All day" else "${formatDate(e.firstDay())} – ${formatDate(e.lastDay())}",
-                style = MaterialTheme.typography.labelSmall,
-            )
-            if (e.conflictIds.isNotEmpty()) {
-                Spacer(Modifier.width(6.dp))
-                Icon(Icons.Outlined.WarningAmber, "Overlaps a task", Modifier.size(18.dp), tint = colors.error)
-            }
-        }
+fun PlanChip(e: CalendarEvent, day: LocalDate, @Suppress("UNUSED_PARAMETER") tone: PlanTone, onOpen: () -> Unit, modifier: Modifier = Modifier) {
+    val span = if (e.allDay && e.firstDay() == e.lastDay()) "All day" else "${formatDate(e.firstDay())} – ${formatDate(e.lastDay())}"
+    Box(modifier) {
+        PlanLine(e.title, listOfNotNull(span, if (e.conflictIds.isNotEmpty()) "overlaps a task" else null).joinToString(" · "), e.conflictIds.isNotEmpty(), onOpen)
     }
 }
 
-/** Today's heads-up for a plan that runs into tasks, with a way into the plan to move them. */
 @Composable
-fun PlanHeadsUp(e: CalendarEvent, tone: PlanTone, onOpen: () -> Unit) {
-    Surface(
-        color = tone.container,
-        contentColor = tone.onContainer,
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.fillMaxWidth(),
+private fun PlanLine(title: String, sub: String, clash: Boolean, onOpen: () -> Unit) {
+    val c = MaterialTheme.colorScheme
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpen)
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .drawBehind { drawRect(c.primary, size = androidx.compose.ui.geometry.Size(2.dp.toPx(), size.height)) }
+            .padding(start = 16.dp),
     ) {
-        Row(Modifier.padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.EventBusy, null)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(e.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(
-                    "${e.whenLabel()} · overlaps ${if (e.conflictIds.size == 1) "a task" else "${e.conflictIds.size} tasks"}",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            TextButton(onClick = onOpen) { Text("Sort it out") }
+        Text(title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(sub, style = MaterialTheme.typography.bodyMedium, color = if (clash) c.error else c.onSurfaceVariant)
+    }
+}
+
+/** Today's heads-up for a plan that runs into tasks: the plan's accent rule, and a way into the plan to move them. */
+@Composable
+fun PlanHeadsUp(e: CalendarEvent, @Suppress("UNUSED_PARAMETER") tone: PlanTone, onOpen: () -> Unit) {
+    val c = MaterialTheme.colorScheme
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .drawBehind { drawRect(c.primary, size = androidx.compose.ui.geometry.Size(2.dp.toPx(), size.height)) }
+            .padding(start = 16.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(e.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                "${e.whenLabel()} · overlaps ${if (e.conflictIds.size == 1) "a task" else "${e.conflictIds.size} tasks"}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = c.onSurfaceVariant,
+            )
         }
+        TextButton(onClick = onOpen) { Text("Sort it out", color = c.primary) }
     }
 }
 
@@ -418,16 +408,14 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    SegmentedButton(
+                PillRow(Modifier.fillMaxWidth()) {
+                    PillSegment(
                         selected = !draft.withPartner,
                         onClick = { draft = draft.copy(withPartner = false) },
-                        shape = SegmentedButtonDefaults.itemShape(0, 2),
                     ) { Text("Just me") }
-                    SegmentedButton(
+                    PillSegment(
                         selected = draft.withPartner,
                         onClick = { draft = draft.copy(withPartner = true) },
-                        shape = SegmentedButtonDefaults.itemShape(1, 2),
                     ) { Text(partner?.let { "Me and $it" } ?: "Both of us", maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 }
                 Text(
@@ -638,7 +626,7 @@ private fun Clashes(items: List<Occurrence>, plan: ClashPlan, form: ClashForm, s
                 val all = listOf(ClashChoice.Keep to "Keep all") +
                     if (allMovable) listOf(ClashChoice.Move to "Move all after", ClashChoice.Cancel to if (isDom) "Call off all" else "Ask off all") else emptyList()
                 all.forEach { (c, label) ->
-                    FilterChip(
+                    ChoiceChip(
                         selected = allAre(c),
                         onClick = { setAll(c) },
                         label = { Text(label) },
@@ -662,9 +650,9 @@ private fun Clashes(items: List<Occurrence>, plan: ClashPlan, form: ClashForm, s
                     if (canAct(o)) {
                         val labels = listOf(ClashChoice.Keep to "Keep") +
                             if (canMove(o)) listOf(ClashChoice.Move to "Move", ClashChoice.Cancel to if (isDom) "Call off" else "Ask off") else emptyList()
-                        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        PillRow(Modifier.fillMaxWidth()) {
                             labels.forEachIndexed { i, (c, label) ->
-                                SegmentedButton(selected = choiceOf(o) == c, onClick = { choices[o.id] = c }, shape = SegmentedButtonDefaults.itemShape(i, labels.size)) { Text(label, maxLines = 1) }
+                                PillSegment(selected = choiceOf(o) == c, onClick = { choices[o.id] = c }) { Text(label, maxLines = 1) }
                             }
                         }
                         if (choiceOf(o) == ClashChoice.Move) {
@@ -744,10 +732,10 @@ private fun CurfewWarning(
     }
     val nightName = due.minusSeconds(12 * 3600).local().format(java.time.format.DateTimeFormatter.ofPattern("EEEE"))
     val c = MaterialTheme.colorScheme
-    Surface(color = c.errorContainer, contentColor = c.onErrorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Box(Modifier.fillMaxWidth()) {
+        Column(Modifier.fillMaxWidth().drawBehind { drawRect(c.error, size = androidx.compose.ui.geometry.Size(2.dp.toPx(), size.height)) }.padding(start = 16.dp, top = 2.dp, bottom = 2.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row {
-                Icon(Icons.Outlined.Bedtime, null)
+                Icon(Icons.Outlined.Bedtime, null, tint = c.error)
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text("Runs $howLong past curfew", style = MaterialTheme.typography.titleSmall)
@@ -757,10 +745,10 @@ private fun CurfewWarning(
                     )
                 }
             }
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            PillRow(Modifier.fillMaxWidth()) {
                 val n = if (canAsk) 2 else 1
-                SegmentedButton(selected = false, onClick = onEndAtCurfew, shape = SegmentedButtonDefaults.itemShape(0, n)) { Text("End at ${formatTime(night.dueAt)}", maxLines = 1) }
-                if (canAsk) SegmentedButton(selected = asking, onClick = { onAsking(!asking) }, shape = SegmentedButtonDefaults.itemShape(1, n)) {
+                PillSegment(selected = false, onClick = onEndAtCurfew) { Text("End at ${formatTime(night.dueAt)}", maxLines = 1) }
+                if (canAsk) PillSegment(selected = asking, onClick = { onAsking(!asking) }) {
                     Text("Ask until ${formatTime(end.toString())}", maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }

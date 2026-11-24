@@ -23,23 +23,22 @@ import { Button, Chip, Dialog, Icon, IconButton, TextArea, TextField, cx, useSna
 
 type Tone = "neutral" | "soon" | "home" | "broken";
 
+/** Letters: a rule down the side carries the tone; the icon sits on paper. */
 const TONE: Record<Tone, { box: string; badge: string }> = {
-  neutral: { box: "bg-surface-container-high text-on-surface", badge: "text-on-surface" },
-  soon: { box: "bg-tertiary-container text-on-tertiary-container", badge: "bg-tertiary text-on-tertiary" },
-  home: { box: "bg-surface-container-high text-on-surface", badge: "bg-primary text-on-primary" },
-  broken: { box: "bg-error-container text-on-error-container", badge: "bg-error text-on-error" },
+  neutral: { box: "border-outline-variant", badge: "text-on-surface-variant" },
+  soon: { box: "border-primary", badge: "text-primary" },
+  home: { box: "border-on-surface", badge: "text-on-surface" },
+  broken: { box: "border-error", badge: "text-error" },
 };
 
 function Strip({ tone, icon, title, body, actions }: { tone: Tone; icon: string; title: string; body: string; actions?: ReactNode }) {
   const t = TONE[tone];
   return (
-    <div className={cx("flex items-center gap-4 rounded-xl px-4 py-3", t.box)}>
-      <span className={cx("flex size-12 shrink-0 items-center justify-center rounded-full", t.badge)}>
-        <Icon name={icon} filled={tone !== "neutral"} />
-      </span>
+    <div className={cx("flex items-center gap-4 border-l-2 py-1 pl-4 text-on-surface", t.box)}>
+      <Icon name={icon} className={cx("shrink-0", t.badge)} />
       <div className="min-w-0 flex-1">
-        <div className="text-title-medium">{title}</div>
-        <div className="text-body-medium opacity-80">{body}</div>
+        <div className="text-body-large">{title}</div>
+        <div className="text-body-medium text-on-surface-variant">{body}</div>
       </div>
       {actions}
     </div>
@@ -123,7 +122,9 @@ function Night({ night, request }: { night: CurfewNight; request?: CurfewRequest
               <IconButton
                 icon="check"
                 label="Leave it missed"
-                onClick={() => confirm.mutate(night.occurrenceId, { onSuccess: () => noteAfter("Left as missed", target("leaving curfew missed")), onError: fail })}
+                onClick={() =>
+                  confirm.mutate(night.occurrenceId, { onSuccess: () => noteAfter("Left as missed", target("leaving curfew missed")), onError: fail })
+                }
               />
             </div>
           )
@@ -193,7 +194,15 @@ function Night({ night, request }: { night: CurfewNight; request?: CurfewRequest
         body={`Since ${fmtTime(night.arrivedAt)} · ${mine ? "stay" : "in"} until ${until}${note}`}
       />
     );
-  if (!mine) return <Strip tone="neutral" icon="bedtime" title={started ? `Curfew started at ${due}` : `Curfew at ${due}`} body={`${who} isn't home yet · in until ${until}`} />;
+  if (!mine)
+    return (
+      <Strip
+        tone="neutral"
+        icon="bedtime"
+        title={started ? `Curfew started at ${due}` : `Curfew at ${due}`}
+        body={`${who} isn't home yet · in until ${until}`}
+      />
+    );
   const more = canAsk && (
     <Button variant="tonal" icon="more_time" onClick={() => setAsking(true)}>
       More time
@@ -215,7 +224,9 @@ function Night({ night, request }: { night: CurfewNight; request?: CurfewRequest
                 icon="home"
                 busy={home.isPending}
                 onClick={() =>
-                  night.reportHome ? setTelling(true) : home.mutate({ occurrenceId: night.occurrenceId }, { onSuccess: () => snack("You're home for curfew"), onError: fail })
+                  night.reportHome
+                    ? setTelling(true)
+                    : home.mutate({ occurrenceId: night.occurrenceId }, { onSuccess: () => snack("You're home for curfew"), onError: fail })
                 }
               >
                 I'm home
@@ -255,7 +266,6 @@ function TellHomeSheet({ night, onClose }: { night: CurfewNight; onClose(): void
     <Dialog
       open
       onClose={onClose}
-      icon="home"
       title={`Tell ${who} you're home`}
       actions={
         <>
@@ -374,7 +384,6 @@ function MoreTimeSheet({ night, onClose }: { night: CurfewNight; onClose(): void
     <Dialog
       open
       onClose={onClose}
-      icon="more_time"
       title="More time tonight"
       actions={
         <>
@@ -438,7 +447,7 @@ function Ask({ request }: { request: CurfewRequest }) {
     onError: (e: unknown) => snack(errorMessage(e)),
   });
   return (
-    <div className="flex flex-col gap-1.5 rounded-xl bg-secondary-container px-4 py-4 text-on-secondary-container">
+    <div className="flex flex-col gap-1.5 rounded-md border border-primary bg-surface-container-lowest px-5 py-4 text-on-surface">
       <div className="text-title-medium">
         {who} asks to be home by {fmtTime(request.untilAt)} {nightLabel(request.fromDueAt)}
       </div>
@@ -481,7 +490,6 @@ function ChangeSheet({ request, onClose }: { request: CurfewRequest; onClose(): 
     <Dialog
       open
       onClose={onClose}
-      icon="bedtime"
       title={`Home by, ${nightLabel(request.fromDueAt)}`}
       actions={
         <>
@@ -531,7 +539,7 @@ export function Clash({ clash }: { clash: CurfewClash }) {
   const fail = (e: unknown) => snack(errorMessage(e));
   const when = `${fmtDate(localDateOf(new Date(clash.eventStartsAt)))}, ${fmtTime(clash.eventStartsAt)} – ${fmtTime(clash.eventEndsAt)}`;
   return (
-    <div className="flex gap-4 rounded-xl bg-error-container/50 px-4 py-3 text-on-surface">
+    <div className="flex gap-4 border-l-2 border-error py-1 pl-4 text-on-surface">
       <Icon name="event_busy" className="mt-0.5 text-on-surface-variant" />
       <div className="min-w-0 flex-1">
         <div className="text-title-medium">{clash.eventTitle}</div>
@@ -561,7 +569,9 @@ export function Clash({ clash }: { clash: CurfewClash }) {
           </Button>
           <Button
             variant="text"
-            onClick={() => dismiss.mutate({ id: clash.eventId, occurrenceIds: [clash.occurrenceId] }, { onSuccess: () => snack("Curfew stays that night"), onError: fail })}
+            onClick={() =>
+              dismiss.mutate({ id: clash.eventId, occurrenceIds: [clash.occurrenceId] }, { onSuccess: () => snack("Curfew stays that night"), onError: fail })
+            }
           >
             Leave it
           </Button>
@@ -588,7 +598,6 @@ function PlanEndSheet({ clash, onClose }: { clash: CurfewClash; onClose(): void 
     <Dialog
       open
       onClose={onClose}
-      icon="event"
       title={`When does ${clash.eventTitle} end?`}
       actions={
         <>
@@ -619,7 +628,9 @@ function PlanEndSheet({ clash, onClose }: { clash: CurfewClash; onClose(): void 
     >
       <div className="flex flex-col gap-4">
         <TimeChoices options={options} value={endsAt} onChange={setEndsAt} after={clash.eventStartsAt} before={clash.eventEndsAt} />
-        {endsAt && <Summary icon="event" title={`${day}, ${fmtTime(clash.eventStartsAt)} – ${fmtTime(endsAt)}`} body={`Was until ${fmtTime(clash.eventEndsAt)}`} />}
+        {endsAt && (
+          <Summary icon="event" title={`${day}, ${fmtTime(clash.eventStartsAt)} – ${fmtTime(endsAt)}`} body={`Was until ${fmtTime(clash.eventEndsAt)}`} />
+        )}
         <TextArea
           label={`Note to ${partners.map((p) => p.displayName).join(" and ") || "them"} (optional)`}
           value={note}

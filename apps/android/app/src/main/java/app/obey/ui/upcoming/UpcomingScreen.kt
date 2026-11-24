@@ -146,7 +146,7 @@ fun UpcomingScreen(
         PlanRow(e, day, if (e.authorId == session?.userId || e.withPartner) null else session?.nameOf(e.authorId), planTone(e, session?.relationship)) { plan = e to day }
     }
     val planChip: @Composable (CalendarEvent, LocalDate) -> Unit = { e, day ->
-        PlanChip(e, day, planTone(e, session?.relationship), onOpen = { plan = e to day }, modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
+        PlanChip(e, day, planTone(e, session?.relationship), onOpen = { plan = e to day })
     }
 
     Scaffold(
@@ -216,18 +216,20 @@ fun UpcomingScreen(
                     val events = s.value.eventsOn(selected)
                     LazyColumn(Modifier.fillMaxSize()) {
                         item(key = "grid") {
-                            MonthGrid(s.value, selected, today, session?.relationship, onSelect = vm::select, Modifier.padding(horizontal = 8.dp))
+                            MonthGrid(s.value, selected, today, session?.relationship, onSelect = vm::select, Modifier.padding(horizontal = 12.dp))
                         }
                         item(key = "h-selected") {
+                            HorizontalDivider(Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp), color = MaterialTheme.colorScheme.outlineVariant)
                             Text(
-                                if (selected == today) "Today · ${formatDate(selected)}" else formatDate(selected),
-                                style = MaterialTheme.typography.titleSmall,
+                                selected.format(DateTimeFormatter.ofPattern("EEEE, MMM d")).uppercase(),
+                                style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp),
                             )
                         }
                         if (items.isEmpty() && events.isEmpty()) item(key = "e-selected") {
                             Text(
-                                "Nothing scheduled",
+                                "Nothing that day",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),

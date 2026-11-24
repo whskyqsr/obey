@@ -6,6 +6,23 @@ import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material.icons.outlined.IosShare
+import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.sp
+import app.obey.ui.common.inkButtonColors
+import app.obey.ui.common.Eyebrow
+import app.obey.ui.common.BackLink
+import app.obey.ui.common.Diamond
+import app.obey.ui.common.DiamondState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -46,7 +63,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilledTonalButton
+import app.obey.ui.common.TonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -56,9 +73,8 @@ import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import app.obey.ui.common.LettersField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import app.obey.ui.common.PillSegment
+import app.obey.ui.common.PillRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -124,13 +140,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** The five answers, best to worst. The colours mean the same thing in light and dark themes. */
-enum class Rating(val key: String, val label: String, val color: Color) {
-    Love("love", "Love it", Color(0xFF2E7D5B)),
-    Like("like", "Like it", Color(0xFF8DB255)),
-    Curious("curious", "Curious", Color(0xFFE8B83A)),
-    Soft("soft", "Soft limit", Color(0xFFE07B3C)),
-    Hard("hard", "Hard limit", Color(0xFFB3261E));
+/** The five answers, best to worst. Each shows as a diamond: filled, half, open, accent outline, filled accent. */
+enum class Rating(val key: String, val label: String) {
+    Love("love", "Love it"),
+    Like("like", "Like it"),
+    Curious("curious", "Curious"),
+    Soft("soft", "Soft limit"),
+    Hard("hard", "Hard limit");
 
     companion object {
         fun of(key: String?) = entries.firstOrNull { it.key == key }
@@ -213,10 +229,10 @@ class LimitsViewModel @Inject constructor(private val api: ObeyApi, private val 
         done()
     }
 
-    /** Draws the chart to a PNG in the cache and opens the share sheet. */
-    fun share(context: Context, list: LimitList, people: List<Member>, dark: Boolean) = action {
+    /** Draws the diamond table to a PNG in the cache and opens the share sheet. */
+    fun share(context: Context, list: LimitList, people: List<Member>, colors: ChartColors) = action {
         val file = withContext(Dispatchers.Default) {
-            val bitmap = chartBitmap(list, people, dark)
+            val bitmap = chartBitmap(list, people, colors)
             val dir = File(context.cacheDir, "share").apply { mkdirs() }
             File(dir, "limits.png").also { f -> f.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) } }
         }
@@ -226,30 +242,49 @@ class LimitsViewModel @Inject constructor(private val api: ObeyApi, private val 
     }
 }
 
+/** The theme's colours, read in the composable and handed to the picture drawn off the main thread. */
+data class ChartColors(val ink: Int, val muted: Int, val line: Int, val accent: Int, val paper: Int)
+
 @Composable
-private fun Dot(rating: String?, size: Int = 12) {
+private fun chartColors(): ChartColors {
+    val c = MaterialTheme.colorScheme
+    return ChartColors(c.onSurface.toArgb(), c.onSurfaceVariant.toArgb(), c.outlineVariant.toArgb(), c.primary.toArgb(), c.surface.toArgb())
+}
+
+/** The item the fill-in screen opens on, when the list sends someone to change one answer. */
+private var openAt: String? = null
+
+/** A rating as a diamond, as on the web: love filled, like half, curious open, soft an accent outline, hard filled accent. */
+@Composable
+private fun RatingMark(rating: String?, size: Dp = 16.dp) {
     val r = Rating.of(rating)
-    val m = Modifier.size(size.dp).clip(CircleShape)
-    if (r != null) Box(m.background(r.color).semantics { contentDescription = r.label })
-    else Box(m.border(2.dp, MaterialTheme.colorScheme.outline, CircleShape).semantics { contentDescription = "Skipped" })
+    val m = Modifier.semantics { contentDescription = r?.label ?: "Skipped" }
+    when (r) {
+        null -> Diamond(DiamondState.Off, m, size)
+        Rating.Love -> Diamond(DiamondState.Done, m, size)
+        Rating.Like -> Diamond(DiamondState.Waiting, m, size)
+        Rating.Curious -> Diamond(DiamondState.Open, m, size)
+        Rating.Soft, Rating.Hard -> {
+            val a = MaterialTheme.colorScheme.primary
+            Box(m.size(size).rotate(45f).background(if (r == Rating.Hard) a else Color.Transparent).border(1.5.dp, a))
+        }
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Legend() {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+private fun Key() {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Rating.entries.forEach { r ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Dot(r.key)
-                Text(r.label, style = MaterialTheme.typography.bodyMedium)
+                RatingMark(r.key, 10.dp)
+                Text(r.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
 }
 
-private enum class Tab { Me, Partner, Together }
-
-/** Each person's limits, and the two side by side once both have finished. */
+/** Mockup 24: what you both want, what's worth a talk and what's off the table, then every answer as diamonds. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LimitsScreen(onEdit: () -> Unit, vm: LimitsViewModel = hiltViewModel()) {
@@ -260,47 +295,41 @@ fun LimitsScreen(onEdit: () -> Unit, vm: LimitsViewModel = hiltViewModel()) {
     MessageEffect(message, snackbar, vm::messageShown)
     val session = vm.session ?: return
     val self = session.myMember ?: return
-    val partner = session.partners.firstOrNull()
-    var tab by rememberSaveable { mutableStateOf(Tab.Me) }
-    var chart by rememberSaveable { mutableStateOf(false) }
+    val partner = if (session.solo) null else session.partners.firstOrNull()
     val context = LocalContext.current
-    val dark = androidx.compose.foundation.isSystemInDarkTheme()
+    val colors = chartColors()
     val list = (state as? Load.Ready)?.value
     val mine = list?.people?.firstOrNull { it.userId == self.userId }
     val theirs = partner?.let { p -> list?.people?.firstOrNull { it.userId == p.userId } }
-    val bothShown = mine?.answers != null && theirs?.answers != null
-    val shown = when {
-        tab == Tab.Together || chart -> if (bothShown && partner != null) listOf(self, partner) else listOf(self)
-        tab == Tab.Partner && partner != null -> listOf(partner)
-        else -> listOf(self)
+    val both = partner != null && mine?.answers != null && theirs?.answers != null
+    val people = if (both) listOf(self, partner!!) else listOf(self)
+    val total = list?.items?.size ?: 0
+    val edit = { key: String? -> openAt = key; onEdit() }
+    val status = when {
+        mine == null -> null
+        both -> "You've both finished. Answers you didn't share stay private."
+        partner == null -> if (mine.finishedAt != null) "You've rated ${mine.rated} of $total." else "You've rated ${mine.rated} of $total so far."
+        mine.finishedAt != null -> "You've finished. ${partner.displayName} has rated ${theirs?.rated ?: 0} of $total; you'll see each other's once they finish."
+        theirs?.finishedAt != null -> "${partner.displayName} has finished. You'll see each other's once you do."
+        else -> "You've rated ${mine.rated} of $total. ${partner.displayName} sees yours only once you've both finished."
     }
 
     Scaffold(
         topBar = {
             LargeTopAppBar(
-                title = {
-                    Column {
-                        Text("Limits")
-                        Text(
-                            if (session.solo) "For you, in your own role" else "${self.displayName} and ${partner?.displayName ?: "your partner"}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-                navigationIcon = { if (chart) IconButton(onClick = { chart = false }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") } else MenuButton() },
+                title = { Text("Limits") },
+                navigationIcon = { MenuButton() },
                 actions = {
+                    if (list != null) IconButton(onClick = { vm.share(context, list, people, colors) }) { Icon(Icons.Outlined.IosShare, "Save as an image") }
                     SafeWordAction()
-                    if (list != null) IconButton(onClick = { vm.share(context, list, shown, dark) }) { Icon(Icons.Outlined.Share, "Share as an image") }
-                    IconButton(onClick = onEdit) { Icon(Icons.Outlined.Edit, "Change your answers") }
                 },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Column(
-            Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(28.dp),
         ) {
             when (val s = state) {
                 Load.Loading -> LoadingBox()
@@ -308,219 +337,93 @@ fun LimitsScreen(onEdit: () -> Unit, vm: LimitsViewModel = hiltViewModel()) {
                 is Load.Ready -> {
                     val l = s.value
                     if (mine == null) return@Column
-                    if (mine.finishedAt == null) {
-                        Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary), shape = MaterialTheme.shapes.medium) {
-                            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(if (mine.rated > 0) "You've rated ${mine.rated} of ${l.items.size}" else "Fill in your limits", style = MaterialTheme.typography.titleMedium)
-                                Text(
-                                    "Rate each item for yourself, as the ${self.role.label}: love it, like it, curious, a soft limit or a hard limit. Skip anything you'd rather not say." +
-                                        (partner?.let { " ${it.displayName} sees your answers once you've both finished." } ?: ""),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                                Button(onClick = onEdit) { Text(if (mine.rated > 0) "Carry on" else "Start") }
-                            }
-                        }
+                    status?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    if (mine.finishedAt == null) Button(onClick = { edit(null) }, colors = inkButtonColors()) { Text(if (mine.rated > 0) "Carry on" else "Start") }
+                    if (both) {
+                        val (off, want, talk) = together(l.items, mine.answers.orEmpty(), theirs?.answers.orEmpty())
+                        PillGroup("You both want", want, Tone.Ink)
+                        PillGroup("Worth talking about", talk, Tone.Outline)
+                        PillGroup("Off the table", off, Tone.Accent)
                     }
-                    if (partner != null && !session.solo && !chart) {
-                        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                            listOf(Tab.Me to self.displayName, Tab.Partner to partner.displayName, Tab.Together to "Together").forEachIndexed { i, (t, label) ->
-                                SegmentedButton(selected = tab == t, onClick = { tab = t }, shape = SegmentedButtonDefaults.itemShape(i, 3)) { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                            }
-                        }
-                    }
-                    when {
-                        chart -> Chart(l, shown) { vm.share(context, l, shown, dark) }
-                        tab == Tab.Together && partner != null ->
-                            if (bothShown) Together(l, self, partner, mine.answers.orEmpty(), theirs?.answers.orEmpty()) { chart = true } else Waiting(mine, theirs, partner, onEdit)
-                        tab == Tab.Partner && partner != null ->
-                            if (theirs?.answers != null) Person(l, partner, theirs) { chart = true } else Waiting(mine, theirs, partner, onEdit)
-                        else -> Person(l, self, mine) { chart = true }
-                    }
+                    Table(l, people, self.userId) { edit(it.key) }
+                    if (mine.finishedAt != null) OutlinedButton(onClick = { edit(null) }) { Text("Change your answers") }
                 }
             }
         }
     }
 }
 
-@Composable
-private fun Waiting(mine: LimitPerson, theirs: LimitPerson?, partner: Member, onEdit: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-        EmptyBox(
-            "Shown once you've both finished",
-            when {
-                theirs?.finishedAt != null -> "${partner.displayName} has finished. Yours are next."
-                mine.finishedAt != null -> "You've finished. ${partner.displayName} has rated ${theirs?.rated ?: 0} so far."
-                else -> "Neither of you sees the other's answers until you've both finished, so nobody answers to match."
-            },
-        )
-        if (mine.finishedAt == null) Button(onClick = onEdit) { Text("Finish yours") }
-    }
-}
+
+private enum class Tone { Ink, Outline, Accent }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Pills(icon: androidx.compose.ui.graphics.vector.ImageVector, rating: Rating, title: String, items: List<LimitItem>) {
+private fun PillGroup(title: String, items: List<LimitItem>, tone: Tone) {
     if (items.isEmpty()) return
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(icon, null, tint = rating.color, modifier = Modifier.size(20.dp))
-            Text(title, style = MaterialTheme.typography.titleSmall)
-        }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    val c = MaterialTheme.colorScheme
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Eyebrow(title)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items.forEach { i ->
-                Surface(shape = CircleShape, color = rating.color.copy(alpha = 0.13f), border = BorderStroke(1.dp, rating.color)) {
-                    Text(i.title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+                val (bg, line, fg) = when (tone) {
+                    Tone.Ink -> Triple(c.onSurface, c.onSurface, c.surface)
+                    Tone.Outline -> Triple(Color.Transparent, c.onSurface, c.onSurface)
+                    Tone.Accent -> Triple(Color.Transparent, c.primary, c.primary)
                 }
+                Text(
+                    i.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = fg,
+                    modifier = Modifier.clip(CircleShape).background(bg).border(1.dp, line, CircleShape).padding(horizontal = 18.dp, vertical = 8.dp),
+                )
             }
         }
     }
 }
 
-private val dayFmt = DateTimeFormatter.ofPattern("MMM d")
-
+/** Every rated item by category, a column of diamonds per person; tapping a row changes your answer. */
 @Composable
-private fun Person(list: LimitList, member: Member, person: LimitPerson, onChart: () -> Unit) {
-    val answers = person.answers.orEmpty()
-    fun pick(r: Rating) = list.items.filter { answers[it.key]?.rating == r.key }
-    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Box(Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer), contentAlignment = Alignment.Center) {
-                    Text(member.displayName.take(1).uppercase(), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                }
-                Column {
-                    Text(member.displayName, style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        listOf(member.role.label, person.updatedAt?.let { "updated " + parseInstant(it).atZone(ZoneId.systemDefault()).format(dayFmt) } ?: "nothing rated yet").joinToString(" · "),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Pills(Icons.Filled.Block, Rating.Hard, "Hard limits", pick(Rating.Hard))
-            Pills(Icons.Filled.DoNotDisturbOn, Rating.Soft, "Soft limits, go slow", pick(Rating.Soft))
-            Pills(Icons.Filled.Favorite, Rating.Love, "Loves", pick(Rating.Love))
-        }
-    }
-    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Everything", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                TextButton(onClick = onChart) { Text("Chart view") }
-            }
-            Legend()
-            byCategory(list.items).forEach { (category, items) ->
-                val rated = items.filter { answers[it.key]?.rating != null }
-                if (rated.isNotEmpty()) {
-                    Text(category.uppercase(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
-                    rated.forEach { i ->
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Dot(answers[i.key]?.rating)
-                            Text(i.title, style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
-                }
-            }
-            val notes = list.items.filter { !answers[it.key]?.note.isNullOrEmpty() }
-            if (notes.isNotEmpty()) Notes(notes.map { Triple(it, null, answers[it.key]!!.note) })
-        }
-    }
-}
-
-@Composable
-private fun Notes(rows: List<Triple<LimitItem, String?, String>>) {
-    Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text("NOTES", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        rows.forEach { (item, who, note) ->
-            Text(
-                androidx.compose.ui.text.buildAnnotatedString {
-                    pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Medium))
-                    append(item.title)
-                    pop()
-                    append((who?.let { " · $it" } ?: "") + ": “$note”")
-                },
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-    }
-}
-
-@Composable
-private fun Together(list: LimitList, a: Member, b: Member, answersA: Map<String, LimitAnswer>, answersB: Map<String, LimitAnswer>, onChart: () -> Unit) {
-    val (off, want, talk) = remember(list, answersA, answersB) { together(list.items, answersA, answersB) }
-    fun hardBy(i: LimitItem) = listOfNotNull(a.displayName.takeIf { answersA[i.key]?.rating == "hard" }, b.displayName.takeIf { answersB[i.key]?.rating == "hard" }).joinToString(" and ")
-    fun why(i: LimitItem): String {
-        val ra = answersA[i.key]?.rating
-        val rb = answersB[i.key]?.rating
-        return when {
-            ra == "soft" || rb == "soft" -> "Go slow"
-            ra == "curious" && rb != "curious" -> "${a.displayName}'s curious"
-            rb == "curious" && ra != "curious" -> "${b.displayName}'s curious"
-            else -> "Both curious"
-        }
-    }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("Left dot ${a.displayName}, right dot ${b.displayName}.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-        TextButton(onClick = onChart) { Text("Chart view") }
-    }
-    @Composable
-    fun group(title: String, color: Color, items: List<LimitItem>, side: (LimitItem) -> String?, empty: String) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, color = color)
-            if (items.isEmpty()) Text(empty, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            else Column(Modifier.clip(RoundedCornerShape(16.dp)), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                items.forEach { i ->
-                    Row(
-                        Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLow).padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) { Dot(answersA[i.key]?.rating, 14); Dot(answersB[i.key]?.rating, 14) }
-                        Text(i.title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                        side(i)?.takeIf { it.isNotEmpty() }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    }
-                }
-            }
-        }
-    }
-    group("Off the table", MaterialTheme.colorScheme.error, off, ::hardBy, "Neither of you marked a hard limit.")
-    group("You both want", Rating.Love.color, want, { null }, "Nothing you both love or like yet.")
-    group("Worth talking about", Color(0xFFA77A00), talk, ::why, "Nothing in between.")
-}
-
-/** The KinkList-style chart: a column of dots for each person, by category. */
-@Composable
-private fun Chart(list: LimitList, people: List<Member>, onShare: () -> Unit) {
+private fun Table(list: LimitList, people: List<Member>, me: String, onOpen: (LimitItem) -> Unit) {
     fun answersOf(m: Member) = list.people.firstOrNull { it.userId == m.userId }?.answers.orEmpty()
-    Legend()
-    FilledTonalButton(onClick = onShare) {
-        Icon(Icons.Outlined.Share, null, Modifier.size(18.dp))
-        Text("  Save as image")
-    }
-    byCategory(list.items).forEach { (category, items) ->
-        val shown = items.filter { i -> people.any { answersOf(it)[i.key]?.rating != null } }
-        if (shown.isNotEmpty()) {
-            Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(category, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                        people.forEach { Text(it.displayName.take(1).uppercase(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(24.dp)) }
+    val c = MaterialTheme.colorScheme
+    val groups = byCategory(list.items).map { (cat, items) -> cat to items.filter { i -> people.any { answersOf(it)[i.key]?.rating != null } } }.filter { it.second.isNotEmpty() }
+    if (groups.isEmpty()) return
+    val names = people.joinToString(" · ") { if (it.userId == me) "You" else it.displayName }
+    Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+        HorizontalDivider(color = c.outlineVariant)
+        groups.forEach { (category, items) ->
+            Column {
+                Row {
+                    Text(category, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    Text(names, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
+                }
+                items.forEach { i ->
+                    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable { onOpen(i) }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(i.title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        people.forEach { m -> Box(Modifier.width(40.dp), contentAlignment = Alignment.Center) { RatingMark(answersOf(m)[i.key]?.rating, 18.dp) } }
                     }
-                    shown.forEach { i ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(i.title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            people.forEach { m -> Box(Modifier.width(24.dp), contentAlignment = Alignment.CenterStart) { Dot(answersOf(m)[i.key]?.rating, 14) } }
-                        }
+                    HorizontalDivider(color = c.outlineVariant)
+                }
+            }
+        }
+        Key()
+        val notes = people.flatMap { m -> list.items.filter { answersOf(m)[it.key]?.note?.isNotEmpty() == true }.map { Triple(it, if (m.userId == me) "You" else m.displayName, answersOf(m)[it.key]!!.note) } }
+        if (notes.isNotEmpty()) {
+            Column {
+                Eyebrow("Notes")
+                notes.forEach { (item, who, note) ->
+                    Column(Modifier.padding(vertical = 12.dp)) {
+                        Text("${item.title} · $who", style = MaterialTheme.typography.bodyLarge)
+                        Text("“$note”", style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 28.sp, fontStyle = FontStyle.Italic))
                     }
+                    HorizontalDivider(color = c.outlineVariant)
                 }
             }
         }
     }
-    val notes = people.flatMap { m -> list.items.filter { !answersOf(m)[it.key]?.note.isNullOrEmpty() }.map { Triple(it, m.displayName.takeIf { people.size > 1 }, answersOf(m)[it.key]!!.note) } }
-    if (notes.isNotEmpty()) Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium) { Box(Modifier.fillMaxWidth().padding(16.dp)) { Notes(notes) } }
 }
 
-/** Filling in your own answers, one category at a time. */
+/** Mockup 73: one item at a time, the five answers as rows, then on to the next. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LimitsEditScreen(onClose: () -> Unit, vm: LimitsViewModel = hiltViewModel()) {
@@ -532,144 +435,124 @@ fun LimitsEditScreen(onClose: () -> Unit, vm: LimitsViewModel = hiltViewModel())
     MessageEffect(message, snackbar, vm::messageShown)
     val session = vm.session ?: return
     val self = session.myMember ?: return
-    val partner = session.partners.firstOrNull()
-    var page by rememberSaveable { mutableIntStateOf(0) }
+    val partner = if (session.solo) null else session.partners.firstOrNull()
+    var at by rememberSaveable { mutableStateOf<Int?>(null) }
     var noting by remember { mutableStateOf<LimitItem?>(null) }
     var adding by remember { mutableStateOf(false) }
-    val scroll = rememberScrollState()
-    val scope = rememberCoroutineScope()
+    var menu by remember { mutableStateOf(false) }
     val list = (state as? Load.Ready)?.value
     val mine = list?.people?.firstOrNull { it.userId == self.userId }
     val answers = mine?.answers.orEmpty()
-    val groups = list?.let { byCategory(it.items) }.orEmpty()
-    val at = page.coerceIn(0, (groups.size - 1).coerceAtLeast(0))
-    fun go(n: Int) { page = n; scope.launch { scroll.scrollTo(0) } }
+    // In category order, so "4 of 12" counts within a category.
+    val items = list?.let { byCategory(it.items).flatMap { (_, xs) -> xs } }.orEmpty()
+    val index = at ?: run {
+        val asked = openAt?.let { k -> items.indexOfFirst { it.key == k } } ?: -1
+        if (asked >= 0) asked else items.indexOfFirst { answers[it.key]?.rating == null }.let { if (it >= 0) it else items.size }
+    }
+    val item = items.getOrNull(index)
+    fun go(n: Int) { at = n.coerceIn(0, items.size) }
     val finish = { if (mine?.finishedAt != null) onClose() else vm.finish(partner?.displayName, onClose) }
+    val c = MaterialTheme.colorScheme
 
     Scaffold(
         topBar = {
-            Column {
-                LargeTopAppBar(
-                    title = {
-                        Column {
-                            Text("Your limits")
-                            if (list != null && mine != null) {
-                                Text("For you as the ${self.role.label} · ${mine.rated} of ${list.items.size}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TopAppBar(
+                title = {},
+                navigationIcon = { BackLink("Limits", onClose) },
+                actions = {
+                    if (item != null && item.custom && item.createdBy == self.userId) {
+                        Box {
+                            IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreHoriz, "More options") }
+                            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                DropdownMenuItem(text = { Text("Remove from the list") }, leadingIcon = { Icon(Icons.Outlined.Delete, null) }, onClick = { menu = false; vm.remove(item) })
                             }
-                        }
-                    },
-                    navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.Outlined.Close, "Close") } },
-                    actions = { TextButton(onClick = finish, enabled = !busy && mine != null) { Text(if (mine?.finishedAt != null) "Done" else "Finish") } },
-                )
-                if (list != null && mine != null) {
-                    LinearProgressIndicator(progress = { mine.rated.toFloat() / list.items.size.coerceAtLeast(1) }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), drawStopIndicator = {})
-                }
-            }
-        },
-        bottomBar = {
-            if (groups.isNotEmpty()) {
-                Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
-                    Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedButton(onClick = { go(at - 1) }, enabled = at > 0, modifier = Modifier.weight(1f)) {
-                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, null, Modifier.size(18.dp))
-                            Text("  " + (if (at > 0) groups[at - 1].first else "Back"), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                        if (at < groups.size - 1) {
-                            Button(onClick = { go(at + 1) }, modifier = Modifier.weight(1f)) {
-                                Text(groups[at + 1].first + "  ", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, Modifier.size(18.dp))
-                            }
-                        } else {
-                            Button(onClick = finish, enabled = !busy, modifier = Modifier.weight(1f)) { Text(if (mine?.finishedAt != null) "Done" else "Finish") }
                         }
                     }
-                }
-            }
+                },
+            )
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        Column(
-            Modifier.padding(padding).fillMaxSize().verticalScroll(scroll).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
+        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
             when (val s = state) {
                 Load.Loading -> LoadingBox()
                 is Load.Failed -> ErrorBox(s.message, { vm.load() })
                 is Load.Ready -> {
-                    if (groups.isEmpty()) return@Column
-                    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium) {
-                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Legend()
-                            Text(
-                                "Tap one for each, and tap it again to clear it. Skip anything you'd rather not say." +
-                                    (partner?.let { " ${it.displayName} sees your answers once you've both finished." } ?: ""),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                    if (mine == null) return@Column
+                    val inCategory = item?.let { i -> items.filter { it.category == i.category } }.orEmpty()
+                    Eyebrow(if (item != null) "${item.category} · ${inCategory.indexOf(item) + 1} of ${inCategory.size}" else "${mine.rated} of ${items.size} rated")
+                    Box(Modifier.padding(top = 12.dp).fillMaxWidth().height(3.dp).background(c.outlineVariant)) {
+                        Box(Modifier.fillMaxWidth(index.coerceAtMost(items.size).toFloat() / items.size.coerceAtLeast(1)).height(3.dp).background(c.onSurface))
                     }
-                    val (category, items) = groups[at]
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text(category, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
-                        Text("${items.count { answers[it.key]?.rating != null }} of ${items.size}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Column(Modifier.clip(RoundedCornerShape(24.dp)), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        items.forEach { i ->
-                            val now = answers[i.key]
-                            Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLow).padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(i.title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                                    IconButton(onClick = { noting = i }) {
-                                        Icon(Icons.Outlined.EditNote, "Note on “${i.title}”", tint = if (now?.note.isNullOrEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary)
-                                    }
-                                    if (i.custom && i.createdBy == self.userId) IconButton(onClick = { vm.remove(i) }) { Icon(Icons.Outlined.Delete, "Remove “${i.title}”") }
-                                }
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Rating.entries.forEach { r ->
-                                        val on = now?.rating == r.key
-                                        Box(
-                                            Modifier.size(44.dp).clip(CircleShape).clickable { vm.answer(i, if (on) null else r.key, now?.note.orEmpty()) }.semantics { contentDescription = r.label + if (on) ", chosen" else "" },
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            Box(
-                                                Modifier.size(if (on) 34.dp else 30.dp)
-                                                    .then(if (on) Modifier.border(2.dp, r.color, RoundedCornerShape(12.dp)).padding(3.dp) else Modifier)
-                                                    .clip(RoundedCornerShape(10.dp))
-                                                    .background(if (on) r.color else Color.Transparent)
-                                                    .border(3.dp, r.color.copy(alpha = if (on) 1f else 0.7f), RoundedCornerShape(10.dp)),
-                                            )
+                    if (item != null) {
+                        Text(item.title, style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 40.dp))
+                        Text("For you, as the ${self.role.label}.", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+                        Column(Modifier.padding(top = 24.dp).selectableGroup(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Rating.entries.forEach { r ->
+                                val on = answers[item.key]?.rating == r.key
+                                Row(
+                                    Modifier.fillMaxWidth().height(64.dp).clip(RoundedCornerShape(12.dp))
+                                        .background(if (on) c.surfaceContainer else c.surfaceContainerLowest)
+                                        .border(1.dp, if (on) c.onSurface else c.outlineVariant, RoundedCornerShape(12.dp))
+                                        .selectable(selected = on, role = Role.RadioButton) {
+                                            vm.answer(item, if (on) null else r.key, answers[item.key]?.note.orEmpty())
+                                            if (!on) go(index + 1)
                                         }
-                                    }
-                                }
-                                now?.note?.takeIf { it.isNotEmpty() }?.let {
-                                    Text("“$it”", style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        .padding(horizontal = 24.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                                ) {
+                                    if (r == Rating.Hard) Box(Modifier.size(16.dp).rotate(45f).background(if (on) c.primary else Color.Transparent).border(1.5.dp, c.primary))
+                                    else Diamond(if (on) DiamondState.Done else DiamondState.Open, size = 16.dp)
+                                    Text(if (r == Rating.Soft) "Soft limit, go slow" else r.label, style = MaterialTheme.typography.bodyLarge)
                                 }
                             }
                         }
+                        answers[item.key]?.note?.takeIf { it.isNotEmpty() }?.let {
+                            Text("“$it”", style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 28.sp, fontStyle = FontStyle.Italic), color = c.onSurfaceVariant, modifier = Modifier.padding(top = 16.dp))
+                        }
+                        Row(Modifier.padding(top = 16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(onClick = { noting = item }) { Text(if (answers[item.key]?.note.isNullOrEmpty()) "Add a note" else "Change the note", color = c.primary) }
+                            Spacer(Modifier.weight(1f))
+                            if (index > 0) TextButton(onClick = { go(index - 1) }) { Text("Previous", color = c.onSurfaceVariant) }
+                            TextButton(onClick = { go(index + 1) }) { Text(if (answers[item.key]?.rating != null) "Next" else "Skip", color = c.onSurfaceVariant) }
+                        }
+                    } else {
+                        Text(if (mine.finishedAt != null) "All saved" else "That's all of them", style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 40.dp))
+                        Text("You've rated ${mine.rated} of ${items.size}.", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+                        Row(Modifier.padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Button(onClick = finish, enabled = !busy, colors = inkButtonColors()) { Text(if (mine.finishedAt != null) "Done" else "Finish") }
+                            OutlinedButton(onClick = { adding = true }) { Text("Add your own") }
+                        }
+                        if (items.isNotEmpty()) TextButton(onClick = { go(0) }, modifier = Modifier.padding(top = 8.dp)) { Text("Start again from the top") }
                     }
-                    TextButton(onClick = { adding = true }) {
-                        Icon(Icons.Outlined.Add, null, Modifier.size(18.dp))
-                        Text("  Add your own")
+                    if (partner != null) {
+                        Text(
+                            "${partner.displayName} sees your answers only once you've both finished.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = c.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().padding(top = 48.dp),
+                        )
                     }
-                    Spacer(Modifier.height(8.dp))
                 }
             }
         }
     }
 
-    noting?.let { item ->
-        var note by remember(item.key) { mutableStateOf(answers[item.key]?.note.orEmpty()) }
+    noting?.let { noted ->
+        var note by remember(noted.key) { mutableStateOf(answers[noted.key]?.note.orEmpty()) }
         AlertDialog(
             onDismissRequest = { noting = null },
-            title = { Text(item.title) },
+            title = { Text(noted.title) },
             text = { LettersField(note, { note = it.take(500) }, label = { Text("Note") }, placeholder = { Text("Only soft ones, and not for long") }, modifier = Modifier.fillMaxWidth()) },
-            confirmButton = { Button(onClick = { vm.answer(item, answers[item.key]?.rating, note.trim()); noting = null }) { Text("Save") } },
+            confirmButton = { Button(onClick = { vm.answer(noted, answers[noted.key]?.rating, note.trim()); noting = null }, colors = inkButtonColors()) { Text("Save") } },
             dismissButton = { TextButton(onClick = { noting = null }) { Text("Cancel") } },
         )
     }
-    if (adding && groups.isNotEmpty()) {
+    if (adding) {
         var title by remember { mutableStateOf("") }
-        var category by remember { mutableStateOf(groups[at].first) }
+        var category by remember { mutableStateOf(LIMIT_CATEGORIES.last()) }
         var open by remember { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { adding = false },
@@ -687,75 +570,90 @@ fun LimitsEditScreen(onClose: () -> Unit, vm: LimitsViewModel = hiltViewModel())
                             modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
                         )
                         ExposedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                            LIMIT_CATEGORIES.forEach { c -> DropdownMenuItem(text = { Text(c) }, onClick = { category = c; open = false }) }
+                            LIMIT_CATEGORIES.forEach { cat -> DropdownMenuItem(text = { Text(cat) }, onClick = { category = cat; open = false }) }
                         }
                     }
-                    Text("You both see it on the list and can each rate it.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
             confirmButton = {
                 Button(onClick = {
-                    val c = category
-                    vm.add(c, title) {
+                    val t = title.trim()
+                    vm.add(category, t) {
                         adding = false
+                        openAt = null
+                        at = null
                     }
-                }, enabled = title.isNotBlank() && !busy) { Text("Add") }
+                }, enabled = title.isNotBlank() && !busy, colors = inkButtonColors()) { Text("Add") }
             },
             dismissButton = { TextButton(onClick = { adding = false }) { Text("Cancel") } },
         )
     }
 }
 
-/** The chart as a picture, for sharing: the same layout as the web's saved image, in one column for a phone. */
-private fun chartBitmap(list: LimitList, people: List<Member>, dark: Boolean): Bitmap {
+/** The diamond table as a picture, for sharing, in the theme's colours: one column for a phone. */
+private fun chartBitmap(list: LimitList, people: List<Member>, colors: ChartColors): Bitmap {
     fun answersOf(m: Member) = list.people.firstOrNull { it.userId == m.userId }?.answers.orEmpty()
     val groups = byCategory(list.items).map { (c, items) -> c to items.filter { i -> people.any { answersOf(it)[i.key]?.rating != null } } }.filter { it.second.isNotEmpty() }
     val s = 2f
-    val w = 460f
-    val pad = 24f
-    val row = 30f
-    val cardW = w - pad * 2
-    val height = 110f + groups.sumOf { (56 + it.second.size * row + pad).toDouble() }.toFloat() + pad
+    val w = 520f
+    val pad = 32f
+    val row = 40f
+    val colW = w - pad * 2
+    val top = 150f
+    val height = top + groups.sumOf { (40 + it.second.size * row + 28).toDouble() }.toFloat() + pad
     val bmp = Bitmap.createBitmap((w * s).toInt(), (height * s).toInt(), Bitmap.Config.ARGB_8888)
     val c = android.graphics.Canvas(bmp)
     c.scale(s, s)
-    val fg = if (dark) 0xFFF1DEDA.toInt() else 0xFF231918.toInt()
-    val muted = if (dark) 0xFFD8C2BE.toInt() else 0xFF534341.toInt()
-    c.drawColor(if (dark) 0xFF1A1110.toInt() else 0xFFFFF8F6.toInt())
+    c.drawColor(colors.paper)
     val text = Paint(Paint.ANTI_ALIAS_FLAG)
-    fun font(size: Float, bold: Boolean = false, color: Int = fg) = text.apply { textSize = size; typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT; this.color = color }
-    val fill = Paint(Paint.ANTI_ALIAS_FLAG)
-    c.drawText("Limits", pad, 48f, font(28f, true))
-    c.drawText(people.joinToString(" and ") { it.displayName }, pad, 74f, font(15f, color = muted))
-    var lx = pad
-    Rating.entries.forEach { r ->
-        fill.color = r.color.toArgb(); fill.style = Paint.Style.FILL
-        c.drawCircle(lx + 6, 94f, 6f, fill)
-        font(12f)
-        c.drawText(r.label, lx + 16, 98f, text)
-        lx += 22 + text.measureText(r.label) + 10
+    fun font(size: Float, serif: Boolean = false, color: Int = colors.ink) = text.apply {
+        textSize = size; typeface = if (serif) Typeface.SERIF else Typeface.DEFAULT; this.color = color; textAlign = Paint.Align.LEFT
     }
-    var y = 116f
-    for ((category, items) in groups) {
-        fill.color = if (dark) 0xFF271D1C.toInt() else 0xFFFDEDEA.toInt()
-        c.drawRoundRect(RectF(pad, y, pad + cardW, y + 56 + items.size * row), 16f, 16f, fill)
-        c.drawText(category, pad + 18, y + 32, font(17f, true))
-        people.forEachIndexed { i, p -> c.drawText(p.displayName.take(1).uppercase(), pad + cardW - 30 - (people.size - 1 - i) * 34 - 4, y + 32, font(12f, color = muted)) }
-        items.forEachIndexed { n, item ->
-            val cy = y + 62 + n * row
-            font(15f)
-            var t = item.title
-            val max = cardW - 40 - people.size * 34
-            while (text.measureText(t) > max && t.length > 1) t = t.dropLast(1)
-            c.drawText(if (t == item.title) t else "$t…", pad + 18, cy + 5, text)
-            people.forEachIndexed { i, p ->
-                val cx = pad + cardW - 26 - (people.size - 1 - i) * 34
-                val r = Rating.of(answersOf(p)[item.key]?.rating)
-                if (r != null) { fill.color = r.color.toArgb(); fill.style = Paint.Style.FILL; c.drawCircle(cx, cy, 8f, fill) }
-                else { fill.color = muted; fill.style = Paint.Style.STROKE; fill.strokeWidth = 2f; c.drawCircle(cx, cy, 7f, fill); fill.style = Paint.Style.FILL }
-            }
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    fun diamond(x: Float, y: Float, r: Float, rating: Rating) {
+        val color = if (rating == Rating.Soft || rating == Rating.Hard) colors.accent else colors.ink
+        val path = android.graphics.Path().apply { moveTo(x, y - r); lineTo(x + r, y); lineTo(x, y + r); lineTo(x - r, y); close() }
+        paint.color = color
+        when (rating) {
+            Rating.Love, Rating.Hard -> { paint.style = Paint.Style.FILL; c.drawPath(path, paint) }
+            Rating.Like -> { c.save(); c.clipPath(path); paint.style = Paint.Style.FILL; c.drawRect(x - r, y - r, x + r, y, paint); c.restore() }
+            else -> {}
         }
-        y += 56 + items.size * row + pad
+        paint.style = Paint.Style.STROKE; paint.strokeWidth = 1.5f
+        c.drawPath(path, paint)
+    }
+    c.drawText("Limits", pad, 80f, font(52f, serif = true))
+    c.drawText(people.joinToString(" and ") { it.displayName }, pad, 110f, font(15f, color = colors.muted))
+    var kx = pad
+    Rating.entries.forEach { r ->
+        diamond(kx + 5, 130f, 5f, r)
+        font(12f, color = colors.muted)
+        c.drawText(r.label, kx + 16, 134f, text)
+        kx += 16 + text.measureText(r.label) + 16
+    }
+    var y = top
+    for ((category, items) in groups) {
+        c.drawText(category, pad, y + 20, font(14f, color = colors.muted))
+        people.forEachIndexed { i, p ->
+            val cx = pad + colW - 20 - (people.size - 1 - i) * 52
+            font(14f, color = colors.muted).textAlign = Paint.Align.CENTER
+            c.drawText(if (p.displayName.length > 6) p.displayName.take(1).uppercase() else p.displayName, cx, y + 20, text)
+        }
+        items.forEachIndexed { n, item ->
+            val ry = y + 40 + n * row
+            font(17f)
+            var t = item.title
+            val max = colW - 30 - people.size * 52
+            while (text.measureText(t) > max && t.length > 1) t = t.dropLast(1)
+            c.drawText(if (t == item.title) t else "$t…", pad, ry + 26, text)
+            people.forEachIndexed { i, p ->
+                val cx = pad + colW - 20 - (people.size - 1 - i) * 52
+                Rating.of(answersOf(p)[item.key]?.rating)?.let { diamond(cx, ry + 20, 8f, it) }
+            }
+            paint.color = colors.line; paint.style = Paint.Style.STROKE; paint.strokeWidth = 1f
+            c.drawLine(pad, ry + row, pad + colW, ry + row, paint)
+        }
+        y += 40 + items.size * row + 28
     }
     return bmp
 }

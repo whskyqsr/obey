@@ -39,7 +39,7 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.LinkOff
-import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Redeem
 import androidx.compose.material.icons.outlined.Report
 import androidx.compose.material.icons.outlined.Share
@@ -52,14 +52,13 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
+import app.obey.ui.common.TonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedCard
 import app.obey.ui.common.LettersField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -394,6 +393,7 @@ fun KitsScreen(
                         item(key = "mine") { SectionLabel("Yours") }
                         items(own, key = { it.id }) { k -> KitCard(Icons.Outlined.Widgets, k.title, k.description, k.items, k.shareCode != null) { onOpenKit(k.id) } }
                     }
+                    item(key = "add") { AddByCodeRow(onOpenShared) }
                 }
             }
         }
@@ -405,6 +405,41 @@ fun KitsScreen(
         }
     }
     if (adding) AddByCodeDialog(onDismiss = { adding = false }, onOpen = { adding = false; onOpenShared(it) })
+}
+
+/** Under the lists (mockup 84): paste a shared kit's link or code and open it. */
+@Composable
+private fun AddByCodeRow(onOpen: (String) -> Unit) {
+    var text by rememberSaveable { mutableStateOf("") }
+    val code = shareCodeFrom(text)
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        color = colors.surfaceContainerLowest,
+        border = androidx.compose.foundation.BorderStroke(1.dp, colors.outlineVariant),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp).fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Link, null, tint = colors.onSurfaceVariant)
+            Spacer(Modifier.width(12.dp))
+            androidx.compose.foundation.text.BasicTextField(
+                value = text,
+                onValueChange = { text = it.take(200) },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.onSurface),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(colors.onSurface),
+                modifier = Modifier.weight(1f),
+                decorationBox = { inner ->
+                    Box {
+                        if (text.isEmpty()) Text("Add from a link or code", style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant)
+                        inner()
+                    }
+                },
+            )
+            Spacer(Modifier.width(8.dp))
+            OutlinedButton(enabled = code != null, onClick = { code?.let(onOpen) }) { Text("Add") }
+        }
+    }
 }
 
 @Composable
@@ -539,7 +574,7 @@ fun KitScreen(kitId: String, onBack: () -> Unit, onAdded: (ApplyKitResult) -> Un
                 actions = {
                     if (kit != null) {
                         Box {
-                            IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "More options") }
+                            IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreHoriz, "More options") }
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                                 DropdownMenuItem(text = { Text("Edit") }, leadingIcon = { Icon(Icons.Outlined.Edit, null) }, onClick = { menu = false; dialog = "edit" })
                                 DropdownMenuItem(
@@ -566,7 +601,7 @@ fun KitScreen(kitId: String, onBack: () -> Unit, onAdded: (ApplyKitResult) -> Un
                     Text(kit.description.ifBlank { counts(items) }, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
                     FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = { dialog = "add" }) { Icon(Icons.Outlined.Add, null); Text("  Add to this dynamic") }
-                        FilledTonalButton(onClick = { dialog = "share" }) { Icon(Icons.Outlined.Share, null); Text("  Share") }
+                        TonalButton(onClick = { dialog = "share" }) { Icon(Icons.Outlined.Share, null); Text("  Share") }
                     }
                     ItemList(items)
                     val saved = runCatching { OffsetDateTime.parse(kit.createdAt).toLocalDate().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)) }.getOrNull()
@@ -618,7 +653,13 @@ private fun ShareSheet(kit: Kit, busy: Boolean, onShare: (Boolean) -> Unit, onDi
                 }
             } else {
                 val link = kitLink(code)
-                OutlinedCard(onClick = { clipboard.setText(AnnotatedString(link)) }, modifier = Modifier.fillMaxWidth()) {
+                Surface(
+                    onClick = { clipboard.setText(AnnotatedString(link)) },
+                    color = colors.surfaceContainerLowest,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, colors.outlineVariant),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
                     Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(link.removePrefix("https://"), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                         Icon(Icons.Outlined.ContentCopy, "Copy link", tint = colors.primary)
@@ -851,7 +892,7 @@ fun SharedKitScreen(code: String, onBack: () -> Unit, onAdded: (ApplyKitResult) 
                     ItemList(items)
                     FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(enabled = !busy, onClick = { vm.copy(code) }) { Icon(Icons.Outlined.BookmarkAdd, null); Text("  Save to your kits") }
-                        FilledTonalButton(onClick = { adding = true }) { Text("Add to this dynamic") }
+                        TonalButton(onClick = { adding = true }) { Text("Add to this dynamic") }
                     }
                 }
                 if (adding) vm.session?.let { session ->
@@ -866,7 +907,12 @@ fun SharedKitScreen(code: String, onBack: () -> Unit, onAdded: (ApplyKitResult) 
 @Composable
 fun KitPrompt(onBrowse: () -> Unit, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
-    OutlinedCard(modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth()) {
+    Surface(
+        color = colors.surfaceContainerLowest,
+        border = androidx.compose.foundation.BorderStroke(1.dp, colors.outlineVariant),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
+    ) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.Widgets, null, tint = colors.primary)
             Spacer(Modifier.width(16.dp))
@@ -875,7 +921,7 @@ fun KitPrompt(onBrowse: () -> Unit, modifier: Modifier = Modifier) {
                 Text("Ready-made daily tasks and rules you can pick from and edit.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
             }
             Spacer(Modifier.width(8.dp))
-            FilledTonalButton(onClick = onBrowse) { Text("Browse") }
+            TonalButton(onClick = onBrowse) { Text("Browse") }
         }
     }
 }

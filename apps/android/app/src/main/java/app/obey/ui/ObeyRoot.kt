@@ -454,6 +454,7 @@ private fun ObeyNavHost(nav: NavHostController, usItems: List<UsItem>, switcher:
                 onOpenAgreement = { edit -> nav.navigate(if (edit) AgreementRoute(edit = true) else AgreementRoute(review = true)) },
                 onOpenRules = { nav.navigate(RulesRoute) },
                 onOpenProtocol = { nav.navigate(ProtocolEditorRoute(protocolId = it)) },
+                onOpenScene = { nav.navigate(SceneRoute(it)) },
             )
         }
         composable<UpcomingRoute> {
@@ -564,12 +565,13 @@ private fun ObeyNavHost(nav: NavHostController, usItems: List<UsItem>, switcher:
             )
         }
         composable<TaskHistoryRoute> { TaskHistoryScreen(onBack = { nav.popBackStack() }) }
-        composable<TaskEditorRoute> { TaskEditorScreen(onDone = { nav.popBackStack() }) }
+        composable<TaskEditorRoute> { TaskEditorScreen(onDone = { nav.popBackStack() }, onKits = { nav.navigate(KitsRoute) }) }
         composable<NoteEditorRoute> { NoteEditorScreen(onDone = { nav.popBackStack() }) }
         composable<SettingsRoute> { SettingsScreen(onBack = { nav.popBackStack() }, onOpenDynamic = { nav.navigate(DynamicRoute()) }, onOpenFeatures = { nav.navigate(DynamicRoute(features = true)) }) }
         composable<DynamicRoute> { entry -> DynamicScreen(startInvite = entry.toRoute<DynamicRoute>().invite, startFeatures = entry.toRoute<DynamicRoute>().features, onBack = { nav.popBackStack() }, onPlaces = { nav.navigate(PlacesRoute) }, onLocation = { nav.navigate(LocationRoute) }, onCurfew = { nav.navigate(CurfewRoute) }) }
         composable<CurfewRoute> { app.obey.ui.location.CurfewScreen(onBack = { nav.popBackStack() }, onPlaces = { nav.navigate(PlacesRoute) }) }
-        composable<PlacesRoute> { app.obey.ui.location.PlacesScreen(onBack = { nav.popBackStack() }) }
-        composable<LocationRoute> { app.obey.ui.location.LocationScreen(onPlaces = { nav.navigate(PlacesRoute) }, onCurfew = { nav.navigate(CurfewRoute) }) }
+        // Places are listed on Location now (mockup 22).
+        composable<PlacesRoute> { app.obey.ui.location.LocationScreen(onCurfew = { nav.navigate(CurfewRoute) }) }
+        composable<LocationRoute> { app.obey.ui.location.LocationScreen(onCurfew = { nav.navigate(CurfewRoute) }) }
     }
 }

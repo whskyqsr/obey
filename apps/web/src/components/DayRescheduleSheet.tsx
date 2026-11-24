@@ -54,7 +54,6 @@ export function DayRescheduleSheet({ tasks, open, onClose }: { tasks: Occurrence
       open={open}
       onClose={onClose}
       title="More time for today"
-      icon="more_time"
       actions={
         <>
           <Button variant="text" onClick={onClose}>

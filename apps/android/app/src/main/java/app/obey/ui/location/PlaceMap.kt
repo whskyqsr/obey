@@ -4,6 +4,15 @@ import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.ui.draw.clip
+import org.maplibre.android.geometry.LatLngBounds
+import org.maplibre.android.style.expressions.Expression
+import org.maplibre.android.style.layers.SymbolLayer
+import org.maplibre.geojson.FeatureCollection
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,7 +39,7 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
+import app.obey.ui.common.TonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -219,6 +228,84 @@ fun PlaceMap(
     }
 }
 
+/** Every saved place as a circle with its name, framed to fit them all (mockup 22). It doesn't move. */
+@Composable
+fun PlacesMap(places: List<Place>, modifier: Modifier = Modifier) {
+    if (places.isEmpty()) return
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val tint = MaterialTheme.colorScheme.primary.toArgb()
+    val ink = MaterialTheme.colorScheme.onSurface.toArgb()
+    val halo = MaterialTheme.colorScheme.surface.toArgb()
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val pad = with(density) { 40.dp.roundToPx() }
+    val view = remember {
+        MapLibre.getInstance(context)
+        MapView(context).apply { onCreate(null) }
+    }
+    var map by remember { mutableStateOf<MapLibreMap?>(null) }
+
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> view.onStart()
+                Lifecycle.Event.ON_RESUME -> view.onResume()
+                Lifecycle.Event.ON_PAUSE -> view.onPause()
+                Lifecycle.Event.ON_STOP -> view.onStop()
+                else -> Unit
+            }
+        }
+        lifecycle.addObserver(observer)
+        view.getMapAsync { m ->
+            m.uiSettings.setAllGesturesEnabled(false)
+            m.setStyle(Style.Builder().fromUri(STYLE)) { map = m }
+        }
+        onDispose {
+            lifecycle.removeObserver(observer)
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                view.onPause()
+                view.onStop()
+            }
+            view.onDestroy()
+        }
+    }
+
+    LaunchedEffect(map, places) {
+        val m = map ?: return@LaunchedEffect
+        val style = m.style ?: return@LaunchedEffect
+        val circles = places.map { circle(it.lat, it.lng, it.radiusM) }
+        val labels = places.map { p -> Feature.fromGeometry(Point.fromLngLat(p.lng, p.lat)).also { it.addStringProperty("name", p.name) } }
+        val shapes = style.getSourceAs<GeoJsonSource>("places")
+        if (shapes == null) {
+            style.addSource(GeoJsonSource("places", FeatureCollection.fromFeatures(circles)))
+            style.addSource(GeoJsonSource("labels", FeatureCollection.fromFeatures(labels)))
+            style.addLayer(FillLayer("places-fill", "places").withProperties(PropertyFactory.fillColor(tint), PropertyFactory.fillOpacity(0.14f)))
+            style.addLayer(LineLayer("places-line", "places").withProperties(PropertyFactory.lineColor(tint), PropertyFactory.lineWidth(2f)))
+            style.addLayer(
+                SymbolLayer("places-label", "labels").withProperties(
+                    PropertyFactory.textField(Expression.get("name")),
+                    PropertyFactory.textFont(arrayOf("Noto Sans Regular")),
+                    PropertyFactory.textSize(13f),
+                    PropertyFactory.textColor(ink),
+                    PropertyFactory.textHaloColor(halo),
+                    PropertyFactory.textHaloWidth(1.5f),
+                ),
+            )
+        } else {
+            shapes.setGeoJson(FeatureCollection.fromFeatures(circles))
+            style.getSourceAs<GeoJsonSource>("labels")?.setGeoJson(FeatureCollection.fromFeatures(labels))
+        }
+        val points = places.flatMap { p ->
+            val dLat = p.radiusM / 111_320.0
+            val dLng = p.radiusM / (111_320.0 * cos(p.lat * PI / 180))
+            listOf(LatLng(p.lat - dLat, p.lng - dLng), LatLng(p.lat + dLat, p.lng + dLng))
+        }
+        runCatching { m.moveCamera(CameraUpdateFactory.newLatLngBounds(LatLngBounds.Builder().includes(points).build(), pad)) }
+    }
+
+    Box(modifier) { AndroidView({ view }, Modifier.fillMaxSize()) }
+}
+
 /** Add or change a place: search or drag the map, name it, and set how close counts. Full screen, so the map has room. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -283,11 +370,14 @@ fun PlaceDialog(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text(if (place == null) "New place" else "Edit place") },
-                    navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.Outlined.Close, "Close") } },
+                CenterAlignedTopAppBar(
+                    title = { Text(if (place == null) "New place" else "Edit place", style = MaterialTheme.typography.titleMedium) },
+                    navigationIcon = { TextButton(onClick = onDismiss) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } },
                     actions = {
-                        Button(onClick = { onSave(draft.copy(name = draft.name.trim())) }, enabled = !busy && draft.name.isNotBlank(), modifier = Modifier.padding(end = 8.dp)) { Text("Save") }
+                        val ok = !busy && draft.name.isNotBlank()
+                        TextButton(onClick = { onSave(draft.copy(name = draft.name.trim())) }, enabled = ok) {
+                            Text("Save", color = MaterialTheme.colorScheme.primary.copy(alpha = if (ok) 1f else 0.4f))
+                        }
                     },
                 )
             },
@@ -311,7 +401,10 @@ fun PlaceDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 )
-                Box(Modifier.weight(1f).fillMaxWidth()) {
+                Box(
+                    Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(MaterialTheme.shapes.medium)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium),
+                ) {
                     PlaceMap(
                         draft.lat,
                         draft.lng,
@@ -322,8 +415,19 @@ fun PlaceDialog(
                         satellite = satellite,
                     )
                     if (photo != null) {
-                        FilledTonalIconButton(onClick = { satellite = !satellite }, modifier = Modifier.align(Alignment.TopStart).padding(12.dp)) {
-                            Icon(if (satellite) Icons.Outlined.Map else Icons.Outlined.SatelliteAlt, if (satellite) "Map view" else "Satellite view")
+                        Row(
+                            Modifier.align(Alignment.TopEnd).padding(12.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape).padding(4.dp),
+                        ) {
+                            listOf(false to "Map", true to "Satellite").forEach { (on, label) ->
+                                Text(
+                                    label,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = if (satellite == on) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.clip(CircleShape).background(if (satellite == on) MaterialTheme.colorScheme.onSurface else androidx.compose.ui.graphics.Color.Transparent)
+                                        .clickable { satellite = on }.padding(horizontal = 14.dp, vertical = 6.dp),
+                                )
+                            }
                         }
                     }
                     // Esri's terms want its credit always visible while the photos are showing.
@@ -333,42 +437,25 @@ fun PlaceDialog(
                                 it,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.inverseOnSurface,
-                                modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).padding(start = 56.dp)
+                                modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp).padding(start = 56.dp)
                                     .background(MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.7f), MaterialTheme.shapes.extraSmall)
                                     .padding(horizontal = 6.dp, vertical = 2.dp),
                             )
                         }
                     }
-                    Surface(
-                        color = MaterialTheme.colorScheme.inverseSurface,
-                        shape = MaterialTheme.shapes.extraSmall,
-                        modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
-                    ) {
-                        Text(
-                            "Drag the map to move the pin",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.inverseOnSurface,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        )
-                    }
-                    FilledTonalIconButton(onClick = ::useMyLocation, modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp)) {
-                        Icon(Icons.Outlined.MyLocation, "Use my location")
-                    }
                     if (found.isNotEmpty()) {
                         Surface(
-                            color = MaterialTheme.colorScheme.surfaceContainer,
+                            color = MaterialTheme.colorScheme.surfaceContainerLowest,
                             shape = MaterialTheme.shapes.small,
-                            shadowElevation = 3.dp,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             modifier = Modifier.align(Alignment.TopCenter).padding(horizontal = 16.dp).fillMaxWidth(),
                         ) {
                             Column {
                                 found.forEach { f ->
-                                    ListItem(
-                                        modifier = Modifier.clickable { pick(f) },
-                                        leadingContent = { Icon(Icons.Outlined.LocationOn, null) },
-                                        headlineContent = { Text(f.name) },
-                                        supportingContent = if (f.address.isNotBlank()) ({ Text(f.address) }) else null,
-                                    )
+                                    Column(Modifier.fillMaxWidth().clickable { pick(f) }.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                                        Text(f.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1)
+                                        if (f.address.isNotBlank()) Text(f.address, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                                    }
                                 }
                             }
                         }
@@ -378,7 +465,10 @@ fun PlaceDialog(
                     Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    hint?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(hint ?: "Drag the map to move the pin.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f, fill = false))
+                        TextButton(onClick = ::useMyLocation) { Text("Use my location", color = MaterialTheme.colorScheme.primary) }
+                    }
                     LettersField(
                         value = draft.name,
                         onValueChange = { draft = draft.copy(name = it.take(40)) },
@@ -387,14 +477,16 @@ fun PlaceDialog(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Radius", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                        Text(formatRadius(draft.radiusM), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    Text("Radius · ${formatRadius(draft.radiusM)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
                     Slider(
                         value = draft.radiusM.toFloat(),
                         onValueChange = { draft = draft.copy(radiusM = (Math.round(it / 50f) * 50).coerceIn(MIN_RADIUS, MAX_RADIUS)) },
                         valueRange = MIN_RADIUS.toFloat()..MAX_RADIUS.toFloat(),
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.onSurface,
+                            activeTrackColor = MaterialTheme.colorScheme.onSurface,
+                            inactiveTrackColor = MaterialTheme.colorScheme.outlineVariant,
+                        ),
                     )
                     Text(
                         "Arriving anywhere inside the circle counts. At least 100 m, since phones can't tell much closer than that.",
@@ -402,7 +494,7 @@ fun PlaceDialog(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     onDelete?.let {
-                        TextButton(onClick = it, enabled = !busy) { Text("Delete place", color = MaterialTheme.colorScheme.error) }
+                        TextButton(onClick = it, enabled = !busy) { Text("Delete this place", color = MaterialTheme.colorScheme.error) }
                     }
                 }
             }

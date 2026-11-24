@@ -59,7 +59,7 @@ fun WidgetSetting(vm: WidgetSettingViewModel = hiltViewModel()) {
     val tick by vm.tick.collectAsStateWithLifecycle()
     val locked by vm.appLock.collectAsStateWithLifecycle()
     val colors = MaterialTheme.colorScheme
-    Surface(color = colors.surfaceContainerLow, shape = MaterialTheme.shapes.large, modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Widgets, null, tint = colors.primary)
@@ -78,7 +78,6 @@ fun WidgetSetting(vm: WidgetSettingViewModel = hiltViewModel()) {
                 Spacer(Modifier.width(36.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Mark done from the widget", style = MaterialTheme.typography.bodyLarge)
-                    Text("Tasks that need proof, steps, a mood or an entry still open the app", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
                 }
                 Switch(checked = tick, onCheckedChange = vm::setTick)
             }

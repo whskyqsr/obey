@@ -39,7 +39,12 @@ export function MarkdownEditor({
     contentType: "markdown",
     editable,
     immediatelyRender: true,
-    editorProps: { attributes: { class: cx("prose-m3 text-on-surface", letters ? "prose-letters py-4" : "px-4 py-4", compact && "prose-compact"), "aria-label": label } },
+    editorProps: {
+      attributes: {
+        class: cx("prose-m3 text-on-surface", letters ? "prose-letters py-4" : bare ? "px-4 py-4" : "py-3", compact && "prose-compact"),
+        "aria-label": label,
+      },
+    },
     onUpdate({ editor }) {
       const md = editor.getMarkdown();
       // Setting up the editor can fire an update with nothing changed; only real edits count.
@@ -69,8 +74,13 @@ export function MarkdownEditor({
     );
 
   return (
-    <div className={cx(!bare && "group rounded-lg border border-outline-variant bg-surface-container-lowest focus-within:border-primary", bare && "-mx-4")}>
-      {editable && editor && <Toolbar editor={editor} pinned={!compact} />}
+    <div className={cx(!bare && "group border-b border-outline-variant focus-within:border-on-surface", bare && "-mx-4")}>
+      {editable && editor && (
+        // In a form the toolbar shows only while writing, so the details read as plain text otherwise.
+        <div className={cx(compact && "hidden group-focus-within:block")}>
+          <Toolbar editor={editor} pinned={!compact} />
+        </div>
+      )}
       <EditorContent editor={editor} />
     </div>
   );
@@ -134,14 +144,10 @@ function Toolbar({ editor, pinned }: { editor: Editor; pinned: boolean }) {
 
   return (
     // The opaque page-colored wrapper hides the editor's frame and text as they scroll under the pinned toolbar.
-    <div className={cx("-mx-px -mt-px bg-surface", pinned && "sticky top-14 z-10")}>
-      <div
-        role="toolbar"
-        aria-label="Formatting"
-        className="flex flex-wrap items-center gap-0.5 rounded-t-lg border border-outline-variant bg-surface-container px-1 py-1 group-focus-within:border-primary group-focus-within:border-b-outline-variant"
-      >
+    <div className={cx("bg-surface", pinned && "sticky top-14 z-10")}>
+      <div role="toolbar" aria-label="Formatting" className="-ml-2 flex flex-wrap items-center gap-0.5 border-b border-outline-variant py-1">
         {groups.map((g, i) => (
-          <div key={i} className={cx("flex items-center gap-0.5", i > 0 && "border-l border-outline-variant pl-0.5")}>
+          <div key={i} className={cx("flex items-center gap-0.5", i > 0 && "pl-2")}>
             {g.map((b) => (
               <button
                 key={b.icon}
@@ -154,7 +160,7 @@ function Toolbar({ editor, pinned }: { editor: Editor; pinned: boolean }) {
                 onClick={b.run}
                 className={cx(
                   "state-layer flex size-9 items-center justify-center rounded-full disabled:opacity-30",
-                  b.active ? "bg-secondary-container text-on-secondary-container" : "text-on-surface-variant",
+                  b.active ? "text-primary" : "text-on-surface-variant",
                 )}
               >
                 <Icon name={b.icon} size={20} />

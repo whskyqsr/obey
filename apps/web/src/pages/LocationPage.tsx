@@ -1,97 +1,76 @@
+import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import type { Member } from "../api/types";
-import { useCurfew, useOccurrences, usePauseLocation } from "../api/hooks";
+import type { Member, Place } from "../api/types";
+import { useCurfew, useOccurrences, usePauseLocation, usePlaces } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { usePlaceLookup } from "../components/Location";
-import { Button, Chip, Icon, PageHeader, useSnackbar } from "../components/ui";
+import { PlaceDialog, PlacesMap, fmtRadius } from "../components/PlaceMap";
+import { Icon, IconButton, OverflowMenu, PageHeader, useSnackbar } from "../components/ui";
 import { fmtDateTime, fmtTime, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 import { AskLocationButton } from "./Places";
-import { describeCurfew } from "./Curfew";
-
-const Card = ({ icon, tone, title, body, children }: { icon: string; tone: "ok" | "warn"; title: string; body: string; children?: React.ReactNode }) => (
-  <div className="border border-outline-variant flex flex-col gap-3 rounded-lg p-4">
-    <div className="flex items-start gap-3">
-      <Icon name={icon} filled className={tone === "ok" ? "text-primary" : "text-on-surface-variant"} />
-      <div className="min-w-0 flex-1">
-        <div className="text-body-large text-on-surface">{title}</div>
-        <div className="text-body-medium text-on-surface-variant">{body}</div>
-      </div>
-    </div>
-    {children}
-  </div>
-);
+import { fmtClock } from "./Curfew";
 
 /** For a Dominant: whether this person's phone can check location tasks, with a nudge to set it up if not. */
 export function LocationReadiness({ member }: { member: Member }) {
   const name = member.displayName;
-  if (member.locationPaused)
-    return (
-      <Card
-        icon="pause_circle"
-        tone="warn"
-        title={`${name} paused location`}
-        body={
-          member.locationPausedUntil
-            ? `Until ${fmtDateTime(member.locationPausedUntil)}. Location tasks due meanwhile are excused.`
-            : "Until they turn it back on. Location tasks due meanwhile are excused."
-        }
-      />
-    );
-  if (member.locationStatus === "ready")
-    return (
-      <Card icon="check_circle" tone="ok" title={`Location is set up on ${name}'s phone`} body={`Fealty only learns when ${name} arrives at or leaves a place a task names.`} />
-    );
-  const why =
-    member.locationStatus === "foreground_only"
-      ? `${name}'s phone only lets Fealty see location while it's open.`
-      : member.locationStatus === "denied" || member.locationStatus === "services_off"
-        ? `Location is turned off for Fealty on ${name}'s phone.`
-        : `${name} hasn't set up location yet.`;
+  const line = member.locationPaused
+    ? `${name} paused location ${member.locationPausedUntil ? `until ${fmtDateTime(member.locationPausedUntil)}` : "until they turn it back on"}. Location tasks due meanwhile are excused.`
+    : member.locationStatus === "ready"
+      ? null
+      : member.locationStatus === "foreground_only"
+        ? `${name}'s phone only lets Fealty see location while it's open.`
+        : member.locationStatus === "denied" || member.locationStatus === "services_off"
+          ? `Location is turned off for Fealty on ${name}'s phone.`
+          : `${name} hasn't set up location yet. It needs the Fealty Android app, with location allowed all the time.`;
+  if (!line) return null;
   return (
-    <Card icon="location_off" tone="warn" title={why} body="Location tasks need the Fealty Android app, with location allowed all the time.">
-      <div>
-        <AskLocationButton name={name} />
-      </div>
-    </Card>
+    <div className="flex flex-col items-start gap-2">
+      <p className="text-body-large text-on-surface">{line}</p>
+      {!member.locationPaused && <AskLocationButton name={name} />}
+    </div>
   );
 }
 
-/** A link to Places or Curfew at the top of the Location page. */
-const LinkRow = ({ icon, title, body, onClick }: { icon: string; title: string; body: string; onClick(): void }) => (
-  <button type="button" onClick={onClick} className="state-layer flex min-h-14 w-full items-center gap-4 px-4 py-3 text-left">
-    <Icon name={icon} className="text-on-surface-variant" />
-    <span className="min-w-0 flex-1">
-      <span className="block text-body-large text-on-surface">{title}</span>
-      <span className="block text-body-medium text-on-surface-variant">{body}</span>
-    </span>
-    <Icon name="chevron_right" className="text-on-surface-variant" />
-  </button>
-);
-
 const stay = (m: number) => (m >= 60 && m % 60 === 0 ? `${m / 60} hr` : `${m} min`);
+const placeIcon = (name: string) =>
+  /home/i.test(name)
+    ? "home"
+    : /gym|fitness/i.test(name)
+      ? "fitness_center"
+      : /work|office/i.test(name)
+        ? "work"
+        : /school|class/i.test(name)
+          ? "school"
+          : "location_on";
+
+/** "Sun–Thu" with a weekend time, else "Every night". */
+const nights = (weekend: string | null) => (weekend ? "Sun–Thu" : "Every night");
 
 /**
- * Everything location in one place: Places and Curfew, then either your own phone (what's watched today, pausing it)
- * or, for a Dominant who isn't being watched, whether their partners' phones are ready and what's watched for them.
+ * Mockup 22: whether sharing is on, the places on a map, curfew, and the places on hairlines. Pausing sits behind the
+ * pause icon. Below, what's watched today.
  */
 export function LocationPage() {
   const { rel, me, self, isDom, solo, memberName } = useRel();
   const navigate = useNavigate();
   const snack = useSnackbar();
   const pause = usePauseLocation(rel.id);
+  const places = usePlaces(rel.id);
   const placeOf = usePlaceLookup();
   const day = today();
   const occurrences = useOccurrences(rel.id, day, day);
+  const [editing, setEditing] = useState<{ place: Place | null } | null>(null);
   const placeTasks = (occurrences.data ?? []).filter((o) => o.placeId && o.status === "pending");
   const watching = placeTasks.filter((o) => o.assigneeId === me.user.id);
   const others = rel.members.filter((m) => m.userId !== me.user.id);
   const who = others.map((m) => memberName(m.userId)).join(" and ") || "Your partner";
   const ready = self?.locationStatus === "ready";
   const curfew = useCurfew(rel.id);
-  const curfewOn = !!curfew.data?.settings?.enabled;
-  const onCurfew = curfewOn && curfew.data!.settings!.assigneeId === me.user.id;
+  const c = curfew.data?.settings?.enabled ? curfew.data.settings : null;
+  const onCurfew = !!c && c.assigneeId === me.user.id;
   const ended = rel.endedAt !== null;
+  const canEdit = isDom && !ended;
   // A sub (or switch, or someone on their own) carries the phone that checks in; a Dominant only does if a task or curfew names them.
   const watched = !ended && (solo || self?.role !== "dominant" || watching.length > 0 || onCurfew);
   const watchedOthers = others.filter((m) => m.role !== "dominant");
@@ -101,112 +80,132 @@ export function LocationPage() {
     return d.toISOString();
   };
   const setPause = (until: string | null | false, msg: string) => pause.mutate(until, { onSuccess: () => snack(msg), onError: (e) => snack(errorMessage(e)) });
+  const paused = !!self?.locationPaused;
 
-  const list = (items: typeof placeTasks, showWho: boolean) =>
-    items.length === 0 ? (
-      <p className="px-1 text-body-medium text-on-surface-variant">No location tasks left today.</p>
+  const status = !watched
+    ? watchedOthers.length
+      ? `You see arrivals and curfew, never where ${watchedOthers.length === 1 ? watchedOthers[0]!.displayName : "they"} ${watchedOthers.length === 1 ? "is" : "are"}.`
+      : undefined
+    : paused
+      ? `Paused ${self!.locationPausedUntil ? `until ${fmtDateTime(self!.locationPausedUntil)}` : "until you turn it back on"}. Location tasks due meanwhile are excused.`
+      : ready
+        ? `Sharing is on.${solo ? "" : ` ${who} never sees where you are, only arrivals and curfew.`}`
+        : "Not set up on this device. Location tasks check in from the Fealty Android app; here you tap I'm here when you arrive.";
+
+  const pauseTool = watched ? (
+    paused ? (
+      <IconButton icon="play_arrow" label="Turn location back on" onClick={() => setPause(false, "Location is back on")} />
     ) : (
-      <ul className="border border-outline-variant overflow-hidden rounded-lg">
-        {items.map((o) => (
-          <li key={o.id} className="flex items-center gap-4 border-t border-surface-container-highest px-4 py-3 first:border-t-0">
-            <span className="flex size-10 shrink-0 items-center justify-center text-primary">
-              <Icon name="location_on" filled />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-body-large text-on-surface">{placeOf(o.placeId)?.name ?? "A place"}</span>
-              <span className="block text-body-medium text-on-surface-variant">
-                {o.title} · by {fmtTime(o.dueAt)}
-                {o.stayMinutes ? `, stay ${stay(o.stayMinutes)}` : ""}
-                {showWho && ` · ${memberName(o.assigneeId)}`}
-              </span>
-            </span>
-          </li>
-        ))}
-      </ul>
-    );
+      <OverflowMenu
+        icon="pause"
+        label="Pause location"
+        items={[
+          { label: "Pause for an hour", icon: "schedule", onClick: () => setPause(new Date(Date.now() + 3_600_000).toISOString(), "Paused for an hour") },
+          { label: "Pause for the rest of today", icon: "today", onClick: () => setPause(endOfDay(), "Paused for the rest of today") },
+          { label: "Pause until I turn it back on", icon: "pause", onClick: () => setPause(null, "Paused until you turn it back on") },
+        ]}
+      />
+    )
+  ) : undefined;
+
+  const list = places.data ?? [];
+  const today_ = watched ? watching : placeTasks.filter((o) => o.assigneeId !== me.user.id);
 
   return (
     <>
-      <PageHeader title="Location" />
-      <div className="flex flex-col gap-4 px-4 pb-10 md:px-6">
-        <div className="border border-outline-variant overflow-hidden rounded-lg">
-          <LinkRow
-            icon="location_on"
-            title="Places"
-            body={isDom ? "Where location tasks can send someone" : "The places location tasks use"}
-            onClick={() => navigate({ to: "/places" })}
-          />
-          {(isDom || curfewOn) && (
-            <LinkRow
-              icon="bedtime"
-              title="Curfew"
-              body={curfewOn ? describeCurfew(curfew.data!.settings!) : "Off"}
+      <PageHeader title="Location" subtitle={status} tools={pauseTool} />
+      <div className="flex max-w-3xl flex-col gap-10 px-4 pb-16 md:px-6">
+        {!watched && watchedOthers.map((m) => <LocationReadiness key={m.userId} member={m} />)}
+        {watched && paused && onCurfew && <p className="-mt-6 text-body-large text-on-surface-variant">Curfew still counts: tap I'm home on Today instead.</p>}
+
+        {list.length > 0 && <PlacesMap places={list} className="h-64 rounded-lg border border-outline-variant md:h-80" />}
+
+        {(c || canEdit) && (
+          <section>
+            <h2 className="eyebrow">Curfew</h2>
+            <button
+              type="button"
               onClick={() => navigate({ to: "/curfew" })}
-            />
-          )}
-        </div>
-
-        {watched ? (
-          <>
-            <h2 className="px-1 pt-2 eyebrow">Your phone</h2>
-            {ready ? (
-              <Card icon="check_circle" tone="ok" title="On, allowed all the time" body={`${who} sees when you arrive at or leave a place a task names, and nothing else.`} />
-            ) : (
-              <Card
-                icon="location_off"
-                tone="warn"
-                title="Not set up on your phone"
-                body="Location tasks check in on their own from the Fealty Android app, with location allowed all the time. Here you can tap I'm here when you arrive."
-              />
-            )}
-
-            <h2 className="px-1 pt-2 eyebrow">Watching today</h2>
-            {list(watching, false)}
-
-            <div className="border border-outline-variant flex flex-col gap-3 rounded-lg p-4">
-              <div className="text-body-large text-on-surface">Pause</div>
-              {self?.locationPaused ? (
-                <>
-                  <p className="text-body-medium text-on-surface-variant">
-                    Paused {self.locationPausedUntil ? `until ${fmtDateTime(self.locationPausedUntil)}` : "until you turn it back on"}. Location tasks due meanwhile are excused.
-                  </p>
-                  <div>
-                    <Button icon="play_arrow" busy={pause.isPending} onClick={() => setPause(false, "Location is back on")}>
-                      Turn back on
-                    </Button>
-                  </div>
-                </>
+              className="state-layer mt-2 flex w-full items-center gap-4 border-b border-outline-variant py-4 text-left"
+            >
+              {c ? (
+                <span className="min-w-0 flex-1">
+                  <span className="block text-body-large text-on-surface">
+                    {fmtClock(c.time)} until {fmtClock(c.until)}
+                  </span>
+                  <span className="block text-body-medium text-on-surface-variant">
+                    {[
+                      nights(c.weekendTime),
+                      c.weekendTime ? `Fri–Sat ${fmtClock(c.weekendTime)}` : null,
+                      `at ${placeOf(c.placeId)?.name ?? "Home"}`,
+                      others.length > 1 || isDom ? memberName(c.assigneeId) : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                </span>
               ) : (
-                <>
-                  <p className="text-body-medium text-on-surface-variant">
-                    Stops watching every place. Location tasks due while paused are excused{solo ? "" : `, and ${who} is told you paused`}.
-                    {onCurfew && " Curfew still counts: tap I'm home on Today instead."}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Chip onClick={() => setPause(new Date(Date.now() + 3_600_000).toISOString(), "Paused for an hour")}>1 hour</Chip>
-                    <Chip onClick={() => setPause(endOfDay(), "Paused for the rest of today")}>Rest of today</Chip>
-                    <Chip onClick={() => setPause(null, "Paused until you turn it back on")}>Until I turn it back on</Chip>
+                <span className="min-w-0 flex-1 text-body-large text-on-surface-variant">Off</span>
+              )}
+              <Icon name="chevron_right" className="text-on-surface-variant" />
+            </button>
+          </section>
+        )}
+
+        <section>
+          <h2 className="eyebrow">Places</h2>
+          <div className="mt-2 flex flex-col divide-y divide-outline-variant border-b border-outline-variant">
+            {list.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                disabled={!canEdit}
+                onClick={() => setEditing({ place: p })}
+                className="state-layer flex w-full items-center gap-5 py-4 text-left disabled:cursor-default"
+              >
+                <Icon name={placeIcon(p.name)} className="text-on-surface" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-body-large text-on-surface">{p.name}</span>
+                  <span className="block truncate text-body-medium text-on-surface-variant">
+                    {p.taskTitles.length ? `Used by ${p.taskTitles.join(", ")}` : `${fmtRadius(p.radiusM)} around`}
+                  </span>
+                </span>
+              </button>
+            ))}
+            {list.length === 0 && !canEdit && <p className="py-4 text-body-large text-on-surface-variant">No places yet.</p>}
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => setEditing({ place: null })}
+                className="state-layer flex w-full items-center gap-5 py-4 text-left text-primary"
+              >
+                <Icon name="add" />
+                <span className="text-body-large">Add a place</span>
+              </button>
+            )}
+          </div>
+        </section>
+
+        {(watched || watchedOthers.length > 0) && (
+          <section>
+            <h2 className="eyebrow">Watching today</h2>
+            <div className="mt-2 flex flex-col divide-y divide-outline-variant border-b border-outline-variant">
+              {today_.length === 0 && <p className="py-4 text-body-large text-on-surface-variant">No location tasks left today.</p>}
+              {today_.map((o) => (
+                <div key={o.id} className="py-4">
+                  <div className="text-body-large text-on-surface">{placeOf(o.placeId)?.name ?? "A place"}</div>
+                  <div className="text-body-medium text-on-surface-variant">
+                    {o.title} · by {fmtTime(o.dueAt)}
+                    {o.stayMinutes ? `, stay ${stay(o.stayMinutes)}` : ""}
+                    {!watched && watchedOthers.length > 1 && ` · ${memberName(o.assigneeId)}`}
                   </div>
-                </>
-              )}
-            </div>
-          </>
-        ) : (
-          watchedOthers.length > 0 && (
-            <>
-              <h2 className="px-1 pt-2 eyebrow">{watchedOthers.length === 1 ? `${watchedOthers[0]!.displayName}'s phone` : "Their phones"}</h2>
-              {watchedOthers.map((m) => (
-                <LocationReadiness key={m.userId} member={m} />
+                </div>
               ))}
-              <h2 className="px-1 pt-2 eyebrow">Watching today</h2>
-              {list(
-                placeTasks.filter((o) => o.assigneeId !== me.user.id),
-                watchedOthers.length > 1,
-              )}
-            </>
-          )
+            </div>
+          </section>
         )}
       </div>
+      <PlaceDialog place={editing?.place ?? null} open={!!editing} onClose={() => setEditing(null)} />
     </>
   );
 }

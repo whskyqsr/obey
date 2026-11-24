@@ -18,7 +18,6 @@ import {
 import { errorMessage } from "../api/client";
 import type { CalendarEvent, DelayUsed, LibraryChange, RescheduleRequest } from "../api/types";
 import { addDays, fmtDateTime, fmtTime, fromLocalInput, localDateOf, toLocalInput, today } from "../lib/dates";
-import { planTone } from "../lib/planColors";
 import { useRel } from "../lib/relationship";
 import { useNeedsYou } from "../lib/today";
 import { Clash } from "./CurfewStrip";
@@ -41,7 +40,18 @@ const TONE: Record<Tone, string> = {
 
 /** One row of the list: a kind of thing waiting, how many, and what they are once opened. A link row opens a page instead. */
 /** [cards]: for a Dominant, one card per item instead of [body]'s rows (the mockup's sentence cards). */
-type Group = { key: string; icon: string; tone: Tone; title: string; sub: string; count: number; action?: ReactNode; body?: ReactNode; cards?: ReactNode[]; to?: string };
+type Group = {
+  key: string;
+  icon: string;
+  tone: Tone;
+  title: string;
+  sub: string;
+  count: number;
+  action?: ReactNode;
+  body?: ReactNode;
+  cards?: ReactNode[];
+  to?: string;
+};
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const names = (list: string[]) => list.join(", ");
@@ -215,7 +225,11 @@ export function TodayInbox() {
       icon: "favorite",
       tone: "error",
       title: list.length === 1 ? `Check in with ${memberName(list[0]!.check.userId)}` : `${plural(list.length, "check-in")} after a scene`,
-      sub: names(list.map(({ check: c }) => (c.note ? `${memberName(c.userId)} still needs something` : `${memberName(c.userId)} felt ${MOOD_LABELS[c.mood - 1]!.toLowerCase()}`))),
+      sub: names(
+        list.map(({ check: c }) =>
+          c.note ? `${memberName(c.userId)} still needs something` : `${memberName(c.userId)} felt ${MOOD_LABELS[c.mood - 1]!.toLowerCase()}`,
+        ),
+      ),
       count: list.length,
       body: (
         <RowGroup>
@@ -252,7 +266,10 @@ export function TodayInbox() {
       key: "delays",
       icon: "schedule",
       tone: "neutral",
-      title: who.size === 1 ? `${memberName(delayList[0]!.requestedBy)} used ${plural(delayList.length, "delay")}` : plural(delayList.length, "delay used", "delays used"),
+      title:
+        who.size === 1
+          ? `${memberName(delayList[0]!.requestedBy)} used ${plural(delayList.length, "delay")}`
+          : plural(delayList.length, "delay used", "delays used"),
       sub: names(delayList.flatMap((d) => d.items.map((x) => x.title))),
       count: delayList.length,
       action: (
@@ -369,7 +386,10 @@ export function TodayInbox() {
               {g.action && <div className="-mt-1 flex justify-end">{g.action}</div>}
             </Fragment>
           ) : g.body && !g.to ? (
-            <div key={g.key} className="rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-1 [&>*+*]:border-t [&>*+*]:border-outline-variant">
+            <div
+              key={g.key}
+              className="rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-1 [&>*+*]:border-t [&>*+*]:border-outline-variant"
+            >
               {g.body}
               {g.action && <div className="flex justify-end py-3">{g.action}</div>}
             </div>
@@ -414,7 +434,12 @@ function GroupRow({ g, open, onToggle }: { g: Group; open: boolean; onToggle(): 
   return (
     <div>
       <div className="flex min-h-16 items-center">
-        <button type="button" aria-expanded={open} onClick={onToggle} className="state-layer flex min-w-0 flex-1 items-center gap-3 self-stretch py-2 pr-2 text-left">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={onToggle}
+          className="state-layer flex min-w-0 flex-1 items-center gap-3 self-stretch py-2 pr-2 text-left"
+        >
           {head}
           {!open && <span className="rounded-full bg-primary px-2 py-0.5 text-label-medium text-on-primary tabular-nums">{g.count}</span>}
           <Icon name={open ? "expand_less" : "expand_more"} className="text-on-surface-variant" />
@@ -562,7 +587,9 @@ function PendingRequests({ cards }: { cards: RescheduleRequest[][] }) {
   }
   /** "Reschedule instead": the Dom picks the new deadline for this one task, whatever was asked. */
   function openInstead(r: RescheduleRequest) {
-    setInsteadAt(toLocalInput(new Date(new Date(r.kind === "cancel" ? r.fromDueAt : r.toDueAt).getTime() + (r.kind === "cancel" ? 86_400_000 : 0)).toISOString()));
+    setInsteadAt(
+      toLocalInput(new Date(new Date(r.kind === "cancel" ? r.fromDueAt : r.toDueAt).getTime() + (r.kind === "cancel" ? 86_400_000 : 0)).toISOString()),
+    );
     setInstead(r);
   }
   function moveInstead() {
@@ -582,7 +609,7 @@ function PendingRequests({ cards }: { cards: RescheduleRequest[][] }) {
         const single = rows.length === 1;
         const canDecide = isDom && !mine(r);
         return (
-          <div key={r.groupId ?? r.id} className="flex flex-col gap-3 rounded-md bg-tertiary-container p-4 text-on-tertiary-container">
+          <div key={r.groupId ?? r.id} className="flex flex-col gap-3 rounded-md border border-primary bg-surface-container-lowest px-5 py-4 text-on-surface">
             <div>
               <div className="text-title-medium">
                 {single && r.kind === "cancel" ? (
@@ -618,7 +645,7 @@ function PendingRequests({ cards }: { cards: RescheduleRequest[][] }) {
                   ))}
                 </ul>
               )}
-              {r.reason && <div className="mt-2 text-body-medium italic">“{r.reason}”</div>}
+              {r.reason && <div className="mt-2 font-serif text-[19px] leading-6 text-on-surface-variant italic">“{r.reason}”</div>}
             </div>
             {canDecide && (
               <div className="flex flex-wrap gap-2">
@@ -630,7 +657,7 @@ function PendingRequests({ cards }: { cards: RescheduleRequest[][] }) {
                     {r.kind === "cancel" ? "Reschedule instead" : "Other time"}
                   </Button>
                 )}
-                <Button variant="text" className="text-on-tertiary-container" disabled={decide.isPending} onClick={() => act(r, false, rows.length)}>
+                <Button variant="text" disabled={decide.isPending} onClick={() => act(r, false, rows.length)}>
                   Decline
                 </Button>
               </div>
@@ -654,7 +681,8 @@ function PendingRequests({ cards }: { cards: RescheduleRequest[][] }) {
         }
       >
         <p className="mb-3">
-          “{instead?.title}” moves to this deadline{instead?.kind === "cancel" ? " instead of being called off" : ""}. The rest of the request stays for you to decide.
+          “{instead?.title}” moves to this deadline{instead?.kind === "cancel" ? " instead of being called off" : ""}. The rest of the request stays for you to
+          decide.
         </p>
         <TextField type="datetime-local" label="New deadline" value={insteadAt} onChange={(e) => setInsteadAt(e.target.value)} />
       </Dialog>
@@ -667,19 +695,20 @@ function usePlanClashes() {
   const { rel } = useRel();
   const t = today();
   const events = useEvents(rel.id, t, addDays(t, 1));
-  return (events.data ?? []).filter((e) => e.conflictIds.length > 0 && new Date(e.endsAt).getTime() > Date.now() && (eventOn(e, t) || eventOn(e, addDays(t, 1))));
+  return (events.data ?? []).filter(
+    (e) => e.conflictIds.length > 0 && new Date(e.endsAt).getTime() > Date.now() && (eventOn(e, t) || eventOn(e, addDays(t, 1))),
+  );
 }
 
 function PlanClashes({ clashing }: { clashing: CalendarEvent[] }) {
-  const { rel } = useRel();
   const [open, setOpen] = useState<CalendarEvent | null>(null);
   return (
-    <div className="flex flex-col gap-0.5 overflow-hidden rounded-md">
+    <div className="flex flex-col gap-3">
       {clashing.map((e) => (
-        <div key={e.id} className={cx("flex items-center gap-3 px-4 py-3", planTone(e, rel).bg, planTone(e, rel).text)}>
+        <div key={e.id} className="flex items-center gap-3 border-l-2 border-primary py-1 pl-4">
           <div className="min-w-0 flex-1">
-            <div className="truncate text-title-small">{e.title}</div>
-            <div className="text-body-small opacity-80">
+            <div className="truncate text-body-large text-on-surface">{e.title}</div>
+            <div className="text-body-medium text-on-surface-variant">
               {eventWhen(e)} · overlaps {e.conflictIds.length === 1 ? "a task" : `${e.conflictIds.length} tasks`}
             </div>
           </div>

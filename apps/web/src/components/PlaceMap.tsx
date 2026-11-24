@@ -6,7 +6,7 @@ import { useDeletePlace, useSavePlace } from "../api/hooks";
 import { api, errorMessage } from "../api/client";
 import { API_URL } from "../env";
 import { useRel } from "../lib/relationship";
-import { Button, Dialog, Icon, IconButton, Spinner, TextField, cx, useSnackbar } from "./ui";
+import { FormSheet, Icon, Spinner, TextField, cx, useSnackbar } from "./ui";
 
 /** Free OpenStreetMap tiles; no key or billing account needed. */
 const STYLE = "https://tiles.openfreemap.org/styles/liberty";
@@ -180,6 +180,76 @@ export function PlaceMap({
   );
 }
 
+/** Every saved place as a circle with its name, framed to fit them all (mockup 22). It doesn't move. */
+export function PlacesMap({ places, className }: { places: Pick<Place, "id" | "name" | "lat" | "lng" | "radiusM">[]; className?: string }) {
+  const el = useRef<HTMLDivElement>(null);
+  const [drawable] = useState(canDrawMap);
+  const key = places.map((p) => `${p.id}:${p.lat}:${p.lng}:${p.radiusM}:${p.name}`).join("|");
+  useEffect(() => {
+    if (!el.current || !drawable || !places.length) return;
+    let gone = false;
+    let made: maplibregl.Map | null = null;
+    void Promise.all([import("maplibre-gl"), import("maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"), import("maplibre-gl/dist/maplibre-gl.css")]).then(
+      ([lib, { default: workerUrl }]) => {
+        if (gone || !el.current) return;
+        lib.setWorkerUrl(workerUrl);
+        const circles = places.map((p) => circle(p.lng, p.lat, p.radiusM));
+        const bounds = new lib.LngLatBounds();
+        circles.forEach((c) => c.geometry.coordinates[0]!.forEach((pt) => bounds.extend(pt)));
+        const m = new lib.Map({
+          container: el.current,
+          style: STYLE,
+          bounds,
+          fitBoundsOptions: { padding: 48, maxZoom: 16 },
+          interactive: false,
+          attributionControl: false,
+        });
+        m.addControl(new lib.AttributionControl({ compact: true }), "bottom-right");
+        m.on("load", () => {
+          m.addSource("places", { type: "geojson", data: { type: "FeatureCollection", features: circles } });
+          m.addLayer({ id: "places-fill", type: "fill", source: "places", paint: { "fill-color": "#9C4332", "fill-opacity": 0.14 } });
+          m.addLayer({ id: "places-line", type: "line", source: "places", paint: { "line-color": "#9C4332", "line-width": 2 } });
+          m.addSource("labels", {
+            type: "geojson",
+            data: {
+              type: "FeatureCollection",
+              features: places.map((p) => ({
+                type: "Feature" as const,
+                properties: { name: p.name },
+                geometry: { type: "Point" as const, coordinates: [p.lng, p.lat] },
+              })),
+            },
+          });
+          m.addLayer({
+            id: "places-label",
+            type: "symbol",
+            source: "labels",
+            layout: { "text-field": ["get", "name"], "text-font": ["Noto Sans Regular"], "text-size": 13 },
+            paint: { "text-color": "#1F1A17", "text-halo-color": "#FFFFFF", "text-halo-width": 1.5 },
+          });
+        });
+        made = m;
+      },
+    );
+    return () => {
+      gone = true;
+      try {
+        made?.remove();
+      } catch {
+        // Going away regardless.
+      }
+    };
+    // Redrawn when the places change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, drawable]);
+  if (!drawable || !places.length) return null;
+  return (
+    <div className={cx("relative overflow-hidden bg-surface-container-highest", className)}>
+      <div ref={el} style={{ position: "absolute", inset: 0 }} />
+    </div>
+  );
+}
+
 /** The satellite tile link the server hands out; null tiles when it has no imagery key. */
 type Imagery = { tiles: string; attribution: string };
 
@@ -221,7 +291,7 @@ function useAddressSearch(q: string, near: { lat: number; lng: number }, chosen:
   return { found, state };
 }
 
-const fmtRadius = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(m % 1000 ? 1 : 0)} km` : `${m} m`);
+export const fmtRadius = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(m % 1000 ? 1 : 0)} km` : `${m} m`);
 
 /** Add or change a place: search or drag the map, name it, and set how close counts. */
 export function PlaceDialog({ place, open, onClose, onSaved }: { place: Place | null; open: boolean; onClose(): void; onSaved?(p: Place): void }) {
@@ -277,36 +347,15 @@ export function PlaceDialog({ place, open, onClose, onSaved }: { place: Place | 
       },
     );
 
+  if (!open) return null;
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      title={place ? "Edit place" : "New place"}
-      actions={
-        <>
-          {place && (
-            <Button
-              variant="text"
-              className="mr-auto text-error"
-              busy={remove.isPending}
-              onClick={() => remove.mutate(place.id, { onSuccess: () => (snack("Place deleted"), onClose()), onError: (e) => snack(errorMessage(e)) })}
-            >
-              Delete
-            </Button>
-          )}
-          <Button variant="text" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={submit} disabled={!valid} busy={save.isPending}>
-            Save
-          </Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-4">
-        <div className="relative">
-          <TextField
-            label="Search an address or business"
+    <FormSheet title={place ? "Edit place" : "New place"} onClose={onClose} onSave={submit} saving={save.isPending} canSave={valid}>
+      <div className="relative">
+        <label className="flex items-center gap-3 border-b border-outline-variant py-3 focus-within:border-on-surface">
+          <Icon name="search" className="text-on-surface-variant" />
+          <input
+            aria-label="Search an address or business"
+            placeholder="Search an address or business"
             // Our own suggestions only: the browser's saved addresses would cover them.
             name="fealty-place-search"
             autoComplete="off"
@@ -315,93 +364,109 @@ export function PlaceDialog({ place, open, onClose, onSaved }: { place: Place | 
             aria-expanded={found.length > 0}
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            // Enter takes the top match, so it doesn't submit the dialog or look like nothing happened.
+            // Enter takes the top match, so it doesn't submit the form or look like nothing happened.
             onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), found[0] && pick(found[0]))}
-            help={
-              searching === "searching"
-                ? "Searching…"
-                : searching === "done" && !found.length
-                  ? "No matches. Try just the street and city."
-                  : !place && chosen && q === chosen
-                    ? "Search can be a few houses off. Drag the map until the pin is on the building."
-                    : undefined
-            }
-            error={searching === "failed" ? "Search isn't working right now. Drag the map to the spot instead." : undefined}
+            className="min-w-0 flex-1 bg-transparent text-body-large text-on-surface outline-none placeholder:text-on-surface-variant"
           />
-          {searching === "searching" && (
-            <span className="pointer-events-none absolute top-4 right-3 text-on-surface-variant">
-              <Spinner size={24} />
-            </span>
-          )}
-          {found.length > 0 && (
-            <ul className="absolute inset-x-0 top-full z-20 mt-1 overflow-hidden rounded-sm bg-surface-container shadow-elev-2">
-              {found.map((f, i) => (
-                <li key={i}>
-                  <button type="button" className="state-layer flex w-full items-start gap-3 px-4 py-2 text-left" onClick={() => pick(f)}>
-                    <Icon name="location_on" className="mt-0.5 text-on-surface-variant" />
-                    <span className="min-w-0">
-                      <span className="block truncate text-body-large text-on-surface">{f.name}</span>
-                      <span className="block truncate text-body-medium text-on-surface-variant">{f.address}</span>
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+          {searching === "searching" && <Spinner size={20} />}
+        </label>
+        {(searching === "done" && !found.length) || searching === "failed" ? (
+          <p className={cx("mt-1 text-body-medium", searching === "failed" ? "text-error" : "text-on-surface-variant")}>
+            {searching === "failed" ? "Search isn't working right now. Drag the map to the spot instead." : "No matches. Try just the street and city."}
+          </p>
+        ) : null}
+        {found.length > 0 && (
+          <ul className="absolute inset-x-0 top-full z-20 mt-1 overflow-hidden rounded-md border border-outline-variant bg-surface-container-lowest">
+            {found.map((f, i) => (
+              <li key={i} className="border-t border-outline-variant first:border-t-0">
+                <button type="button" className="state-layer flex w-full flex-col px-4 py-2.5 text-left" onClick={() => pick(f)}>
+                  <span className="truncate text-body-large text-on-surface">{f.name}</span>
+                  <span className="truncate text-body-medium text-on-surface-variant">{f.address}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div>
         <div className="relative">
-          <PlaceMap lat={draft.lat} lng={draft.lng} radiusM={draft.radiusM} onMove={(c) => set(c)} imagery={imagery} satellite={satellite} className="h-72 rounded-md md:h-80" />
+          <PlaceMap
+            lat={draft.lat}
+            lng={draft.lng}
+            radiusM={draft.radiusM}
+            onMove={(c) => set(c)}
+            imagery={imagery}
+            satellite={satellite}
+            className="h-72 rounded-md border border-outline-variant md:h-80"
+          />
           {imagery && (
-            <IconButton
-              icon={satellite ? "map" : "satellite_alt"}
-              label={satellite ? "Map view" : "Satellite view"}
-              variant="tonal"
-              className="absolute top-3 left-3"
-              onClick={() => setSatellite((v) => !v)}
-            />
+            <div className="absolute top-3 right-3 flex rounded-full border border-outline-variant bg-surface-container-lowest p-1">
+              {[false, true].map((on) => (
+                <button
+                  key={String(on)}
+                  type="button"
+                  aria-pressed={satellite === on}
+                  onClick={() => setSatellite(on)}
+                  className={cx("h-8 rounded-full px-4 text-label-large", satellite === on ? "bg-on-surface text-surface" : "text-on-surface-variant")}
+                >
+                  {on ? "Satellite" : "Map"}
+                </button>
+              ))}
+            </div>
           )}
           {/* Esri's terms want its credit always visible while the photos are showing, not behind the map's info button. */}
           {imagery && satellite && (
-            <span className="pointer-events-none absolute top-3 right-12 left-16 text-right">
+            <span className="pointer-events-none absolute right-3 bottom-3 left-3 text-right">
               <span className="rounded-xs bg-inverse-surface/70 px-1.5 py-0.5 text-label-small text-inverse-on-surface">{imagery.attribution}</span>
             </span>
           )}
-          <span className="pointer-events-none absolute bottom-3 left-3 rounded-xs bg-inverse-surface px-2.5 py-1 text-body-small text-inverse-on-surface">
-            Drag the map to move the pin
-          </span>
-          <IconButton
-            icon="my_location"
-            label="Use my location"
-            variant="tonal"
-            className="absolute right-3 bottom-3"
+        </div>
+        <p className="mt-2 text-body-large text-on-surface-variant">
+          {!place && chosen && q === chosen
+            ? "Search can be a few houses off. Drag the map until the pin is on the building."
+            : "Drag the map to move the pin."}{" "}
+          <button
+            type="button"
+            className="text-primary"
             onClick={() =>
               navigator.geolocation?.getCurrentPosition(
-                (pos) => set({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                (pos) => (setLocated(true), set({ lat: pos.coords.latitude, lng: pos.coords.longitude })),
                 () => snack("Allow location in your browser to use this"),
               )
             }
-          />
-        </div>
-        {!place && !located && <p className="-mt-2 px-1 text-body-small text-on-surface-variant">Search, or drag the map to the spot.</p>}
-        <TextField label="Name" value={draft.name} maxLength={40} onChange={(e) => set({ name: e.target.value })} placeholder="Gym, Home, Work" />
-        <div>
-          <div className="flex items-center justify-between px-1">
-            <span className="text-body-large text-on-surface">Radius</span>
-            <span className="text-body-medium text-on-surface-variant">{fmtRadius(draft.radiusM)}</span>
-          </div>
-          <input
-            type="range"
-            aria-label="Radius"
-            min={MIN_RADIUS}
-            max={MAX_RADIUS}
-            step={50}
-            value={draft.radiusM}
-            onChange={(e) => set({ radiusM: Number(e.target.value) })}
-            className="my-3 w-full accent-primary"
-          />
-          <p className="px-1 text-body-small text-on-surface-variant">Arriving anywhere inside the circle counts. At least 100 m, since phones can't tell much closer than that.</p>
-        </div>
+          >
+            Use my location
+          </button>
+        </p>
+        {!place && !located && !chosen && <p className="text-body-medium text-on-surface-variant">Or search for the address above.</p>}
       </div>
-    </Dialog>
+      <TextField label="Name" value={draft.name} maxLength={40} onChange={(e) => set({ name: e.target.value })} placeholder="Gym, Home, Work" />
+      <div>
+        <div className="text-body-medium text-on-surface-variant">Radius · {fmtRadius(draft.radiusM)}</div>
+        <input
+          type="range"
+          aria-label="Radius"
+          min={MIN_RADIUS}
+          max={MAX_RADIUS}
+          step={50}
+          value={draft.radiusM}
+          onChange={(e) => set({ radiusM: Number(e.target.value) })}
+          className="my-3 w-full accent-on-surface"
+        />
+        <p className="text-body-medium text-on-surface-variant">
+          Arriving anywhere inside the circle counts. At least 100 m, since phones can't tell much closer.
+        </p>
+      </div>
+      {place && (
+        <button
+          type="button"
+          disabled={remove.isPending}
+          className="self-start text-body-large text-error disabled:opacity-40"
+          onClick={() => remove.mutate(place.id, { onSuccess: () => (snack("Place deleted"), onClose()), onError: (e) => snack(errorMessage(e)) })}
+        >
+          Delete this place
+        </button>
+      )}
+    </FormSheet>
   );
 }

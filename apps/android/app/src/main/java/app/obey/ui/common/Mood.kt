@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SentimentDissatisfied
 import androidx.compose.material.icons.filled.SentimentNeutral
@@ -28,13 +29,8 @@ import androidx.compose.material.icons.outlined.SentimentNeutral
 import androidx.compose.material.icons.outlined.SentimentSatisfied
 import androidx.compose.material.icons.outlined.SentimentVeryDissatisfied
 import androidx.compose.material.icons.outlined.SentimentVerySatisfied
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -87,24 +83,26 @@ private val MOOD_FILLED = listOf(
 fun moodIcon(mood: Int, filled: Boolean = false): ImageVector = (if (filled) MOOD_FILLED else MOOD_OUTLINED)[(mood - 1).coerceIn(0, 4)]
 fun moodLabel(mood: Int): String = MOOD_LABELS[(mood - 1).coerceIn(0, 4)]
 
-/** Five faces to pick how you feel. */
+/** How you feel, 1 (awful) to 5 (great), as five word pills; the chosen one has the ink border. */
 @Composable
 fun MoodPicker(value: Int?, onChange: (Int) -> Unit, modifier: Modifier = Modifier) {
-    val colors = MaterialTheme.colorScheme
-    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    val c = MaterialTheme.colorScheme
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         (1..5).forEach { m ->
             val on = value == m
-            Column(
-                Modifier
+            Text(
+                moodLabel(m),
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (on) c.onSurface else c.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                maxLines = 1,
+                modifier = Modifier
                     .weight(1f)
-                    .background(if (on) colors.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent, MaterialTheme.shapes.medium)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .border(1.dp, if (on) c.onSurface else c.outlineVariant, androidx.compose.foundation.shape.CircleShape)
                     .clickable(role = SemanticsRole.RadioButton) { onChange(m) }
-                    .padding(vertical = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Icon(moodIcon(m, on), null, Modifier.size(28.dp), tint = if (on) colors.onSecondaryContainer else colors.onSurfaceVariant)
-                Text(moodLabel(m), style = MaterialTheme.typography.labelMedium, color = if (on) colors.onSecondaryContainer else colors.onSurfaceVariant)
-            }
+                    .padding(vertical = 9.dp),
+            )
         }
     }
 }
@@ -129,59 +127,57 @@ private val RANGES = listOf(7 to "Week", 30 to "Month", 90 to "3 months", 365 to
 
 /**
  * Mood over time for one person: check-ins and journal moods as a line with a point per answer. Hidden, header
- * included, until there's something to show.
+ * included, until there's something to show. With [days] and [person] (as on Stats) the screen's own range and
+ * person apply and the card shows no controls.
  */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-fun MoodCard(modifier: Modifier = Modifier, header: (@Composable () -> Unit)? = null, vm: MoodViewModel = hiltViewModel(key = "moods")) {
-    LaunchedEffect(Unit) { vm.load() }
+fun MoodCard(
+    modifier: Modifier = Modifier,
+    header: (@Composable () -> Unit)? = null,
+    days: Int? = null,
+    person: String? = null,
+    vm: MoodViewModel = hiltViewModel(key = "moods"),
+) {
+    LaunchedEffect(days) { if (days != null) vm.load(days) else vm.load() }
     val all by vm.entries.collectAsStateWithLifecycle()
-    val days by vm.days.collectAsStateWithLifecycle()
+    val shownDays by vm.days.collectAsStateWithLifecycle()
     val session = vm.session ?: return
     val data = all ?: return
-    if (data.isEmpty() && days == 30) return
+    if (data.isEmpty() && shownDays == 30) return
     val people = data.map { it.userId }.distinct()
     var picked by remember { mutableStateOf<String?>(null) }
     val sub = session.relationship?.members?.firstOrNull { it.role == Role.Submissive }?.userId
-    val who = picked?.takeIf { it in people } ?: sub?.takeIf { it in people } ?: people.firstOrNull() ?: session.userId
+    val who = person ?: picked?.takeIf { it in people } ?: sub?.takeIf { it in people } ?: people.firstOrNull() ?: session.userId
     val entries = data.filter { it.userId == who }
+    if (days != null && entries.isEmpty()) return
     val avg = entries.takeIf { it.isNotEmpty() }?.map { it.mood }?.average()
     val colors = MaterialTheme.colorScheme
 
-    header?.invoke()
-    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, colors.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        header?.invoke()
+        if (days == null) {
             if (people.size > 1) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    people.forEach { id ->
-                        FilterChip(selected = id == who, onClick = { picked = id }, label = { Text(if (id == session.userId) "You" else session.nameOf(id)) })
-                    }
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    people.forEach { id -> LettersChip(if (id == session.userId) "You" else session.nameOf(id), id == who, { picked = id }) }
                 }
             }
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                RANGES.forEachIndexed { i, (d, label) ->
-                    SegmentedButton(selected = d == days, onClick = { vm.load(d) }, shape = SegmentedButtonDefaults.itemShape(i, RANGES.size)) { Text(label) }
-                }
+            PillToggle(RANGES.map { it.second }, RANGES.indexOfFirst { it.first == shownDays }.coerceAtLeast(0)) { vm.load(RANGES[it].first) }
+        }
+        if (avg != null) {
+            val rounded = Math.round(avg).toInt()
+            Column {
+                Text("${moodLabel(rounded)} on average", style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    "%.1f out of 5 from %d %s".format(avg, entries.size, if (entries.size == 1) "answer" else "answers") +
+                        if (who != session.userId) " by ${session.nameOf(who)}" else "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceVariant,
+                )
             }
-            if (avg != null) {
-                val rounded = Math.round(avg).toInt()
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(moodIcon(rounded), null, Modifier.size(36.dp), tint = colors.primary)
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text("${moodLabel(rounded)} on average", style = MaterialTheme.typography.titleLarge)
-                        Text(
-                            "%.1f out of 5 from %d %s".format(avg, entries.size, if (entries.size == 1) "answer" else "answers") +
-                                if (who != session.userId) " by ${session.nameOf(who)}" else "",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.onSurfaceVariant,
-                        )
-                    }
-                }
-                MoodChart(entries, days)
-            } else {
-                Text("No moods in this stretch.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-            }
+            MoodChart(entries, shownDays)
+        } else {
+            Text("No moods in this stretch.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
         }
     }
 }
@@ -197,8 +193,8 @@ private fun MoodChart(entries: List<MoodEntry>, days: Int) {
     val times = entries.map { Instant.parse(it.at).toEpochMilli() }
     Column {
         Row {
-            Column(Modifier.height(chartH + 0.dp), verticalArrangement = Arrangement.SpaceBetween) {
-                (5 downTo 1).forEach { Icon(moodIcon(it), null, Modifier.size(24.dp), tint = colors.onSurfaceVariant) }
+            Column(Modifier.height(chartH).width(44.dp).padding(vertical = 4.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                (5 downTo 1).forEach { Text(moodLabel(it), style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant) }
             }
             Spacer(Modifier.width(6.dp))
             var widthPx by remember { mutableStateOf(1f) }
@@ -226,21 +222,21 @@ private fun MoodChart(entries: List<MoodEntry>, days: Int) {
                 val pts = entries.mapIndexed { i, e -> Offset(xOf(times[i], size.width), y(e.mood)) }
                 if (pts.size > 1) {
                     val path = Path().apply { pts.forEachIndexed { i, p -> if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) } }
-                    drawPath(path, colors.primary, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+                    drawPath(path, colors.onSurface, style = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
                 }
                 pts.forEachIndexed { i, p ->
                     val r = (if (i == selected) 6f else 4.5f).dp.toPx()
                     if (entries[i].source == "checkin") {
-                        drawCircle(colors.surfaceContainerLow, r + 2.dp.toPx(), p)
-                        drawCircle(colors.primary, r, p)
+                        drawCircle(colors.surface, r + 2.dp.toPx(), p)
+                        drawCircle(colors.onSurface, r, p)
                     } else {
-                        drawCircle(colors.surfaceContainerLow, r, p)
-                        drawCircle(colors.primary, r, p, style = Stroke(2.dp.toPx()))
+                        drawCircle(colors.surface, r, p)
+                        drawCircle(colors.onSurface, r, p, style = Stroke(1.5.dp.toPx()))
                     }
                 }
             }
         }
-        Row(Modifier.fillMaxWidth().padding(start = 30.dp, top = 4.dp)) {
+        Row(Modifier.fillMaxWidth().padding(start = 50.dp, top = 4.dp)) {
             val fmt = DateTimeFormatter.ofPattern("MMM d")
             val zone = ZoneId.systemDefault()
             Text(Instant.ofEpochMilli(start).atZone(zone).format(fmt), style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant, modifier = Modifier.weight(1f))
@@ -250,33 +246,28 @@ private fun MoodChart(entries: List<MoodEntry>, days: Int) {
         if (entries.any { it.source == "journal" } && entries.any { it.source == "checkin" }) {
             Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(10.dp).background(colors.primary, CircleShape))
+                    Box(Modifier.size(10.dp).background(colors.onSurface, CircleShape))
                     Text("  Check-in", style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(10.dp).border(2.dp, colors.primary, CircleShape))
+                    Box(Modifier.size(10.dp).border(1.5.dp, colors.onSurface, CircleShape))
                     Text("  Journal", style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
                 }
             }
         }
         val s = selected?.let { entries[it] }
-        Surface(color = if (s != null) colors.inverseSurface else colors.surfaceContainer, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
+            androidx.compose.material3.HorizontalDivider(color = colors.outlineVariant)
             if (s == null) {
-                Text("Tap the chart to see an answer", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, modifier = Modifier.padding(12.dp))
+                Text("Tap the chart to see an answer", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
             } else {
-                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(moodIcon(s.mood, true), null, tint = colors.inverseOnSurface)
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            "${moodLabel(s.mood)} · ${s.title.ifBlank { if (s.source == "journal") "Journal entry" else "Check-in" }}",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = colors.inverseOnSurface,
-                        )
-                        s.note?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = colors.inverseOnSurface, maxLines = 2) }
-                        Text(formatDateTime(s.at), style = MaterialTheme.typography.bodySmall, color = colors.inverseOnSurface.copy(alpha = 0.8f))
-                    }
-                }
+                Text(
+                    "${moodLabel(s.mood)} · ${s.title.ifBlank { if (s.source == "journal") "Journal entry" else "Check-in" }}",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+                s.note?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 2) }
+                Text(formatDateTime(s.at), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
             }
         }
     }

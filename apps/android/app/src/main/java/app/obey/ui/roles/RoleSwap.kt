@@ -21,7 +21,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import app.obey.ui.common.ChoiceChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -193,7 +193,7 @@ fun EndSwapDialog(session: Session, swap: RoleSwap, onDismiss: () -> Unit, vm: R
     if (messages) SwapMessages(vm)
     val other = session.nameOf(if (swap.requestedBy == session.userId) swap.partnerId else swap.requestedBy)
     val text = if (swap.active) {
-        val back = if (session.myRole == Role.Submissive) "You go back to being the Dominant and $other the Submissive." else "$other goes back to being the Dominant and you the Submissive."
+        val back = if (session.myRole == Role.Submissive) "You go back to being the Dominant and $other the submissive." else "$other goes back to being the Dominant and you the submissive."
         "$back${if (swap.pauseTasks) " Paused tasks pick up again." else ""} $other gets a notification."
     } else {
         "$other won't be asked any more."
@@ -214,9 +214,9 @@ fun EndSwapDialog(session: Session, swap: RoleSwap, onDismiss: () -> Unit, vm: R
 @Composable
 private fun Becomes(m: Member, label: String) {
     val c = MaterialTheme.colorScheme
-    Surface(color = c.surfaceContainerHighest, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Surface(color = c.primaryContainer, contentColor = c.onPrimaryContainer, shape = CircleShape, modifier = Modifier.size(40.dp)) {
+            Surface(color = androidx.compose.ui.graphics.Color.Transparent, contentColor = c.onSurface, border = androidx.compose.foundation.BorderStroke(1.dp, c.outline), shape = CircleShape, modifier = Modifier.size(40.dp)) {
                 Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { Text(m.displayName.take(1).uppercase()) }
             }
             Spacer(Modifier.width(12.dp))
@@ -262,8 +262,8 @@ fun SwapSheet(session: Session, onDismiss: () -> Unit, vm: RoleSwapViewModel = h
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("For how long", style = MaterialTheme.typography.titleSmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = timed, onClick = { timed = true }, label = { Text("Until a set time") })
-                    FilterChip(selected = !timed, onClick = { timed = false }, label = { Text("Until we swap back") })
+                    ChoiceChip(selected = timed, onClick = { timed = true }, label = { Text("Until a set time") })
+                    ChoiceChip(selected = !timed, onClick = { timed = false }, label = { Text("Until we swap back") })
                 }
             }
             if (timed) {

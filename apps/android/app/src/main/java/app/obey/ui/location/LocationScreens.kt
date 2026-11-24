@@ -7,7 +7,20 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.FitnessCenter
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.Work
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.draw.clip
+import app.obey.ui.common.Eyebrow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,7 +52,7 @@ import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
+import app.obey.ui.common.TonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -81,92 +94,74 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 
-@Composable
-private fun StatusCard(icon: ImageVector, ok: Boolean, title: String, body: String, content: @Composable () -> Unit = {}) {
-    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(icon, null, tint = if (ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                Column(Modifier.weight(1f)) {
-                    Text(title, style = MaterialTheme.typography.bodyLarge)
-                    Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            content()
-        }
-    }
-}
-
-/** For a Dominant: whether this person's phone can check location tasks, with a nudge to set it up if not. */
+/** For a Dominant: whether this person's phone can check location tasks, with a nudge to set it up if not. Nothing once it's ready. */
 @Composable
 fun LocationReadiness(member: Member, onAsk: () -> Unit) {
     val name = member.displayName
-    when {
-        member.locationPaused -> StatusCard(
-            Icons.Outlined.PauseCircle, false, "$name paused location",
-            (member.locationPausedUntil?.let { "Until ${formatDateTime(it)}." } ?: "Until they turn it back on.") + " Location tasks due meanwhile are excused.",
-        )
-        member.locationStatus == LocationStatus.Ready -> StatusCard(
-            Icons.Outlined.CheckCircle, true, "Location is set up on $name's phone",
-            "Fealty only learns when $name arrives at or leaves a place a task names.",
-        )
-        else -> StatusCard(
-            Icons.Outlined.LocationOff, false,
-            when (member.locationStatus) {
-                LocationStatus.ForegroundOnly -> "$name's phone only lets Fealty see location while it's open."
-                LocationStatus.Denied, LocationStatus.ServicesOff -> "Location is turned off for Fealty on $name's phone."
-                else -> "$name hasn't set up location yet."
-            },
-            "Location tasks need the Fealty Android app, with location allowed all the time.",
-        ) {
-            FilledTonalButton(onClick = onAsk) {
-                Icon(Icons.AutoMirrored.Outlined.Send, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Ask $name to set it up")
-            }
-        }
+    val line = when {
+        member.locationPaused -> "$name paused location " +
+            (member.locationPausedUntil?.let { "until ${formatDateTime(it)}" } ?: "until they turn it back on") + ". Location tasks due meanwhile are excused."
+        member.locationStatus == LocationStatus.Ready -> return
+        member.locationStatus == LocationStatus.ForegroundOnly -> "$name's phone only lets Fealty see location while it's open."
+        member.locationStatus == LocationStatus.Denied || member.locationStatus == LocationStatus.ServicesOff -> "Location is turned off for Fealty on $name's phone."
+        else -> "$name hasn't set up location yet. It needs the Fealty Android app, with location allowed all the time."
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(line, style = MaterialTheme.typography.bodyLarge)
+        if (!member.locationPaused) OutlinedButton(onClick = onAsk, shape = MaterialTheme.shapes.small) { Text("Ask $name to set it up") }
     }
 }
 
 /** On Today, for someone with location tasks whose phone can't notice them arriving. */
 @Composable
 fun LocationSetupPrompt(onOpen: () -> Unit) {
-    OutlinedCard(Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth()) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.LocationOff, null, tint = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Set up location", style = MaterialTheme.typography.titleMedium)
-                Text("So your location tasks check in on their own when you get there.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Spacer(Modifier.width(8.dp))
-            FilledTonalButton(onClick = onOpen) { Text("Set up") }
+    val c = MaterialTheme.colorScheme
+    Row(
+        Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth().clip(MaterialTheme.shapes.medium).background(c.surfaceContainerLowest)
+            .border(1.dp, c.outlineVariant, MaterialTheme.shapes.medium).clickable(onClick = onOpen).padding(20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Outlined.LocationOn, null, tint = c.onSurface)
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text("Set up location", style = MaterialTheme.typography.bodyLarge)
+            Text("So your location tasks check in on their own when you get there.", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
+        }
+        Spacer(Modifier.width(8.dp))
+        Text("Set up", style = MaterialTheme.typography.labelLarge, color = c.primary)
+    }
+}
+
+/** One setup step on a hairline: done, or the button that does it. */
+@Composable
+private fun Step(done: Boolean, title: String, body: String, action: String?, onAction: () -> Unit) {
+    val c = MaterialTheme.colorScheme
+    Row(Modifier.fillMaxWidth().padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = if (done) c.onSurfaceVariant else c.onSurface)
+            Text(if (done) "Done" else body, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
+        }
+        if (!done && action != null) {
+            Spacer(Modifier.width(12.dp))
+            OutlinedButton(onClick = onAction, shape = MaterialTheme.shapes.small) { Text(action) }
         }
     }
 }
 
-/** One setup step: a ticked circle once done, else the button that does it. */
-@Composable
-private fun Step(done: Boolean, title: String, body: String, action: String?, onAction: () -> Unit) {
-    ListItem(
-        colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-        leadingContent = {
-            Icon(
-                if (done) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
-                if (done) "Done" else "To do",
-                tint = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-            )
-        },
-        headlineContent = { Text(title) },
-        supportingContent = { Text(body) },
-        trailingContent = if (!done && action != null) ({ FilledTonalButton(onClick = onAction) { Text(action) } }) else null,
-    )
+private fun placeIcon(name: String): ImageVector = when {
+    Regex("home", RegexOption.IGNORE_CASE).containsMatchIn(name) -> Icons.Outlined.Home
+    Regex("gym|fitness", RegexOption.IGNORE_CASE).containsMatchIn(name) -> Icons.Outlined.FitnessCenter
+    Regex("work|office", RegexOption.IGNORE_CASE).containsMatchIn(name) -> Icons.Outlined.Work
+    else -> Icons.Outlined.LocationOn
 }
 
-/** For the person being watched: setting it up, what's watched today, and pausing. */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+/**
+ * Mockup 22: whether sharing is on, the places on a map, curfew, and the places on hairlines. Pausing sits behind the
+ * pause icon. Below, setting up this phone and what's watched today.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LocationScreen(onPlaces: () -> Unit, onCurfew: () -> Unit, vm: LocationViewModel = hiltViewModel()) {
+fun LocationScreen(onCurfew: () -> Unit, vm: LocationViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val setup by vm.setup.collectAsStateWithLifecycle()
     val watching by vm.watching.collectAsStateWithLifecycle()
@@ -192,227 +187,198 @@ fun LocationScreen(onPlaces: () -> Unit, onCurfew: () -> Unit, vm: LocationViewM
     val me = session?.myMember
     val who = session?.partners?.joinToString(" and ") { it.displayName }?.ifEmpty { null } ?: "Your partner"
     val solo = session?.solo == true
-    val canManage = session?.canManage == true
-    val curfewOn = curfew?.enabled == true
+    val canEdit = session?.canManage == true
+    val c = MaterialTheme.colorScheme
+    val on = curfew?.takeIf { it.enabled }
     // A sub (or switch, or someone on their own) carries the phone that checks in; a Dominant only does if a task or curfew names them.
     val watched = session?.readOnly != true && (solo || me?.role != Role.Dominant || watching.isNotEmpty() || underCurfew)
     val watchedOthers = session?.partners.orEmpty().filter { it.role != Role.Dominant }
     val placeName = { o: app.obey.api.Occurrence -> places?.firstOrNull { it.id == o.placeId }?.name ?: "A place" }
+    val paused = me?.locationPaused == true
+    var pauseMenu by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<Pair<Boolean, Place?>?>(null) }
+    val status = when {
+        !watched -> if (watchedOthers.isEmpty()) null else if (watchedOthers.size == 1) "You see arrivals and curfew, never where ${watchedOthers[0].displayName} is." else "You see arrivals and curfew, never where they are."
+        paused -> "Paused " + (me?.locationPausedUntil?.let { "until ${formatDateTime(it)}" } ?: "until you turn it back on") + ". Location tasks due meanwhile are excused." +
+            if (underCurfew) " Curfew still counts: tap I'm home on Today instead." else ""
+        setup.ready -> "Sharing is on." + if (solo) "" else " $who never sees where you are, only arrivals and curfew."
+        else -> "Not set up yet. Fealty watches only the places your tasks name, including while it's closed, and sends only when you arrive or leave."
+    }
 
     Scaffold(
         topBar = {
             LargeTopAppBar(
                 title = { Text("Location") },
                 navigationIcon = { app.obey.ui.common.MenuButton() },
-                actions = { app.obey.ui.common.SafeWordAction() },
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbar) },
-    ) { padding ->
-        Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-            Column(
-                Modifier.widthIn(max = 640.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium) {
-                    Column {
-                        ListItem(
-                            modifier = Modifier.clickable(onClick = onPlaces),
-                            colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-                            leadingContent = { Icon(Icons.Outlined.LocationOn, null) },
-                            headlineContent = { Text("Places") },
-                            supportingContent = { Text(if (canManage) "Where location tasks can send someone" else "The places location tasks use") },
-                            trailingContent = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
-                        )
-                        if (canManage || curfewOn) {
-                            ListItem(
-                                modifier = Modifier.clickable(onClick = onCurfew),
-                                colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-                                leadingContent = { Icon(Icons.Outlined.Bedtime, null) },
-                                headlineContent = { Text("Curfew") },
-                                supportingContent = { Text(curfew?.takeIf { it.enabled }?.let { describeCurfew(it) } ?: "Off") },
-                                trailingContent = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
-                            )
-                        }
-                    }
-                }
-
-                if (!watched) {
-                    if (watchedOthers.isNotEmpty()) {
-                        SectionHeader(if (watchedOthers.size == 1) "${watchedOthers[0].displayName}'s phone" else "Their phones", horizontalPadding = 4.dp)
-                        watchedOthers.forEach { m -> LocationReadiness(m) { vm.ask(m.displayName) } }
-                        SectionHeader("Watching today", horizontalPadding = 4.dp)
-                        WatchList(othersWatching, placeName) { o -> if (watchedOthers.size > 1) session?.relationship?.members?.firstOrNull { it.userId == o.assigneeId }?.displayName else null }
-                    }
-                    Spacer(Modifier.height(24.dp))
-                    return@Column
-                }
-
-                SectionHeader("Your phone", horizontalPadding = 4.dp)
-                if (setup.ready) {
-                    StatusCard(Icons.Outlined.CheckCircle, true, "On, allowed all the time", "$who sees when you arrive at or leave a place a task names, and nothing else.")
-                } else {
-                    // Google asks apps to say plainly why they want location in the background before asking for it.
-                    StatusCard(
-                        Icons.Outlined.LocationOff, false, "Set up location",
-                        "Location tasks check in on their own when you get there. Fealty watches only the places your tasks name, " +
-                            "including while it's closed, and sends only when you arrive or leave. Never where you are otherwise.",
-                    )
-                    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium) {
-                        Column {
-                            Step(
-                                setup.precise,
-                                "Allow precise location",
-                                if (setup.any && !setup.precise) "Approximate isn't enough to tell you're at the gym. Turn on Precise in Fealty's permissions." else "So Fealty can tell when you're at a place.",
-                                if (setup.any) "Settings" else "Allow",
-                            ) {
-                                vm.markAsked()
-                                if (setup.any) openAppSettings() else foreground.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-                            }
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                Step(
-                                    setup.background,
-                                    "Allow all the time",
-                                    "So arriving counts while Fealty is closed. Pick \"Allow all the time\" on the next screen.",
-                                    if (setup.precise) "Allow" else null,
-                                ) {
-                                    vm.markAsked()
-                                    background.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                actions = {
+                    if (watched) {
+                        if (paused) {
+                            IconButton(onClick = vm::resume, enabled = !busy) { Icon(Icons.Outlined.PlayArrow, "Turn location back on") }
+                        } else {
+                            Box {
+                                IconButton(onClick = { pauseMenu = true }) { Icon(Icons.Outlined.Pause, "Pause location") }
+                                DropdownMenu(expanded = pauseMenu, onDismissRequest = { pauseMenu = false }) {
+                                    DropdownMenuItem(text = { Text("Pause for an hour") }, onClick = { pauseMenu = false; vm.pause(Instant.now().plusSeconds(3600), "Paused for an hour") })
+                                    DropdownMenuItem(
+                                        text = { Text("Pause for the rest of today") },
+                                        onClick = {
+                                            pauseMenu = false
+                                            vm.pause(LocalDate.now().atTime(LocalTime.of(23, 59)).atZone(ZoneId.systemDefault()).toInstant(), "Paused for the rest of today")
+                                        },
+                                    )
+                                    DropdownMenuItem(text = { Text("Pause until I turn it back on") }, onClick = { pauseMenu = false; vm.pause(null, "Paused until you turn it back on") })
                                 }
                             }
-                            Step(setup.servicesOn, "Turn on location", "Location is off for the whole phone.", "Turn on") {
-                                context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-                            }
                         }
                     }
-                }
-
-                SectionHeader("Watching today", horizontalPadding = 4.dp)
-                WatchList(watching, placeName) { null }
-
-                SectionHeader("Pause", horizontalPadding = 4.dp)
-                if (me?.locationPaused == true) {
-                    Text(
-                        "Paused " + (me?.locationPausedUntil?.let { "until ${formatDateTime(it)}" } ?: "until you turn it back on") + ". Location tasks due meanwhile are excused.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Button(onClick = vm::resume, enabled = !busy) {
-                        Icon(Icons.Outlined.PlayArrow, null)
-                        Text("  Turn back on")
-                    }
-                } else {
-                    Text(
-                        "Stops watching every place. Location tasks due while paused are excused" + (if (solo) "." else ", and $who is told you paused.") +
-                            if (underCurfew) " Curfew still counts: tap I'm home on Today instead." else "",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AssistChip(onClick = { vm.pause(Instant.now().plusSeconds(3600), "Paused for an hour") }, enabled = !busy, label = { Text("1 hour") })
-                        AssistChip(
-                            onClick = { vm.pause(LocalDate.now().atTime(LocalTime.of(23, 59)).atZone(ZoneId.systemDefault()).toInstant(), "Paused for the rest of today") },
-                            enabled = !busy,
-                            label = { Text("Rest of today") },
-                        )
-                        AssistChip(onClick = { vm.pause(null, "Paused until you turn it back on") }, enabled = !busy, label = { Text("Until I turn it back on") })
-                    }
-                }
-                Spacer(Modifier.height(24.dp))
-            }
-        }
-    }
-}
-
-/** Today's location tasks still to come, with whose they are when [who] says. */
-@Composable
-private fun WatchList(items: List<app.obey.api.Occurrence>, placeName: (app.obey.api.Occurrence) -> String, who: (app.obey.api.Occurrence) -> String?) {
-    if (items.isEmpty()) {
-        Text("No location tasks left today.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        return
-    }
-    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium) {
-        Column {
-            items.forEach { o ->
-                ListItem(
-                    colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-                    leadingContent = { Icon(Icons.Outlined.LocationOn, null, tint = MaterialTheme.colorScheme.primary) },
-                    headlineContent = { Text(placeName(o)) },
-                    supportingContent = {
-                        Text("${o.title} · by ${formatTime(o.dueAt)}" + (o.stayMinutes?.let { ", stay ${stayLabel(it)}" } ?: "") + (who(o)?.let { " · $it" } ?: ""))
-                    },
-                )
-            }
-        }
-    }
-}
-
-/** The dynamic's saved places. Everyone sees them; a Dominant adds and changes them. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun PlacesScreen(onBack: () -> Unit, vm: LocationViewModel = hiltViewModel()) {
-    val places by vm.places.collectAsStateWithLifecycle()
-    val busy by vm.busy.collectAsStateWithLifecycle()
-    val message by vm.message.collectAsStateWithLifecycle()
-    val snackbar = remember { SnackbarHostState() }
-    MessageEffect(message, snackbar, vm::messageShown)
-    val session = vm.session
-    val canEdit = session?.canManage == true
-    val subs = session?.partners.orEmpty().filter { it.role != Role.Dominant }
-    var editing by remember { mutableStateOf<Pair<Boolean, Place?>?>(null) }
-
-    Scaffold(
-        topBar = {
-            LargeTopAppBar(
-                title = { Text("Places") },
-                navigationIcon = { BackLink("Location", onBack) },
+                    app.obey.ui.common.SafeWordAction()
+                },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Column(
-                Modifier.widthIn(max = 640.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                Modifier.widthIn(max = 640.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 40.dp),
+                verticalArrangement = Arrangement.spacedBy(32.dp),
             ) {
-                if (canEdit) subs.forEach { m -> LocationReadiness(m) { vm.ask(m.displayName) } }
-                val list = places
-                if (list != null && list.isEmpty()) {
-                    EmptyBox("No places yet", if (canEdit) "Save the places tasks can ask for: the gym, work, home." else "Places a Dominant saves for location tasks show here.", icon = Icons.Outlined.LocationOn)
-                } else if (list != null) {
-                    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium) {
-                        Column {
-                            list.forEach { p ->
-                                ListItem(
-                                    modifier = if (canEdit) Modifier.clickable { editing = true to p } else Modifier,
-                                    colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-                                    leadingContent = { Icon(Icons.Outlined.LocationOn, null, tint = MaterialTheme.colorScheme.primary) },
-                                    headlineContent = { Text(p.name) },
-                                    supportingContent = {
-                                        Column {
-                                            Text(listOfNotNull(p.address, formatRadius(p.radiusM)).joinToString(" · "), maxLines = 1)
-                                            Text(if (p.taskTitles.isEmpty()) "Not used by any task" else "Used by ${p.taskTitles.joinToString(", ")}", maxLines = 1)
-                                        }
-                                    },
-                                    trailingContent = if (canEdit) ({ Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) }) else null,
+                status?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant) }
+                if (!watched) watchedOthers.forEach { m -> LocationReadiness(m) { vm.ask(m.displayName) } }
+
+                if (watched && !setup.ready) {
+                    Column {
+                        Eyebrow("Set up this phone")
+                        Step(
+                            setup.precise,
+                            "Allow precise location",
+                            if (setup.any && !setup.precise) "Approximate isn't enough to tell you're at the gym. Turn on Precise in Fealty's permissions." else "So Fealty can tell when you're at a place.",
+                            if (setup.any) "Settings" else "Allow",
+                        ) {
+                            vm.markAsked()
+                            if (setup.any) openAppSettings() else foreground.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                        }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            HorizontalDivider(color = c.outlineVariant)
+                            Step(
+                                setup.background,
+                                "Allow all the time",
+                                "So arriving counts while Fealty is closed. Pick \"Allow all the time\" on the next screen.",
+                                if (setup.precise) "Allow" else null,
+                            ) {
+                                vm.markAsked()
+                                background.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                            }
+                        }
+                        HorizontalDivider(color = c.outlineVariant)
+                        Step(setup.servicesOn, "Turn on location", "Location is off for the whole phone.", "Turn on") {
+                            context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                        }
+                        HorizontalDivider(color = c.outlineVariant)
+                    }
+                }
+
+                val list = places.orEmpty()
+                if (list.isNotEmpty()) {
+                    PlacesMap(
+                        list,
+                        Modifier.fillMaxWidth().height(240.dp).clip(MaterialTheme.shapes.medium).border(1.dp, c.outlineVariant, MaterialTheme.shapes.medium),
+                    )
+                }
+
+                if (on != null || canEdit) {
+                    Column {
+                        Eyebrow("Curfew")
+                        Row(Modifier.fillMaxWidth().clickable(onClick = onCurfew).padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                if (on != null) {
+                                    Text("${clockLabel(on.time)} until ${clockLabel(on.until)}", style = MaterialTheme.typography.bodyLarge)
+                                    Text(
+                                        listOfNotNull(
+                                            if (on.weekendTime != null) "Sun–Thu" else "Every night",
+                                            on.weekendTime?.let { "Fri–Sat ${clockLabel(it)}" },
+                                            "at ${list.firstOrNull { it.id == on.placeId }?.name ?: "Home"}",
+                                            if (canEdit) session?.nameOf(on.assigneeId) else null,
+                                        ).joinToString(" · "),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = c.onSurfaceVariant,
+                                    )
+                                } else {
+                                    Text("Off", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
+                                }
+                            }
+                            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = c.onSurfaceVariant)
+                        }
+                        HorizontalDivider(color = c.outlineVariant)
+                    }
+                }
+
+                Column {
+                    Eyebrow("Places")
+                    list.forEachIndexed { i, p ->
+                        if (i > 0) HorizontalDivider(color = c.outlineVariant)
+                        Row(
+                            Modifier.fillMaxWidth().then(if (canEdit) Modifier.clickable { editing = true to p } else Modifier).padding(vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(placeIcon(p.name), null, tint = c.onSurface)
+                            Spacer(Modifier.width(20.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(p.name, style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    if (p.taskTitles.isEmpty()) "${formatRadius(p.radiusM)} around" else "Used by ${p.taskTitles.joinToString(", ")}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = c.onSurfaceVariant,
+                                    maxLines = 1,
                                 )
                             }
                         }
                     }
+                    if (list.isEmpty() && !canEdit) Text("No places yet.", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant, modifier = Modifier.padding(vertical = 14.dp))
+                    if (canEdit) {
+                        if (list.isNotEmpty()) HorizontalDivider(color = c.outlineVariant)
+                        Row(Modifier.fillMaxWidth().clickable { editing = true to null }.padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Outlined.Add, null, tint = c.primary)
+                            Spacer(Modifier.width(20.dp))
+                            Text("Add a place", style = MaterialTheme.typography.bodyLarge, color = c.primary)
+                        }
+                    }
+                    HorizontalDivider(color = c.outlineVariant)
                 }
-                if (canEdit) {
-                    FilledTonalButton(onClick = { editing = true to null }) {
-                        Icon(Icons.Outlined.AddLocationAlt, null)
-                        Text("  Add a place")
+
+                if (watched || watchedOthers.isNotEmpty()) {
+                    Column {
+                        Eyebrow("Watching today")
+                        WatchList(if (watched) watching else othersWatching, placeName) { o ->
+                            if (!watched && watchedOthers.size > 1) session?.relationship?.members?.firstOrNull { it.userId == o.assigneeId }?.displayName else null
+                        }
                     }
                 }
             }
         }
     }
 
-    editing?.let { (_, place) ->
-        PlaceEditor(vm, place, busy) { editing = null }
+    editing?.let { (_, place) -> PlaceEditor(vm, place, busy) { editing = null } }
+}
+
+/** Today's location tasks still to come, on hairlines, with whose they are when [who] says. */
+@Composable
+private fun WatchList(items: List<app.obey.api.Occurrence>, placeName: (app.obey.api.Occurrence) -> String, who: (app.obey.api.Occurrence) -> String?) {
+    val c = MaterialTheme.colorScheme
+    if (items.isEmpty()) {
+        Text("No location tasks left today.", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant, modifier = Modifier.padding(vertical = 14.dp))
     }
+    items.forEachIndexed { i, o ->
+        if (i > 0) HorizontalDivider(color = c.outlineVariant)
+        Column(Modifier.fillMaxWidth().padding(vertical = 14.dp)) {
+            Text(placeName(o), style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "${o.title} · by ${formatTime(o.dueAt)}" + (o.stayMinutes?.let { ", stay ${stayLabel(it)}" } ?: "") + (who(o)?.let { " · $it" } ?: ""),
+                style = MaterialTheme.typography.bodyMedium,
+                color = c.onSurfaceVariant,
+            )
+        }
+    }
+    HorizontalDivider(color = c.outlineVariant)
 }
 
 /** The place dialog, wired to saving and deleting. */

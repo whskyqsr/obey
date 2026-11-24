@@ -237,7 +237,6 @@ fun ProofTermsDialog(onDismiss: () -> Unit, onAgree: () -> Unit) {
     var rules by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Outlined.AddAPhoto, null) },
         title = { Text("Before your first photo") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -264,12 +263,11 @@ fun ProofBlurSetting(vm: ProofViewModel = hiltViewModel(key = "proof-settings"))
     val viewer by vm.viewer.collectAsStateWithLifecycle()
     var confirm by remember { mutableStateOf(false) }
     androidx.compose.material3.ListItem(
-        headlineContent = { Text("Show proof photos without blur") },
-        supportingContent = { Text("Off: photos stay blurred until you open one.") },
+        headlineContent = { Text("Blur proof photos") },
         trailingContent = {
             androidx.compose.material3.Switch(
-                checked = viewer?.revealProofs == true,
-                onCheckedChange = { on -> if (on) confirm = true else vm.setReveal(false) },
+                checked = viewer?.revealProofs != true,
+                onCheckedChange = { blur -> if (!blur) confirm = true else vm.setReveal(false) },
             )
         },
     )

@@ -31,8 +31,8 @@ import androidx.compose.material.icons.outlined.Shower
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
+import app.obey.ui.common.TonalButton
+import app.obey.ui.common.ChoiceChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -215,7 +215,7 @@ private fun lockLines(l: ChastityLock, now: Long): Lines {
 private fun Ring(frac: Float?, onBreak: Boolean) {
     val c = MaterialTheme.colorScheme
     Box(Modifier.size(72.dp), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(progress = { frac ?: 0f }, modifier = Modifier.size(72.dp), strokeWidth = 6.dp, trackColor = c.secondaryContainer, gapSize = 0.dp)
+        CircularProgressIndicator(progress = { frac ?: 0f }, modifier = Modifier.size(72.dp), strokeWidth = 6.dp, trackColor = c.outlineVariant, gapSize = 0.dp)
         Icon(if (onBreak) Icons.Filled.Shower else Icons.Filled.Lock, null, tint = c.primary)
     }
 }
@@ -247,7 +247,7 @@ private fun KeyboxPicker(photo: Uri?, onPhoto: (Uri) -> Unit) {
         camera.launch(uri)
     }
     if (photo == null) {
-        FilledTonalButton(onClick = { take() }, modifier = Modifier.fillMaxWidth()) {
+        TonalButton(onClick = { take() }, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Outlined.AddAPhoto, null)
             Text("Photograph the keybox code", Modifier.padding(start = 8.dp))
         }
@@ -287,7 +287,7 @@ private fun LockUp(l: ChastityLock, keyholder: String, relock: Boolean, busy: Bo
 }
 
 @Composable
-private fun Card(container: Boolean = false, content: @Composable () -> Unit) {
+private fun LockBox(container: Boolean = false, content: @Composable () -> Unit) {
     val c = MaterialTheme.colorScheme
     Surface(
         color = androidx.compose.ui.graphics.Color.Transparent,
@@ -307,7 +307,7 @@ private fun AskToAnswer(e: ChastityEvent, l: ChastityLock, wearer: String, busy:
     var changing by remember { mutableStateOf(false) }
     var minutes by remember { mutableStateOf(e.minutes ?: 20) }
     val isBreak = e.kind == "break"
-    Card(container = true) {
+    LockBox(container = true) {
         Text(if (isBreak) "$wearer asked for a hygiene break" else "$wearer asked to be released", style = MaterialTheme.typography.titleMedium)
         Text(
             if (isBreak) "${e.minutes} minutes, then they relock${if (l.keyMode == "keybox") " and seal a new code" else ""}. The lock's clock keeps running."
@@ -317,7 +317,7 @@ private fun AskToAnswer(e: ChastityEvent, l: ChastityLock, wearer: String, busy:
         e.note?.let { Text("“$it”", style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic) }
         if (changing) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(10, 15, 20, 30, 45).forEach { m -> FilterChip(selected = minutes == m, onClick = { minutes = m }, label = { Text("$m min") }) }
+                listOf(10, 15, 20, 30, 45).forEach { m -> ChoiceChip(selected = minutes == m, onClick = { minutes = m }, label = { Text("$m min") }) }
             }
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -351,14 +351,14 @@ fun LockCard(l: ChastityLock, events: List<ChastityEvent>, session: Session, bus
 
     if (l.status == "pending") {
         if (wearer && !readOnly) {
-            Card(container = true) {
+            LockBox(container = true) {
                 val length = l.minutes?.let { " for ${fmtMinutes(it)}" } ?: if (l.timeHidden) "" else " until they release you"
                 Text("$keyholderName wants you locked$length", style = MaterialTheme.typography.titleMedium)
                 if (l.keyMode == "keyholder") Text("$keyholderName keeps the key. Tap when you're locked.", style = MaterialTheme.typography.bodyMedium)
                 LockUp(l, keyholderName, relock = false, busy = busy, vm = vm)
             }
         } else {
-            Card {
+            LockBox {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Icon(Icons.Outlined.LockClock, null, tint = MaterialTheme.colorScheme.primary)
                     Column(Modifier.weight(1f)) {
@@ -378,14 +378,14 @@ fun LockCard(l: ChastityLock, events: List<ChastityEvent>, session: Session, bus
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (keyholder && !readOnly) asks.forEach { AskToAnswer(it, l, wearerName, busy, vm) }
-        Card {
+        LockBox {
             val onBreak = l.status == "break"
             LockSummary(l, if (wearer) (if (onBreak) "You're on a hygiene break" else "You're locked") else "$wearerName is ${if (onBreak) "on a hygiene break" else "locked"}")
             if (wearer && onBreak && !readOnly) LockUp(l, keyholderName, relock = true, busy = busy, vm = vm)
             if (!readOnly) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (wearer && l.status == "active") {
-                        FilledTonalButton(onClick = { dialog = LockDialog.AskRelease }, enabled = !asked("release_ask")) {
+                        TonalButton(onClick = { dialog = LockDialog.AskRelease }, enabled = !asked("release_ask")) {
                             Text(if (asked("release_ask")) "Release asked" else "Ask for release")
                         }
                         OutlinedButton(onClick = { dialog = LockDialog.AskBreak }, enabled = !asked("break")) {
@@ -395,7 +395,7 @@ fun LockCard(l: ChastityLock, events: List<ChastityEvent>, session: Session, bus
                     }
                     if (keyholder) {
                         if (l.endsAt != null) {
-                            FilledTonalButton(onClick = { dialog = LockDialog.Add }) {
+                            TonalButton(onClick = { dialog = LockDialog.Add }) {
                                 Icon(Icons.Outlined.MoreTime, null, Modifier.size(18.dp))
                                 Text("Add time", Modifier.padding(start = 8.dp))
                             }
@@ -451,7 +451,7 @@ private fun TimeDialog(sign: Int, onDismiss: () -> Unit, onSave: (Int, String) -
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(60, 360, 1440, 4320).forEach { m -> FilterChip(selected = minutes == m, onClick = { minutes = m }, label = { Text(fmtMinutes(m)) }) }
+                    listOf(60, 360, 1440, 4320).forEach { m -> ChoiceChip(selected = minutes == m, onClick = { minutes = m }, label = { Text(fmtMinutes(m)) }) }
                 }
                 LettersField(note, { note = it.take(500) }, label = { Text("Why (optional)") }, singleLine = true)
             }
@@ -472,7 +472,7 @@ private fun PhotoAskDialog(wearer: String, onDismiss: () -> Unit, onAsk: (Int) -
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Within", style = MaterialTheme.typography.titleSmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(30, 60, 180).forEach { m -> FilterChip(selected = minutes == m, onClick = { minutes = m }, label = { Text(fmtMinutes(m)) }) }
+                    listOf(30, 60, 180).forEach { m -> ChoiceChip(selected = minutes == m, onClick = { minutes = m }, label = { Text(fmtMinutes(m)) }) }
                 }
                 Text("$wearer gets a task with photo proof, and you approve it. Missing it counts like any missed task.", style = MaterialTheme.typography.bodySmall)
             }
@@ -495,7 +495,7 @@ private fun AskDialog(kind: String, l: ChastityLock, keyholder: String, onDismis
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (isBreak) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(10, 20, 30).forEach { m -> FilterChip(selected = minutes == m, onClick = { minutes = m }, label = { Text("$m minutes") }) }
+                        listOf(10, 20, 30).forEach { m -> ChoiceChip(selected = minutes == m, onClick = { minutes = m }, label = { Text("$m minutes") }) }
                     }
                     Text(
                         "The lock's clock keeps running. When the break is over, you relock${if (l.keyMode == "keybox") " and seal a new code" else ""}.",
@@ -547,17 +547,17 @@ fun StartLockDialog(wearers: List<Member>, busy: Boolean, onDismiss: () -> Unit,
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (wearers.size > 1) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        wearers.forEach { w -> FilterChip(selected = w.userId == wearerId, onClick = { wearerId = w.userId }, label = { Text(w.displayName) }) }
+                        wearers.forEach { w -> ChoiceChip(selected = w.userId == wearerId, onClick = { wearerId = w.userId }, label = { Text(w.displayName) }) }
                     }
                 }
                 Text("For how long", style = MaterialTheme.typography.titleSmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = timed, onClick = { timed = true }, label = { Text("Set time") })
-                    FilterChip(selected = !timed, onClick = { timed = false }, label = { Text("Until I release") })
+                    ChoiceChip(selected = timed, onClick = { timed = true }, label = { Text("Set time") })
+                    ChoiceChip(selected = !timed, onClick = { timed = false }, label = { Text("Until I release") })
                 }
                 if (timed) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(1440, 3 * 1440, 7 * 1440, 14 * 1440).forEach { m -> FilterChip(selected = minutes == m, onClick = { minutes = m }, label = { Text(fmtMinutes(m)) }) }
+                        listOf(1440, 3 * 1440, 7 * 1440, 14 * 1440).forEach { m -> ChoiceChip(selected = minutes == m, onClick = { minutes = m }, label = { Text(fmtMinutes(m)) }) }
                     }
                     Text(
                         "Unlocks about ${fmtLockTime(Instant.now().plusSeconds(minutes * 60L).toString())}, counted from when $name locks up.",
@@ -567,8 +567,8 @@ fun StartLockDialog(wearers: List<Member>, busy: Boolean, onDismiss: () -> Unit,
                 }
                 Text("Who has the key?", style = MaterialTheme.typography.titleSmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = !keybox, onClick = { keybox = false }, label = { Text("I keep it") })
-                    FilterChip(selected = keybox, onClick = { keybox = true }, label = { Text("Keybox") })
+                    ChoiceChip(selected = !keybox, onClick = { keybox = false }, label = { Text("I keep it") })
+                    ChoiceChip(selected = keybox, onClick = { keybox = true }, label = { Text("Keybox") })
                 }
                 Text(
                     if (keybox) "$name scrambles the keybox code without looking and seals a photo of it. You can see it any time; $name sees it when released."
@@ -611,8 +611,8 @@ fun LockTimeField(label: String, value: Int?, onChange: (Int?) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = MaterialTheme.typography.titleSmall)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = value == null, onClick = { onChange(null) }, label = { Text("None") })
-            LOCK_TIME_CHOICES.forEach { m -> FilterChip(selected = value == m, onClick = { onChange(m) }, label = { Text(fmtMinutes(m)) }) }
+            ChoiceChip(selected = value == null, onClick = { onChange(null) }, label = { Text("None") })
+            LOCK_TIME_CHOICES.forEach { m -> ChoiceChip(selected = value == m, onClick = { onChange(m) }, label = { Text(fmtMinutes(m)) }) }
         }
     }
 }

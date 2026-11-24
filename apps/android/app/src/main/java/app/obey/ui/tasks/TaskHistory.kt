@@ -2,6 +2,7 @@ package app.obey.ui.tasks
 
 import app.obey.ui.common.LocalFeatures
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,7 +12,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import app.obey.ui.common.ChoiceChip
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -59,10 +60,9 @@ private val HistoryEntry.label: String
 fun TaskHistorySection(history: List<HistoryEntry>, onEdit: ((HistoryEntry, OccurrenceStatus, Instant?, String) -> Unit)?) {
     var editing by remember { mutableStateOf<HistoryEntry?>(null) }
     val showPoints = LocalFeatures.current.points
-    SectionHeader("History", horizontalPadding = 0.dp)
     if (history.isEmpty()) {
         Text(
-            "Nothing yet. Finished and missed occurrences show up here.",
+            "Nothing yet.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -74,16 +74,21 @@ fun TaskHistorySection(history: List<HistoryEntry>, onEdit: ((HistoryEntry, Occu
             headlineContent = { Text(formatDate(LocalDate.parse(h.originalDate))) },
             supportingContent = {
                 Text(
-                    (h.completedAt?.let { "Done ${formatDateTime(it)}" } ?: "Due ${formatDateTime(h.dueAt)}") +
+                    h.label + (h.completedAt?.let { " · ${formatDateTime(it)}" } ?: if (h.status == OccurrenceStatus.Pending) " · due ${formatDateTime(h.dueAt)}" else "") +
                         (h.syncedAt?.let { " · offline, synced ${formatDateTime(it)}" } ?: "") +
                         if (h.editedBy != null) " · edited" else "",
                 )
             },
             trailingContent = {
-                Text(
-                    listOfNotNull(h.pointsDelta.takeIf { it != 0 && showPoints }?.let(::signed), h.label).joinToString("  "),
-                    color = if (h.status == OccurrenceStatus.Missed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.labelLarge,
+                // A note reads as the partner's words; otherwise the points it moved.
+                val right = h.noteMd?.takeIf { it.isNotBlank() }?.let { "\u201C$it\u201D" } ?: h.pointsDelta.takeIf { it != 0 && showPoints }?.let(::signed)
+                if (right != null) Text(
+                    right,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = if (h.noteMd.isNullOrBlank()) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyLarge.copy(fontFamily = app.obey.ui.theme.InstrumentSerif, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 160.dp),
                 )
             },
         )
@@ -108,7 +113,7 @@ private fun EditHistoryDialog(entry: HistoryEntry, onDismiss: () -> Unit, onSave
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(OccurrenceStatus.Completed to "Done", OccurrenceStatus.Missed to "Missed", OccurrenceStatus.Excused to "Excused")
-                        .forEach { (s, label) -> FilterChip(selected = status == s, onClick = { status = s }, label = { Text(label) }) }
+                        .forEach { (s, label) -> ChoiceChip(selected = status == s, onClick = { status = s }, label = { Text(label) }) }
                 }
                 if (status == OccurrenceStatus.Completed) {
                     Text("Done at", style = MaterialTheme.typography.labelLarge)

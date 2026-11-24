@@ -49,8 +49,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
+import app.obey.ui.common.TonalButton
+import app.obey.ui.common.ChoiceChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -62,9 +62,8 @@ import app.obey.ui.common.LettersField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import app.obey.ui.common.PillSegment
+import app.obey.ui.common.PillRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
@@ -365,8 +364,10 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
 
                 if (rel.ended) {
                     Surface(
-                        color = c.surfaceContainerHigh,
-                        shape = MaterialTheme.shapes.large,
+                        color = c.surface,
+                        contentColor = c.onSurfaceVariant,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
                         modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
                     ) {
                         Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -518,7 +519,7 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
                             ReschedulePolicy.Request to "Sub asks, I approve",
                             ReschedulePolicy.Allowance to "Free delays per week",
                         ).forEach { (p, label) ->
-                            FilterChip(selected = rel.reschedulePolicy == p, onClick = { vm.updatePolicy(policy = p) }, label = { Text(label) })
+                            ChoiceChip(selected = rel.reschedulePolicy == p, onClick = { vm.updatePolicy(policy = p) }, label = { Text(label) })
                         }
                     }
                     if (rel.reschedulePolicy == ReschedulePolicy.Allowance) {
@@ -659,7 +660,7 @@ internal fun InviteControls(vm: SettingsViewModel, initialRole: Role?) {
         Text("They'll join as", style = MaterialTheme.typography.labelLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             (listOf<Role?>(Role.Submissive, Role.Dominant, Role.Switch) + null).forEach { r ->
-                FilterChip(
+                ChoiceChip(
                     selected = role == r,
                     onClick = { role = r; vm.clearInvite() },
                     label = { Text(r?.label ?: "Let them choose") },
@@ -725,7 +726,6 @@ private fun LeaveDialog(
     var block by remember { mutableStateOf(listOfNotNull(target?.userId)) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(if (target != null) Icons.Outlined.Block else Icons.AutoMirrored.Outlined.Logout, null) },
         title = {
             Text(
                 when {

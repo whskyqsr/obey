@@ -38,8 +38,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
+import app.obey.ui.common.TonalButton
+import app.obey.ui.common.ChoiceChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -313,7 +313,6 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
         val ledger = (state as? Load.Ready)?.value?.ledger.orEmpty()
         AlertDialog(
             onDismissRequest = { history = false },
-            icon = { Icon(Icons.Outlined.History, null) },
             title = { Text("History") },
             text = {
                 androidx.compose.foundation.lazy.LazyColumn {
@@ -405,7 +404,6 @@ private fun LetOffDialog(
     var picked by remember { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Outlined.Redeem, null) },
         title = { Text(reward.title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -482,7 +480,7 @@ private fun AdjustDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    members.forEach { (id, name) -> FilterChip(selected = user == id, onClick = { user = id }, label = { Text(name) }) }
+                    members.forEach { (id, name) -> ChoiceChip(selected = user == id, onClick = { user = id }, label = { Text(name) }) }
                 }
                 NumberField("Points (negative to deduct)", delta, Modifier.fillMaxWidth()) { delta = it }
                 LettersField(note, { note = it.take(500) }, label = { Text("Why") }, singleLine = true)

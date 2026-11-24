@@ -1,6 +1,7 @@
 package app.obey.ui.protocols
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,9 +18,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.EditNote
-import androidx.compose.material.icons.outlined.Gavel
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -50,6 +50,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -59,6 +60,9 @@ import app.obey.api.ObeyApi
 import app.obey.api.Protocol
 import app.obey.api.ProtocolInput
 import app.obey.api.Rule
+import app.obey.api.RuleLogEntry
+import app.obey.ui.common.BackLink
+import app.obey.ui.rules.roman
 import app.obey.data.SessionRepository
 import app.obey.ui.ProtocolEditorRoute
 import app.obey.ui.common.BaseViewModel
@@ -97,6 +101,9 @@ class ProtocolEditorViewModel @Inject constructor(
         private set
     var rules: List<Rule> = emptyList()
         private set
+    /** This month's rule log entries for this protocol, each with the title of the consequence it got (if any). */
+    var broken: List<Pair<RuleLogEntry, String?>> = emptyList()
+        private set
 
     private val _load = MutableStateFlow<Load<Unit>>(Load.Loading)
     val load: StateFlow<Load<Unit>> = _load.asStateFlow()
@@ -118,6 +125,15 @@ class ProtocolEditorViewModel @Inject constructor(
                     val rules = async { api.rules(rel) }
                     this@ProtocolEditorViewModel.rules = rules.await().inOrder()
                     protocol = protocolId?.let { id -> protocols.await().firstOrNull { it.id == id } ?: error("That protocol no longer exists") }
+                    if (protocolId != null) {
+                        // Best effort: the page still opens if the log can't be read.
+                        broken = runCatching {
+                            val month = java.time.LocalDate.now().toString().take(7)
+                            val entries = api.ruleLog(rel).filter { it.protocolId == protocolId && it.occurredOn.startsWith(month) }
+                            val tasks = if (entries.any { it.consequenceTaskId != null }) api.tasks(rel) else emptyList()
+                            entries.map { e -> e to e.consequenceTaskId?.let { id -> tasks.firstOrNull { it.id == id }?.title } }
+                        }.getOrDefault(emptyList())
+                    }
                 }
             }
         }
@@ -158,6 +174,7 @@ fun ProtocolEditorScreen(onDone: () -> Unit, vm: ProtocolEditorViewModel = hiltV
     var dirty by remember { mutableStateOf(false) }
     var ruleMenu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var menu by remember { mutableStateOf(false) }
     var confirmDiscard by remember { mutableStateOf(false) }
 
     fun reset() {
@@ -187,19 +204,20 @@ fun ProtocolEditorScreen(onDone: () -> Unit, vm: ProtocolEditorViewModel = hiltV
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (reading) "Protocol" else if (vm.protocol == null) "New protocol" else "Edit protocol") },
+                title = {},
                 navigationIcon = {
-                    IconButton(onClick = ::back) {
-                        if (reading || vm.protocol == null) Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") else Icon(Icons.Outlined.Close, "Stop editing")
-                    }
+                    if (reading) BackLink("Protocols", ::back)
+                    else TextButton(onClick = ::back) { Text("Cancel", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 },
                 actions = {
                     if (vm.canManage && load is Load.Ready) {
-                        if (vm.protocol != null) IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Outlined.Delete, "Delete") }
                         if (reading) {
-                            TextButton(onClick = { reading = false }) {
-                                Icon(Icons.Outlined.EditNote, null)
-                                Text(" Edit")
+                            IconButton(onClick = { reading = false }) { Icon(Icons.Outlined.Edit, "Edit") }
+                            Box {
+                                IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreHoriz, "More") }
+                                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                    DropdownMenuItem(text = { Text("Delete") }, onClick = { menu = false; confirmDelete = true })
+                                }
                             }
                         } else {
                             TextButton(
@@ -225,19 +243,40 @@ fun ProtocolEditorScreen(onDone: () -> Unit, vm: ProtocolEditorViewModel = hiltV
                     Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp).widthIn(max = 720.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    val titleStyle = MaterialTheme.typography.headlineSmall.copy(color = MaterialTheme.colorScheme.onSurface)
+                    val titleStyle = MaterialTheme.typography.headlineLarge.copy(color = MaterialTheme.colorScheme.onSurface)
                     if (reading) {
-                        Text(title.text, style = titleStyle)
+                        Text(title.text, style = MaterialTheme.typography.displayMedium)
                         if (ruleIndex >= 0) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Icon(Icons.Outlined.Gavel, null, tint = MaterialTheme.colorScheme.primary)
-                                Text("Rule ${ruleIndex + 1}: ${rules[ruleIndex].title}", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
-                            }
+                            Text(
+                                "Spells out rule ${roman(ruleIndex + 1)}: ${rules[ruleIndex].title}.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                         if (body.text.isBlank()) {
-                            Text("No details yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Nothing written yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         } else {
-                            MarkdownPreview(markdown = body.text, onToggleCheck = null, modifier = Modifier.fillMaxWidth())
+                            MarkdownPreview(markdown = body.text, onToggleCheck = null, modifier = Modifier.fillMaxWidth(), letters = true)
+                        }
+                        if (showRules && vm.broken.isNotEmpty()) {
+                            Text(
+                                "BROKEN THIS MONTH",
+                                style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 20.dp),
+                            )
+                            vm.broken.forEachIndexed { i, (e, consequence) ->
+                                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(java.time.LocalDate.parse(e.occurredOn).format(java.time.format.DateTimeFormatter.ofPattern("EEE, MMM d")), style = MaterialTheme.typography.bodyLarge)
+                                        if (e.note.isNotBlank()) Text(e.note, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    if (e.consequenceTaskId != null) {
+                                        Text((consequence ?: "consequence").lowercase(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                                if (i < vm.broken.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            }
                         }
                     } else {
                         BasicTextField(
@@ -249,20 +288,23 @@ fun ProtocolEditorScreen(onDone: () -> Unit, vm: ProtocolEditorViewModel = hiltV
                             modifier = Modifier.fillMaxWidth(),
                             decorationBox = { inner ->
                                 Box {
-                                    if (title.text.isEmpty()) Text("Protocol name, e.g. Hydration", style = titleStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    if (title.text.isEmpty()) Text("Name it", style = titleStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     inner()
                                 }
                             },
                         )
                         if (rules.isNotEmpty()) {
                             Box {
-                                OutlinedButton(onClick = { ruleMenu = true }, modifier = Modifier.fillMaxWidth()) {
-                                    Icon(Icons.Outlined.Gavel, null)
+                                Column(Modifier.fillMaxWidth().clickable { ruleMenu = true }) {
+                                    Text("Spells out a rule (optional)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Text(
-                                        if (ruleIndex >= 0) "  Rule ${ruleIndex + 1}: ${rules[ruleIndex].title}" else "  Spells out a rule (optional)",
+                                        if (ruleIndex >= 0) "${ruleIndex + 1}. ${rules[ruleIndex].title}" else "No rule",
+                                        style = MaterialTheme.typography.bodyLarge,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(vertical = 8.dp),
                                     )
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                                 }
                                 DropdownMenu(expanded = ruleMenu, onDismissRequest = { ruleMenu = false }) {
                                     DropdownMenuItem(text = { Text("No rule") }, onClick = { ruleId = null; dirty = true; ruleMenu = false })
@@ -272,7 +314,6 @@ fun ProtocolEditorScreen(onDone: () -> Unit, vm: ProtocolEditorViewModel = hiltV
                                 }
                             }
                         }
-                        HorizontalDivider()
                         MarkdownField(
                             value = body,
                             onChange = { v -> body = v; dirty = true },

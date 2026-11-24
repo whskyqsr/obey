@@ -4,7 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
-import androidx.compose.material3.FilledTonalIconButton
+import app.obey.ui.common.TonalIconButton
 import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material.icons.outlined.RemoveDone
 import androidx.compose.material.icons.automirrored.outlined.Notes
@@ -14,7 +14,7 @@ import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.TaskAlt
@@ -144,10 +144,7 @@ fun OccurrenceRow(
             Column {
                 if (supporting.isNotEmpty()) Text(supporting, color = if (occurrence.status == OccurrenceStatus.Missed || occurrence.countState() == app.obey.api.CountState.Over) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
                 occurrence.mood?.let { m ->
-                    Row(Modifier.padding(top = 4.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                        Icon(app.obey.ui.common.moodIcon(m), null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(" Felt ${app.obey.ui.common.moodLabel(m).lowercase()}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    Text("Felt ${app.obey.ui.common.moodLabel(m).lowercase()}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
                 }
                 if (occurrence.commentCount > 0) {
                     val n = occurrence.commentCount
@@ -179,7 +176,7 @@ fun OccurrenceRow(
                 Row {
                     actions.onExcuse?.let { IconButton(onClick = it) { Icon(Icons.Outlined.RemoveCircleOutline, "Excuse: no penalty") } }
                     actions.onDropConsequence?.let { IconButton(onClick = it) { Icon(Icons.Outlined.RemoveDone, "Drop “${occurrence.missConsequence}”: it stays missed") } }
-                    actions.onConfirmMiss?.let { FilledTonalIconButton(onClick = it) { Icon(Icons.Outlined.Check, "Accept: it stays missed") } }
+                    actions.onConfirmMiss?.let { TonalIconButton(onClick = it) { Icon(Icons.Outlined.Check, "Accept: it stays missed") } }
                 }
             } else if (actions.onApprove != null || actions.onReject != null) {
                 Row {
@@ -189,7 +186,7 @@ fun OccurrenceRow(
                 }
             } else if (listOf(actions.onCompleteWithNote, actions.onReschedule, actions.onEditTask, actions.onComments).any { it != null }) {
                 Box {
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "More") }
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreHoriz, "More") }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         if (occurrence.status == OccurrenceStatus.Pending) {
                             if (occurrence.isOpen() && !occurrence.isRitual && !occurrence.isCounted && !occurrence.isPlaced) actions.onCompleteWithNote?.let {

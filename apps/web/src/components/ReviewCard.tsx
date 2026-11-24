@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import type { Occurrence } from "../api/types";
 import { useReviewOccurrence } from "../api/hooks";
 import { errorMessage } from "../api/client";
-import { fmtDateTime, fmtTime, localDateOf, today } from "../lib/dates";
+import { fmtDateTime, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 import { MOOD_LABELS } from "./Mood";
 import { ProofPhotos } from "./Proof";

@@ -13,6 +13,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -86,10 +89,15 @@ fun SignInScreen(vm: SettingsViewModel = hiltViewModel()) {
                     Button(
                         onClick = { scope.launch { googleSignIn(context, vm) } },
                         enabled = !busy,
-                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                        colors = app.obey.ui.common.inkButtonColors(),
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
                     ) { Text("Continue with Google") }
 
-                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
+                        Text("or", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
+                    }
                     LettersField(
                         value = email,
                         onValueChange = { email = it },
@@ -107,16 +115,18 @@ fun SignInScreen(vm: SettingsViewModel = hiltViewModel()) {
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Button(
-                        onClick = { vm.signInEmail(email, password, create = false) },
-                        enabled = !busy && email.isNotBlank() && password.length >= 6,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Sign in") }
-                    TextButton(
-                        onClick = { vm.signInEmail(email, password, create = true) },
-                        enabled = !busy && email.isNotBlank() && password.length >= 6,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Create an account") }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedButton(
+                            onClick = { vm.signInEmail(email, password, create = false) },
+                            enabled = !busy && email.isNotBlank() && password.length >= 6,
+                            modifier = Modifier.weight(1f).height(52.dp),
+                        ) { Text("Sign in") }
+                        TextButton(
+                            onClick = { vm.signInEmail(email, password, create = true) },
+                            enabled = !busy && email.isNotBlank() && password.length >= 6,
+                            modifier = Modifier.weight(1f).height(52.dp),
+                        ) { Text("Create account") }
+                    }
                 } else {
                     Text(
                         "Firebase isn't configured in this build yet (no google-services.json), so normal sign-in is unavailable.",
@@ -146,6 +156,15 @@ fun SignInScreen(vm: SettingsViewModel = hiltViewModel()) {
                         enabled = !busy && devId.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                     ) { Text("Use dev user") }
+                }
+                val uri = androidx.compose.ui.platform.LocalUriHandler.current
+                Row(Modifier.fillMaxWidth().padding(top = 24.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                    val small = MaterialTheme.typography.bodySmall
+                    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+                    Text("18+ only · ", style = small, color = muted)
+                    Text("Privacy", style = small, color = muted, modifier = Modifier.clickable { uri.openUri("https://fealty.me/privacy") }.padding(vertical = 8.dp))
+                    Text(" · ", style = small, color = muted)
+                    Text("Terms", style = small, color = muted, modifier = Modifier.clickable { uri.openUri("https://fealty.me/terms") }.padding(vertical = 8.dp))
                 }
             }
         }

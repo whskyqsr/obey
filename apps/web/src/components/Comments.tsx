@@ -39,12 +39,18 @@ export function CommentThread<C extends AnyComment>({
             <Avatar userId={c.authorId} name={author?.displayName ?? "?"} version={author?.avatarVersion ?? null} size={28} />
             <div className="border border-outline-variant min-w-0 flex-1 rounded-md px-3 py-2">
               <div className="text-label-medium text-on-surface-variant">
-                {c.authorId === me.user.id ? "You" : memberName(c.authorId)} · {Date.now() - Date.parse(c.createdAt) < 60_000 ? "just now" : fmtRelative(c.createdAt)}
+                {c.authorId === me.user.id ? "You" : memberName(c.authorId)} ·{" "}
+                {Date.now() - Date.parse(c.createdAt) < 60_000 ? "just now" : fmtRelative(c.createdAt)}
               </div>
               <div className="text-body-medium whitespace-pre-wrap text-on-surface">{c.body}</div>
             </div>
             {c.authorId === me.user.id && !readOnly && (
-              <IconButton icon="delete" label="Delete comment" className="opacity-0 group-focus-within:opacity-100 group-hover:opacity-100" onClick={() => onDelete(c)} />
+              <IconButton
+                icon="delete"
+                label="Delete comment"
+                className="opacity-0 group-focus-within:opacity-100 group-hover:opacity-100"
+                onClick={() => onDelete(c)}
+              />
             )}
           </div>
         );
@@ -105,7 +111,6 @@ export function ReplyDialog({ o, title, intro, onClose }: { o: Pick<Occurrence, 
     <Dialog
       open
       onClose={onClose}
-      icon="chat"
       title={title}
       actions={
         <Button variant="text" onClick={onClose}>
@@ -152,7 +157,6 @@ export function SendBackDialog({ o, open, onClose }: { o: Occurrence; open: bool
     <Dialog
       open={open}
       onClose={onClose}
-      icon="undo"
       title="Send it back?"
       actions={
         <>

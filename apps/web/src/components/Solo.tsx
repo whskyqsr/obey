@@ -29,7 +29,7 @@ function useDismissed(key: string) {
 function TodayCard({ title, body, children }: { title: string; body: string; children: React.ReactNode }) {
   return (
     <div className="px-4 pb-4 md:px-6">
-      <div className="flex flex-col gap-2 rounded-xl bg-secondary-container px-4 py-4 text-on-secondary-container">
+      <div className="flex flex-col gap-2 rounded-md border border-primary bg-surface-container-lowest px-5 py-4 text-on-surface">
         <div className="text-title-medium">{title}</div>
         <p className="text-body-medium">{body}</p>
         <div className="mt-2 flex flex-wrap gap-2">{children}</div>
@@ -57,7 +57,7 @@ export function SoloCards() {
         body="Set your own tasks, rules and rewards. Invite a partner whenever you're ready, and everything you've set up comes with you."
       >
         <Button onClick={menu.invite}>Invite a partner</Button>
-        <Button variant="text" className="text-on-secondary-container" onClick={hideInvite}>
+        <Button variant="text" className="text-on-surface-variant" onClick={hideInvite}>
           Not now
         </Button>
       </TodayCard>
@@ -69,7 +69,7 @@ export function SoloCards() {
   const joiner = s && rel.members.find((m) => m.userId === s.joinerId);
   if (!s || setupGone || setter?.role !== "submissive" || !joiner || joiner.role === "submissive") return null;
   const got = (
-    <Button variant="text" className="text-on-secondary-container" onClick={hideSetup}>
+    <Button variant="text" className="text-on-surface-variant" onClick={hideSetup}>
       Got it
     </Button>
   );

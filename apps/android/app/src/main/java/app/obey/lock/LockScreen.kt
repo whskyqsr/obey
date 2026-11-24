@@ -25,13 +25,9 @@ fun LockScreen(name: String, onUnlock: () -> Unit) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
         Box(contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.primaryContainer) {
-                    Box(Modifier.size(64.dp), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Outlined.Lock, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                    }
-                }
-                Text("$name is locked", style = MaterialTheme.typography.headlineSmall)
-                Button(onClick = onUnlock) { Text("Unlock") }
+                Icon(Icons.Outlined.Lock, null, Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary)
+                Text("$name is locked", style = MaterialTheme.typography.displaySmall)
+                Button(onClick = onUnlock, colors = app.obey.ui.common.inkButtonColors()) { Text("Unlock") }
             }
         }
     }

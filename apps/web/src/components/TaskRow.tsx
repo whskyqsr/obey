@@ -1,4 +1,4 @@
-import { MOODS, MOOD_LABELS } from "./Mood";
+import { MOOD_LABELS } from "./Mood";
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import type { Occurrence } from "../api/types";
@@ -16,7 +16,9 @@ import { CheckInButton, PlaceRing, canCheckIn, isPlaced, placeLine, useCheckIn, 
 import { Button, Diamond, Icon, IconButton, cx, useSnackbar } from "./ui";
 
 /** Where a row opens its task. Today's wide layout points it at the side panel instead of the task page. */
-export const RowLink = createContext<((taskId: string) => { to: string; params?: Record<string, string>; search?: Record<string, string>; current?: boolean }) | null>(null);
+export const RowLink = createContext<
+  ((taskId: string) => { to: string; params?: Record<string, string>; search?: Record<string, string>; current?: boolean }) | null
+>(null);
 
 /** One-tap Done with Undo in the snackbar, shared by rows and the keyboard shortcut. */
 export function useQuickComplete() {
@@ -108,7 +110,13 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
           />
         ) : canComplete ? (
           isRitual(o) ? (
-            <IconButton icon="play_circle" label={`Start “${o.title}”`} data-action="done" className={missed ? "text-error" : "text-primary"} onClick={() => setRunning(true)} />
+            <IconButton
+              icon="play_circle"
+              label={`Start “${o.title}”`}
+              data-action="done"
+              className={missed ? "text-error" : "text-primary"}
+              onClick={() => setRunning(true)}
+            />
           ) : (
             <button
               type="button"
@@ -123,7 +131,9 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
           )
         ) : (
           <span className="flex size-10 items-center justify-center" title={o.status === "submitted" ? "Waiting for approval" : undefined}>
-            <Diamond state={o.status === "completed" ? "done" : o.status === "submitted" ? "waiting" : o.status === "excused" ? "off" : missed ? "owed" : "off"} />
+            <Diamond
+              state={o.status === "completed" ? "done" : o.status === "submitted" ? "waiting" : o.status === "excused" ? "off" : missed ? "owed" : "off"}
+            />
           </span>
         )}
       </div>
@@ -139,12 +149,7 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
             <StreakStrip taskId={o.seriesId} compact />
           </span>
           {parts.length > 0 && <span className="truncate">{parts.join(" · ")}</span>}
-          {o.mood && (
-            <span className="inline-flex items-center gap-0.5" aria-label={`Felt ${MOOD_LABELS[o.mood - 1]!.toLowerCase()}`}>
-              <Icon name={MOODS[o.mood - 1]!} size={16} />
-              {MOOD_LABELS[o.mood - 1]}
-            </span>
-          )}
+          {o.mood && <span>Felt {MOOD_LABELS[o.mood - 1]!.toLowerCase()}</span>}
           {o.commentCount > 0 && (
             <span className="inline-flex items-center gap-0.5" aria-label={`${o.commentCount} comment${o.commentCount === 1 ? "" : "s"}`}>
               <Icon name="chat_bubble" size={14} />
@@ -160,7 +165,13 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
         {/* A Dominant moves anyone's deadline as easily as a sub asks for more time on their own. */}
         {/* Phones keep rows to a title and a time; the task page and wider screens carry the rest. */}
         {!actions && o.status === "pending" && (mine || isDom) && (
-          <IconButton icon="more_time" label={mine ? "More time" : "Reschedule"} data-action="more" className="max-md:hidden" onClick={() => setRescheduling(true)} />
+          <IconButton
+            icon="more_time"
+            label={mine ? "More time" : "Reschedule"}
+            data-action="more"
+            className="max-md:hidden"
+            onClick={() => setRescheduling(true)}
+          />
         )}
         {isToday && !showDate && !(o.arrivedAt && o.status === "pending") && (
           <span className={cx("px-1 text-body-medium tabular-nums", missed ? "text-error" : "text-on-surface-variant")}>{when}</span>
@@ -205,7 +216,10 @@ export function MissActions({ o }: { o: Occurrence }) {
         label="Excuse: no penalty"
         disabled={busy}
         onClick={() =>
-          edit.mutate({ id: o.id, change: { status: "excused" } }, { onSuccess: () => noteAfter("Excused", target("excusing")), onError: (e) => snack(errorMessage(e)) })
+          edit.mutate(
+            { id: o.id, change: { status: "excused" } },
+            { onSuccess: () => noteAfter("Excused", target("excusing")), onError: (e) => snack(errorMessage(e)) },
+          )
         }
       />
       {o.missConsequence && (
@@ -226,7 +240,9 @@ export function MissActions({ o }: { o: Occurrence }) {
         label="Accept: it stays missed"
         variant="tonal"
         disabled={busy}
-        onClick={() => confirm.mutate(o.id, { onSuccess: () => noteAfter("Kept as missed", target("keeping as missed")), onError: (e) => snack(errorMessage(e)) })}
+        onClick={() =>
+          confirm.mutate(o.id, { onSuccess: () => noteAfter("Kept as missed", target("keeping as missed")), onError: (e) => snack(errorMessage(e)) })
+        }
       />
     </>
   );
@@ -274,7 +290,9 @@ export function MissCard({ o }: { o: Occurrence }) {
         <Button
           busy={confirm.isPending}
           disabled={busy}
-          onClick={() => confirm.mutate(o.id, { onSuccess: () => noteAfter("Kept as missed", target("keeping as missed")), onError: (e) => snack(errorMessage(e)) })}
+          onClick={() =>
+            confirm.mutate(o.id, { onSuccess: () => noteAfter("Kept as missed", target("keeping as missed")), onError: (e) => snack(errorMessage(e)) })
+          }
         >
           Keep as missed
         </Button>
@@ -282,7 +300,10 @@ export function MissCard({ o }: { o: Occurrence }) {
           variant="outlined"
           disabled={busy}
           onClick={() =>
-            edit.mutate({ id: o.id, change: { status: "excused" } }, { onSuccess: () => noteAfter("Excused", target("excusing")), onError: (e) => snack(errorMessage(e)) })
+            edit.mutate(
+              { id: o.id, change: { status: "excused" } },
+              { onSuccess: () => noteAfter("Excused", target("excusing")), onError: (e) => snack(errorMessage(e)) },
+            )
           }
         >
           Excuse

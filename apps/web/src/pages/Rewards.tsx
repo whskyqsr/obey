@@ -64,10 +64,7 @@ export function RewardsPage() {
       {/* -mb-10 takes back the page's bottom padding, so the side panel runs to the bottom edge. */}
       <div className="flex lg:-mb-10 lg:min-h-dvh">
         <div className="min-w-0 flex-1 lg:pb-10">
-          <PageHeader
-            title="Rewards"
-            tools={!wide && <IconButton icon="history" label="History" onClick={() => setHistoryOpen(true)} />}
-          />
+          <PageHeader title="Rewards" tools={!wide && <IconButton icon="history" label="History" onClick={() => setHistoryOpen(true)} />} />
 
           <Balances balances={balances} rewards={rewards.data ?? []} ledger={ledger.data ?? []} onAdjust={isDom ? () => setAdjusting(true) : undefined} />
 
@@ -160,7 +157,6 @@ export function RewardsPage() {
               open={historyOpen}
               onClose={() => setHistoryOpen(false)}
               title="History"
-              icon="history"
               actions={
                 <Button variant="text" onClick={() => setHistoryOpen(false)}>
                   Close
@@ -274,7 +270,6 @@ function LetOffDialog({ reward, onClose }: { reward: Reward; onClose(): void }) 
     <Dialog
       open
       onClose={onClose}
-      icon="redeem"
       title={reward.title}
       actions={
         <>

@@ -1,6 +1,13 @@
 package app.obey.ui.notes
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -26,7 +33,7 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FilterChip
+import app.obey.ui.common.ChoiceChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -76,6 +83,7 @@ fun NotesScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
+    val replies by vm.replies.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     MessageEffect(message, snackbar, vm::messageShown)
     LifecycleResumeEffect(Unit) {
@@ -141,9 +149,9 @@ fun NotesScreen(
                     Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    FilterChip(selected = tag == null, onClick = { tag = null }, label = { Text("All") })
+                    ChoiceChip(selected = tag == null, onClick = { tag = null }, label = { Text("All") })
                     tags.forEach { t ->
-                        FilterChip(selected = tag == t, onClick = { tag = if (tag == t) null else t }, label = { Text(t) })
+                        ChoiceChip(selected = tag == t, onClick = { tag = if (tag == t) null else t }, label = { Text(t) })
                     }
                 }
             }
@@ -184,7 +192,12 @@ fun NotesScreen(
                         }
                         if (journal && shown.isNotEmpty()) item(key = "top") { androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant) }
                         if (journal) items(shown, key = { it.id }) { n ->
-                            JournalEntryRow(n, author = vm.session?.let { if (n.authorId == it.userId) null else it.nameOf(n.authorId) }, onOpen = { onOpen(n.id) })
+                            JournalEntryRow(
+                                n,
+                                author = vm.session?.let { if (n.authorId == it.userId) null else it.nameOf(n.authorId) },
+                                reply = replies[n.id]?.let { r -> r to (vm.session?.nameOf(r.authorId) ?: "") },
+                                onOpen = { onOpen(n.id) },
+                            )
                         }
                         item { androidx.compose.foundation.layout.Spacer(Modifier.padding(32.dp)) }
                     }
@@ -225,7 +238,7 @@ private fun NoteRow(note: Note, author: String?, subName: String?, onOpen: () ->
 
 /** Letters: a journal entry on a hairline, "MONDAY, NOV 23 · FEELING GOOD" over the first lines in the serif. */
 @Composable
-private fun JournalEntryRow(note: Note, author: String?, onOpen: () -> Unit) {
+private fun JournalEntryRow(note: Note, author: String?, reply: Pair<app.obey.api.NoteComment, String>?, onOpen: () -> Unit) {
     val c = MaterialTheme.colorScheme
     Column(Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
         Column(Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -250,13 +263,32 @@ private fun JournalEntryRow(note: Note, author: String?, onOpen: () -> Unit) {
                 maxLines = 4,
                 overflow = TextOverflow.Ellipsis,
             )
-            val extras = listOfNotNull(
-                note.tags.takeIf { it.isNotEmpty() }?.joinToString(" ") { "#$it" },
-                note.commentCount.takeIf { it > 0 }?.let { if (it == 1) "1 reply" else "$it replies" },
-            )
-            if (extras.isNotEmpty()) Text(extras.joinToString(" · "), style = MaterialTheme.typography.labelMedium, color = c.primary)
+            if (note.tags.isNotEmpty()) Text(note.tags.joinToString(" ") { "#$it" }, style = MaterialTheme.typography.labelMedium, color = c.onSurfaceVariant)
+            reply?.let { (r, name) -> ReplyQuote(r, name) }
         }
         androidx.compose.material3.HorizontalDivider(color = c.outlineVariant)
+    }
+}
+
+/** The partner's reply quoted under the entry: an accent rule, the words in serif italic, then who and when. */
+@Composable
+private fun ReplyQuote(reply: app.obey.api.NoteComment, name: String) {
+    val c = MaterialTheme.colorScheme
+    Row(Modifier.padding(start = 24.dp, top = 8.dp).height(IntrinsicSize.Min)) {
+        Box(Modifier.width(2.dp).fillMaxHeight().background(c.primary))
+        Column(Modifier.padding(start = 18.dp)) {
+            Text(
+                "\u201C${journalExcerpt(reply.body).take(220)}\u201D",
+                style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 28.sp, fontStyle = FontStyle.Italic),
+            )
+            Text(
+                listOf(name, java.time.OffsetDateTime.parse(reply.createdAt).atZoneSameInstant(java.time.ZoneId.systemDefault())
+                    .format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))).filter { it.isNotBlank() }.joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = c.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
     }
 }
 

@@ -1,10 +1,10 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { useMonth, useStats } from "../api/hooks";
+import { useLedger, useMonth, useStats } from "../api/hooks";
 import type { DynamicStats, Tally } from "../api/types";
 import { MoodCard } from "../components/Mood";
-import { Button, Chip, Empty, ErrorBox, Icon, IconButton, Loading, PageHeader, SegmentedButtons, cx } from "../components/ui";
-import { addMonths, fmtDate, fmtMonth, today } from "../lib/dates";
+import { Chip, ErrorBox, IconButton, Loading, PageHeader, SegmentedButtons, cx } from "../components/ui";
+import { addDays, addMonths, fmtDate, fmtMonth, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 
 // "Month" is a calendar month, the same stretch the monthly review counts, so the two always agree.
@@ -20,9 +20,12 @@ const pct = (rate: number) => `${Math.round(rate * 100)}%`;
 const monthOf = (date: string) => date.slice(0, 7);
 const shiftMonth = (month: string, by: number) => monthOf(addMonths(`${month}-01`, by));
 
-/** How one person's tasks have gone: rate and trend, done and missed over time, weekdays, and each task. */
+/**
+ * Mockup 26: three serif numbers, then each task as a line with an ink bar, and points earned, spent and lost. Over
+ * time, weekdays and mood follow on hairlines.
+ */
 export function StatsPage({ month: startMonth, who: startWho }: { month?: string; who?: string } = {}) {
-  const { rel, me, memberName } = useRel();
+  const { rel, me, memberName, features } = useRel();
   const current = monthOf(today());
   const [range, setRange] = useState<string>("month");
   const [month, setMonth] = useState(startMonth && startMonth <= current ? startMonth : current);
@@ -30,149 +33,159 @@ export function StatsPage({ month: startMonth, who: startWho }: { month?: string
   const [who, setWho] = useState<string>(rel.members.some((m) => m.userId === startWho) ? startWho! : (sub ?? me.user.id));
   const byMonth = range === "month";
   const stats = useStats(rel.id, Number(range), who, byMonth ? month : undefined);
-  const name = who === me.user.id ? "Your" : `${memberName(who)}'s`;
+  const ledger = useLedger(rel.id, features.points);
   const before = byMonth ? fmtDate(`${shiftMonth(month, -1)}-01`, { month: "long" }) : RANGES.find((r) => r.value === range)!.before;
+  const from = byMonth ? `${month}-01` : addDays(today(), -Number(range) + 1);
+  const to = byMonth ? addDays(`${shiftMonth(month, 1)}-01`, -1) : today();
+  const points = (ledger.data ?? []).filter((e) => e.userId === who && localDateOf(new Date(e.createdAt)) >= from && localDateOf(new Date(e.createdAt)) <= to);
+  const earned = points.filter((e) => e.delta > 0).reduce((n, e) => n + e.delta, 0);
+  const spent = -points.filter((e) => e.delta < 0 && (e.kind === "redemption" || e.kind === "delay")).reduce((n, e) => n + e.delta, 0);
+  const lost = -points.filter((e) => e.delta < 0 && e.kind !== "redemption" && e.kind !== "delay").reduce((n, e) => n + e.delta, 0);
 
   return (
     <>
-      <PageHeader title="Stats" subtitle={`${name} tasks`} />
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-10 md:px-6">
-        <ReviewOpen />
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-2">
-            {rel.members.length > 1 &&
-              rel.members.map((m) => (
-                <Chip key={m.userId} selected={m.userId === who} onClick={() => setWho(m.userId)}>
-                  {m.userId === me.user.id ? "You" : m.displayName}
-                </Chip>
-              ))}
+      <PageHeader
+        title="Stats"
+        actions={
+          <div className="hidden md:block">
+            <SegmentedButtons
+              className="[&>*]:whitespace-nowrap"
+              value={range}
+              onChange={setRange}
+              options={RANGES.map(({ value, label }) => ({ value, label }))}
+            />
           </div>
+        }
+      />
+      <div className="flex w-full max-w-3xl flex-col gap-10 px-4 pb-16 md:px-6">
+        <div className="flex flex-col gap-4">
           <SegmentedButtons
-            className="w-full sm:w-md [&>*]:px-2 [&>*]:whitespace-nowrap"
+            className="w-full md:hidden [&>*]:px-2 [&>*]:whitespace-nowrap"
             value={range}
             onChange={setRange}
             options={RANGES.map(({ value, label }) => ({ value, label }))}
           />
+          {rel.members.length > 1 && (
+            <div className="flex flex-wrap gap-2">
+              {rel.members.map((m) => (
+                <Chip key={m.userId} plain selected={m.userId === who} onClick={() => setWho(m.userId)}>
+                  {m.userId === me.user.id ? "You" : m.displayName}
+                </Chip>
+              ))}
+            </div>
+          )}
+          {byMonth && (
+            <div className="-ml-2 flex items-center gap-1">
+              <IconButton icon="chevron_left" label="The month before" onClick={() => setMonth(shiftMonth(month, -1))} />
+              <span className="text-body-large text-on-surface">
+                {fmtMonth(`${month}-01`)}
+                {month === current && <span className="text-on-surface-variant"> so far</span>}
+              </span>
+              <IconButton icon="chevron_right" label="The month after" disabled={month >= current} onClick={() => setMonth(shiftMonth(month, 1))} />
+            </div>
+          )}
+          <ReviewOpen />
         </div>
-        {byMonth && (
-          <div className="flex items-center justify-center gap-2">
-            <IconButton icon="chevron_left" label="The month before" onClick={() => setMonth(shiftMonth(month, -1))} />
-            <span className="min-w-40 text-center text-title-medium text-on-surface">
-              {fmtMonth(`${month}-01`)}
-              {month === current && <span className="text-on-surface-variant"> so far</span>}
-            </span>
-            <IconButton icon="chevron_right" label="The month after" disabled={month >= current} onClick={() => setMonth(shiftMonth(month, 1))} />
-          </div>
-        )}
         {stats.isPending ? (
           <Loading />
         ) : stats.error ? (
           <ErrorBox error={stats.error} onRetry={() => stats.refetch()} />
         ) : stats.data.totals.done + stats.data.totals.missed + stats.data.totals.excused === 0 ? (
-          <Empty icon="insights" title={byMonth && month !== current ? `Nothing was due in ${fmtDate(`${month}-01`, { month: "long" })}` : "Nothing finished in this stretch"} body="Stats fill in as tasks are done or missed." />
+          <p className="text-body-large text-on-surface-variant">
+            {byMonth && month !== current ? `Nothing was due in ${fmtDate(`${month}-01`, { month: "long" })}.` : "Nothing finished in this stretch yet."}
+          </p>
         ) : (
-          <Body s={stats.data} before={before} />
+          <Body s={stats.data} before={before} name={who === me.user.id ? null : memberName(who)} />
         )}
-        {who === sub && <MoodCard heading={<h2 className="mt-2 text-title-medium text-on-surface">Mood</h2>} />}
+        {features.points && points.length > 0 && (
+          <section>
+            <h2 className="eyebrow">Points</h2>
+            <p className="mt-3 text-body-large text-on-surface">
+              Earned {earned} · spent {spent} · lost {lost}
+            </p>
+          </section>
+        )}
+        {(!byMonth || month === current) && (
+          <section>
+            <MoodCard heading={<h2 className="eyebrow">Mood</h2>} days={byMonth ? 30 : Number(range)} person={who} />
+          </section>
+        )}
       </div>
     </>
   );
 }
 
-/** While this month's review is open and you haven't looked back yet, a way over to it. */
+/** While this month's review is open and you haven't looked back yet, a line over to it. */
 function ReviewOpen() {
   const { rel, me, features } = useRel();
   const navigate = useNavigate();
   const current = monthOf(today());
   const month = useMonth(rel.id, current, features.review && !rel.endedAt);
   if (!month.data?.reviewOpen || !month.data.waitingOn.includes(me.user.id)) return null;
-  const name = fmtDate(`${current}-01`, { month: "long" });
   return (
-    <section className="border border-outline-variant flex flex-col gap-3 rounded-lg p-4 sm:flex-row sm:items-center sm:gap-4 text-on-surface">
-      <div className="flex min-w-0 flex-1 items-start gap-3">
-        <Icon name="flag" />
-        <div className="min-w-0">
-          <h2 className="text-title-medium">{name}'s review is open</h2>
-          <p className="text-body-medium opacity-80">Look back on the month together{month.data.focus ? " and how the focus went" : ""}.</p>
-        </div>
-      </div>
-      <Button className="self-end sm:self-auto" onClick={() => navigate({ to: "/review" })}>
-        Look back
-      </Button>
-    </section>
+    <button type="button" onClick={() => navigate({ to: "/review" })} className="self-start text-left text-body-large text-primary">
+      {fmtDate(`${current}-01`, { month: "long" })}'s review is open · Look back ›
+    </button>
   );
 }
 
-/** `flush` lets rows run to the card's edges. */
-function Card({ title, children, flush }: { title?: string; children: ReactNode; flush?: boolean }) {
+function Figure({ value, label }: { value: string; label: string }) {
   return (
-    <section className={cx("flex flex-col gap-3 rounded-lg bg-surface-container-low", flush ? "pt-4 pb-2" : "p-4")}>
-      {title && <h2 className={cx("text-title-medium text-on-surface", flush && "px-4")}>{title}</h2>}
-      {children}
-    </section>
+    <div>
+      <div className="font-serif text-[64px] leading-[68px] text-on-surface tabular-nums">{value}</div>
+      <div className="text-body-large text-on-surface-variant">{label}</div>
+    </div>
   );
 }
 
-function Body({ s, before }: { s: DynamicStats; before: string }) {
+function Body({ s, before, name }: { s: DynamicStats; before: string; name: string | null }) {
   const t = s.totals;
+  const due = t.done + t.missed;
+  const best = Math.max(0, ...s.tasks.map((x) => x.streak));
   return (
     <>
-      <Card>
-        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-          <div>
-            <div className="text-display-medium text-on-surface">{t.rate === null ? "–" : pct(t.rate)}</div>
-            <div className="text-body-medium text-on-surface-variant">done of what was due</div>
-            <Trend rate={t.rate} previous={s.previous.rate} before={before} />
-          </div>
-          <dl className="grid grid-cols-3 gap-2 text-center">
-            <Count label="Done" value={t.done} dot="bg-primary" />
-            <Count label="Missed" value={t.missed} dot="bg-outline" />
-            <Count label="Excused" value={t.excused} dot="bg-outline-variant" />
-          </dl>
+      <section className="flex flex-col gap-3">
+        <div className="flex flex-wrap gap-x-10 gap-y-4">
+          <Figure value={due ? pct(t.onTime / due) : "–"} label="on time" />
+          <Figure value={String(best)} label="best streak" />
+          <Figure value={String(t.missed)} label="missed" />
         </div>
-        {(t.done > 0 || t.moved > 0) && (
-          <p className="text-body-medium text-on-surface-variant">
-            {t.done > 0 && `${pct(t.onTime / t.done)} of done tasks were on time`}
-            {t.done > 0 && t.moved > 0 && " · "}
-            {t.moved > 0 && `${t.moved} ${t.moved === 1 ? "deadline" : "deadlines"} moved`}
-          </p>
-        )}
-      </Card>
-      <Card title="Over time">
-        <Bars s={s} />
-      </Card>
-      <Card title="By weekday">
-        <Weekdays days={s.weekdays} />
-      </Card>
-      <Card title="By task" flush>
+        <p className="text-body-medium text-on-surface-variant">
+          {[
+            name ? `${name}'s tasks` : null,
+            t.rate === null ? null : `${pct(t.rate)} done`,
+            trend(t.rate, s.previous.rate, before),
+            t.excused ? `${t.excused} excused` : null,
+            t.moved ? `${t.moved} ${t.moved === 1 ? "deadline" : "deadlines"} moved` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+      </section>
+      <section>
+        <h2 className="eyebrow">By task</h2>
         <Tasks tasks={s.tasks} />
-      </Card>
+      </section>
+      <section>
+        <h2 className="eyebrow">Over time</h2>
+        <div className="mt-4">
+          <Bars s={s} />
+        </div>
+      </section>
+      <section>
+        <h2 className="eyebrow">By weekday</h2>
+        <div className="mt-4">
+          <Weekdays days={s.weekdays} />
+        </div>
+      </section>
     </>
   );
 }
 
-function Trend({ rate, previous, before }: { rate: number | null; previous: number | null; before: string }) {
+function trend(rate: number | null, previous: number | null, before: string) {
   if (rate === null || previous === null) return null;
   const diff = Math.round((rate - previous) * 100);
-  const up = diff > 0;
-  return (
-    <div className={cx("mt-1 flex items-center gap-1 text-label-large", diff === 0 ? "text-on-surface-variant" : up ? "text-primary" : "text-error")}>
-      <Icon name={diff === 0 ? "trending_flat" : up ? "trending_up" : "trending_down"} size={20} />
-      {diff === 0 ? `Same as ${before}` : `${up ? "Up" : "Down"} ${Math.abs(diff)} ${Math.abs(diff) === 1 ? "point" : "points"} on ${before}`}
-    </div>
-  );
-}
-
-function Count({ label, value, dot }: { label: string; value: number; dot: string }) {
-  return (
-    <div className="border border-outline-variant min-w-16 rounded-md px-3 py-2">
-      <dd className="text-title-large text-on-surface">{value}</dd>
-      <dt className="flex items-center justify-center gap-1.5 text-label-medium text-on-surface-variant">
-        <span className={cx("size-2 rounded-full", dot)} />
-        {label}
-      </dt>
-    </div>
-  );
+  return diff === 0 ? `same as ${before}` : `${diff > 0 ? "up" : "down"} ${Math.abs(diff)} ${Math.abs(diff) === 1 ? "point" : "points"} on ${before}`;
 }
 
 function bucketLabel(start: string, bucket: DynamicStats["bucket"], days: number) {
@@ -181,7 +194,7 @@ function bucketLabel(start: string, bucket: DynamicStats["bucket"], days: number
   return days <= 7 ? fmtDate(start, { weekday: "short" }) : fmtDate(start, { day: "numeric" });
 }
 
-/** Stacked bars per day, week or month: done at the bottom, then missed, then excused. Empty stretches before the first task are left off. */
+/** Stacked bars per day, week or month: done in ink at the bottom, then missed in the accent, then excused. */
 function Bars({ s }: { s: DynamicStats }) {
   const first = s.buckets.findIndex((b) => b.done + b.missed + b.excused > 0);
   const buckets = s.buckets.slice(s.bucket === "day" ? 0 : Math.max(0, first));
@@ -190,7 +203,7 @@ function Bars({ s }: { s: DynamicStats }) {
   const unit = s.bucket === "day" ? "day" : s.bucket === "week" ? "week of" : "";
   return (
     <div>
-      <div className="flex h-40 items-end gap-[3px]" role="img" aria-label={`Done and missed by ${s.bucket}`}>
+      <div className="flex h-32 items-end gap-[3px] border-b border-outline-variant" role="img" aria-label={`Done and missed by ${s.bucket}`}>
         {buckets.map((b) => {
           const total = b.done + b.missed + b.excused;
           return (
@@ -199,12 +212,10 @@ function Bars({ s }: { s: DynamicStats }) {
               className="flex h-full min-w-0 flex-1 flex-col justify-end"
               title={`${unit} ${fmtDate(b.start, { month: "short", day: "numeric" })}: ${b.done} done, ${b.missed} missed${b.excused ? `, ${b.excused} excused` : ""}`}
             >
-              {total === 0 ? (
-                <div className="h-0.5 rounded-full bg-outline-variant/60" />
-              ) : (
-                <div className="flex flex-col-reverse overflow-hidden rounded-t-sm" style={{ height: `${(total / max) * 100}%` }}>
-                  <div className="bg-primary" style={{ flexGrow: b.done }} />
-                  <div className="bg-outline" style={{ flexGrow: b.missed }} />
+              {total > 0 && (
+                <div className="flex flex-col-reverse overflow-hidden" style={{ height: `${(total / max) * 100}%` }}>
+                  <div className="bg-on-surface" style={{ flexGrow: b.done }} />
+                  <div className="bg-primary" style={{ flexGrow: b.missed }} />
                   <div className="bg-outline-variant" style={{ flexGrow: b.excused }} />
                 </div>
               )}
@@ -219,11 +230,22 @@ function Bars({ s }: { s: DynamicStats }) {
           </span>
         ))}
       </div>
+      <p className="mt-3 flex gap-4 text-body-medium text-on-surface-variant">
+        <span className="flex items-center gap-1.5">
+          <span className="size-2.5 bg-on-surface" /> done
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-2.5 bg-primary" /> missed
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-2.5 bg-outline-variant" /> excused
+        </span>
+      </p>
     </div>
   );
 }
 
-/** Done rate for each weekday, with the day that slips most called out. */
+/** Done rate for each weekday as a thin ink bar, with the day that slips most called out. */
 function Weekdays({ days }: { days: Tally[] }) {
   const { me } = useRel();
   const order = me.user.weekStart === "mon" ? [1, 2, 3, 4, 5, 6, 0] : [0, 1, 2, 3, 4, 5, 6];
@@ -235,17 +257,17 @@ function Weekdays({ days }: { days: Tally[] }) {
           const d = days[i]!;
           return (
             <div key={i} className="flex flex-col items-center gap-1">
-              <div className="border border-outline-variant relative flex h-20 w-full max-w-10 items-end overflow-hidden rounded-sm">
-                {d.rate !== null && <div className="w-full bg-primary" style={{ height: `${Math.max(4, d.rate * 100)}%` }} />}
+              <div className="flex h-16 w-full items-end justify-center border-b border-outline-variant">
+                {d.rate !== null && <div className="w-2 bg-on-surface" style={{ height: `${Math.max(4, d.rate * 100)}%` }} />}
               </div>
-              <span className={cx("text-label-medium", i === worst ? "font-bold text-on-surface" : "text-on-surface-variant")}>{WEEKDAYS[i]!.slice(0, 3)}</span>
+              <span className={cx("text-label-medium", i === worst ? "text-primary" : "text-on-surface-variant")}>{WEEKDAYS[i]!.slice(0, 3)}</span>
               <span className="text-label-small text-on-surface-variant">{d.rate === null ? "–" : pct(d.rate)}</span>
             </div>
           );
         })}
       </div>
       {worst >= 0 && (
-        <p className="text-body-medium text-on-surface-variant">
+        <p className="mt-3 text-body-medium text-on-surface-variant">
           Most misses on {WEEKDAYS[worst]}s ({days[worst]!.missed}).
         </p>
       )}
@@ -253,38 +275,32 @@ function Weekdays({ days }: { days: Tally[] }) {
   );
 }
 
-/** Each task, lowest done rate first, so what's slipping is at the top. */
+/** Each task as a line with an ink bar, lowest done rate first, so what's slipping is at the top. */
 function Tasks({ tasks }: { tasks: DynamicStats["tasks"] }) {
   const navigate = useNavigate();
   const sorted = [...tasks].sort((a, b) => (a.rate ?? 2) - (b.rate ?? 2) || b.done + b.missed - (a.done + a.missed));
   return (
-    <ul>
+    <ul className="mt-2 divide-y divide-outline-variant border-b border-outline-variant">
       {sorted.map((t) => (
         <li key={t.taskId}>
           <button
             type="button"
             disabled={!t.active}
             onClick={() => navigate({ to: "/tasks/$taskId", params: { taskId: t.taskId } })}
-            className="state-layer flex w-full items-center gap-4 px-4 py-3 text-left disabled:cursor-default"
+            className="state-layer flex w-full flex-col gap-2.5 py-3.5 text-left disabled:cursor-default"
           >
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-body-large text-on-surface">{t.title}</div>
-              <div className="text-body-medium text-on-surface-variant">
-                {t.done} of {t.done + t.missed} done{t.excused ? `, ${t.excused} excused` : ""}
-                {!t.active && " · ended"}
-              </div>
-              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-container-highest">
-                {t.rate !== null && <div className="h-full rounded-full bg-primary" style={{ width: `${t.rate * 100}%` }} />}
-              </div>
+            <div className="flex w-full items-baseline gap-3">
+              <span className="min-w-0 flex-1 truncate text-body-large text-on-surface">
+                {t.title}
+                {!t.active && <span className="text-on-surface-variant"> · ended</span>}
+              </span>
+              <span className="shrink-0 text-body-medium text-on-surface-variant tabular-nums">
+                {t.done} of {t.done + t.missed}
+                {t.excused ? ` · ${t.excused} excused` : ""}
+              </span>
             </div>
-            <div className="w-14 shrink-0 text-right">
-              <div className="text-title-medium text-on-surface">{t.rate === null ? "–" : pct(t.rate)}</div>
-              {t.streak > 1 && (
-                <div className="flex items-center justify-end gap-0.5 text-label-small text-on-surface-variant" title={`Streak of ${t.streak}`}>
-                  <Icon name="local_fire_department" size={14} />
-                  {t.streak}
-                </div>
-              )}
+            <div className="h-1 w-full bg-outline-variant/60">
+              {t.rate !== null && <div className="h-full bg-on-surface" style={{ width: `${t.rate * 100}%` }} />}
             </div>
           </button>
         </li>

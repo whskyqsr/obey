@@ -51,14 +51,14 @@ function DynamicList({ onPick }: { onPick(): void }) {
                   void navigate({ to: "/" });
                 }
               }}
-              className={cx("state-layer flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left", r.id === rel.id && "bg-secondary-container")}
+              className={cx("state-layer flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left", r.id === rel.id && "bg-surface-container")}
             >
               <DynamicMark rel={r} size={36} />
               <span className="min-w-0 flex-1">
                 <span className={cx("block truncate text-label-large", r.endedAt ? "text-on-surface-variant" : "text-on-surface")}>{label(r, me.user.id)}</span>
                 <span className="block truncate text-body-small text-on-surface-variant">{subtitle(r, me.user.id)}</span>
               </span>
-              {r.id === rel.id && <Icon name="check" className="text-on-secondary-container" />}
+              {r.id === rel.id && <Icon name="check" className="text-on-surface" />}
             </button>
           </li>
         ))}

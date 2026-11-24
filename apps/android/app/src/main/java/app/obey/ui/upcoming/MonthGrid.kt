@@ -1,7 +1,6 @@
 package app.obey.ui.upcoming
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,11 +8,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,27 +19,32 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import app.obey.ui.common.Diamond
+import app.obey.ui.common.DiamondState
+import app.obey.ui.today.diamondState
 import app.obey.api.Occurrence
 import app.obey.api.Relationship
 import app.obey.api.OccurrenceStatus
 import app.obey.ui.common.formatDate
-import app.obey.ui.common.parseInstant
-import app.obey.ui.plans.isLong
-import app.obey.ui.plans.planTone
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 
-/** A month as a grid of whole weeks, with a dot per task and a bar for plans. Tapping a day shows its tasks below, as on the web. */
+/**
+ * A month as in mockup 13: serif dates, one diamond for the day's tasks and an accent bar when it has plans. The chosen
+ * day is filled in ink; days outside the month are left blank. Tapping a day lists it below.
+ */
 @Composable
-fun MonthGrid(data: CalendarData, selected: LocalDate, today: LocalDate, rel: Relationship?, onSelect: (LocalDate) -> Unit, modifier: Modifier = Modifier) {
+fun MonthGrid(data: CalendarData, selected: LocalDate, today: LocalDate, @Suppress("UNUSED_PARAMETER") rel: Relationship?, onSelect: (LocalDate) -> Unit, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
     val month = data.anchor.month
     val now = Instant.now()
@@ -49,7 +52,7 @@ fun MonthGrid(data: CalendarData, selected: LocalDate, today: LocalDate, rel: Re
         Row(Modifier.fillMaxWidth()) {
             data.days.take(7).forEach { (d, _) ->
                 Text(
-                    d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                    d.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.getDefault()),
                     style = MaterialTheme.typography.labelMedium,
                     color = colors.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -57,68 +60,50 @@ fun MonthGrid(data: CalendarData, selected: LocalDate, today: LocalDate, rel: Re
                 )
             }
         }
-        Column(
-            Modifier.clip(RoundedCornerShape(12.dp)).background(colors.outlineVariant),
-            verticalArrangement = Arrangement.spacedBy(1.dp),
-        ) {
-            data.days.chunked(7).forEach { week ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(1.dp)) {
-                    week.forEach { (d, items) ->
-                        val inMonth = d.month == month
-                        val plans = data.eventsOn(d)
-                        val label = buildString {
-                            append(formatDate(d))
-                            if (items.isEmpty() && plans.isEmpty()) append(", nothing scheduled")
-                            if (plans.isNotEmpty()) append(", ${plans.size} plan${if (plans.size == 1) "" else "s"}")
-                            if (items.isNotEmpty()) append(", ${items.size} task${if (items.size == 1) "" else "s"}")
-                        }
+        data.days.chunked(7).forEach { week ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                week.forEach { (d, all) ->
+                    if (d.month != month) Spacer(Modifier.weight(1f)) else {
+                    val items = all.filter { it.status != OccurrenceStatus.Cancelled }
+                    val plans = data.eventsOn(d)
+                    val on = d == selected
+                    val label = buildString {
+                        append(formatDate(d))
+                        if (items.isEmpty() && plans.isEmpty()) append(", nothing scheduled")
+                        if (plans.isNotEmpty()) append(", ${plans.size} plan${if (plans.size == 1) "" else "s"}")
+                        if (items.isNotEmpty()) append(", ${items.size} task${if (items.size == 1) "" else "s"}")
+                    }
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                         Column(
                             Modifier
-                                .weight(1f)
-                                .heightIn(min = 64.dp)
-                                .background(if (d == selected) colors.secondaryContainer else if (inMonth) colors.surfaceContainerLow else colors.surface)
+                                .size(48.dp, 52.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (on) colors.onSurface else Color.Transparent)
                                 .clickable { onSelect(d) }
                                 .semantics(mergeDescendants = true) {
                                     contentDescription = label
-                                    this.selected = d == selected
+                                    this.selected = on
                                 }
-                                .padding(4.dp),
+                                .padding(top = 4.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            Box(
-                                Modifier.size(28.dp).clip(CircleShape).background(if (d == today) colors.primary else Color.Transparent),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    "${d.dayOfMonth}",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = when {
-                                        d == today -> colors.onPrimary
-                                        inMonth -> colors.onSurface
-                                        else -> colors.onSurfaceVariant.copy(alpha = 0.6f)
-                                    },
-                                )
-                            }
-                            if (plans.isNotEmpty()) {
-                                // A full-width bar for all-day and multi-day plans, so they read as spanning; a short one for timed plans.
-                                // One bar per person whose plans fall on the day, in their colour.
-                                val tones = plans.map { planTone(it, rel).dot }.distinct().take(3)
-                                Row(
-                                    Modifier
-                                        .padding(top = 4.dp)
-                                        .then(if (plans.any { it.isLong }) Modifier.fillMaxWidth() else Modifier.width(if (tones.size == 1) 14.dp else 24.dp)),
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                ) {
-                                    tones.forEach { dot -> Box(Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(dot)) }
+                            Text(
+                                "${d.dayOfMonth}",
+                                style = MaterialTheme.typography.headlineMedium.copy(fontSize = 22.sp, lineHeight = 28.sp),
+                                color = when {
+                                    on -> colors.surface
+                                    d == today -> colors.primary
+                                    else -> colors.onSurface
+                                },
+                            )
+                            Row(Modifier.height(8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                monthState(items, now)?.let { st ->
+                                    if (on) Box(Modifier.size(5.dp).rotate(45f).background(colors.surface)) else Diamond(st, size = 6.dp)
                                 }
-                            }
-                            Row(
-                                Modifier.padding(top = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                            ) {
-                                items.take(4).forEach { StatusDot(it, now) }
+                                if (plans.isNotEmpty()) Box(Modifier.width(12.dp).height(3.dp).clip(RoundedCornerShape(2.dp)).background(if (on) colors.surface else colors.primary))
                             }
                         }
+                    }
                     }
                 }
             }
@@ -126,18 +111,14 @@ fun MonthGrid(data: CalendarData, selected: LocalDate, today: LocalDate, rel: Re
     }
 }
 
-@Composable
-private fun StatusDot(o: Occurrence, now: Instant) {
-    val c = MaterialTheme.colorScheme
-    val overdue = o.status == OccurrenceStatus.Pending && parseInstant(o.dueAt).isBefore(now)
-    val base = Modifier.size(6.dp).clip(CircleShape)
-    val m = when {
-        o.status == OccurrenceStatus.Completed -> base.background(c.primary)
-        o.status == OccurrenceStatus.Missed || overdue -> base.background(c.error)
-        o.status == OccurrenceStatus.Submitted -> base.background(c.tertiary)
-        o.status == OccurrenceStatus.Excused || o.status == OccurrenceStatus.Cancelled -> base.background(c.outline)
-        // Still to do: an open ring, so it reads differently from done at dot size.
-        else -> base.border(1.5.dp, c.onSurfaceVariant, CircleShape)
+/** One diamond for a day: owed if anything was missed, filled once all is done, open while some are to do. */
+private fun monthState(items: List<Occurrence>, now: Instant): DiamondState? {
+    if (items.isEmpty()) return null
+    val states = items.map { it.diamondState(now) }
+    return when {
+        DiamondState.Owed in states -> DiamondState.Owed
+        states.all { it == DiamondState.Done || it == DiamondState.Off } -> DiamondState.Done
+        DiamondState.Waiting in states -> DiamondState.Waiting
+        else -> DiamondState.Open
     }
-    Box(m)
 }

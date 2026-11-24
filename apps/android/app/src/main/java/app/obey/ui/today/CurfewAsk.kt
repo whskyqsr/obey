@@ -23,7 +23,7 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import app.obey.ui.common.ChoiceChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -92,14 +92,14 @@ private fun TimeChoices(options: List<Pair<String, Instant>>, value: Instant?, a
     val custom = value != null && options.none { it.second == value }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.filter { valid(it.second) }.forEach { (label, at) ->
-            FilterChip(
+            ChoiceChip(
                 selected = value == at,
                 onClick = { onChange(at) },
                 label = { Text(label) },
                 leadingIcon = if (value == at) ({ Icon(Icons.Outlined.Check, null, Modifier.size(18.dp)) }) else null,
             )
         }
-        FilterChip(
+        ChoiceChip(
             selected = custom,
             onClick = { picking = true },
             label = { Text(if (custom) formatTime(value!!.iso()) else "Pick a time") },

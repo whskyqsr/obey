@@ -114,7 +114,9 @@ export function SwapDialog({ open, onClose }: { open: boolean; onClose(): void }
           label={`Pause ${subName} tasks meanwhile`}
           help={timed ? "They pick up again when you swap back" : "They pick up again when either of you swaps back"}
         />
-        <p className="text-body-small">{partner.displayName} has to accept first. Points, rules and history stay as they are, and either of you can end the swap at any time.</p>
+        <p className="text-body-small">
+          {partner.displayName} has to accept first. Points, rules and history stay as they are, and either of you can end the swap at any time.
+        </p>
       </div>
     </Dialog>
   );
@@ -147,7 +149,10 @@ export function EndSwapDialog({ open, onClose, swap }: { open: boolean; onClose(
             variant="text"
             busy={end.isPending}
             onClick={() =>
-              end.mutate(undefined, { onSuccess: () => (onClose(), snack(active ? "Your roles are back" : "Request taken back")), onError: (e) => snack(errorMessage(e)) })
+              end.mutate(undefined, {
+                onSuccess: () => (onClose(), snack(active ? "Your roles are back" : "Request taken back")),
+                onError: (e) => snack(errorMessage(e)),
+              })
             }
           >
             {active ? "End swap" : "Take back"}
@@ -155,7 +160,9 @@ export function EndSwapDialog({ open, onClose, swap }: { open: boolean; onClose(
         </>
       }
     >
-      {active ? `${back}${swap.pauseTasks ? " Paused tasks pick up again." : ""} ${memberName(other)} gets a notification.` : `${memberName(other)} won't be asked any more.`}
+      {active
+        ? `${back}${swap.pauseTasks ? " Paused tasks pick up again." : ""} ${memberName(other)} gets a notification.`
+        : `${memberName(other)} won't be asked any more.`}
     </Dialog>
   );
 }
@@ -182,19 +189,22 @@ export function RoleSwapCard() {
     const pausesMine = swap.pauseTasks && mine?.role === "submissive";
     return (
       <div className="px-4 pb-4 md:px-6">
-        <div className="flex flex-col gap-2 rounded-xl bg-secondary-container px-4 py-4 text-on-secondary-container">
+        <div className="flex flex-col gap-2 rounded-md border border-primary bg-surface-container-lowest px-5 py-4 text-on-surface">
           <div className="text-title-medium">{memberName(other)} asked to swap roles</div>
           <p className="text-body-medium">
             You'd be {willBe} {swap.endsAt ? `until ${fmtSwapEnd(swap.endsAt)}` : "until one of you swaps back"}.
             {pausesMine ? " Your tasks pause until then." : swap.pauseTasks ? ` ${memberName(other)}'s tasks pause until then.` : ""}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <Button busy={accept.isPending} onClick={() => accept.mutate(undefined, { onSuccess: () => snack("Your roles are swapped"), onError: (e) => snack(errorMessage(e)) })}>
+            <Button
+              busy={accept.isPending}
+              onClick={() => accept.mutate(undefined, { onSuccess: () => snack("Your roles are swapped"), onError: (e) => snack(errorMessage(e)) })}
+            >
               Accept
             </Button>
             <Button
               variant="text"
-              className="text-on-secondary-container"
+              className="text-on-surface-variant"
               busy={decline.isPending}
               onClick={() => decline.mutate(undefined, { onError: (e) => snack(errorMessage(e)) })}
             >
@@ -225,13 +235,13 @@ export function RoleSwapCard() {
           .join(" · ");
   return (
     <div className="px-4 pb-4 md:px-6">
-      <div className="flex items-center gap-3 rounded-xl bg-tertiary-container px-4 py-3 text-on-tertiary-container">
+      <div className="flex items-center gap-3 border-l-2 border-primary py-1 pl-4 text-on-surface">
         <Icon name="swap_horiz" className="shrink-0" />
         <div className="min-w-0 flex-1">
           <div className="text-title-small">{line}</div>
-          <div className="text-body-small opacity-85">{sub}</div>
+          <div className="text-body-medium text-on-surface-variant">{sub}</div>
         </div>
-        <Button variant="text" className="shrink-0 text-on-tertiary-container" onClick={() => setEnding(true)}>
+        <Button variant="text" className="shrink-0" onClick={() => setEnding(true)}>
           {swap.status === "pending" ? "Take back" : "End"}
         </Button>
       </div>

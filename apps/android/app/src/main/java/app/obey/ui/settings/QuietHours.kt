@@ -49,14 +49,13 @@ fun QuietHoursSetting(saved: QuietHours?, enabled: Boolean, onChange: (start: St
     val end = saved?.end ?: "07:00"
     fun label(hhmm: String) = LocalTime.parse(hhmm).format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))
 
-    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, colors.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.padding(horizontal = 16.dp).padding(top = 8.dp).fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Bedtime, null, tint = colors.primary)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Quiet hours", style = MaterialTheme.typography.bodyLarge)
-                    Text("Notifications still arrive, just without sound or vibration.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
                 }
                 Switch(checked = saved != null, enabled = enabled, onCheckedChange = { on -> if (on) onChange(start, end) else onChange(null, null) })
             }

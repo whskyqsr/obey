@@ -4,7 +4,7 @@ import { starterKits, type ApplyKitResult, type Features, type Kit, type KitItem
 import { describe } from "@obey/recurrence";
 import { useApplyKit, useCopySharedKit, useDeleteKit, useLibrary, useMyKits, useSaveKit, useShareKit, useSharedKit, useTasks, useUpdateKit } from "../api/hooks";
 import { errorMessage } from "../api/client";
-import { SubHeader, Button, Card, Checkbox, IconButton, Dialog, Empty, ErrorBox, Fab, Icon, Loading, OverflowMenu, PageHeader, Select, TextField, useSnackbar } from "../components/ui";
+import { SubHeader, Button, Checkbox, IconButton, Dialog, Empty, ErrorBox, Fab, Icon, Loading, OverflowMenu, PageHeader, Select, TextField, useSnackbar } from "../components/ui";
 import { browserTimeZone, fmtClock, fmtDate, today } from "../lib/dates";
 import { useReadOnly, useRel } from "../lib/relationship";
 import { useConfirm } from "../lib/useConfirm";
@@ -129,6 +129,7 @@ export function KitsPage() {
           </ul>
         </>
       )}
+      <AddByCodeRow />
       {open && <KitDialog kit={open} source={{ kit: open.id }} onClose={() => setOpen(null)} />}
       {adding && <AddByCodeDialog onClose={() => setAdding(false)} />}
     </>
@@ -142,6 +143,34 @@ const shareCodeFrom = (text: string) => {
 };
 export const kitLink = (code: string) => `${window.location.origin}/kit/${code}`;
 const dashed = (code: string) => `${code.slice(0, 3)}-${code.slice(3)}`;
+
+/** Under the lists (mockup 84): paste a shared kit's link or code and open it. */
+function AddByCodeRow() {
+  const navigate = useNavigate();
+  const [text, setText] = useState("");
+  const code = shareCodeFrom(text);
+  return (
+    <form
+      className="mx-4 mb-8 flex items-center gap-3 rounded-md border border-outline-variant bg-surface-container-lowest py-2 pr-2 pl-4 md:mx-6"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (code) void navigate({ to: "/kit/$code", params: { code } });
+      }}
+    >
+      <Icon name="link" className="shrink-0 text-on-surface-variant" />
+      <input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Add from a link or code"
+        aria-label="Add from a link or code"
+        className="min-w-0 flex-1 bg-transparent py-2 text-body-large text-on-surface outline-none placeholder:text-on-surface-variant"
+      />
+      <Button type="submit" variant="outlined" disabled={!code}>
+        Add
+      </Button>
+    </form>
+  );
+}
 
 function AddByCodeDialog({ onClose }: { onClose(): void }) {
   const navigate = useNavigate();
@@ -677,7 +706,7 @@ export function KitPrompt() {
   if (!isDom || readOnly || !tasks.data || tasks.data.length) return null;
   return (
     <div className="px-4 pb-4 md:px-6">
-      <Card variant="outlined">
+      <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-4">
         <div className="flex items-center gap-4">
           <Icon name="widgets" className="text-primary" />
           <div className="min-w-0 flex-1">
@@ -688,7 +717,7 @@ export function KitPrompt() {
             Browse
           </Button>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }

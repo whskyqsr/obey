@@ -110,7 +110,7 @@ describe("app smoke test (dev auth, mocked API)", () => {
     await visit("/calendar", "Week");
     await visit("/us", "Your dynamic");
     await visit("/tasks", /Every 2 weeks on Mon, Thu at 9:00\s?PM/);
-    await visit("/tasks/t1", "Streak");
+    await visit("/tasks/t1", "streak");
     await visit("/tasks/t1", /, all day$/);
     await visit("/tasks/t1/edit", "Edit task");
     await visit("/tasks/t1/history", "History");
@@ -120,6 +120,8 @@ describe("app smoke test (dev auth, mocked API)", () => {
     await visit("/rules", "Ask before sweets");
     await visit("/notes", "Aftercare");
     await visit("/notes/n1", "blanket");
-    await visit("/settings", "Accent");
+    await visit("/settings", "Theme and accent");
+    await visit("/settings/look", "Accent");
+    await visit("/settings/features", "Limits");
   });
 });
