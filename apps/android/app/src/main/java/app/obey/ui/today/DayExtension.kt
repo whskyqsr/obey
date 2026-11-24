@@ -14,8 +14,6 @@ import androidx.compose.material.icons.outlined.EditCalendar
 import app.obey.ui.common.TonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import app.obey.ui.common.ChoiceChip
@@ -122,13 +120,8 @@ fun ExtensionRequestCard(
     fun change(x: RescheduleRequest) = if (x.kind == "cancel") "Call off" else "${formatDateTime(x.fromDueAt)} → ${formatDateTime(x.toDueAt)}"
     val r = rows.first()
     val who = requester?.let { "$it asks" } ?: "You asked"
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.Transparent, contentColor = MaterialTheme.colorScheme.onSurface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    app.obey.ui.common.AccentBox {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             if (rows.size == 1 && r.kind == "cancel") {
                 Text("$who to call off “${r.title}”", style = MaterialTheme.typography.titleMedium)
                 Text("Due ${formatDateTime(r.fromDueAt)}", style = MaterialTheme.typography.bodyMedium)
@@ -149,10 +142,10 @@ fun ExtensionRequestCard(
                     }
                 }
             }
-            r.reason?.let { Text("“$it”", style = MaterialTheme.typography.bodyMedium) }
+            r.reason?.let { Text("“$it”", style = MaterialTheme.typography.titleLarge.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = MaterialTheme.colorScheme.onSurfaceVariant) }
             if (canDecide) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { onDecide(true) }) { Text(if (rows.size == 1) "Approve" else "Approve all") }
+                    Button(onClick = { onDecide(true) }, colors = app.obey.ui.common.inkButtonColors()) { Text(if (rows.size == 1) "Approve" else "Approve all") }
                     if (rows.size == 1) TonalButton(onClick = { onInstead(r) }) { Text(if (r.kind == "cancel") "Reschedule instead" else "Other time") }
                     TextButton(onClick = { onDecide(false) }) { Text("Decline") }
                 }

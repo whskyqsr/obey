@@ -287,7 +287,7 @@ private fun LockUp(l: ChastityLock, keyholder: String, relock: Boolean, busy: Bo
 }
 
 @Composable
-private fun Card(container: Boolean = false, content: @Composable () -> Unit) {
+private fun LockBox(container: Boolean = false, content: @Composable () -> Unit) {
     val c = MaterialTheme.colorScheme
     Surface(
         color = androidx.compose.ui.graphics.Color.Transparent,
@@ -307,7 +307,7 @@ private fun AskToAnswer(e: ChastityEvent, l: ChastityLock, wearer: String, busy:
     var changing by remember { mutableStateOf(false) }
     var minutes by remember { mutableStateOf(e.minutes ?: 20) }
     val isBreak = e.kind == "break"
-    Card(container = true) {
+    LockBox(container = true) {
         Text(if (isBreak) "$wearer asked for a hygiene break" else "$wearer asked to be released", style = MaterialTheme.typography.titleMedium)
         Text(
             if (isBreak) "${e.minutes} minutes, then they relock${if (l.keyMode == "keybox") " and seal a new code" else ""}. The lock's clock keeps running."
@@ -351,14 +351,14 @@ fun LockCard(l: ChastityLock, events: List<ChastityEvent>, session: Session, bus
 
     if (l.status == "pending") {
         if (wearer && !readOnly) {
-            Card(container = true) {
+            LockBox(container = true) {
                 val length = l.minutes?.let { " for ${fmtMinutes(it)}" } ?: if (l.timeHidden) "" else " until they release you"
                 Text("$keyholderName wants you locked$length", style = MaterialTheme.typography.titleMedium)
                 if (l.keyMode == "keyholder") Text("$keyholderName keeps the key. Tap when you're locked.", style = MaterialTheme.typography.bodyMedium)
                 LockUp(l, keyholderName, relock = false, busy = busy, vm = vm)
             }
         } else {
-            Card {
+            LockBox {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Icon(Icons.Outlined.LockClock, null, tint = MaterialTheme.colorScheme.primary)
                     Column(Modifier.weight(1f)) {
@@ -378,7 +378,7 @@ fun LockCard(l: ChastityLock, events: List<ChastityEvent>, session: Session, bus
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (keyholder && !readOnly) asks.forEach { AskToAnswer(it, l, wearerName, busy, vm) }
-        Card {
+        LockBox {
             val onBreak = l.status == "break"
             LockSummary(l, if (wearer) (if (onBreak) "You're on a hygiene break" else "You're locked") else "$wearerName is ${if (onBreak) "on a hygiene break" else "locked"}")
             if (wearer && onBreak && !readOnly) LockUp(l, keyholderName, relock = true, busy = busy, vm = vm)

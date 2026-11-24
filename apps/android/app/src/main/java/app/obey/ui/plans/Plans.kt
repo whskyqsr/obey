@@ -732,10 +732,10 @@ private fun CurfewWarning(
     }
     val nightName = due.minusSeconds(12 * 3600).local().format(java.time.format.DateTimeFormatter.ofPattern("EEEE"))
     val c = MaterialTheme.colorScheme
-    Surface(color = c.errorContainer, contentColor = c.onErrorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Box(Modifier.fillMaxWidth()) {
+        Column(Modifier.fillMaxWidth().drawBehind { drawRect(c.error, size = androidx.compose.ui.geometry.Size(2.dp.toPx(), size.height)) }.padding(start = 16.dp, top = 2.dp, bottom = 2.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row {
-                Icon(Icons.Outlined.Bedtime, null)
+                Icon(Icons.Outlined.Bedtime, null, tint = c.error)
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text("Runs $howLong past curfew", style = MaterialTheme.typography.titleSmall)

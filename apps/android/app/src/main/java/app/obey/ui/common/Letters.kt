@@ -2,6 +2,7 @@ package app.obey.ui.common
 
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.background
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -143,3 +145,19 @@ fun androidx.compose.foundation.layout.RowScope.PillSegment(selected: Boolean, o
         ) { label() }
     }
 }
+
+/** Something waiting on you (a request, an aftercare plan): paper in an accent hairline. */
+@Composable
+fun AccentBox(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    val c = MaterialTheme.colorScheme
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+    Column(
+        modifier.fillMaxWidth().clip(shape).border(1.dp, c.primary, shape).background(c.surfaceContainerLowest).padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        content = content,
+    )
+}
+
+/** A rule down the left edge, the way plans and status lines carry their tone. */
+fun Modifier.sideRule(color: Color): Modifier =
+    drawBehind { drawRect(color, size = androidx.compose.ui.geometry.Size(2.dp.toPx(), size.height)) }.padding(start = 16.dp)

@@ -84,17 +84,17 @@ fun SwipeableRow(o: Occurrence, onDone: (() -> Unit)?, onMoreTime: (() -> Unit)?
             Row(
                 Modifier
                     .fillMaxSize()
-                    .background(if (toDone) colors.primary else colors.tertiaryContainer)
+                    .background(if (toDone) colors.onSurface else colors.surfaceContainerHigh)
                     .padding(horizontal = 24.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = if (toDone) Arrangement.Start else Arrangement.End,
             ) {
                 if (toDone) {
-                    Icon(Icons.Outlined.Check, null, tint = colors.onPrimary)
-                    Text("  Done", color = colors.onPrimary, style = MaterialTheme.typography.labelLarge)
+                    Icon(Icons.Outlined.Check, null, tint = colors.surface)
+                    Text("  Done", color = colors.surface, style = MaterialTheme.typography.labelLarge)
                 } else {
-                    Text("$moreTimeLabel  ", color = colors.onTertiaryContainer, style = MaterialTheme.typography.labelLarge)
-                    Icon(Icons.Outlined.MoreTime, null, tint = colors.onTertiaryContainer)
+                    Text("$moreTimeLabel  ", color = colors.onSurface, style = MaterialTheme.typography.labelLarge)
+                    Icon(Icons.Outlined.MoreTime, null, tint = colors.onSurface)
                 }
             }
         },

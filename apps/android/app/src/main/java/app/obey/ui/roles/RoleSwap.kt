@@ -214,9 +214,9 @@ fun EndSwapDialog(session: Session, swap: RoleSwap, onDismiss: () -> Unit, vm: R
 @Composable
 private fun Becomes(m: Member, label: String) {
     val c = MaterialTheme.colorScheme
-    Surface(color = c.surfaceContainerHighest, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Surface(color = c.primaryContainer, contentColor = c.onPrimaryContainer, shape = CircleShape, modifier = Modifier.size(40.dp)) {
+            Surface(color = androidx.compose.ui.graphics.Color.Transparent, contentColor = c.onSurface, border = androidx.compose.foundation.BorderStroke(1.dp, c.outline), shape = CircleShape, modifier = Modifier.size(40.dp)) {
                 Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { Text(m.displayName.take(1).uppercase()) }
             }
             Spacer(Modifier.width(12.dp))
