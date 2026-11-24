@@ -90,6 +90,17 @@ interface ObeyApi {
     @PATCH("relationships/{id}")
     suspend fun setProofDays(@Path("id") relationshipId: String, @Body body: ProofDaysInput): Relationship
 
+    @GET("relationships/{id}/ai-access")
+    suspend fun aiAccess(@Path("id") relationshipId: String): AiAccess
+
+    /** Your own switch. Turning it off always works; turning it on needs a live dynamic. */
+    @PUT("relationships/{id}/ai-access")
+    suspend fun setAiAccess(@Path("id") relationshipId: String, @Body body: AiAccessInput): AiAccessResult
+
+    /** Disconnects one of your own AI apps: its tokens stop working at once. */
+    @DELETE("me/ai-apps/{id}")
+    suspend fun disconnectAiApp(@Path("id") grantId: String)
+
     @POST("relationships/{id}/leave")
     suspend fun leaveRelationship(@Path("id") relationshipId: String, @Body body: LeaveInput): Relationship
 
@@ -144,8 +155,16 @@ interface ObeyApi {
     @POST("events/{id}/seen")
     suspend fun seenPlanChange(@Path("id") id: String, @Body body: Map<String, String> = emptyMap())
 
+    /** [following] "1" also removes the later plans of a repeating plan. */
     @DELETE("events/{id}")
-    suspend fun deleteEvent(@Path("id") id: String)
+    suspend fun deleteEvent(@Path("id") id: String, @Query("following") following: String? = null)
+
+    /** Plans someone asked to pause their tasks during, for a Dominant to answer. */
+    @GET("relationships/{id}/events/pause-asks")
+    suspend fun pauseAsks(@Path("id") relationshipId: String): List<CalendarEvent>
+
+    @POST("events/{id}/pause")
+    suspend fun answerPause(@Path("id") id: String, @Body body: PauseAnswerInput): CalendarEvent
 
     @POST("events/{id}/dismiss")
     suspend fun dismissClashes(@Path("id") id: String, @Body body: DismissClashesInput): CalendarEvent

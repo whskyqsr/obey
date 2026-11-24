@@ -44,3 +44,22 @@ export function isEndOfLocalDay(instant: Date, zone: string): boolean {
   const dt = DateTime.fromJSDate(instant, { zone });
   return dt.hour === 23 && dt.minute === 59 && dt.second === 59;
 }
+
+/** Moves an instant by whole days or months of local wall-clock time, so a plan at 19:00 stays at 19:00 across DST. */
+export function shiftLocal(instant: Date, by: { days?: number; months?: number }, zone: string): Date {
+  return DateTime.fromJSDate(instant, { zone }).plus({ days: by.days ?? 0, months: by.months ?? 0 }).toJSDate();
+}
+
+/**
+ * Moves [instant] the way [from] was moved to [to], in local wall-clock terms: the same number of days, landing at
+ * [to]'s time of day. Used to carry an edit of one repeating plan over to the ones after it.
+ */
+export function moveLike(instant: Date, from: Date, to: Date, zone: string): Date {
+  const f = DateTime.fromJSDate(from, { zone }).startOf("day");
+  const t = DateTime.fromJSDate(to, { zone });
+  const days = Math.round(t.startOf("day").diff(f, "days").days);
+  return DateTime.fromJSDate(instant, { zone })
+    .plus({ days })
+    .set({ hour: t.hour, minute: t.minute, second: t.second, millisecond: t.millisecond })
+    .toJSDate();
+}

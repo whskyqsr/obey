@@ -158,6 +158,8 @@ data class Member(
     val locationPausedUntil: String? = null,
     /** Their pushes carry a partner's own words; see [User.notifyDetails]. */
     val notifyDetails: Boolean = false,
+    /** Whether they allow AI apps into this dynamic. AI apps reach it only once every member does. */
+    val aiAccess: Boolean = false,
 )
 
 /** Whether this phone can notice arriving at and leaving places while Fealty is closed. */
@@ -1045,7 +1047,25 @@ data class CalendarEventInput(
     /** Whether the partner is in on it; only then do their tasks count as clashing. */
     val withPartner: Boolean = false,
     val noteMd: String? = null,
+    /** Excuse the tasks that fall due during it; a submissive's plan asks a Dominant first. */
+    val pauseTasks: Boolean = false,
+    /** Only when making a plan. */
+    val repeat: PlanRepeat? = null,
+    /** Editing one plan of a repeating plan: "one", or "following" for it and the ones after. */
+    val applyTo: String? = null,
 )
+
+/** How a plan repeats; each repeat is its own plan, made up front until [until]. */
+@Serializable
+data class PlanRepeat(
+    /** day, week, 2weeks or month. */
+    val every: String,
+    val until: String,
+    val timezone: String,
+)
+
+@Serializable
+data class PauseAnswerInput(val approve: Boolean)
 
 @Serializable
 data class CalendarEvent(
@@ -1058,6 +1078,12 @@ data class CalendarEvent(
     val allDay: Boolean = false,
     val withPartner: Boolean = false,
     val noteMd: String? = null,
+    /** Shared by the plans of one repeating plan. */
+    val seriesId: String? = null,
+    val repeat: PlanRepeat? = null,
+    val pauseTasks: Boolean = false,
+    /** asked: waiting on a Dominant; approved: tasks during it are excused; declined: they aren't. */
+    val pauseStatus: String? = null,
     /** Tasks still to do that fall due during the plan, for the people it involves. */
     val conflictIds: List<String> = emptyList(),
     /** Someone else (a Dominant) moved its end; the author is shown it until they close the card. */
@@ -1629,3 +1655,35 @@ data class LimitAnswerInput(val rating: String?, val note: String)
 
 @Serializable
 data class LimitItemInput(val category: String, val title: String)
+
+/** AI access for a dynamic: who has allowed it, the apps its members connected, and their calls in the last 30 days. */
+@Serializable
+data class AiAccess(
+    val reachable: Boolean,
+    val members: List<AiAccessMember> = emptyList(),
+    val apps: List<AiApp> = emptyList(),
+    val calls: List<AiCall> = emptyList(),
+)
+
+@Serializable
+data class AiAccessMember(val userId: String, val allowed: Boolean)
+
+@Serializable
+data class AiApp(
+    val id: String,
+    val userId: String,
+    val app: String,
+    /** "claude" or "chatgpt" when recognised; picks the app's mark. */
+    val kind: String? = null,
+    val connectedAt: String,
+    val lastUsedAt: String? = null,
+)
+
+@Serializable
+data class AiCall(val tool: String, val userId: String, val ok: Boolean, val app: String, val kind: String? = null, val at: String)
+
+@Serializable
+data class AiAccessInput(val allowed: Boolean)
+
+@Serializable
+data class AiAccessResult(val allowed: Boolean, val reachable: Boolean)

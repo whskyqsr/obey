@@ -9,6 +9,7 @@ import { startWelcome, useWelcome } from "./lib/welcome";
 import { CalendarPage } from "./pages/Calendar";
 import { ConsequencesPage } from "./pages/Consequences";
 import { DynamicPage, PeoplePage, HowItWorksPage } from "./pages/Dynamic";
+import { AiAccessPage } from "./pages/AiAccess";
 import { AdminReportsPage } from "./pages/AdminReports";
 import { NoteRoutePage, NotesPage } from "./pages/Notes";
 import { Onboarding } from "./pages/Onboarding";
@@ -299,6 +300,7 @@ const routeTree = rootRoute.addChildren([
   page("/dynamic", DynamicPage),
   page("/dynamic/people", PeoplePage),
   page("/dynamic/how", HowItWorksPage),
+  page("/dynamic/ai", AiAccessPage),
   page("/places", gated("location", PlacesPage)),
   page("/location", gated("location", LocationPage)),
   page("/curfew", gated("location", CurfewPage)),

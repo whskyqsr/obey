@@ -42,6 +42,7 @@ import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.SwapHoriz
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material3.AlertDialog
 import app.obey.ui.common.Button
 import androidx.compose.material3.Card
@@ -264,12 +265,16 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
     // How it works (mockup 87): the app's own rules for this dynamic, on a page of its own. Settings' proof-photo row opens it directly.
     var how by rememberSaveable { mutableStateOf(startFeatures) }
     androidx.activity.compose.BackHandler(how) { how = false }
+    var ai by rememberSaveable { mutableStateOf(false) }
+    androidx.activity.compose.BackHandler(ai) { ai = false }
     val ended = session?.relationship?.ended == true
 
     Scaffold(
         topBar = {
             if (people) {
                 LargeTopAppBar(title = { Text("People") }, navigationIcon = { BackLink("Your dynamic") { people = false } })
+            } else if (ai) {
+                LargeTopAppBar(title = { Text("AI access") }, navigationIcon = { BackLink("Your dynamic") { ai = false } })
             } else if (how) {
                 LargeTopAppBar(title = { Text("How it works") }, navigationIcon = { BackLink("Your dynamic") { how = false } })
             } else {
@@ -290,7 +295,9 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
         val c = MaterialTheme.colorScheme
         Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             val scroll = rememberScrollState()
-            if (how) {
+            if (ai) {
+                AiAccessPage(s, rel)
+            } else if (how) {
                 HowItWorks(s, rel, busy, vm, onRename = { dialog = "relname" })
             } else if (people) {
                 Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(rememberScrollState())) {
@@ -437,6 +444,18 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
                         supportingContent = { Text("Link or code") },
                     )
                     Hair()
+                    ListItem(
+                        modifier = Modifier.clickable { ai = true },
+                        leadingContent = { Icon(Icons.Outlined.AutoAwesome, null) },
+                        headlineContent = { Text("AI access") },
+                        trailingContent = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(aiAccessState(rel, s.userId), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null)
+                            }
+                        },
+                    )
+                    Hair()
                 }
 
                 SectionHeader("People")
@@ -454,6 +473,14 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
                     trailingContent = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
                 )
                 Hair()
+                if (rel.ended && me?.aiAccess == true) {
+                    ListItem(
+                        modifier = Modifier.clickable { ai = true },
+                        headlineContent = { Text("AI access") },
+                        trailingContent = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
+                    )
+                    Hair()
+                }
 
                 Spacer(Modifier.height(24.dp))
             }

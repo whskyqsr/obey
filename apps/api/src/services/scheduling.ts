@@ -18,6 +18,7 @@ import type { Tx } from "../db/index.js";
 import { consequences, memberships, notes, occurrences, pointsLedger, relationships, reschedules, rewards, safeCalls, taskSeries } from "../db/schema.js";
 import { HttpError, forbidden } from "../errors.js";
 import { type Role, canManage } from "./access.js";
+import { planPausedAt } from "./plans.js";
 import { tasksPausedAt } from "./roleSwaps.js";
 
 export type Series = typeof taskSeries.$inferSelect;
@@ -552,10 +553,12 @@ export async function markMissed(db: Tx, now: Date) {
     if (series.placeId && (series.stayMinutes || series.curfewUntil) && occ.arrivedAt && !occ.leftAt) continue;
     // A location task that came due while its assignee had location paused is excused, like under a red safe call.
     // Not a curfew: with location paused, the sub says "I'm home" instead.
-    // So is any task of someone whose tasks a role swap paused.
+    // So is any task of someone whose tasks a role swap paused, or a plan with paused tasks (not a curfew night,
+    // which a plan settles through its own ask).
     const paused =
       (series.placeId !== null && !series.curfewUntil && (await locationPausedAt(db, series.relationshipId, series.assigneeId, occ.dueAt))) ||
-      (await tasksPausedAt(db, series.relationshipId, series.assigneeId, occ.dueAt));
+      (await tasksPausedAt(db, series.relationshipId, series.assigneeId, occ.dueAt)) ||
+      (!series.curfewUntil && (await planPausedAt(db, series.relationshipId, series.assigneeId, occ.dueAt)));
     // A count task kept within its bounds is done at the deadline ("no more than 3" has nothing to reach before then).
     // One that needs approval goes to the Dominant then, unless they already sent it back; one that only asked for proof,
     // a mood or an entry the assignee never sent is still done, since the count was kept.
@@ -632,10 +635,12 @@ export async function claimReminders(db: Tx, now: Date, leadMinutes: number) {
     .where(inArray(taskSeries.id, [...new Set(due.map((o) => o.seriesId))]));
   const byId = new Map(series.map((s) => [s.id, s]));
   const out: { occ: Occurrence; series: Series }[] = [];
-  // No reminders for tasks a role swap has paused.
+  // No reminders for tasks a role swap or a plan has paused.
   for (const occ of due) {
     const s = byId.get(occ.seriesId)!;
-    if (!(await tasksPausedAt(db, s.relationshipId, s.assigneeId, occ.dueAt))) out.push({ occ, series: s });
+    if (await tasksPausedAt(db, s.relationshipId, s.assigneeId, occ.dueAt)) continue;
+    if (!s.curfewUntil && (await planPausedAt(db, s.relationshipId, s.assigneeId, occ.dueAt))) continue;
+    out.push({ occ, series: s });
   }
   return out;
 }

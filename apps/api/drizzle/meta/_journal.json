@@ -358,6 +358,20 @@
       "when": 1792717871098,
       "tag": "0050_limit_list",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1795532562449,
+      "tag": "0051_ai_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1795536819582,
+      "tag": "0052_plan_repeats_pause",
+      "breakpoints": true
     }
   ]
 }

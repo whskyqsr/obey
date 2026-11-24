@@ -29,6 +29,10 @@ const app = buildApp({
   sendVerification:
     firebase?.canSendPush && config.resendApiKey ? verificationSender(firebase.app, { resendApiKey: config.resendApiKey, from: config.mailFrom, appUrl: config.appUrl }) : null,
   imagery: config.esriApiKey ? { key: config.esriApiKey } : null,
+  appUrl: config.appUrl,
+  apiUrl: config.apiUrl,
+  // Generous for a person using the app; it only stops floods.
+  rateLimit: { max: 600 },
   logger: true,
 });
 await app.listen({ port: config.port, host: "0.0.0.0" });

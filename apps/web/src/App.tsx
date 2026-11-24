@@ -13,6 +13,7 @@ import { Onboarding } from "./pages/Onboarding";
 import { SignInPage } from "./pages/SignIn";
 import { VerifyEmailPage } from "./pages/VerifyEmail";
 import { ConfirmEmailPage } from "./pages/ConfirmEmail";
+import { ConnectPage } from "./pages/Connect";
 import { registerPush } from "./push";
 import { router } from "./router";
 import { AppLockGate } from "./components/AppLock";
@@ -31,7 +32,8 @@ export function App() {
   if (needsVerification(session)) return <VerifyEmailPage email={session.kind === "firebase" ? session.email : null} />;
   return (
     <AppLockGate key={session.uid} uid={session.uid}>
-      <SignedIn key={session.uid} />
+      {/* An AI app asking to connect (OAuth), after sign-in and the app lock. */}
+      {location.pathname === "/connect" ? <ConnectPage /> : <SignedIn key={session.uid} />}
     </AppLockGate>
   );
 }

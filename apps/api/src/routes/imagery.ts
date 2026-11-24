@@ -59,7 +59,8 @@ export const imageryRoutes = (deps: Deps) => async (app: FastifyInstance) => {
 
   app.get<{ Params: { z: string; y: string; x: string }; Querystring: { exp?: string; sig?: string } }>(
     "/imagery/:z/:y/:x",
-    { config: { signedLink: true } },
+    // A map view loads dozens of tiles at once, so tiles get a bigger allowance.
+    { config: { signedLink: true, rateLimit: { max: 1200, timeWindow: "1 minute" } } },
     async (req, reply) => {
       if (!key) throw notFound();
       const { exp = "", sig = "" } = req.query;
