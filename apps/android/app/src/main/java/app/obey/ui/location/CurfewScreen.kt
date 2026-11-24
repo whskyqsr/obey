@@ -4,7 +4,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.SwitchDefaults
 import app.obey.ui.common.inkButtonColors
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,7 +40,7 @@ import app.obey.ui.common.PillRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
+import app.obey.ui.common.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -217,7 +216,6 @@ fun CurfewScreen(onBack: () -> Unit, onPlaces: () -> Unit, vm: CurfewViewModel =
                         Switch(
                             checked = f.weekendTime != null,
                             onCheckedChange = { on -> form = f.copy(weekendTime = if (on) saved?.weekendTime ?: "00:00" else null) },
-                            colors = SwitchDefaults.colors(checkedTrackColor = c.onSurface, checkedThumbColor = c.surface, checkedBorderColor = c.onSurface),
                         )
                     }
                     HorizontalDivider(color = c.outlineVariant)
@@ -243,7 +241,6 @@ fun CurfewScreen(onBack: () -> Unit, onPlaces: () -> Unit, vm: CurfewViewModel =
                             Switch(
                                 checked = f.reportHome,
                                 onCheckedChange = { form = f.copy(reportHome = it) },
-                                colors = SwitchDefaults.colors(checkedTrackColor = c.onSurface, checkedThumbColor = c.surface, checkedBorderColor = c.onSurface),
                             )
                         }
                         HorizontalDivider(color = c.outlineVariant)

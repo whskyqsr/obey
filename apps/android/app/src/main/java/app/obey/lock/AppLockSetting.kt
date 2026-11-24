@@ -17,7 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import app.obey.ui.common.PillSegment
 import app.obey.ui.common.PillRow
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
+import app.obey.ui.common.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue

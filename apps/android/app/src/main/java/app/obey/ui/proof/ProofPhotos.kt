@@ -265,7 +265,7 @@ fun ProofBlurSetting(vm: ProofViewModel = hiltViewModel(key = "proof-settings"))
     androidx.compose.material3.ListItem(
         headlineContent = { Text("Blur proof photos") },
         trailingContent = {
-            androidx.compose.material3.Switch(
+            app.obey.ui.common.Switch(
                 checked = viewer?.revealProofs != true,
                 onCheckedChange = { blur -> if (!blur) confirm = true else vm.setReveal(false) },
             )

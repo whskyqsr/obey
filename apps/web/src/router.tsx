@@ -3,7 +3,7 @@ import { importPage } from "./lib/staleBuild";
 import { createRootRoute, createRoute, createRouter, useNavigate } from "@tanstack/react-router";
 import { AppShell } from "./components/AppShell";
 import type { Features } from "./api/types";
-import { Button, Empty, ErrorBox, Loading, PageHeader } from "./components/ui";
+import { BackLink, Button, Empty, ErrorBox, Loading, PageHeader } from "./components/ui";
 import { useRel } from "./lib/relationship";
 import { startWelcome, useWelcome } from "./lib/welcome";
 import { CalendarPage } from "./pages/Calendar";
@@ -130,12 +130,13 @@ function Gate({ feature, children }: { feature: keyof Features; children: React.
   if (features[feature]) return <>{children}</>;
   return (
     <div className="p-4 md:p-6">
+      <BackLink label="Us" onClick={() => void navigate({ to: "/us" })} />
       <Empty
         icon="toggle_off"
         title="This is switched off"
         body="It can be turned back on in Settings, under Features."
         action={
-          <Button variant="tonal" icon="toggle_on" onClick={() => void navigate({ to: "/settings/$section", params: { section: "features" } })}>
+          <Button variant="outlined" onClick={() => void navigate({ to: "/settings/$section", params: { section: "features" } })}>
             Open Features
           </Button>
         }
