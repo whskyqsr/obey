@@ -14,6 +14,7 @@ import { anniversary, describeDate } from "../lib/dynamicDates";
 import { inviteLink } from "../lib/invite";
 import { ROLE_LABEL, isCollared, relTitle, useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
+import { aiAccessState } from "./AiAccess";
 
 export const FEATURE_ROWS: { key: keyof Features; label: string; help: string }[] = [
   { key: "points", label: "Points and rewards", help: "Tasks earn points that can be spent on rewards." },
@@ -122,17 +123,17 @@ export function useDynamicTitle() {
   return names.length > 1 ? `${names.slice(0, -1).join(", ")} & ${names.at(-1)}` : `${names[0]} (waiting for a partner)`;
 }
 
-const Label = ({ children, id }: { children: ReactNode; id?: string }) => (
+export const Label = ({ children, id }: { children: ReactNode; id?: string }) => (
   <h2 id={id} className="scroll-mt-4 pt-8 pb-1 eyebrow">
     {children}
   </h2>
 );
 /** Rows between hairlines, as in the mockups. */
-const Group = ({ children }: { children: ReactNode }) => (
+export const Group = ({ children }: { children: ReactNode }) => (
   <div className="flex flex-col divide-y divide-outline-variant border-b border-outline-variant">{children}</div>
 );
 
-function Row({
+export function Row({
   leading,
   headline,
   supporting,
@@ -265,6 +266,17 @@ export function DynamicPage() {
                 supporting="Link or code"
                 onClick={() => setSheet("invite")}
               />
+              <Row
+                leading={<Icon name="auto_awesome" className="text-on-surface-variant" />}
+                headline="AI access"
+                trailing={
+                  <span className="flex shrink-0 items-center text-body-medium text-on-surface-variant">
+                    {aiAccessState(rel, me.user.id)}
+                    <Icon name="chevron_right" />
+                  </span>
+                }
+                onClick={() => navigate({ to: "/dynamic/ai" })}
+              />
             </Group>
           </>
         )}
@@ -281,6 +293,13 @@ export function DynamicPage() {
             trailing={<Icon name="chevron_right" className="text-on-surface-variant" />}
             onClick={() => navigate({ to: "/dynamic/how" })}
           />
+          {ended && rel.members.some((m) => m.userId === me.user.id && m.aiAccess) && (
+            <Row
+              headline="AI access"
+              trailing={<Icon name="chevron_right" className="text-on-surface-variant" />}
+              onClick={() => navigate({ to: "/dynamic/ai" })}
+            />
+          )}
         </Group>
 
       </div>

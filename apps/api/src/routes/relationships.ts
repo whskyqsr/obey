@@ -59,6 +59,7 @@ export async function relationshipDto(db: Tx, ids: string[]) {
       notifyDetails: users.notifyDetails,
       locationPausedAt: memberships.locationPausedAt,
       locationPausedUntil: memberships.locationPausedUntil,
+      aiAccess: memberships.aiAccess,
       joinedAt: memberships.createdAt,
     })
     .from(memberships)
@@ -82,7 +83,7 @@ export async function relationshipDto(db: Tx, ids: string[]) {
     soloSetup: setups.get(r.id) ?? null,
     members: members
       .filter((m) => m.relationshipId === r.id)
-      .map(({ userId, displayName, role, avatarUpdatedAt, locationStatus, notifyDetails, locationPausedAt, locationPausedUntil }) => {
+      .map(({ userId, displayName, role, avatarUpdatedAt, locationStatus, notifyDetails, locationPausedAt, locationPausedUntil, aiAccess }) => {
         const paused = locationPausedAt !== null && (locationPausedUntil === null || locationPausedUntil > now);
         return {
           userId,
@@ -93,6 +94,7 @@ export async function relationshipDto(db: Tx, ids: string[]) {
           locationPaused: paused,
           locationPausedUntil: paused ? (locationPausedUntil?.toISOString() ?? null) : null,
           notifyDetails,
+          aiAccess,
         };
       }),
   }));

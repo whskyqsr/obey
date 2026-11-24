@@ -75,6 +75,7 @@ import type {
   TaskInput,
   User,
 } from "./types";
+import type { AiAccess } from "./types";
 
 export const keys = {
   me: ["me"] as const,
@@ -90,6 +91,7 @@ export const keys = {
   curfew: (rel: string) => ["rel", rel, "curfew"] as const,
   planChanges: (rel: string) => ["rel", rel, "planChanges"] as const,
   delays: (rel: string) => ["rel", rel, "delays"] as const,
+  aiAccess: (rel: string) => ["rel", rel, "aiAccess"] as const,
 };
 
 /** Invalidate everything belonging to a relationship (occurrences, balances and so on interlock). */
@@ -256,6 +258,33 @@ export function useJoinRelationship() {
   return useMutation({
     mutationFn: (body: { code: string; role?: Role }) => api<Relationship>("/relationships/join", { method: "POST", body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.me }),
+  });
+}
+
+// ---- AI access
+
+export function useAiAccess(rel: string) {
+  return useQuery({ queryKey: keys.aiAccess(rel), queryFn: () => api<AiAccess>(`/relationships/${rel}/ai-access`) });
+}
+
+/** Your own switch for this dynamic. */
+export function useSetAiAccess(rel: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (allowed: boolean) => api<{ allowed: boolean; reachable: boolean }>(`/relationships/${rel}/ai-access`, { method: "PUT", body: { allowed } }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.aiAccess(rel) });
+      void qc.invalidateQueries({ queryKey: keys.me });
+    },
+  });
+}
+
+/** Disconnects one of your own AI apps, everywhere. */
+export function useDisconnectAiApp(rel: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<void>(`/me/ai-apps/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.aiAccess(rel) }),
   });
 }
 

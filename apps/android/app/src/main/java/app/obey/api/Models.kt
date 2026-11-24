@@ -158,6 +158,8 @@ data class Member(
     val locationPausedUntil: String? = null,
     /** Their pushes carry a partner's own words; see [User.notifyDetails]. */
     val notifyDetails: Boolean = false,
+    /** Whether they allow AI apps into this dynamic. AI apps reach it only once every member does. */
+    val aiAccess: Boolean = false,
 )
 
 /** Whether this phone can notice arriving at and leaving places while Fealty is closed. */
@@ -1629,3 +1631,35 @@ data class LimitAnswerInput(val rating: String?, val note: String)
 
 @Serializable
 data class LimitItemInput(val category: String, val title: String)
+
+/** AI access for a dynamic: who has allowed it, the apps its members connected, and their calls in the last 30 days. */
+@Serializable
+data class AiAccess(
+    val reachable: Boolean,
+    val members: List<AiAccessMember> = emptyList(),
+    val apps: List<AiApp> = emptyList(),
+    val calls: List<AiCall> = emptyList(),
+)
+
+@Serializable
+data class AiAccessMember(val userId: String, val allowed: Boolean)
+
+@Serializable
+data class AiApp(
+    val id: String,
+    val userId: String,
+    val app: String,
+    /** "claude" or "chatgpt" when recognised; picks the app's mark. */
+    val kind: String? = null,
+    val connectedAt: String,
+    val lastUsedAt: String? = null,
+)
+
+@Serializable
+data class AiCall(val tool: String, val userId: String, val ok: Boolean, val app: String, val kind: String? = null, val at: String)
+
+@Serializable
+data class AiAccessInput(val allowed: Boolean)
+
+@Serializable
+data class AiAccessResult(val allowed: Boolean, val reachable: Boolean)
