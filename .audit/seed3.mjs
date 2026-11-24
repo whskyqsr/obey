@@ -14,3 +14,8 @@ await sub("POST", `${R}/events`, { title: "Off work", startsAt: day(-1).toISOStr
 await dom("POST", `${R}/events`, { title: "Thanksgiving", startsAt: day(2).toISOString(), endsAt: day(3).toISOString(), allDay: true, withPartner: true });
 await sub("POST", `${R}/events`, { title: "Dinner with Jess", startsAt: at(0, 18), endsAt: at(0, 23, 30), allDay: false, withPartner: false });
 await dom("POST", `${R}/events`, { title: "Work trip", startsAt: at(1, 9), endsAt: at(1, 17), allDay: false, withPartner: false });
+// A running lock: hidden time, two hours added for a missed task, and a hygiene break asked.
+const lock = await dom("POST", `${R}/chastity`, { wearerId: SUB, minutes: 4560, hideTime: true, keyMode: "keyholder" });
+await sub("POST", `/chastity/${lock.id}/lock`, {});
+await dom("POST", `/chastity/${lock.id}/time`, { minutes: 120, note: "Missed Hydration" });
+await sub("POST", `/chastity/${lock.id}/asks`, { kind: "break", minutes: 20 });

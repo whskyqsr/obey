@@ -55,18 +55,24 @@ def run(who, uid):
     shot(f"{who}-today"); scroll(); shot(f"{who}-today-2"); scroll(); shot(f"{who}-today-3")
     tap("Today")
     if tap("New", desc=True): shot(f"{who}-plus")
-    if tap("Plan", wait=3): shot(f"{who}-plan-editor"); scroll(); shot(f"{who}-plan-editor-2"); back(); back()
+    if tap("Plan", wait=3):
+        adb("shell", "input", "text", "dinner%swith%sfriends"); time.sleep(1); adb("shell", "input", "keyevent", "111"); time.sleep(1)
+        shot(f"{who}-plan-editor"); back(); back()
     tap("Today")
     tap("Week"); shot(f"{who}-week")
     for d in range(7):
         if tap(str(__import__("datetime").date.today().day + d - 1), wait=1.5): pass
     shot(f"{who}-week-open")
-    if tap("Off work", exact=False, wait=3): shot(f"{who}-plan-open"); scroll(); shot(f"{who}-plan-open-2"); back()
+    if tap("Off work", exact=False, wait=3): shot(f"{who}-plan-open"); back()
+    if who == "sub" and tap("Dinner with Jess", exact=False, wait=3): shot("sub-clash"); back()
     if tap("Show the month", desc=True): shot(f"{who}-month"); back()
     tap("Us"); shot(f"{who}-us")
     tap("Us")
     if not find("Chastity"): scroll()
-    if tap("Chastity", wait=3): shot(f"{who}-chastity"); scroll(); shot(f"{who}-chastity-2"); back()
+    if tap("Chastity", wait=3):
+        shot(f"{who}-chastity"); scroll(); shot(f"{who}-chastity-2")
+        if who == "dom" and tap("Lock", exact=False, wait=2): shot("dom-lock-sheet"); back()
+        back()
     tap("Us")
     if tap("Settings", desc=True, wait=3):
         shot(f"{who}-settings")
@@ -74,7 +80,9 @@ def run(who, uid):
         back()
     if who == "sub":
         tap("Today")
-        if tap("Safe word", desc=True, wait=3): shot("sub-safecall"); back()
+        if tap("Safe word", desc=True, wait=3):
+            shot("sub-safecall")
+            if tap("Red", wait=3): shot("sub-safered"); tap("I'm okay now", wait=2)
 import traceback
 for who, uid in [("sub", "22222222-2222-4222-8222-222222222222"), ("dom", "11111111-1111-4111-8111-111111111111")]:
     try: run(who, uid)
