@@ -367,15 +367,10 @@ fun KitsScreen(
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
-                title = { Text("Kits") },
-                navigationIcon = { app.obey.ui.common.MenuButton() },
-                actions = {
-                    IconButton(onClick = { adding = true }) { Icon(Icons.Outlined.Link, "Add from a link or code") }
-                    IconButton(onClick = onNewKit) { Icon(Icons.Outlined.Add, "New kit") }
-                    app.obey.ui.common.SafeWordAction()
-                },
-            )
+            app.obey.ui.common.PageHeader("Kits") {
+                IconButton(onClick = { adding = true }) { Icon(Icons.Outlined.Link, "Add from a link or code") }
+                IconButton(onClick = onNewKit) { Icon(Icons.Outlined.Add, "New kit") }
+            }
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->

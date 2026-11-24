@@ -45,7 +45,8 @@ No style from the pre-Letters design may show through: no Material filled or ton
 
 Once Jake decides how something looks or behaves, apply it everywhere the same situation comes up, not just on the screen he pointed at. Record each decision here.
 
-- Create buttons read "+ New" (from Rules/Protocols, 2026-11-23).
+- Create buttons read "+ New" (from Rules/Protocols, 2026-11-23). One per page, in the shared header; the calendar's opens Task / Plan (2026-11-24).
+- Every page header is the shared one, with its title in the same place whether or not the page has icons (2026-11-24, see Page headers).
 - No explainers under names or settings (2026-11-23).
 - Write for people who already know their dynamic: everyone who sees a screen is a partner who knows whose plans, tasks and notes are whose, so don't spell out what they already know (2026-11-24).
 - Name a person once per page. If the header says whose task or item it is, rows and status lines below don't name them again ("missed", not "Kitten missed") (task page, 2026-11-24).
@@ -56,6 +57,17 @@ Once Jake decides how something looks or behaves, apply it everywhere the same s
 - Plans are marked with a rule or line in their person's colour, ink for plans for both of you, and don't name whose they are; a small key under the calendar says which colour is whose. Copy never names what the page already makes clear ("Kitten's plan", "Kitten's side"). Oxblood stays for what's owed or clashing. (Jake, 2026-11-24, reversing Claude's earlier single-accent call for mockup 13.)
 
 Pixel perfection isn't the goal. Once the big gaps in `design/STATUS.md` are closed, there will be a consistency pass across every screen: same headers, same row styles, same buttons and same spacing for the same jobs.
+
+## Page headers
+
+Every main page uses the one shared header: `PageHeader` on web (`apps/web/src/components/ui.tsx`) and `PageHeader` on Android (`ui/common/Components.kt`). Never draw a page's own heading row, title size or New button. Mockups: `/mnt/project-files/mockups/headers/` (Jake approved 2026-11-24).
+
+- The top row (the way back on phones, then the page's icons) is always drawn at the same height, even when it's empty. A page without icons, such as Consequences, has its title in exactly the same place as Rules. (Jake, 2026-11-24: "drift continues to happen", so this is explicit.)
+- Then the serif title (52px on desktop), with the one outlined "+ New" level with it on desktop. Pages with more than one kind of new thing (the calendar's task or plan) open a menu from that same "+ New" instead of showing two buttons (Jake, 2026-11-24).
+- Then an optional line under the title: a count ("5 rules") or a status. No explainers.
+- Then the page's tabs (Rules | Protocols, Notes | Journal), left-aligned under the title, never beside it.
+- A section label ("Your list") only appears when a page has more than one section; a page's only list doesn't get one.
+- Notes and Journal share one layout: on desktop the list sits in a column with the header, search and rows, and the open note or entry is beside it; on phones both are lists with Notes | Journal tabs. A journal row reads like a note row: "Tue, Nov 24 · good · Jake replied" over the first lines.
 
 ## Structure
 

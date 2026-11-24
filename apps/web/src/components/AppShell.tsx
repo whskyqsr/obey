@@ -286,8 +286,8 @@ export function AppShell() {
         </nav>
 
         <main className={cx(tab ? "pb-32" : "pb-10", "md:pb-10 md:pl-60")}>
-          {/* Today brings its own side panel on wide screens, notes their list beside the open one, and rewards a panel of what's waiting, so they get the full width. */}
-          <div className={cx("mx-auto", pathname === "/" ? "max-w-5xl xl:max-w-none" : pathname.startsWith("/notes") || pathname === "/rewards" ? "max-w-5xl lg:max-w-none" : "max-w-5xl")}>
+          {/* Today brings its own side panel on wide screens, notes and the journal their list beside the open one, and rewards a panel of what's waiting, so they get the full width. */}
+          <div className={cx("mx-auto", pathname === "/" ? "max-w-5xl xl:max-w-none" : pathname.startsWith("/notes") || pathname === "/journal" || pathname === "/rewards" ? "max-w-5xl lg:max-w-none" : "max-w-5xl")}>
             {rel.endedAt && pathname !== "/dynamic" && (
               <Link
                 to="/dynamic"

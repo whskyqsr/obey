@@ -53,15 +53,17 @@ export function ConsequencesPage() {
   for (const t of tasks.data ?? []) if (t.active && t.consequenceId) usedBy.set(t.consequenceId, (usedBy.get(t.consequenceId) ?? 0) + 1);
   const sorted = [...(list.data ?? [])].sort((a, b) => a.severity - b.severity || a.title.localeCompare(b.title));
 
+  const hasOwed = owed.owed.length > 0 || owed.excused.length > 0;
+
   return (
     <>
       <PageHeader title="Consequences" />
-      {(owed.owed.length > 0 || owed.excused.length > 0) && (
+      {hasOwed && (
         <Section title={whose === me.user.id ? "You owe" : `${memberName(whose!)} owes`}>
           <OwedList {...owed} />
         </Section>
       )}
-      <Section title={isDom ? "Your list" : "The list"}>
+      <Section title={hasOwed ? (isDom ? "Your list" : "The list") : undefined}>
         <div className="flex flex-col divide-y divide-outline-variant">
           {list.isLoading && <Loading />}
           {list.error && <ErrorBox error={list.error} onRetry={() => list.refetch()} />}

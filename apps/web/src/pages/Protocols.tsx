@@ -37,7 +37,7 @@ export function ProtocolsPage() {
       <PageHeader
         title="Protocols"
         subtitle={`${protocols.length} protocol${protocols.length === 1 ? "" : "s"}`}
-        actions={<RulesTabs current="protocols" />}
+        tabs={<RulesTabs current="protocols" />}
         tools={<IconButton icon="assignment_late" label="Broken rules" onClick={() => void navigate({ to: "/rule-log" })} />}
       />
       <ol className="mx-4 flex flex-col border-t border-outline-variant md:mx-6">

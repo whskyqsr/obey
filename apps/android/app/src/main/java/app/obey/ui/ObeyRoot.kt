@@ -550,6 +550,7 @@ private fun ObeyNavHost(nav: NavHostController, usItems: List<UsItem>, switcher:
                 onOpen = { nav.navigate(NoteEditorRoute(noteId = it)) },
                 onNew = { nav.navigate(NoteEditorRoute()) },
                 onOpenSettings = settings,
+                onSwitch = if (LocalFeatures.current.journal) ({ nav.navigate(JournalRoute) { popUpTo<NotesRoute> { inclusive = true } } }) else null,
             )
         }
         composable<JournalRoute> {
@@ -558,6 +559,7 @@ private fun ObeyNavHost(nav: NavHostController, usItems: List<UsItem>, switcher:
                 onOpen = { nav.navigate(NoteEditorRoute(noteId = it, journal = true)) },
                 onNew = { nav.navigate(NoteEditorRoute(journal = true)) },
                 onOpenSettings = settings,
+                onSwitch = { nav.navigate(NotesRoute) { popUpTo<JournalRoute> { inclusive = true } } },
             )
         }
         composable<StatsRoute> { StatsScreen(onOpenSettings = settings, onOpenTask = openTask, onOpenReview = { nav.navigate(MonthReviewRoute) }) }

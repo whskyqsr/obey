@@ -112,11 +112,6 @@ export function CalendarPage() {
                 ]}
               />
             )}
-            {desk && !rel.endedAt && (
-              <Button variant="outlined" icon="event" onClick={() => setPlan(null)} className="ml-2">
-                Plan
-              </Button>
-            )}
           </>
         }
       />
@@ -281,14 +276,21 @@ export function CalendarPage() {
         open={plan !== undefined}
         onClose={() => setPlan(undefined)}
       />
-      {isDom && (
-        <Fab
-          icon="add"
-          label="New task"
-          className="max-md:hidden"
-          onClick={() => navigate({ to: "/tasks/$taskId", params: { taskId: "new" }, search: { start: newTaskDay } })}
-        />
-      )}
+      {/* One + New, as on every page: a Dominant picks a task or a plan; anyone else starts a plan. On phones the + in the tab bar does this. */}
+      <Fab
+        icon="add"
+        label={isDom ? "New task or plan" : "New plan"}
+        className="max-md:hidden"
+        onClick={isDom ? undefined : () => setPlan(null)}
+        items={
+          isDom
+            ? [
+                { label: "Task", icon: "check_box", onClick: () => void navigate({ to: "/tasks/$taskId", params: { taskId: "new" }, search: { start: newTaskDay } }) },
+                { label: "Plan", icon: "event", onClick: () => setPlan(null) },
+              ]
+            : undefined
+        }
+      />
     </>
   );
 }

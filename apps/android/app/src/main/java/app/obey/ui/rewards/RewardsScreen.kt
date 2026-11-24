@@ -110,16 +110,11 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
-                navigationIcon = { MenuButton() },
-                title = { Text(if (consequences) "Consequences" else "Rewards") },
-                actions = {
-                    if (features.points) IconButton(onClick = { history = true }) { Icon(Icons.Outlined.History, "History") }
-                    if (canManage && consequences && features.consequences) IconButton(onClick = { editConsequence = Editing(null) }) { Icon(Icons.Outlined.Add, "New consequence") }
-                    if (canManage && !consequences && features.points) IconButton(onClick = { editReward = Editing(null) }) { Icon(Icons.Outlined.Add, "New reward") }
-                    SafeWordAction()
-                },
-            )
+            app.obey.ui.common.PageHeader(if (consequences) "Consequences" else "Rewards") {
+                if (features.points) IconButton(onClick = { history = true }) { Icon(Icons.Outlined.History, "History") }
+                if (canManage && consequences && features.consequences) IconButton(onClick = { editConsequence = Editing(null) }) { Icon(Icons.Outlined.Add, "New consequence") }
+                if (canManage && !consequences && features.points) IconButton(onClick = { editReward = Editing(null) }) { Icon(Icons.Outlined.Add, "New reward") }
+            }
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->

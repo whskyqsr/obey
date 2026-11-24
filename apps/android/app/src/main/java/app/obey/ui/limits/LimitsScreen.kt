@@ -358,14 +358,9 @@ fun LimitsScreen(onEdit: () -> Unit, vm: LimitsViewModel = hiltViewModel()) {
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
-                title = { Text("Limits") },
-                navigationIcon = { MenuButton() },
-                actions = {
-                    if (list != null) IconButton(onClick = { vm.share(context, rows, names, colors) }) { Icon(Icons.Outlined.IosShare, "Save as an image") }
-                    SafeWordAction()
-                },
-            )
+            app.obey.ui.common.PageHeader("Limits") {
+                if (list != null) IconButton(onClick = { vm.share(context, rows, names, colors) }) { Icon(Icons.Outlined.IosShare, "Save as an image") }
+            }
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->

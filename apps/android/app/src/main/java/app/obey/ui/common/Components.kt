@@ -209,22 +209,40 @@ fun PairedTitle(current: String, other: String?, onOther: () -> Unit) {
 }
 
 /**
- * The large serif page title with a pill toggle beside it, as in the mockups for Rules | Protocols.
- * [showToggle] is false when only one of the pair is switched on, and then only the title shows.
+ * Every main page's header, the same on all of them (DESIGN.md, "Page headers"): the row with the way back and the
+ * page's icons, always drawn even when it holds no icons so the title never moves up, then the serif title, an optional
+ * line under it (a count or status), and the page's tabs (Rules | Protocols, Notes | Journal) left-aligned below.
+ * Use it as a Scaffold's topBar.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-fun TitleWithToggle(title: String, options: List<String>, selected: Int, onSelect: (Int) -> Unit, showToggle: Boolean = true) {
-    androidx.compose.foundation.layout.Row(
-        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+fun PageHeader(
+    title: String,
+    sub: String? = null,
+    navigation: @Composable () -> Unit = { MenuButton() },
+    tabs: (@Composable () -> Unit)? = null,
+    actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
+) {
+    val c = MaterialTheme.colorScheme
+    Column(Modifier.fillMaxWidth().background(c.surface)) {
+        androidx.compose.material3.TopAppBar(
+            title = {},
+            navigationIcon = navigation,
+            actions = {
+                actions()
+                SafeWordAction()
+            },
+        )
         Text(
             title,
             style = MaterialTheme.typography.displaySmall,
-            maxLines = 1,
-            modifier = Modifier.weight(1f).semantics { heading() },
+            color = c.onSurface,
+            maxLines = 2,
+            modifier = Modifier.padding(horizontal = 16.dp).semantics { heading() },
         )
-        if (showToggle) PillToggle(options, selected, onSelect)
+        if (sub != null) Text(sub, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp))
+        if (tabs != null) Box(Modifier.padding(start = 16.dp, top = 16.dp)) { tabs() }
+        androidx.compose.foundation.layout.Spacer(Modifier.size(16.dp))
     }
 }
 

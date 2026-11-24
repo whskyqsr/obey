@@ -207,33 +207,28 @@ fun LocationScreen(onCurfew: () -> Unit, vm: LocationViewModel = hiltViewModel()
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
-                title = { Text("Location") },
-                navigationIcon = { app.obey.ui.common.MenuButton() },
-                actions = {
-                    if (watched) {
-                        if (paused) {
-                            IconButton(onClick = vm::resume, enabled = !busy) { Icon(Icons.Outlined.PlayArrow, "Turn location back on") }
-                        } else {
-                            Box {
-                                IconButton(onClick = { pauseMenu = true }) { Icon(Icons.Outlined.Pause, "Pause location") }
-                                DropdownMenu(expanded = pauseMenu, onDismissRequest = { pauseMenu = false }) {
-                                    DropdownMenuItem(text = { Text("Pause for an hour") }, onClick = { pauseMenu = false; vm.pause(Instant.now().plusSeconds(3600), "Paused for an hour") })
-                                    DropdownMenuItem(
-                                        text = { Text("Pause for the rest of today") },
-                                        onClick = {
-                                            pauseMenu = false
-                                            vm.pause(LocalDate.now().atTime(LocalTime.of(23, 59)).atZone(ZoneId.systemDefault()).toInstant(), "Paused for the rest of today")
-                                        },
-                                    )
-                                    DropdownMenuItem(text = { Text("Pause until I turn it back on") }, onClick = { pauseMenu = false; vm.pause(null, "Paused until you turn it back on") })
-                                }
+            app.obey.ui.common.PageHeader("Location") {
+                if (watched) {
+                    if (paused) {
+                        IconButton(onClick = vm::resume, enabled = !busy) { Icon(Icons.Outlined.PlayArrow, "Turn location back on") }
+                    } else {
+                        Box {
+                            IconButton(onClick = { pauseMenu = true }) { Icon(Icons.Outlined.Pause, "Pause location") }
+                            DropdownMenu(expanded = pauseMenu, onDismissRequest = { pauseMenu = false }) {
+                                DropdownMenuItem(text = { Text("Pause for an hour") }, onClick = { pauseMenu = false; vm.pause(Instant.now().plusSeconds(3600), "Paused for an hour") })
+                                DropdownMenuItem(
+                                    text = { Text("Pause for the rest of today") },
+                                    onClick = {
+                                        pauseMenu = false
+                                        vm.pause(LocalDate.now().atTime(LocalTime.of(23, 59)).atZone(ZoneId.systemDefault()).toInstant(), "Paused for the rest of today")
+                                    },
+                                )
+                                DropdownMenuItem(text = { Text("Pause until I turn it back on") }, onClick = { pauseMenu = false; vm.pause(null, "Paused until you turn it back on") })
                             }
                         }
                     }
-                    app.obey.ui.common.SafeWordAction()
-                },
-            )
+                }
+            }
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->

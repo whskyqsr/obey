@@ -133,14 +133,9 @@ fun ScenesScreen(onOpenSettings: () -> Unit, onOpen: (String) -> Unit, onAfterca
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
-                title = { Text("Scenes") },
-                navigationIcon = { MenuButton() },
-                actions = {
-                    if (!session.readOnly) IconButton(onClick = { logging = true }) { Icon(Icons.Outlined.Add, "Log a scene") }
-                    SafeWordAction()
-                },
-            )
+            app.obey.ui.common.PageHeader("Scenes") {
+                if (!session.readOnly) IconButton(onClick = { logging = true }) { Icon(Icons.Outlined.Add, "Log a scene") }
+            }
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->

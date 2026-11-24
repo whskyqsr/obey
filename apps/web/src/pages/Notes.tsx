@@ -80,20 +80,28 @@ function ReplyQuote({ n, large }: { n: Note; large?: boolean }) {
   );
 }
 
-/** A row in the desktop journal's "Earlier" column. */
-function EarlierRow({ n, onOpen }: { n: Note; onOpen(): void }) {
-  const { memberName } = useRel();
+/** A journal entry in the list: its day, mood and who replied over the start of what it says, as in the header mockups. */
+function JournalRow({ n, current, onOpen }: { n: Note; current?: boolean; onOpen(): void }) {
+  const { me, memberName } = useRel();
   const reply = usePartnerReply(n);
+  const meta = [
+    entryDay(n, "short"),
+    n.mood ? MOOD_LABELS[n.mood - 1]!.toLowerCase() : null,
+    n.authorId !== me.user.id ? memberName(n.authorId) : null,
+    n.visibility === "private" ? "Private" : null,
+    reply ? `${memberName(reply.authorId)} replied` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
-    <button type="button" onClick={onOpen} className="state-layer state-row flex w-full flex-col gap-1.5 py-5 text-left">
-      <span className="flex items-baseline gap-2 text-body-medium text-on-surface-variant">
-        <span className="min-w-0 flex-1 truncate">
-          {entryDay(n, "short")}
-          {n.mood ? ` · ${MOOD_LABELS[n.mood - 1]!.toLowerCase()}` : ""}
-        </span>
-        {reply && <span className="shrink-0">{memberName(reply.authorId)} replied</span>}
-      </span>
-      <span className="line-clamp-2 font-serif text-[21px] leading-8 text-on-surface">{excerpt(n.bodyMd, 160) || n.title || "Untitled"}</span>
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-current={current || undefined}
+      className={cx("state-layer state-row flex w-full flex-col gap-1 px-4 py-4 text-left", current && "bg-surface-container")}
+    >
+      <span className="truncate text-body-small text-on-surface-variant">{meta}</span>
+      <span className="line-clamp-2 font-serif text-[21px] leading-7 text-on-surface-variant">{excerpt(n.bodyMd, 160) || n.title || "Untitled"}</span>
     </button>
   );
 }
@@ -101,7 +109,6 @@ function EarlierRow({ n, onOpen }: { n: Note; onOpen(): void }) {
 const COPY = {
   note: {
     title: "Notes",
-    subtitle: "Plans, ideas, lists and anything else worth writing down.",
     search: "Search notes",
     empty: "No notes yet",
     icon: "sticky_note_2",
@@ -110,7 +117,6 @@ const COPY = {
   },
   journal: {
     title: "Journal",
-    subtitle: "Dated entries about how things are going.",
     search: "Search the journal",
     empty: "No entries yet",
     icon: "auto_stories",
@@ -129,7 +135,6 @@ export function NotesPage({ kind, selected }: { kind: "note" | "journal"; select
   const notes = useLibrary(rel.id, "notes");
   const wide = useMediaQuery(SPLIT);
   const split = wide && kind === "note";
-  const wideJournal = wide && kind === "journal";
   const [shown, setShown] = useState<string>();
   const sub = rel.members.find((m) => m.role === "submissive");
   const [q, setQ] = useState("");
@@ -203,7 +208,7 @@ export function NotesPage({ kind, selected }: { kind: "note" | "journal"; select
       type="button"
       onClick={() => openNote(n.id)}
       aria-current={current || undefined}
-      className={cx("state-layer flex w-full flex-col gap-0.5 py-4 text-left", split && "rounded-md px-3", current && "bg-surface-container")}
+      className={cx("state-layer state-row flex w-full flex-col gap-0.5 px-4 py-4 text-left", current && "bg-surface-container")}
     >
       <span className="flex items-center gap-1.5">
         <span className="min-w-0 flex-1 truncate font-serif text-[24px] leading-8 text-on-surface">{n.title || "Untitled"}</span>
@@ -213,39 +218,43 @@ export function NotesPage({ kind, selected }: { kind: "note" | "journal"; select
     </button>
   );
 
+  const chartButton = kind === "journal" && (
+    <IconButton icon="show_chart" label={chart ? "Hide the mood chart" : "Show the mood chart"} aria-pressed={chart} onClick={() => setChart(!chart)} />
+  );
+  const rows =
+    kind === "note"
+      ? (current?: string) => list.map((n) => noteRow(n, n.id === current))
+      : (current?: string) => list.map((n) => <JournalRow key={n.id} n={n} current={n.id === current} onOpen={() => (wide ? setShown(n.id) : openNote(n.id))} />);
+
   // A blank page shown on /notes moves to /notes/new first, so saving it doesn't swap the editor out mid-sentence.
   const blank = split && !selected && !list.length && canWrite && !!notes.data && !q && !tag;
   useEffect(() => {
     if (blank) void navigate({ to: "/notes/$noteId", params: { noteId: "new" }, replace: true });
   }, [blank, navigate]);
 
-  if (wideJournal) {
-    // Desktop journal (mockup desktop-15): one entry read in full, the rest listed beside it.
-    const entry = list.find((n) => n.id === shown) ?? list[0];
-    const rest = list.filter((n) => n !== entry);
+  if (wide) {
+    // Notes and the journal share one desktop layout: the list in a column with the page header, the open one beside it.
+    const current = kind === "note" ? (selected ?? list[0]?.id ?? (canWrite && notes.data && !q && !tag ? "new" : undefined)) : undefined;
+    const entry = kind === "journal" ? (list.find((n) => n.id === shown) ?? list[0]) : undefined;
     const mine = entry?.authorId === me.user.id;
     return (
       <div className="-mb-10 flex min-h-dvh">
-        <article className="min-w-0 flex-1 px-16 pt-10 pb-16">
-          <div className="mx-auto max-w-[720px]">
-            <div className="flex items-center gap-1">
-              <div className="eyebrow min-w-0 flex-1">Journal{entry && !mine ? ` · ${memberName(entry.authorId)}'s` : ""}</div>
-              <IconButton icon="search" label={copy.search} onClick={() => setSearching((v) => !v)} />
-              <IconButton
-                icon="show_chart"
-                label={chart ? "Hide the mood chart" : "Show the mood chart"}
-                aria-pressed={chart}
-                onClick={() => setChart(!chart)}
+        <section className="sticky top-0 flex h-dvh w-[360px] shrink-0 flex-col overflow-y-auto border-r border-outline-variant pb-6">
+          <PageHeader title={copy.title} tools={chartButton} />
+          <div className="px-6">
+            <label className="flex h-12 items-center gap-2 border-y border-outline-variant text-on-surface-variant">
+              <Icon name="search" size={20} />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search"
+                aria-label={copy.search}
+                type="search"
+                className="min-w-0 flex-1 bg-transparent text-body-large text-on-surface outline-none placeholder:text-on-surface-variant"
               />
-              {entry && <IconButton icon={mine ? "edit" : "reply"} label={mine ? "Edit" : "Reply"} onClick={() => openNote(entry.id)} />}
-            </div>
-            {(searching || q) && (
+            </label>
+            {chart && kind === "journal" && !q && !tag && (
               <div className="mt-3">
-                <TextField autoFocus placeholder={copy.search} value={q} onChange={(e) => setQ(e.target.value)} aria-label={copy.search} type="search" />
-              </div>
-            )}
-            {chart && !q && !tag && (
-              <div className="mt-4">
                 <MoodCard />
               </div>
             )}
@@ -253,88 +262,40 @@ export function NotesPage({ kind, selected }: { kind: "note" | "journal"; select
             {notes.isLoading && <Loading />}
             {notes.error && <ErrorBox error={notes.error} onRetry={() => notes.refetch()} />}
             {empty}
-            {entry && (
-              <>
-                <h1 className="mt-3 font-serif text-[64px] leading-[72px] text-on-surface">{entryDay(entry)}</h1>
+            <div className="flex flex-col divide-y divide-outline-variant">{rows(kind === "note" ? current : entry?.id)}</div>
+          </div>
+          {canWrite && <Fab icon="add" label={copy.fab} onClick={newEntry} />}
+        </section>
+        <div className="min-w-0 flex-1">
+          {kind === "note" && current && (
+            <Suspense fallback={<Loading />}>
+              <NoteEditorPage noteId={current} kind="note" />
+            </Suspense>
+          )}
+          {entry && (
+            <article className="px-16 pt-6 pb-16">
+              <div className="mx-auto max-w-[720px]">
+                <div className="-mx-2 flex min-h-10 items-center justify-end">
+                  <IconButton icon={mine ? "edit" : "reply"} label={mine ? "Edit" : "Reply"} onClick={() => openNote(entry.id)} />
+                </div>
+                <h2 className="font-serif text-[56px] leading-[1.05] text-on-surface">{entryDay(entry)}</h2>
                 <p className="mt-2 text-body-medium text-on-surface-variant">
                   {[
-                    entry.mood ? `Feeling ${MOOD_LABELS[entry.mood - 1]!.toLowerCase()}` : null,
+                    mine ? null : memberName(entry.authorId),
+                    entry.mood ? `feeling ${MOOD_LABELS[entry.mood - 1]!.toLowerCase()}` : null,
                     entry.visibility === "private" ? "Private" : null,
                     `written ${clock(entry.createdAt)}`,
                   ]
                     .filter(Boolean)
                     .join(" · ")}
                 </p>
-                {entry.title && entry.title !== "Untitled" && <h2 className="mt-8 text-title-large text-on-surface">{entry.title}</h2>}
+                {entry.title && entry.title !== "Untitled" && <h3 className="mt-8 text-title-large text-on-surface">{entry.title}</h3>}
                 <div className="mt-6">
                   <MarkdownEditor key={entry.id} value={entry.bodyMd} onChange={() => {}} editable={false} letters />
                 </div>
                 <ReplyQuote n={entry} large />
-              </>
-            )}
-          </div>
-        </article>
-        <aside className="sticky top-0 h-dvh w-[400px] shrink-0 overflow-y-auto border-l border-outline-variant px-10 pt-12 pb-10">
-          <div className="eyebrow">Earlier</div>
-          {rest.length > 0 && (
-            <div className="mt-2 flex flex-col divide-y divide-outline-variant border-b border-outline-variant">
-              {rest.map((n) => (
-                <EarlierRow key={n.id} n={n} onOpen={() => setShown(n.id)} />
-              ))}
-            </div>
-          )}
-          {canWrite && !rel.endedAt && (
-            <button type="button" onClick={newEntry} className="state-layer mt-8 h-12 rounded-md bg-on-surface px-6 text-label-large text-surface">
-              Write tonight's entry
-            </button>
-          )}
-        </aside>
-      </div>
-    );
-  }
-
-  if (split) {
-    // The open note: the one in the address, else the top of the list (or a blank one to write in when there are none).
-    const current = selected ?? list[0]?.id ?? (canWrite && notes.data && !q && !tag ? "new" : undefined);
-    return (
-      <div className="-mb-10 flex min-h-dvh">
-        <section className="sticky top-0 flex h-dvh w-[340px] shrink-0 flex-col overflow-y-auto border-r border-outline-variant px-6 pt-6 pb-6">
-          <div className="flex items-center gap-2">
-            <h1 className="min-w-0 flex-1 text-display-small text-on-surface">{copy.title}</h1>
-            {canWrite && !rel.endedAt && (
-              <button
-                type="button"
-                onClick={newEntry}
-                aria-label={copy.fab}
-                title={copy.fab}
-                className="state-layer flex size-11 items-center justify-center rounded-md bg-on-surface text-surface"
-              >
-                <Icon name="add" />
-              </button>
-            )}
-          </div>
-          <label className="mt-4 flex h-11 items-center gap-2 border-b border-outline-variant text-on-surface-variant">
-            <Icon name="search" size={20} />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search"
-              aria-label={copy.search}
-              type="search"
-              className="min-w-0 flex-1 bg-transparent text-body-large text-on-surface outline-none placeholder:text-on-surface-variant"
-            />
-          </label>
-          {tagChips && <div className="mt-3">{tagChips}</div>}
-          {notes.isLoading && <Loading />}
-          {notes.error && <ErrorBox error={notes.error} onRetry={() => notes.refetch()} />}
-          {empty}
-          <div className="mt-2 flex flex-col divide-y divide-outline-variant">{list.map((n) => noteRow(n, n.id === current))}</div>
-        </section>
-        <div className="min-w-0 flex-1">
-          {current && (
-            <Suspense fallback={<Loading />}>
-              <NoteEditorPage noteId={current} kind="note" />
-            </Suspense>
+              </div>
+            </article>
           )}
         </div>
       </div>
@@ -345,7 +306,7 @@ export function NotesPage({ kind, selected }: { kind: "note" | "journal"; select
     <>
       <PageHeader
         title={copy.title}
-        actions={
+        tabs={
           features.journal ? (
             <SegmentedButtons
               value={kind}
@@ -360,14 +321,7 @@ export function NotesPage({ kind, selected }: { kind: "note" | "journal"; select
         tools={
           <>
             <IconButton icon="search" label={copy.search} onClick={() => setSearching((v) => !v)} />
-            {kind === "journal" && (
-              <IconButton
-                icon="show_chart"
-                label={chart ? "Hide the mood chart" : "Show the mood chart"}
-                aria-pressed={chart}
-                onClick={() => setChart(!chart)}
-              />
-            )}
+            {chartButton}
           </>
         }
       />
@@ -383,35 +337,9 @@ export function NotesPage({ kind, selected }: { kind: "note" | "journal"; select
       {empty && <div className="px-4 md:px-6">{empty}</div>}
       {/* Letters: entries on hairlines like pages of a notebook, not cards. */}
       <div className={cx("mx-4 flex max-w-3xl flex-col divide-y divide-outline-variant md:mx-6", list.length > 0 && "border-t border-outline-variant")}>
-        {kind === "note"
-          ? list.map((n) => noteRow(n))
-          : list.map((n) => (
-              <div key={n.id} className="group relative flex flex-col gap-1.5 py-4">
-                <button type="button" className="state-layer absolute inset-0" aria-label={`Open ${n.title || "entry"}`} onClick={() => openNote(n.id)} />
-                <div className="eyebrow pointer-events-none flex items-center gap-1.5">
-                  {n.visibility === "private" && <Icon name="lock" size={14} />}
-                  <span>
-                    {fmtDate(localDateOf(new Date(n.createdAt)), { weekday: "long", month: "short", day: "numeric" })}
-                    {n.mood ? ` · feeling ${MOOD_LABELS[n.mood - 1]!.toLowerCase()}` : ""}
-                    {n.authorId !== me.user.id ? ` · ${memberName(n.authorId)}` : ""}
-                  </span>
-                </div>
-                {n.title && n.title !== "Untitled" && <div className="pointer-events-none text-title-medium text-on-surface">{n.title}</div>}
-                {n.bodyMd && <p className="pointer-events-none line-clamp-4 font-serif text-[23px] leading-8 text-on-surface">{excerpt(n.bodyMd, 280)}</p>}
-                {n.tags.length > 0 && (
-                  <div className="pointer-events-none flex flex-wrap items-center gap-2 text-label-medium text-on-surface-variant">
-                    {n.tags.map((t) => (
-                      <span key={t}>#{t}</span>
-                    ))}
-                  </div>
-                )}
-                <div className="pointer-events-none">
-                  <ReplyQuote n={n} />
-                </div>
-              </div>
-            ))}
+        {rows()}
       </div>
-      {canWrite && <Fab icon="edit" label={copy.fab} onClick={newEntry} />}
+      {canWrite && <Fab icon="add" label={copy.fab} onClick={newEntry} />}
       {kind === "journal" && canWrite && (
         <>
           {/* Phones: tonight's entry starts from a bar above the tabs, as in the mockup. */}

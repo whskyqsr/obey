@@ -185,7 +185,7 @@ fun StatsScreen(onOpenSettings: () -> Unit, onOpenTask: (String) -> Unit, onOpen
     val spent = -points.filter { it.delta < 0 && it.kind in spending }.sumOf { it.delta }
     val lost = -points.filter { it.delta < 0 && it.kind !in spending }.sumOf { it.delta }
 
-    Scaffold(topBar = { LargeTopAppBar(title = { Text("Stats") }, navigationIcon = { MenuButton() }, actions = { SafeWordAction() }) }) { padding ->
+    Scaffold(topBar = { app.obey.ui.common.PageHeader("Stats") }) { padding ->
         Column(
             Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(32.dp),

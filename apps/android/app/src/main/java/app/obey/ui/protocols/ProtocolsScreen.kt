@@ -130,20 +130,19 @@ fun ProtocolsScreen(onOpen: (String) -> Unit, onNew: () -> Unit, onOpenSettings:
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                navigationIcon = { MenuButton() },
-                title = {},
-                actions = {
-                    IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.AssignmentLate, "Broken rules") }
-                    if (canManage) IconButton(onClick = onNew) { Icon(Icons.Outlined.Add, "New protocol") }
-                    SafeWordAction()
-                },
-            )
+            val count = (state as? Load.Ready)?.value?.protocols?.size
+            app.obey.ui.common.PageHeader(
+                "Protocols",
+                sub = count?.let { "$it protocol${if (it == 1) "" else "s"}" },
+                tabs = onRules?.let { go -> { app.obey.ui.common.PillToggle(listOf("Rules", "Protocols"), 1) { go() } } },
+            ) {
+                IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.AssignmentLate, "Broken rules") }
+                if (canManage) IconButton(onClick = onNew) { Icon(Icons.Outlined.Add, "New protocol") }
+            }
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
       Column(Modifier.padding(padding).fillMaxSize()) {
-        app.obey.ui.common.TitleWithToggle("Protocols", listOf("Rules", "Protocols"), 1, { onRules?.invoke() }, showToggle = onRules != null)
         when (val s = state) {
             Load.Loading -> LoadingBox()
             is Load.Failed -> ErrorBox(s.message, vm::refresh)

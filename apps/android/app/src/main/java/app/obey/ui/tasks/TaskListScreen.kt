@@ -166,14 +166,9 @@ fun TaskListScreen(
     }
     Scaffold(
         topBar = {
-            LargeTopAppBar(
-                navigationIcon = { MenuButton() },
-                title = { Text("All tasks") },
-                actions = {
-                    if (vm.session?.canManage == true) IconButton(onClick = onNew) { Icon(Icons.Outlined.Add, "New task") }
-                    SafeWordAction()
-                },
-            )
+            app.obey.ui.common.PageHeader("All tasks") {
+                if (vm.session?.canManage == true) IconButton(onClick = onNew) { Icon(Icons.Outlined.Add, "New task") }
+            }
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
