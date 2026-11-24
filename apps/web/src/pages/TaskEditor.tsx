@@ -8,9 +8,11 @@ import type { Task, TaskInput, TaskStep } from "../api/types";
 import { RecurrencePicker } from "../components/RecurrencePicker";
 import { SortableList } from "../components/SortableList";
 import { MarkdownEditor } from "../components/MarkdownEditor";
-import { Button, Chip, ErrorBox, Icon, IconButton, Loading, SegmentedButtons, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
+import { Button, Chip, Diamond, Dialog, ErrorBox, IconButton, Loading, Select, TextField, cx, useSnackbar } from "../components/ui";
 import { type PickerState, defaultPicker, fromSchedule, preview, toSchedule } from "../recurrence/picker";
 import { browserTimeZone, fmtClock, fmtDate, localDateOf, today } from "../lib/dates";
+import { addDays } from "@obey/recurrence";
+import { useMediaQuery } from "../lib/useMediaQuery";
 import { ROLE_LABEL, useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
 
@@ -224,9 +226,6 @@ export function TaskEditorPage({ taskId, start }: { taskId: string; start?: stri
 /** "America/New_York" → "New York". */
 const tzName = (tz: string) => tz.split("/").pop()!.replace(/_/g, " ");
 
-/** "Thu Oct 22", without the comma, so a list of them reads cleanly. */
-const shortDay = (d: string) => fmtDate(d).replace(",", "");
-
 /** "9:15 PM", or "12:30 AM the next day" once it passes midnight. */
 function clockAfter(minutes: number) {
   const day = Math.floor(minutes / 1440);
@@ -236,16 +235,47 @@ function clockAfter(minutes: number) {
   return fmtClock(hhmm) + (day ? " the next day" : "");
 }
 
+type Panel = "who" | "often" | "count" | "time" | "start" | "points" | "missed";
+
+const WEEKDAYS_ONLY = ["MO", "TU", "WE", "TH", "FR"] as const;
+const isWeekdays = (p: PickerState) =>
+  p.kind === "weeks" && p.interval === 1 && !p.afterCompletion && p.weekdays.length === 5 && WEEKDAYS_ONLY.every((d) => p.weekdays.includes(d));
+
+/** "Daily" → "every day": the summary as it reads in the middle of a sentence. */
+function oftenPhrase(summary: string) {
+  const s = summary
+    .replace(/^Daily\b/, "Every day")
+    .replace(/^Weekly\b/, "Every week")
+    .replace(/^Monthly\b/, "Every month");
+  return s.charAt(0).toLowerCase() + s.slice(1);
+}
+
+/** "today", "tomorrow" or "Thu Nov 26". */
+function dayPhrase(d: string) {
+  if (d === today()) return "today";
+  if (d === addDays(today(), 1)) return "tomorrow";
+  return fmtDate(d, { weekday: "short", month: "short", day: "numeric" }).replace(",", "");
+}
+
+const TIMES = ["20:00", "21:00", "22:00"];
+
+/** The editor (mockups 04, 52, 53 and desktop 14): the task as one sentence with tappable parts, then what else it asks. */
 function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readOnly: boolean; defaultAssignee: string; start?: string }) {
   const { rel, features, memberName, solo, me } = useRel();
   const navigate = useNavigate();
   const snack = useSnackbar();
+  const wide = useMediaQuery("(min-width: 1024px)");
   const save = useSaveTask(rel.id);
   const rewards = useLibrary(rel.id, "rewards");
   const consequences = useLibrary(rel.id, "consequences");
   const [form, setForm] = useState(() => formFrom(task, defaultAssignee, start));
-  const [changingZone, setChangingZone] = useState(false);
+  const [panel, setPanel] = useState<Panel | null>(null);
+  const [howOften, setHowOften] = useState(false);
+  const [showSteps, setShowSteps] = useState(form.steps.length > 0);
+  const [showPlace, setShowPlace] = useState(!!form.placeId);
+  const [otherTime, setOtherTime] = useState(!form.allDay && !TIMES.includes(form.dueTime));
   const set = (patch: Partial<Form>) => setForm((f) => ({ ...f, ...patch }));
+  const toggle = (p: Panel) => setPanel((o) => (o === p ? null : p));
 
   const sched = useMemo(() => {
     const p = form.picker;
@@ -255,8 +285,8 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
   // Back to wherever the editor was opened from: the task's page, or Today, Calendar or Tasks for a new one.
   const back = useBack(() => (task ? navigate({ to: "/tasks/$taskId", params: { taskId: task.id } }) : navigate({ to: "/" })));
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
+  function submit(e?: React.FormEvent) {
+    e?.preventDefault();
     if (!canSave) return;
     save.mutate(
       // A quick deadline counts from when it's saved, not from when the chip was tapped.
@@ -272,332 +302,579 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
     );
   }
 
-  // Each section collapses to a sentence, so the whole task reads at a glance.
-  const when = form.allDay ? ", all day" : form.dueTime ? ` at ${fmtClock(form.dueTime)}` : "";
   const atMost = atMostOf(form);
-  const quickWhen = form.quick ? `Once, at ${fmtClock(form.dueTime)}${form.picker.start === today() ? " today" : ` ${fmtDate(form.picker.start, { weekday: "long" })}`}` : "";
-  const scheduleTitle = form.quick
-    ? `Due in ${quickLabel(form.quick)}`
-    : form.picker.kind === "once"
-      ? `Once, ${fmtDate(form.picker.start)}${when}`
-      : `${sched.summary || "Schedule"}${when}`;
-  const scheduleSub = sched.errors.length
-    ? (sched.errors[0] ?? "")
-    : [
-        form.picker.kind !== "once" && sched.dates.length ? `Next ${sched.dates.map(shortDay).join(", ")}` : null,
-        !form.allDay && form.windowMinutes ? `opens ${windowLabel(form.windowMinutes)}` : null,
-        `${tzName(form.timezone)} time`,
-      ]
-        .filter(Boolean)
-        .join(" · ");
-
+  const mine = form.assigneeId === me.user.id;
+  const who = memberName(form.assigneeId);
   const reward = rewards.data?.find((r) => r.id === form.rewardId)?.title;
   const consequence = consequences.data?.find((c) => c.id === form.consequenceId)?.title;
   const pts = Number.isFinite(form.points) ? Math.trunc(form.points) : 0;
   const penalty = Number.isFinite(form.missPenalty) ? Math.trunc(form.missPenalty) : 0;
-  const stakesTitle = features.points
-    ? [pts ? `${pts > 0 ? "+" : "−"}${Math.abs(pts)} if done` : "No points", penalty ? `−${penalty} if missed` : null].filter(Boolean).join(" · ")
-    : consequence
-      ? `Missed: ${consequence}`
-      : "No consequence";
-  const stakesSub = [
-    features.consequences && features.points ? `Missed: ${consequence ?? "nothing"}` : null,
-    features.consequences && consequence ? `due ${dueDaysLabel(form.consequenceDueDays).toLowerCase()}` : null,
-    features.points ? `Reward: ${reward ?? "none"}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const { countMin, countMax } = countBoundsOf(form);
+  const bounds =
+    countMin != null && countMax != null
+      ? countMin === countMax
+        ? `${countMin} times`
+        : `${countMin} to ${countMax} times`
+      : countMin != null
+        ? `at least ${countMin} times`
+        : `no more than ${countMax} times`;
+  const missedPhrase =
+    [features.points && penalty ? `−${penalty} points` : null, features.consequences ? consequence : null].filter(Boolean).join(" and ") || "nothing happens";
+  const timePhrase = form.allDay ? "the end of the day" : fmtClock(form.dueTime || "00:00");
+  const giveLabel = task ? "Save" : mine || solo ? "Add it" : `Give to ${who}`;
+
+  const slot = (p: Panel, text: ReactNode, label: string) =>
+    readOnly ? (
+      <span>{text}</span>
+    ) : (
+      <button
+        type="button"
+        aria-label={label}
+        aria-expanded={panel === p}
+        onClick={() => toggle(p)}
+        className={cx("border-b-[1.5px] border-primary text-left transition-colors", panel === p ? "bg-primary-container/60" : "hover:bg-primary-container/30")}
+      >
+        {text}
+      </button>
+    );
+
+  const sentence = (
+    <p className="font-serif text-[34px] leading-[1.25] tracking-[-0.01em] text-on-surface md:text-[44px] lg:text-[52px] lg:leading-[1.2]">
+      {!solo && rel.members.length > 1 ? slot("who", mine ? "You" : who, "Who it's for") : mine ? "You" : who} will{" "}
+      <span className="inline-grid max-w-full align-baseline">
+        <span aria-hidden className="invisible col-start-1 row-start-1 overflow-hidden pr-1 whitespace-pre">
+          {form.title || "do what"}
+        </span>
+        <input
+          aria-label="Title"
+          size={1}
+          value={form.title}
+          onChange={(e) => set({ title: e.target.value })}
+          placeholder="do what"
+          maxLength={200}
+          required
+          readOnly={readOnly}
+          autoFocus={!task && !readOnly}
+          className="col-start-1 row-start-1 w-full min-w-[4ch] border-b-[1.5px] border-primary bg-transparent p-0 text-inherit outline-none placeholder:text-on-surface-variant/50"
+        />
+      </span>
+      {form.counted && <> {slot("count", bounds, "How many")}</>}
+      {form.quick ? (
+        <> {slot("time", `in ${quickLabel(form.quick)}`, "When it's due")}.</>
+      ) : (
+        <>
+          {" "}
+          {slot("often", sched.errors.length ? "how often?" : form.picker.kind === "once" ? "once" : oftenPhrase(sched.summary), "How often")} by{" "}
+          {slot("time", timePhrase, "Due time")},{" "}
+          {form.picker.kind === "once" ? (form.picker.start === today() || form.picker.start === addDays(today(), 1) ? "" : "on ") : "starting "}
+          {slot("start", dayPhrase(form.picker.start), form.picker.kind === "once" ? "Day" : "First day")}.
+        </>
+      )}
+      {features.points && <> It's worth {slot("points", `${pts} point${Math.abs(pts) === 1 ? "" : "s"}`, "Points")}.</>}
+      {(features.points || features.consequences) && <> If it's missed, {slot("missed", missedPhrase, "If it's missed")}.</>}
+    </p>
+  );
+
+  const row = (key: string, label: ReactNode, on: boolean, onClick: () => void, sub?: ReactNode) => (
+    <button
+      key={key}
+      type="button"
+      onClick={onClick}
+      className="state-layer flex w-full items-center gap-3 border-b border-outline-variant py-3.5 text-left last:border-b-0"
+    >
+      <span className="min-w-0 flex-1">
+        <span className={cx("block text-body-large", on ? "text-on-surface" : "text-on-surface-variant")}>{label}</span>
+        {sub && <span className="block text-body-small text-on-surface-variant">{sub}</span>}
+      </span>
+      {on && <Diamond state="owed" size={12} className="bg-primary" />}
+    </button>
+  );
+  const done = (
+    <div className="flex justify-end pt-2">
+      <Button variant="text" onClick={() => setPanel(null)}>
+        Done
+      </Button>
+    </div>
+  );
+
+  const panelBody: Record<Panel, () => ReactNode> = {
+    who: () =>
+      rel.members.map((m) =>
+        row(
+          m.userId,
+          m.userId === me.user.id ? "You" : m.displayName,
+          form.assigneeId === m.userId,
+          () => (set({ assigneeId: m.userId }), setPanel(null)),
+          ROLE_LABEL[m.role],
+        ),
+      ),
+    often: () => {
+      const p = form.picker;
+      const pick = (patch: Partial<PickerState>) => (
+        set({ picker: { ...p, afterCompletion: false, end: "never", interval: 1, ...patch }, counted: false }),
+        setPanel(null)
+      );
+      const daily = p.kind === "days" && p.interval === 1 && !p.afterCompletion;
+      const weekly = p.kind === "weeks" && p.interval === 1 && !p.afterCompletion && p.weekdays.length === 1;
+      const preset = p.kind === "once" || daily || weekly || isWeekdays(p);
+      return (
+        <>
+          {row("once", "Once", p.kind === "once", () => pick({ kind: "once" }))}
+          {row("daily", "Every day", daily, () => pick({ kind: "days" }))}
+          {row("weekdays", "Weekdays", isWeekdays(p), () => pick({ kind: "weeks", weekdays: [...WEEKDAYS_ONLY] }))}
+          {row("weekly", `Every ${fmtDate(p.start, { weekday: "long" })}`, weekly, () => pick({ kind: "weeks", weekdays: defaultPicker(p.start).weekdays }))}
+          {row(
+            "other",
+            preset ? "Something else…" : oftenPhrase(sched.summary || "Something else…").replace(/^./, (c) => c.toUpperCase()),
+            !preset,
+            () => (setPanel(null), setHowOften(true)),
+          )}
+          {!form.placeId &&
+            row("count", form.counted ? "Stop counting" : "Count it instead…", false, () =>
+              form.counted ? (set({ counted: false }), setPanel(null)) : (set({ counted: true, steps: [] }), setShowSteps(false), setPanel("count")),
+            )}
+        </>
+      );
+    },
+    count: () => (
+      <div className="flex flex-col gap-4 py-3">
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["exactly", "Exactly"],
+              ["atLeast", "At least"],
+              ["atMost", "At most"],
+              ["range", "Range"],
+            ] as const
+          ).map(([v, label]) => (
+            <Chip key={v} plain selected={form.countKind === v} onClick={() => set({ countKind: v })}>
+              {label}
+            </Chip>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <TextField
+            label={form.countKind === "range" ? "At least" : "Count"}
+            type="number"
+            min={1}
+            max={1000}
+            value={Number.isFinite(form.countN) ? form.countN : ""}
+            onChange={(e) => set({ countN: num(e.target.value) })}
+          />
+          {form.countKind === "range" ? (
+            <TextField
+              label="At most"
+              type="number"
+              min={whole(form.countN)}
+              max={1000}
+              value={Number.isFinite(form.countTo) ? form.countTo : ""}
+              onChange={(e) => set({ countTo: num(e.target.value) })}
+            />
+          ) : (
+            features.points && (
+              <Select label="Points" value={form.countPer} onChange={(e) => set({ countPer: e.target.value as Form["countPer"] })}>
+                <option value="task">Per task</option>
+                <option value="count">Per count</option>
+              </Select>
+            )
+          )}
+        </div>
+        {form.countKind === "range" && features.points && (
+          <Select label="Points" value={form.countPer} onChange={(e) => set({ countPer: e.target.value as Form["countPer"] })}>
+            <option value="task">Per task</option>
+            <option value="count">Per count</option>
+          </Select>
+        )}
+        {atMost && (
+          <p className="text-body-small text-on-surface-variant">"At most" is checked at the deadline, so it can't ask for a photo, a mood or an entry.</p>
+        )}
+        {done}
+      </div>
+    ),
+    time: () => (
+      <div className="flex flex-col gap-4 py-3">
+        {!task && (
+          <div className="flex flex-wrap gap-2">
+            {QUICK.map((m) => (
+              <Chip key={m} plain selected={form.quick === m} onClick={() => (set(quickDeadline(m)), setPanel(null))}>
+                In {quickLabel(m)}
+              </Chip>
+            ))}
+          </div>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {TIMES.map((t) => (
+            <Chip
+              key={t}
+              plain
+              selected={!form.quick && !form.allDay && !otherTime && form.dueTime === t}
+              onClick={() => (set({ quick: null, allDay: false, dueTime: t }), setOtherTime(false), setPanel(null))}
+            >
+              {fmtClock(t)}
+            </Chip>
+          ))}
+          <Chip plain selected={!form.quick && form.allDay} onClick={() => (set({ quick: null, allDay: true }), setOtherTime(false), setPanel(null))}>
+            All day
+          </Chip>
+          <Chip plain selected={!form.quick && !form.allDay && otherTime} onClick={() => (set({ quick: null, allDay: false }), setOtherTime(true))}>
+            Other…
+          </Chip>
+        </div>
+        {!form.quick && !form.allDay && otherTime && (
+          <TextField label="Due at" type="time" value={form.dueTime} onChange={(e) => set({ dueTime: e.target.value })} className="w-40" />
+        )}
+        {form.quick && !mine && <p className="text-body-small text-on-surface-variant">{who} gets a push right away and a countdown on Today.</p>}
+        {done}
+      </div>
+    ),
+    start: () => (
+      <div className="flex flex-col gap-4 py-3">
+        <div className="flex flex-wrap gap-2">
+          {[today(), addDays(today(), 1)].map((d) => (
+            <Chip key={d} plain selected={form.picker.start === d} onClick={() => (set({ picker: { ...form.picker, start: d } }), setPanel(null))}>
+              {d === today() ? "Today" : "Tomorrow"}
+            </Chip>
+          ))}
+        </div>
+        <TextField
+          label="Date"
+          type="date"
+          value={form.picker.start}
+          onChange={(e) => e.target.value && set({ picker: { ...form.picker, start: e.target.value } })}
+          className="w-48"
+        />
+        {done}
+      </div>
+    ),
+    points: () => (
+      <div className="flex flex-col gap-4 py-3">
+        <div className="grid grid-cols-2 gap-4">
+          <TextField
+            label="Points if done"
+            type="number"
+            value={Number.isFinite(form.points) ? form.points : ""}
+            onChange={(e) => set({ points: num(e.target.value) })}
+          />
+          <TextField
+            label="Lost if missed"
+            type="number"
+            min={0}
+            value={Number.isFinite(form.missPenalty) ? form.missPenalty : ""}
+            onChange={(e) => set({ missPenalty: num(e.target.value) })}
+          />
+        </div>
+        {done}
+      </div>
+    ),
+    missed: () => (
+      <>
+        {features.points && (
+          <div className="border-b border-outline-variant py-3">
+            <TextField
+              label="Points lost"
+              type="number"
+              min={0}
+              value={Number.isFinite(form.missPenalty) ? form.missPenalty : ""}
+              onChange={(e) => set({ missPenalty: num(e.target.value) })}
+              className="w-40"
+            />
+          </div>
+        )}
+        {features.consequences && (
+          <>
+            {row("none", "No consequence", !form.consequenceId, () => set({ consequenceId: "" }))}
+            {consequences.data?.map((c) => row(c.id, c.title, form.consequenceId === c.id, () => set({ consequenceId: c.id })))}
+            {form.consequenceId && (
+              <div className="grid grid-cols-2 gap-4 py-3">
+                <Select label="Due" value={form.consequenceDueDays} onChange={(e) => set({ consequenceDueDays: Number(e.target.value) })}>
+                  {[...new Set([0, 1, 2, 3, 7, form.consequenceDueDays])]
+                    .sort((a, b) => a - b)
+                    .map((d) => (
+                      <option key={d} value={d}>
+                        {dueDaysLabel(d)}
+                      </option>
+                    ))}
+                </Select>
+                <Select
+                  label="By"
+                  value={form.consequenceAllDay ? "" : form.consequenceDueTime}
+                  onChange={(e) => set(e.target.value ? { consequenceAllDay: false, consequenceDueTime: e.target.value } : { consequenceAllDay: true })}
+                >
+                  <option value="">Any time that day</option>
+                  {[...new Set(["12:00", "18:00", "21:00", form.consequenceDueTime])].sort().map((t) => (
+                    <option key={t} value={t}>
+                      {fmtClock(t)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
+          </>
+        )}
+        {done}
+      </>
+    ),
+  };
+
+  const also: { key: string; label: string; on: boolean; toggle(): void; show: boolean }[] = [
+    { key: "approve", label: "I approve it", on: form.approvalRequired, toggle: () => set({ approvalRequired: !form.approvalRequired }), show: !solo },
+    {
+      key: "photo",
+      label: "Ask for a photo",
+      on: form.proofRequired,
+      toggle: () => set({ proofRequired: !form.proofRequired }),
+      show: !atMost && !form.placeId,
+    },
+    {
+      key: "steps",
+      label: "Steps",
+      on: showSteps,
+      toggle: () => (showSteps ? (setShowSteps(false), set({ steps: [] })) : setShowSteps(true)),
+      show: !form.counted && !form.placeId,
+    },
+    { key: "mood", label: "Mood check-in", on: form.askMood, toggle: () => set({ askMood: !form.askMood }), show: !atMost && !form.placeId },
+    {
+      key: "journal",
+      label: "Journal task",
+      on: form.asksJournal,
+      toggle: () => set({ asksJournal: !form.asksJournal }),
+      show: (features.journal || form.asksJournal) && !atMost && !form.placeId,
+    },
+    {
+      key: "early",
+      label: "Can be done early",
+      on: form.windowMinutes != null,
+      toggle: () => set({ windowMinutes: form.windowMinutes != null ? null : 120 }),
+      show: !form.allDay && !form.quick,
+    },
+    {
+      key: "place",
+      label: "Be somewhere",
+      on: showPlace,
+      toggle: () => (showPlace ? (setShowPlace(false), set({ placeId: "", stayMinutes: null })) : setShowPlace(true)),
+      show: (features.location || !!form.placeId) && !form.counted && !form.steps.length,
+    },
+    {
+      key: "words",
+      label: "Remind in my words",
+      on: form.reminder === "custom",
+      toggle: () => set({ reminder: form.reminder === "custom" ? "default" : "custom" }),
+      show: true,
+    },
+  ];
 
   const grace = graceMinutes(form);
   const dueMinutes = form.allDay || !form.dueTime ? 1440 : minutesOf(form.dueTime);
-  const graceTitle = form.grace === "none" ? "No grace period" : form.grace === "midnight" ? "Grace until midnight" : `${grace} min grace`;
-  const graceSub = `Counts as missed ${grace ? "at" : "right at"} ${form.allDay && !grace ? "midnight" : clockAfter(dueMinutes + grace)}`;
-  const graceChips: { value: Grace; label: string }[] = [
-    { value: "none", label: "None" },
-    { value: "15", label: "15 min" },
-    { value: "60", label: "1 hour" },
-    ...(form.allDay ? [] : [{ value: "midnight" as const, label: "Until midnight" }]),
-    { value: "custom", label: "Custom" },
-  ];
 
-  return (
-    <form onSubmit={submit}>
-      <header className="sticky top-0 z-10 flex items-center gap-2 bg-surface px-2 py-2 md:px-4">
-        <IconButton icon="close" label="Close" onClick={back} />
-        <h1 className="flex-1 truncate text-title-large text-on-surface">{readOnly ? form.title : task ? "Edit task" : "New task"}</h1>
-        {!readOnly && (
-          <Button type="submit" busy={save.isPending} disabled={!canSave}>
-            Save
-          </Button>
-        )}
-      </header>
+  const main = (
+    <>
+      {sentence}
+      {panel && !readOnly && <div className="mt-4 rounded-lg border border-outline-variant bg-surface-container-lowest px-4">{panelBody[panel]()}</div>}
 
-      <fieldset disabled={readOnly} className="flex flex-col gap-4 px-4 pt-4 pb-10 md:px-6">
-        <TextField label="Title" value={form.title} onChange={(e) => set({ title: e.target.value })} maxLength={200} required autoFocus={!task} />
-        <div>
-          <div className="mb-1 px-1 text-label-large text-on-surface-variant">Details</div>
-          <MarkdownEditor value={form.bodyMd} onChange={(bodyMd) => set({ bodyMd })} editable={!readOnly} placeholder="What to do, and how" label="Details" compact />
-        </div>
-
-        <div className="mt-2 flex flex-col gap-2">
-          <Fold
-            icon="person"
-            title={`For ${memberName(form.assigneeId).replace(/^You$/, "you")}`}
-            sub={[
-              solo ? null : form.approvalRequired ? "Needs your approval" : "No approval needed",
-              form.proofRequired && !atMost ? "proof required" : "no proof",
-              form.askMood && !atMost ? "mood check-in" : null,
-              form.asksJournal && !atMost ? "journal task" : null,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-            open={readOnly}
-          >
-            {solo ? (
-              <p className="text-body-medium text-on-surface-variant">Just you for now. Once a partner joins, a Dominant sets your tasks. "Needs approval" comes back then too.</p>
-            ) : (
-              <Select label="Assigned to" value={form.assigneeId} onChange={(e) => set({ assigneeId: e.target.value })}>
-                {rel.members.map((m) => (
-                  <option key={m.userId} value={m.userId}>
-                    {m.displayName} ({ROLE_LABEL[m.role]})
-                  </option>
-                ))}
-              </Select>
-            )}
-            {form.placeId ? (
-              !solo && (
-                <Switch
-                  checked={form.approvalRequired}
-                  onChange={(approvalRequired) => set({ approvalRequired })}
-                  label="Needs approval"
-                  help="Getting there sends it to you to approve. A location task doesn't take proof, a mood or a journal entry."
-                />
-              )
-            ) : (
-              <div>
-                {!solo && (
-                  <Switch
-                    checked={form.approvalRequired}
-                    onChange={(approvalRequired) => set({ approvalRequired })}
-                    label="Needs approval"
-                    help={
-                      atMost
-                        ? "Sent to you at the deadline. Points post once you approve it."
-                        : form.counted
-                          ? "Asked once, when the count is met. The count locks while it waits for you."
-                          : features.points
-                            ? "Points post only after you approve the completion."
-                            : "It counts as done only after you approve it."
-                    }
-                  />
-                )}
-                {atMost ? (
-                  <p className="mt-2 border-l-2 border-outline-variant px-3 py-1 text-body-medium text-on-surface-variant">
-                    "At most" counts are sent at the deadline, since there's no moment they're met, so they only take approval. Counted tasks can't be rituals.
-                  </p>
-                ) : (
-                  <>
-                    <Switch
-                      checked={form.proofRequired}
-                      onChange={(proofRequired) => set({ proofRequired })}
-                      label="Proof required"
-                      help={
-                        form.counted
-                          ? "One photo or note when they send it, not one for each"
-                          : solo
-                            ? "A note or photo goes with the completion, kept with the task for your own record."
-                            : "A note or photo must accompany the completion."
-                      }
-                    />
-                    <Switch
-                      checked={form.askMood}
-                      onChange={(askMood) => set({ askMood })}
-                      label="Mood check-in"
-                      help={form.counted ? "Asked when the count is met" : "Marking it done asks how they feel. Their answers build the mood graph in Your dynamic."}
-                    />
-                    {(features.journal || form.asksJournal) && (
-                      <Switch
-                        checked={form.asksJournal}
-                        onChange={(asksJournal) => set({ asksJournal })}
-                        label="Journal task"
-                        help={form.counted ? "Written when the count is met" : "Marking it done means writing a journal entry, shared with you. Use the details as the prompt."}
-                      />
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-          </Fold>
-
-          <Fold
-            icon={form.quick ? "schedule" : "event_repeat"}
-            title={scheduleTitle}
-            sub={form.quick ? quickWhen : scheduleSub}
-            error={!form.quick && !!sched.errors.length}
-            open={readOnly || !task}
-          >
-            {!task && !readOnly && (
-              <div className="flex flex-wrap gap-2">
-                {QUICK.map((m) => (
-                  <Chip key={m} icon="bolt" selected={form.quick === m} onClick={() => set(quickDeadline(m))}>
-                    {m === QUICK[0] ? `In ${quickLabel(m)}` : quickLabel(m)}
-                  </Chip>
-                ))}
-                <Chip icon="calendar_month" selected={!form.quick} onClick={() => set({ quick: null })}>
-                  Pick a day and time
-                </Chip>
-              </div>
-            )}
-            {form.quick ? (
-              <p className="text-body-medium text-on-surface-variant">
-                Quick deadlines are one-off tasks with no grace period.{" "}
-                {form.assigneeId === me.user.id ? "You get a countdown on Today." : `${memberName(form.assigneeId)} gets a push right away and a countdown on Today.`}
-              </p>
-            ) : (
-              <>
-                <RecurrencePicker value={form.picker} onChange={(picker) => set({ picker })} />
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="w-full sm:w-auto">
-                    <Switch checked={form.allDay} onChange={(allDay) => set({ allDay })} label="All day" help="Due by the end of the day" />
-                  </div>
-                  {!form.allDay && <TextField label="Due at" type="time" value={form.dueTime} onChange={(e) => set({ dueTime: e.target.value })} className="w-36" />}
-                  {!form.allDay && (
-                    <Select
-                      label="Can be done"
-                      value={form.windowMinutes ?? ""}
-                      onChange={(e) => set({ windowMinutes: e.target.value ? Number(e.target.value) : null })}
-                      className="w-48"
-                    >
-                      {[...new Set([...WINDOWS, form.windowMinutes])].map((m) => (
-                        <option key={m ?? "any"} value={m ?? ""}>
-                          {windowLabel(m)}
-                        </option>
-                      ))}
-                    </Select>
-                  )}
-                </div>
-                {changingZone ? (
-                  <Select label="Time zone" value={form.timezone} onChange={(e) => set({ timezone: e.target.value })}>
-                    {[...new Set([form.timezone, ...Intl.supportedValuesOf("timeZone")])].map((z) => (
-                      <option key={z} value={z}>
-                        {z.replace(/_/g, " ")}
-                      </option>
-                    ))}
-                  </Select>
-                ) : (
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                      <div className="text-body-large text-on-surface">Time zone</div>
-                      <div className="text-body-medium text-on-surface-variant">
-                        {tzName(form.timezone)}
-                        {form.timezone === browserTimeZone() ? " (this device)" : ""}
-                      </div>
-                    </div>
-                    {!readOnly && (
-                      <Button variant="text" onClick={() => setChangingZone(true)}>
-                        Change
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </Fold>
-
-          {(features.location || form.placeId) && !form.counted && !form.steps.length && <PlaceFold form={form} set={set} readOnly={readOnly} />}
-          {!form.counted && !form.placeId && <StepsFold steps={form.steps} onChange={(steps) => set({ steps })} readOnly={readOnly} />}
-          {!form.placeId && <CountFold form={form} set={set} readOnly={readOnly} points={features.points} />}
-
-          {(features.points || features.consequences) && (
-            <Fold icon="balance" title={stakesTitle} sub={stakesSub} open={readOnly}>
-              {features.points && (
-                <div className="flex gap-4">
-                  <TextField
-                    label="Points if done"
-                    type="number"
-                    value={Number.isFinite(form.points) ? form.points : ""}
-                    onChange={(e) => set({ points: num(e.target.value) })}
-                    className="flex-1"
-                  />
-                  <TextField
-                    label="Lost if missed"
-                    type="number"
-                    min={0}
-                    value={Number.isFinite(form.missPenalty) ? form.missPenalty : ""}
-                    onChange={(e) => set({ missPenalty: num(e.target.value) })}
-                    className="flex-1"
-                  />
-                </div>
-              )}
-              {features.points && (
-                <Select label="Reward on completion" value={form.rewardId} onChange={(e) => set({ rewardId: e.target.value })}>
-                  <option value="">None</option>
-                  {rewards.data?.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.title}
-                    </option>
-                  ))}
-                </Select>
-              )}
-              {features.consequences && (
-                <Select
-                  label="Consequence if missed"
-                  help={form.consequenceId ? "Handed out automatically when it's missed" : undefined}
-                  value={form.consequenceId}
-                  onChange={(e) => set({ consequenceId: e.target.value })}
-                >
-                  <option value="">None</option>
-                  {consequences.data?.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.title}
-                    </option>
-                  ))}
-                </Select>
-              )}
-              {features.consequences && form.consequenceId && (
-                <div className="flex flex-wrap items-center gap-4">
-                  <Select label="Consequence due" value={form.consequenceDueDays} onChange={(e) => set({ consequenceDueDays: Number(e.target.value) })} className="w-48">
-                    {[...new Set([0, 1, 2, 3, 7, form.consequenceDueDays])]
-                      .sort((a, b) => a - b)
-                      .map((d) => (
-                        <option key={d} value={d}>
-                          {dueDaysLabel(d)}
-                        </option>
-                      ))}
-                  </Select>
-                  <Switch checked={form.consequenceAllDay} onChange={(consequenceAllDay) => set({ consequenceAllDay })} label="Any time that day" />
-                  {!form.consequenceAllDay && (
-                    <TextField label="By" type="time" value={form.consequenceDueTime} onChange={(e) => set({ consequenceDueTime: e.target.value })} className="w-36" />
-                  )}
-                </div>
-              )}
-            </Fold>
-          )}
-
-          <ReminderFold form={form} set={set} readOnly={readOnly} />
-
-          <Fold icon="timer" title={graceTitle} sub={graceSub} open={readOnly}>
-            <div className="flex flex-wrap gap-2">
-              {graceChips.map((c) => (
-                <Chip key={c.value} selected={form.grace === c.value} onClick={() => set({ grace: c.value, graceMinutes: c.value === "custom" ? grace || 30 : form.graceMinutes })}>
-                  {c.label}
+      {!readOnly && (
+        <section className="mt-8">
+          <h2 className="eyebrow mb-3">Also</h2>
+          <div className="flex flex-wrap gap-2">
+            {also
+              .filter((a) => a.show)
+              .map((a) => (
+                <Chip key={a.key} selected={a.on} onClick={a.toggle}>
+                  {a.label}
                 </Chip>
               ))}
-            </div>
-            {form.grace === "custom" && (
+          </div>
+        </section>
+      )}
+
+      <section className="mt-8">
+        <h2 className="eyebrow mb-1">{mine ? "Details" : `Details ${who} reads`}</h2>
+        <MarkdownEditor
+          value={form.bodyMd}
+          onChange={(bodyMd) => set({ bodyMd })}
+          editable={!readOnly}
+          placeholder={`What to do, and why it matters`}
+          label="Details"
+          compact
+        />
+      </section>
+
+      {showSteps && !form.counted && !form.placeId && <Steps steps={form.steps} onChange={(steps) => set({ steps })} readOnly={readOnly} />}
+
+      {showPlace && !form.counted && <PlaceSection form={form} set={set} readOnly={readOnly} />}
+
+      <section className="mt-8 flex flex-col gap-5">
+        <h2 className="eyebrow -mb-2">Timing</h2>
+        {!form.allDay && !form.quick && (
+          <Select label="Can be done" value={form.windowMinutes ?? ""} onChange={(e) => set({ windowMinutes: e.target.value ? Number(e.target.value) : null })}>
+            {[...new Set([...WINDOWS, form.windowMinutes])].map((m) => (
+              <option key={m ?? "any"} value={m ?? ""}>
+                {m === null ? "Any time that day" : `Up to ${windowLabel(m).replace(" before", "")} early`}
+              </option>
+            ))}
+          </Select>
+        )}
+        <Select label="Time zone" value={form.timezone} onChange={(e) => set({ timezone: e.target.value })}>
+          {[...new Set([form.timezone, ...Intl.supportedValuesOf("timeZone")])].map((z) => (
+            <option key={z} value={z}>
+              {tzName(z)}
+              {z === browserTimeZone() ? " (this device)" : ""}
+            </option>
+          ))}
+        </Select>
+        {!form.quick && (
+          <div className="flex flex-col gap-5">
+            <Select
+              label="Missed after"
+              value={form.grace}
+              onChange={(e) => {
+                const g = e.target.value as Grace;
+                set({ grace: g, graceMinutes: g === "custom" ? grace || 30 : form.graceMinutes });
+              }}
+            >
+              <option value="none">Right at {form.allDay ? "midnight" : "the due time"}</option>
+              <option value="15">15 min late</option>
+              <option value="60">1 hour late</option>
+              {!form.allDay && <option value="midnight">Midnight</option>}
+              <option value="custom">Other</option>
+            </Select>
+            {form.grace === "custom" ? (
               <TextField
-                label="Minutes"
+                label="Minutes late"
                 type="number"
                 min={0}
                 value={Number.isFinite(form.graceMinutes) ? form.graceMinutes : ""}
                 onChange={(e) => set({ graceMinutes: num(e.target.value) })}
-                className="w-36"
               />
-            )}
-          </Fold>
+            ) : null}
+            {grace > 0 && <p className="-mt-3 text-body-small text-on-surface-variant">Missed at {clockAfter(dueMinutes + grace)}</p>}
+          </div>
+        )}
+      </section>
+
+      <Reminders form={form} set={set} readOnly={readOnly} />
+
+      {features.points && (
+        <section className="mt-8">
+          <h2 className="eyebrow mb-1">Reward when done</h2>
+          <Select aria-label="Reward when done" value={form.rewardId} onChange={(e) => set({ rewardId: e.target.value })}>
+            <option value="">None</option>
+            {rewards.data?.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.title}
+              </option>
+            ))}
+          </Select>
+        </section>
+      )}
+    </>
+  );
+
+  const actions = !readOnly && (
+    <Button type="submit" busy={save.isPending} disabled={!canSave} className={wide ? "h-12 px-7" : "h-12 w-full"}>
+      {giveLabel}
+    </Button>
+  );
+
+  if (wide)
+    return (
+      <form onSubmit={submit} className="grid min-h-dvh grid-cols-[minmax(0,1fr)_360px]">
+        <div className="max-w-[880px] px-12 pt-10 pb-16">
+          <div className="eyebrow mb-4">{readOnly ? "Task" : task ? "Edit task" : "New task"}</div>
+          <fieldset disabled={readOnly} className="contents">
+            {main}
+          </fieldset>
+          <div className="mt-10 flex gap-3">
+            {actions}
+            <Button variant="outlined" className="h-12 px-7" onClick={back}>
+              {readOnly ? "Back" : "Cancel"}
+            </Button>
+          </div>
         </div>
+        <aside className="border-l border-outline-variant bg-surface-container-lowest px-8 pt-10">
+          <Preview form={form} who={mine ? "you" : who} sched={sched} reward={reward} />
+        </aside>
+        <HowOften open={howOften} onClose={() => setHowOften(false)} picker={form.picker} onChange={(picker) => set({ picker, quick: null })} />
+      </form>
+    );
+
+  return (
+    <form onSubmit={submit}>
+      <header className="sticky top-0 z-10 grid grid-cols-[1fr_auto_1fr] items-center bg-surface px-4 py-2">
+        <button type="button" onClick={back} className="state-layer -ml-2 h-10 justify-self-start rounded-md px-2 text-body-large text-on-surface-variant">
+          {readOnly ? "Back" : "Cancel"}
+        </button>
+        <h1 className="text-title-medium text-on-surface">{readOnly ? "Task" : task ? "Edit task" : "New task"}</h1>
+        <div className="justify-self-end">
+          {!task && !readOnly && <IconButton icon="stacks" label="Start from a kit" onClick={() => navigate({ to: "/kits" })} />}
+        </div>
+      </header>
+      <fieldset disabled={readOnly} className="px-4 pt-6 pb-32 md:px-6">
+        {main}
       </fieldset>
+      {actions && <div className="fixed inset-x-0 bottom-0 z-10 bg-surface px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6">{actions}</div>}
+      <HowOften open={howOften} onClose={() => setHowOften(false)} picker={form.picker} onChange={(picker) => set({ picker, quick: null })} />
     </form>
+  );
+}
+
+function HowOften({ open, onClose, picker, onChange }: { open: boolean; onClose(): void; picker: PickerState; onChange(p: PickerState): void }) {
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={<span className="font-serif text-[34px]">How often</span>}
+      actions={
+        <Button className="h-12 w-full" onClick={onClose}>
+          Done
+        </Button>
+      }
+    >
+      <RecurrencePicker value={picker} onChange={onChange} />
+    </Dialog>
+  );
+}
+
+/** Desktop: the task as it will show on their Today, and its next three dates. */
+function Preview({ form, who, sched, reward }: { form: Form; who: string; sched: ReturnType<typeof preview>; reward?: string }) {
+  const { features, memberName, rel, me } = useRel();
+  const dom = rel.members.find((m) => m.role !== "submissive" && m.userId !== form.assigneeId)?.userId ?? me.user.id;
+  const time = form.allDay ? "All day" : form.quick ? `In ${quickLabel(form.quick)}` : fmtClock(form.dueTime);
+  const first = sched.dates[0];
+  const sub = [
+    form.quick ? "Once" : form.picker.kind === "once" ? "Once" : sched.summary,
+    form.approvalRequired ? `${memberName(dom).replace(/^You$/, "You")} approve${memberName(dom) === "You" ? "" : "s"} it` : null,
+    features.points && form.points ? `${form.points > 0 ? "+" : "−"}${Math.abs(Math.trunc(form.points))}` : null,
+    reward ? `Reward: ${reward}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <>
+      <h2 className="eyebrow mb-4">How {who} will see it</h2>
+      <div className="rounded-lg border border-outline-variant bg-surface p-6">
+        <div className="eyebrow">
+          {first && !form.quick ? dayPhrase(first) : "Today"} · {time}
+        </div>
+        <div className="mt-2 font-serif text-[30px] leading-tight text-on-surface">{form.title.trim() || "Untitled"}</div>
+        <div className="mt-1 text-body-medium text-on-surface-variant">{sub}</div>
+        <div aria-hidden className="mt-5 grid grid-cols-2 gap-2">
+          <span className="flex h-10 items-center justify-center rounded-sm bg-on-surface text-label-large text-surface">Done</span>
+          <span className="flex h-10 items-center justify-center rounded-sm border border-on-surface text-label-large text-on-surface">More time</span>
+        </div>
+      </div>
+      {!form.quick && form.picker.kind !== "once" && sched.dates.length > 0 && (
+        <>
+          <h2 className="eyebrow mt-8 mb-1">Next three</h2>
+          {sched.dates.map((d) => (
+            <div key={d} className="flex items-center border-b border-outline-variant py-3.5">
+              <span className="flex-1 text-body-large text-on-surface">{fmtDate(d, { weekday: "short", month: "short", day: "numeric" })}</span>
+              <span className="text-body-medium text-on-surface-variant">{form.allDay ? "All day" : fmtClock(form.dueTime)}</span>
+            </div>
+          ))}
+        </>
+      )}
+      {sched.errors.length > 0 && <p className="mt-6 text-body-medium text-error">{sched.errors[0]}</p>}
+    </>
   );
 }
 
@@ -608,187 +885,61 @@ const REMINDERS: { value: Reminder; label: string }[] = [
 ];
 
 /** The push half an hour before it's due: the app's, the Dominant's own words, or none for a Dom who'd rather nudge. */
-function ReminderFold({ form, set, readOnly }: { form: Form; set(p: Partial<Form>): void; readOnly: boolean }) {
+function Reminders({ form, set, readOnly }: { form: Form; set(p: Partial<Form>): void; readOnly: boolean }) {
   const { rel, memberName } = useRel();
   const who = memberName(form.assigneeId);
   const details = rel.members.find((m) => m.userId === form.assigneeId)?.notifyDetails ?? false;
-  const words = form.reminderText.trim();
-  const title = form.reminder === "none" ? "No reminder" : form.reminder === "custom" && words ? `Reminder: “${words}”` : "Reminder 30 min before";
-  const sub =
-    form.reminder === "none"
-      ? "You'll nudge them yourself"
-      : form.reminder === "custom" && words && !details
-        ? `${who} sees "A task is due soon" until they turn on details`
-        : form.reminder === "custom"
-          ? "In your words"
-          : `"A task is due soon"`;
   return (
-    <Fold icon="notifications" title={title} sub={sub} open={readOnly}>
+    <section className="mt-8">
+      <h2 className="eyebrow mb-3">Reminders</h2>
       <div className="flex flex-wrap gap-2">
         {REMINDERS.map((r) => (
-          <Chip key={r.value} selected={form.reminder === r.value} onClick={readOnly ? undefined : () => set({ reminder: r.value })}>
+          <Chip key={r.value} plain selected={form.reminder === r.value} onClick={readOnly ? undefined : () => set({ reminder: r.value })}>
             {r.label}
           </Chip>
         ))}
       </div>
       {form.reminder === "custom" && (
         <>
-          <TextField
-            label="What they'll read"
-            placeholder="Lines, pet. Neatly."
-            value={form.reminderText}
-            onChange={(e) => set({ reminderText: e.target.value })}
-            maxLength={140}
-          />
-          <p className="text-body-medium text-on-surface-variant">
-            {details
-              ? `${who} lets notifications show your words, so this is what their lock screen says.`
-              : `${who} keeps notifications discreet, so they'll see "A task is due soon" until they turn on "Show your partner's words" in Settings.`}
-          </p>
-        </>
-      )}
-      {form.reminder === "none" && <p className="text-body-medium text-on-surface-variant">No push before it's due. It still shows on Today.</p>}
-    </Fold>
-  );
-}
-
-const COUNT_HELP: Record<CountKind, (n: number, to: number) => string> = {
-  exactly: (n) => `Done at exactly ${n}. Fewer by the deadline is missed; more counts as failed.`,
-  atLeast: (n) => `Done once it reaches ${n}, and it can keep going. Fewer by the deadline is missed.`,
-  atMost: (n) => `Done at the deadline if it's ${n} or fewer. More counts as failed.`,
-  range: (n, to) => `Done once it reaches ${n}. Fewer by the deadline is missed; more than ${to} counts as failed.`,
-};
-
-/** A count task is marked once each time (cups of water, edges) and is done when the count is in bounds. */
-function CountFold({ form, set, readOnly, points }: { form: Form; set(p: Partial<Form>): void; readOnly: boolean; points: boolean }) {
-  const { countMin, countMax } = countBoundsOf(form);
-  const n = whole(form.countN);
-  const to = whole(form.countTo, n);
-  const bounds =
-    countMin != null && countMax != null
-      ? countMin === countMax
-        ? `exactly ${countMin}`
-        : `${countMin} to ${countMax}`
-      : countMin != null
-        ? `at least ${countMin}`
-        : `no more than ${countMax}`;
-  return (
-    <Fold
-      icon="exposure_plus_1"
-      title={form.counted ? `Count: ${bounds}` : "Count it"}
-      sub={form.counted ? "Marked once each time, until it's due" : "Mark it more than once, like cups of water"}
-      open={readOnly && form.counted}
-    >
-      <Switch
-        checked={form.counted}
-        onChange={(counted) => set(counted ? { counted, steps: [] } : { counted })}
-        label="Count it"
-        help="A tap marks one more; hold to change the count."
-      />
-      {form.counted && (
-        <>
-          <SegmentedButtons
-            value={form.countKind}
-            onChange={(countKind) => set({ countKind })}
-            options={[
-              { value: "exactly", label: "Exactly" },
-              { value: "atLeast", label: "At least" },
-              { value: "atMost", label: "At most" },
-              { value: "range", label: "Range" },
-            ]}
-            className="w-full"
-          />
-          <div>
-            <div className="flex gap-4">
-              <TextField
-                label={form.countKind === "range" ? "At least" : "How many"}
-                type="number"
-                min={1}
-                max={1000}
-                value={Number.isFinite(form.countN) ? form.countN : ""}
-                onChange={(e) => set({ countN: num(e.target.value) })}
-                className="w-36"
-              />
-              {form.countKind === "range" && (
-                <TextField
-                  label="At most"
-                  type="number"
-                  min={n}
-                  max={1000}
-                  value={Number.isFinite(form.countTo) ? form.countTo : ""}
-                  onChange={(e) => set({ countTo: num(e.target.value) })}
-                  className="w-36"
-                />
-              )}
-            </div>
-            <p className="mt-1 px-1 text-body-small text-on-surface-variant">{COUNT_HELP[form.countKind](n, to)}</p>
+          <div className="mt-3 flex items-baseline border-b border-outline-variant focus-within:border-on-surface">
+            <span className="text-body-large text-on-surface">“</span>
+            <input
+              aria-label="What they'll read"
+              placeholder="Lines, pet. Neatly."
+              value={form.reminderText}
+              onChange={(e) => set({ reminderText: e.target.value })}
+              maxLength={140}
+              className="h-11 min-w-0 flex-1 bg-transparent text-body-large text-on-surface outline-none placeholder:text-on-surface-variant/60"
+            />
+            <span className="text-body-large text-on-surface">”</span>
           </div>
-          {points && (
-            <div>
-              <div className="text-body-large text-on-surface">Points and penalties</div>
-              <SegmentedButtons
-                value={form.countPer}
-                onChange={(countPer) => set({ countPer })}
-                options={[
-                  { value: "task", label: "Per task" },
-                  { value: "count", label: "Per count" },
-                ]}
-                className="mt-2 w-full"
-              />
-              <p className="mt-1 px-1 text-body-small text-on-surface-variant">
-                {form.countPer === "task"
-                  ? "Booked once: points when it's done, the penalty if it isn't."
-                  : "Points for each one counted, and the penalty for each one short or over. A consequence is still handed out once."}
-              </p>
-            </div>
+          {!details && who !== "You" && (
+            <p className="mt-1 text-body-small text-on-surface-variant">{who} keeps notifications discreet, so they'll see "A task is due soon".</p>
           )}
         </>
       )}
-    </Fold>
+    </section>
   );
 }
 
-const STAYS = [null, 30, 60] as const;
-const stayLabel = (m: number) => (m >= 60 && m % 60 === 0 ? `${m / 60} hr` : `${m} min`);
+const STAYS = [null, 30, 45, 60, 90, 120];
+const stayLabel = (m: number) => (m >= 60 && m % 60 === 0 ? `${m / 60} hour${m === 60 ? "" : "s"}` : `${m} minutes`);
 
 /** A location task: done by getting to a place by the due time, and staying a while if it says so. */
-function PlaceFold({ form, set, readOnly }: { form: Form; set(p: Partial<Form>): void; readOnly: boolean }) {
+function PlaceSection({ form, set, readOnly }: { form: Form; set(p: Partial<Form>): void; readOnly: boolean }) {
   const { rel, memberName } = useRel();
   const places = usePlaces(rel.id);
   const [adding, setAdding] = useState(false);
-  const [otherStay, setOtherStay] = useState(form.stayMinutes !== null && !STAYS.includes(form.stayMinutes as 30 | 60));
   const assignee = rel.members.find((m) => m.userId === form.assigneeId);
   const name = memberName(form.assigneeId);
   // A place can only be set once the assignee's phone can notice arrivals; one already set stays editable.
   const ready = assignee?.locationStatus === "ready" || !!form.placeId;
-  const place = places.data?.find((p) => p.id === form.placeId);
-  const due = form.allDay ? "the end of the day" : fmtClock(form.dueTime || "00:00");
-  const stay = form.stayMinutes ?? null;
   return (
-    <Fold
-      icon="location_on"
-      title={place ? `At ${place.name} by ${due}${stay ? `, for ${stayLabel(stay)}` : ""}` : "Be somewhere"}
-      sub={
-        place
-          ? `Checked by ${name === "You" ? "your" : `${name}'s`} phone`
-          : ready
-            ? `${name === "You" ? "Your" : `${name}'s`} phone checks in on arrival`
-            : `Not set up on ${name === "You" ? "your" : `${name}'s`} phone yet`
-      }
-      open={readOnly && !!place}
-    >
+    <section className="mt-8 flex flex-col gap-5">
+      <h2 className="eyebrow -mb-2">Be somewhere</h2>
       {!ready ? (
         <>
-          <Select label="Place" value="" disabled>
-            <option value="">Choose a place</option>
-          </Select>
-          <div className="flex items-start gap-3">
-            <Icon name="info" className="text-on-surface-variant" />
-            <div className="text-body-medium">
-              <div className="text-on-surface">{name} hasn't allowed location yet</div>
-              <div className="text-on-surface-variant">Location tasks need Fealty on {name}'s Android phone, with location allowed all the time.</div>
-            </div>
-          </div>
+          <p className="text-body-medium text-on-surface-variant">{name === "You" ? "You haven't" : `${name} hasn't`} allowed location on Android yet.</p>
           {!readOnly && assignee && (
             <div>
               <AskLocationButton name={name} />
@@ -802,7 +953,7 @@ function PlaceFold({ form, set, readOnly }: { form: Form; set(p: Partial<Form>):
             value={form.placeId}
             onChange={(e) => (e.target.value === "+" ? setAdding(true) : set({ placeId: e.target.value, ...(e.target.value ? {} : { stayMinutes: null }) }))}
           >
-            <option value="">None</option>
+            <option value="">Choose a place</option>
             {(places.data ?? []).map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -811,52 +962,23 @@ function PlaceFold({ form, set, readOnly }: { form: Form; set(p: Partial<Form>):
             {!readOnly && <option value="+">Add a place…</option>}
           </Select>
           {form.placeId && (
-            <>
-              <p className="-mt-2 px-1 text-body-small text-on-surface-variant">Arrive by {due}, the task's due time. Later than that is missed.</p>
-              <div>
-                <div className="text-body-large text-on-surface">Stay at least</div>
-                <SegmentedButtons
-                  value={otherStay ? "other" : String(stay)}
-                  onChange={(v) => {
-                    setOtherStay(v === "other");
-                    set({ stayMinutes: v === "other" ? (stay ?? 90) : v === "null" ? null : Number(v) });
-                  }}
-                  options={[
-                    { value: "null", label: "No" },
-                    { value: "30", label: "30 min" },
-                    { value: "60", label: "1 hr" },
-                    { value: "other", label: "Other" },
-                  ]}
-                  className="mt-2 w-full"
-                />
-                {otherStay && (
-                  <TextField
-                    label="Minutes"
-                    type="number"
-                    min={5}
-                    max={720}
-                    value={stay ?? ""}
-                    onChange={(e) => set({ stayMinutes: e.target.value === "" ? null : Math.min(720, Math.max(5, Math.trunc(Number(e.target.value)))) })}
-                    className="mt-3 w-36"
-                  />
-                )}
-                <p className="mt-1 px-1 text-body-small text-on-surface-variant">
-                  {stay
-                    ? `Done after ${stayLabel(stay)} there. Leaving sooner is marked left early, which counts like a miss unless you excuse it.`
-                    : "Done as soon as they get there."}
-                </p>
-              </div>
-            </>
+            <Select label="Stay at least" value={form.stayMinutes ?? ""} onChange={(e) => set({ stayMinutes: e.target.value ? Number(e.target.value) : null })}>
+              {[...new Set([...STAYS, form.stayMinutes])].map((m) => (
+                <option key={m ?? "no"} value={m ?? ""}>
+                  {m == null ? "Done on arrival" : stayLabel(m)}
+                </option>
+              ))}
+            </Select>
           )}
         </>
       )}
       <PlaceDialog place={null} open={adding} onClose={() => setAdding(false)} onSaved={(p) => set({ placeId: p.id })} />
-    </Fold>
+    </section>
   );
 }
 
 /** A ritual's steps: done in order, one at a time, from a run view. A task with none is an ordinary task. */
-function StepsFold({ steps, onChange, readOnly }: { steps: TaskStep[]; onChange(steps: TaskStep[]): void; readOnly: boolean }) {
+function Steps({ steps, onChange, readOnly }: { steps: TaskStep[]; onChange(steps: TaskStep[]): void; readOnly: boolean }) {
   const [draft, setDraft] = useState("");
   const add = () => {
     const title = draft.trim();
@@ -864,27 +986,22 @@ function StepsFold({ steps, onChange, readOnly }: { steps: TaskStep[]; onChange(
     onChange([...steps, { id: crypto.randomUUID().slice(0, 8), title }]);
     setDraft("");
   };
-  const named = steps.filter((s) => s.title.trim());
   return (
-    <Fold
-      icon="format_list_numbered"
-      title={named.length ? `Ritual: ${named.length} step${named.length === 1 ? "" : "s"}` : "Make it a ritual"}
-      sub={named.length ? named.map((s) => s.title.trim()).join(" → ") : "Add steps that are done in order, one at a time"}
-      open={readOnly && steps.length > 0}
-    >
+    <section className="mt-8">
+      <h2 className="eyebrow mb-1">Steps</h2>
       {steps.length > 0 && (
-        <ol className="flex flex-col gap-1">
+        <ol>
           <SortableList items={steps} enabled={!readOnly} onReorder={onChange}>
             {(s, i, handle) => (
-              <li className="flex items-center gap-2">
+              <li className="flex items-center gap-2 border-b border-outline-variant">
                 {handle}
-                <span className="w-6 text-center text-label-large text-on-surface-variant tabular-nums">{i + 1}</span>
-                <TextField
+                <span className="text-body-large text-on-surface tabular-nums">{i + 1}.</span>
+                <input
                   aria-label={`Step ${i + 1}`}
                   value={s.title}
                   maxLength={200}
                   onChange={(e) => onChange(steps.map((x) => (x.id === s.id ? { ...x, title: e.target.value } : x)))}
-                  className="flex-1"
+                  className="h-13 min-w-0 flex-1 bg-transparent text-body-large text-on-surface outline-none"
                 />
                 {!readOnly && <IconButton icon="close" label={`Remove step ${i + 1}`} onClick={() => onChange(steps.filter((x) => x.id !== s.id))} />}
               </li>
@@ -893,44 +1010,25 @@ function StepsFold({ steps, onChange, readOnly }: { steps: TaskStep[]; onChange(
         </ol>
       )}
       {!readOnly && steps.length < 30 && (
-        <div className="flex items-center gap-2">
-          <TextField
-            label="Add a step"
+        <div className="flex items-center gap-2 border-b border-outline-variant focus-within:border-on-surface">
+          <span className="text-body-large text-primary">+</span>
+          <input
+            aria-label="Add a step"
+            placeholder="Add a step"
             value={draft}
             maxLength={200}
             onChange={(e) => setDraft(e.target.value)}
+            onBlur={add}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
                 add();
               }
             }}
-            className="flex-1"
+            className="h-12 min-w-0 flex-1 bg-transparent text-body-large text-on-surface outline-none placeholder:text-primary"
           />
-          <Button variant="tonal" icon="add" disabled={!draft.trim()} onClick={add}>
-            Add
-          </Button>
         </div>
       )}
-      {steps.length > 0 && <p className="text-body-small text-on-surface-variant">They're done one at a time from Start, and the task is finished when the last one is.</p>}
-    </Fold>
-  );
-}
-
-/** A section that collapses to a one-line summary of what's in it. */
-function Fold({ icon, title, sub, error, open: initiallyOpen, children }: { icon: string; title: string; sub: string; error?: boolean; open?: boolean; children: ReactNode }) {
-  const [open, setOpen] = useState(!!initiallyOpen);
-  return (
-    <section className="border border-outline-variant rounded-lg" style={{ ["--field-bg" as string]: "var(--md-surface-container-low)" }}>
-      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="state-layer flex w-full items-center gap-4 rounded-lg px-4 py-3 text-left">
-        <Icon name={icon} className="text-on-surface-variant" />
-        <span className="min-w-0 flex-1">
-          <span className="block text-body-large text-on-surface">{title}</span>
-          <span className={cx("block text-body-medium", error ? "text-error" : "text-on-surface-variant")}>{sub}</span>
-        </span>
-        <Icon name={open ? "expand_less" : "expand_more"} className="text-on-surface-variant" />
-      </button>
-      {open && <div className="flex flex-col gap-4 px-4 pt-2 pb-4">{children}</div>}
     </section>
   );
 }

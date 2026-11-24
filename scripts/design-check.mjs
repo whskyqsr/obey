@@ -26,7 +26,6 @@ const rules = [
     test: /\b(Card|ElevatedCard|OutlinedCard)\(/,
     allow: [
       "ui/stats/MonthReviewScreen.kt",
-      "ui/tasks/RecurrencePicker.kt",
       "ui/location/LocationScreens.kt",
       "ui/chastity/Chastity.kt",
       "ui/today/DayExtension.kt",
