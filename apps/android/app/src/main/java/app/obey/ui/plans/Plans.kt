@@ -224,7 +224,7 @@ class PlanViewModel @Inject constructor(
 /** A plan in a day's list: an accent rule down its side, its title, and when and whose. [tone] is kept for callers. */
 @Composable
 fun PlanRow(e: CalendarEvent, day: LocalDate, who: String?, @Suppress("UNUSED_PARAMETER") tone: PlanTone, onOpen: () -> Unit) {
-    PlanLine(e.title, listOfNotNull(e.dayLabel(day), who?.let { "$it's plan" }, if (e.conflictIds.isNotEmpty()) "overlaps ${if (e.conflictIds.size == 1) "a task" else "${e.conflictIds.size} tasks"}" else null).joinToString(" · "), e.conflictIds.isNotEmpty(), onOpen)
+    PlanLine(e.title, listOfNotNull(e.dayLabel(day), who, if (e.conflictIds.isNotEmpty()) "overlaps ${if (e.conflictIds.size == 1) "a task" else "${e.conflictIds.size} tasks"}" else null).joinToString(" · "), e.conflictIds.isNotEmpty(), onOpen)
 }
 
 /** An all-day or multi-day plan above a day's tasks, ruled the same way as [PlanRow]. */

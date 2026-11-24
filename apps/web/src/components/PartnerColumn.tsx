@@ -105,11 +105,11 @@ function ComingRow({ title, sub }: { title: string; sub: string }) {
   );
 }
 
-/** "Fri 7–10 PM · Kitten's plan". */
+/** "Fri 7–10 PM · Kitten". */
 function planLine(e: CalendarEvent, members: { userId: string }[], myId: string, memberName: (id: string) => string) {
   const day = fmtDate(localDateOf(new Date(e.startsAt)), { weekday: "short" });
   const when = e.allDay ? `${day}, all day` : `${day} ${fmtTime(e.startsAt)}–${fmtTime(e.endsAt)}`;
-  const whose = e.withPartner || members.length < 2 ? null : e.authorId === myId ? "Your plan" : `${memberName(e.authorId)}'s plan`;
+  const whose = e.withPartner || members.length < 2 ? null : e.authorId === myId ? "You" : memberName(e.authorId);
   return [when, whose].filter(Boolean).join(" · ");
 }
 

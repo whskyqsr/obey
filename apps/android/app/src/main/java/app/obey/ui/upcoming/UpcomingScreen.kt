@@ -143,7 +143,7 @@ fun UpcomingScreen(
     }
 
     val planRow: @Composable (CalendarEvent, LocalDate) -> Unit = { e, day ->
-        PlanRow(e, day, if (e.authorId == session?.userId || e.withPartner) null else session?.nameOf(e.authorId), planTone(e, session?.relationship)) { plan = e to day }
+        PlanRow(e, day, if (e.withPartner || (session?.relationship?.members?.size ?: 0) < 2) null else if (e.authorId == session?.userId) "You" else session?.nameOf(e.authorId), planTone(e, session?.relationship)) { plan = e to day }
     }
     val planChip: @Composable (CalendarEvent, LocalDate) -> Unit = { e, day ->
         PlanChip(e, day, planTone(e, session?.relationship), onOpen = { plan = e to day })
