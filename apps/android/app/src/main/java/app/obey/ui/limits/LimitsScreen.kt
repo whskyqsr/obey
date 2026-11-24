@@ -502,7 +502,10 @@ fun LimitsEditScreen(onClose: () -> Unit, vm: LimitsViewModel = hiltViewModel())
                             val a = answers[side][item.key]
                             val said = limitSentence(if (side == "dom") item.sentences.dom else item.sentences.sub, partner?.displayName)
                             Row(Modifier.padding(top = 28.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                Text(said, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(said, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f, fill = false))
+                                    if (side != usual) Text("Optional", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant, modifier = Modifier.padding(start = 8.dp))
+                                }
                                 Text(
                                     if (a?.note.isNullOrEmpty()) "Add a note" else "Change the note",
                                     style = MaterialTheme.typography.labelLarge,
