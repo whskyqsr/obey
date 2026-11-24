@@ -3,10 +3,10 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEvents, useOccurrences } from "../api/hooks";
 import type { CalendarEvent, Occurrence } from "../api/types";
 import { EventDialog, eventOn } from "../components/EventDialog";
-import { MonthWeeks, WeekGrid, inTopStrip } from "../components/WeekGrid";
+import { MonthWeeks, inTopStrip } from "../components/WeekGrid";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { OccurrenceCard, isOverdue } from "../components/OccurrenceCard";
-import { Button, Diamond, Dialog, type DiamondState, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, cx } from "../components/ui";
+import { Button, Diamond, Dialog, type DiamondState, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, SegmentedButtons, cx } from "../components/ui";
 import { useOpenOnNew } from "../lib/newParam";
 import { addDays, addMonths, daysBetween, fmtDate, fmtMonth, fmtTime, localDateOf, monthGrid, startOfWeek, today } from "../lib/dates";
 import { storage } from "../lib/storage";
@@ -94,11 +94,13 @@ export function CalendarPage() {
         tools={
           <>
             <IconButton icon="checklist" label="All tasks" onClick={() => void navigate({ to: "/tasks" })} />
-            <IconButton
-              icon={view === "month" ? "view_week" : "calendar_month"}
-              label={view === "month" ? "Show the week" : "Show the month"}
-              onClick={() => setView(view === "month" ? "week" : "month")}
-            />
+            {!desk && (
+              <IconButton
+                icon={view === "month" ? "view_week" : "calendar_month"}
+                label={view === "month" ? "Show the week" : "Show the month"}
+                onClick={() => setView(view === "month" ? "week" : "month")}
+              />
+            )}
           </>
         }
         actions={
@@ -106,10 +108,26 @@ export function CalendarPage() {
             {view === "week" && heading !== range && <span className="mr-1 text-body-large text-on-surface-variant">{range}</span>}
             <IconButton icon="chevron_left" label={view === "month" ? "Previous month" : "Previous week"} onClick={() => step(-1)} />
             <IconButton icon="chevron_right" label={view === "month" ? "Next month" : "Next week"} onClick={() => step(1)} />
+            {desk && (
+              <SegmentedButtons
+                className="ml-2"
+                value={view}
+                onChange={setView}
+                options={[
+                  { value: "week", label: "Week" },
+                  { value: "month", label: "Month" },
+                ]}
+              />
+            )}
+            {desk && !rel.endedAt && (
+              <Button variant="outlined" icon="event" onClick={() => setPlan(null)} className="ml-2">
+                Plan
+              </Button>
+            )}
           </>
         }
       />
-      {(away || (!rel.endedAt && desk)) && (
+      {away && (
         <div className="-mt-2 flex items-center gap-2 px-4 pb-3 md:px-6">
           {away && (
             <Button
@@ -120,12 +138,6 @@ export function CalendarPage() {
               }}
             >
               {view === "month" ? "Back to this month" : "Back to this week"}
-            </Button>
-          )}
-          <span className="flex-1" />
-          {!rel.endedAt && desk && (
-            <Button variant="tonal" icon="event" onClick={() => setPlan(null)}>
-              Plan
             </Button>
           )}
         </div>
@@ -238,15 +250,32 @@ export function CalendarPage() {
           </div>
         </div>
       ) : desk ? (
-        <WeekGrid
-          days={days}
-          occurrences={(occ.data ?? []).filter((o) => o.status !== "cancelled")}
-          events={events.data ?? []}
-          clashing={clashing}
-          onOpenTask={(o) => setDetailId(o.id)}
-          onOpenEvent={setPlan}
-          fab={isDom}
-        />
+        // Letters desktop: a column per day, its plans first, then its tasks in time order.
+        <div className="mx-6 grid grid-cols-7 border-y border-outline-variant">
+          {days.map((d, i) => {
+            const items = byDay.get(d) ?? [];
+            const dayEvents = eventsOn(d).sort((a, b) => Number(inTopStrip(b)) - Number(inTopStrip(a)) || a.startsAt.localeCompare(b.startsAt));
+            return (
+              <div
+                key={d}
+                className={cx(
+                  "flex min-h-[420px] min-w-0 flex-col gap-1 px-3 pt-3 pb-6",
+                  i > 0 && "border-l border-outline-variant",
+                  d === t && "bg-surface-container-lowest",
+                )}
+              >
+                <span className={cx("text-label-medium", d === t ? "text-primary" : "text-on-surface-variant")}>{fmtDate(d, { weekday: "short" })}</span>
+                <span className="mb-2 font-serif text-[30px] leading-8 text-on-surface">{Number(d.slice(8))}</span>
+                {dayEvents.map((e) => (
+                  <EventItem key={e.id} e={e} onOpen={() => setPlan(e)} />
+                ))}
+                {items.map((o) => (
+                  <ColumnItem key={o.id} o={o} clash={clashing.has(o.id)} onOpen={() => setDetailId(o.id)} />
+                ))}
+              </div>
+            );
+          })}
+        </div>
       ) : (
         // Letters: one hairline row per day, a diamond for each task, and a word on how it went. Tap a day to open it.
         <div className="mx-4 border-t border-outline-variant md:mx-6">
@@ -256,7 +285,13 @@ export function CalendarPage() {
             const dayEvents = eventsOn(d).sort((a, b) => Number(inTopStrip(b)) - Number(inTopStrip(a)) || a.startsAt.localeCompare(b.startsAt));
             const open = d === openDay;
             return (
-              <div key={d} className={cx("border-b border-outline-variant", d === t && "-mx-4 border-l-2 border-l-primary bg-surface-container-lowest px-[14px] md:-mx-6 md:px-[22px]")}>
+              <div
+                key={d}
+                className={cx(
+                  "border-b border-outline-variant",
+                  d === t && "-mx-4 border-l-2 border-l-primary bg-surface-container-lowest px-[14px] md:-mx-6 md:px-[22px]",
+                )}
+              >
                 <button
                   type="button"
                   aria-expanded={open}
@@ -302,9 +337,19 @@ export function CalendarPage() {
       >
         {detail && <OccurrenceCard o={detail} showDate />}
       </Dialog>
-      <EventDialog event={plan ?? null} day={view === "month" ? selected : days.includes(t) ? t : from} open={plan !== undefined} onClose={() => setPlan(undefined)} />
+      <EventDialog
+        event={plan ?? null}
+        day={view === "month" ? selected : days.includes(t) ? t : from}
+        open={plan !== undefined}
+        onClose={() => setPlan(undefined)}
+      />
       {isDom && (
-        <Fab icon="add" label="New task" className="max-md:hidden" onClick={() => navigate({ to: "/tasks/$taskId", params: { taskId: "new" }, search: { start: newTaskDay } })} />
+        <Fab
+          icon="add"
+          label="New task"
+          className="max-md:hidden"
+          onClick={() => navigate({ to: "/tasks/$taskId", params: { taskId: "new" }, search: { start: newTaskDay } })}
+        />
       )}
     </>
   );
@@ -354,12 +399,33 @@ function daySummary(items: Occurrence[], events: CalendarEvent[], d: string, t: 
   return plan ?? (d < t ? `${done} of ${items.length}` : "");
 }
 
+/** A task in a desktop day column, as in the mockup: its diamond and name, quieter once it's settled. */
+function ColumnItem({ o, clash, onOpen }: { o: Occurrence; clash?: boolean; onOpen(): void }) {
+  const state = dayState(o);
+  const settled = state === "done" || state === "off";
+  return (
+    <button type="button" onClick={onOpen} title={fmtTime(o.dueAt)} className="state-layer -mx-1 flex items-start gap-2 rounded-sm px-1 py-1 text-left">
+      <Diamond state={state} size={10} className="mt-1 shrink-0" />
+      <span
+        className={cx(
+          "line-clamp-2 min-w-0 flex-1 text-body-small break-words",
+          clash ? "text-error" : settled ? "text-on-surface-variant" : "text-on-surface",
+        )}
+      >
+        {o.title}
+      </span>
+    </button>
+  );
+}
+
 function WeekItem({ o, clash, onOpen }: { o: Occurrence; clash?: boolean; onOpen(): void }) {
   return (
     <button type="button" onClick={onOpen} className="state-layer flex w-full items-start gap-2 rounded-sm px-2 py-1.5 text-left">
       <span className={cx("mt-1.5 size-2 shrink-0 rounded-full", dotClass(o))} />
       <span className="min-w-0 flex-1">
-        <span className={cx("line-clamp-2 block text-label-large break-words text-on-surface", o.status === "completed" && "line-through opacity-70")}>{o.title}</span>
+        <span className={cx("line-clamp-2 block text-label-large break-words text-on-surface", o.status === "completed" && "line-through opacity-70")}>
+          {o.title}
+        </span>
         <span className={cx("flex items-center gap-1 text-label-small", clash ? "text-error" : "text-on-surface-variant")}>
           {fmtTime(o.dueAt)}
           {clash && <Icon name="event_busy" size={14} />}
