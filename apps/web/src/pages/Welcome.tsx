@@ -171,7 +171,7 @@ function FinishStep({ uid, partnerName }: { uid: string; partnerName: string | n
                 <button
                   type="button"
                   onClick={() => setOpen(k)}
-                  className="state-layer -mx-2 flex w-[calc(100%+1rem)] items-center gap-4 rounded-md px-2 py-3 text-left"
+                  className="state-layer state-row flex w-full items-center gap-4 py-3 text-left"
                 >
                   <Diamond state={applied.includes(k.id) ? "done" : "open"} size={16} className="mx-1" />
                   <span className="min-w-0 flex-1">

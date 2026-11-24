@@ -100,7 +100,7 @@ export function MonthReviewPage() {
                       <button
                         type="button"
                         onClick={() => (setMonth(p.month), window.scrollTo({ top: 0 }))}
-                        className="state-layer -mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-md px-2 py-3 text-left"
+                        className="state-layer state-row flex w-full items-center gap-3 py-3 text-left"
                       >
                         <span className="min-w-0 flex-1">
                           <span className={cx("block text-body-large", p.month === month ? "text-primary" : "text-on-surface")}>
@@ -339,7 +339,7 @@ function Questions({ s, mine, onSent }: { s: MonthSummary; mine?: MonthReview; o
               disabled={readOnly}
               aria-expanded={open === key}
               onClick={() => setOpen(open === key ? null : key)}
-              className="state-layer -mx-2 flex w-[calc(100%+1rem)] items-center gap-4 rounded-md px-2 py-4 text-left"
+              className="state-layer state-row flex w-full items-center gap-4 py-4 text-left"
             >
               <Diamond state={answered(key) ? "done" : "open"} size={18} className="mx-1" />
               <span className="min-w-0 flex-1 text-body-large text-on-surface">{q}</span>

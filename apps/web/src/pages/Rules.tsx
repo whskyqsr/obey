@@ -5,7 +5,7 @@ import { errorMessage } from "../api/client";
 import type { Rule } from "../api/types";
 import { ItemDialog, type FieldDef } from "../components/ItemDialog";
 import { SortableList } from "../components/SortableList";
-import { Chip, Empty, ErrorBox, Fab, IconButton, Loading, PageHeader, SegmentedButtons, useSnackbar } from "../components/ui";
+import { Chip, Empty, ErrorBox, Fab, IconButton, Loading, PageHeader, SegmentedButtons, useSnackbar, cx } from "../components/ui";
 import { useRel } from "../lib/relationship";
 import { useConfirm } from "../lib/useConfirm";
 
@@ -78,7 +78,7 @@ export function RulesPage() {
                   type="button"
                   disabled={!isDom}
                   onClick={() => setEditing(r)}
-                  className="state-layer flex min-w-0 flex-1 items-start gap-4 rounded-sm py-2 pr-2 text-left disabled:cursor-default"
+                  className={cx("state-layer flex min-w-0 flex-1 items-start gap-4 py-2 text-left disabled:cursor-default", handle ? "px-3" : "state-row")}
                 >
                   {/* Numbered like clauses in a letter: i, ii, iii. */}
                   <span className="w-8 shrink-0 font-serif text-[24px] leading-8 text-primary">{roman(number.get(r.id) ?? 0)}</span>

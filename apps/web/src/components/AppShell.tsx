@@ -157,7 +157,7 @@ function NewSheet({ open, onClose }: { open: boolean; onClose(): void }) {
                   onClose();
                   void navigate(it.go as never);
                 }}
-                className="state-layer -mx-2 flex w-[calc(100%+16px)] items-center gap-4 rounded-md px-2 py-3.5 text-left outline-none"
+                className="state-layer state-row flex w-full items-center gap-4 py-3.5 text-left outline-none"
               >
                 <Icon name={it.icon} size={22} className="text-on-surface-variant" />
                 <span className="min-w-0 flex-1 font-serif text-[22px] leading-7 text-on-surface">{it.label}</span>

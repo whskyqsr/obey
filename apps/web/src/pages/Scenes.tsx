@@ -56,7 +56,7 @@ export function ScenesPage() {
   const names = partners.map((p) => p.displayName).join(" and ");
   return (
     <>
-      <PageHeader title="Scenes" subtitle="Only your dynamic sees these." />
+      <PageHeader title="Scenes" />
       <div className="flex max-w-3xl flex-col gap-6 px-4 pb-28 md:px-6">
         {mine && (
           <section className="rounded-lg border border-outline-variant bg-surface-container-lowest p-6">

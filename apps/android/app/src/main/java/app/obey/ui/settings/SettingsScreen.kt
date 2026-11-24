@@ -51,7 +51,6 @@ import androidx.compose.material3.SnackbarHostState
 import app.obey.ui.common.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -70,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.obey.ui.common.BackLink
+import app.obey.ui.common.PageHeader
 import app.obey.api.Features
 import app.obey.api.ReschedulePolicy
 import app.obey.api.title
@@ -115,19 +115,15 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, onOpenLimits: 
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
-                title = {
-                    Text(
-                        when (page) {
-                            "you" -> "You"
-                            "notifications" -> "Notifications"
-                            "privacy" -> "Privacy"
-                            "features" -> "Features"
-                            else -> "Settings"
-                        },
-                    )
+            PageHeader(
+                title = when (page) {
+                    "you" -> "You"
+                    "notifications" -> "Notifications"
+                    "privacy" -> "Privacy"
+                    "features" -> "Features"
+                    else -> "Settings"
                 },
-                navigationIcon = { if (page == null) BackLink("Us", onBack) else BackLink("Settings") { page = null } },
+                navigation = { if (page == null) BackLink("Us", onBack) else BackLink("Settings") { page = null } },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },

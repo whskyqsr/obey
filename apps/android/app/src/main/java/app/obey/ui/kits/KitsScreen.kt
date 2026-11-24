@@ -65,7 +65,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -87,6 +86,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.obey.ui.common.BackLink
+import app.obey.ui.common.PageHeader
 import app.obey.BuildConfig
 import app.obey.api.ApplyKitInput
 import app.obey.api.ApplyKitResult
@@ -562,9 +562,9 @@ fun KitScreen(kitId: String, onBack: () -> Unit, onAdded: (ApplyKitResult) -> Un
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
-                title = { Text(kit?.title ?: "Kit") },
-                navigationIcon = { BackLink("Kits", onBack) },
+            PageHeader(
+                title = kit?.title ?: "Kit",
+                navigation = { BackLink("Kits", onBack) },
                 actions = {
                     if (kit != null) {
                         Box {
@@ -742,9 +742,9 @@ fun NewKitScreen(onBack: () -> Unit, onSaved: (String) -> Unit, vm: KitsViewMode
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
-                title = { Text("New kit") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.Close, "Close") } },
+            PageHeader(
+                title = "New kit",
+                navigation = { IconButton(onClick = onBack) { Icon(Icons.Outlined.Close, "Close") } },
                 actions = {
                     Button(
                         enabled = !busy && title.isNotBlank() && total > 0 && lib != null,
@@ -863,9 +863,9 @@ fun SharedKitScreen(code: String, onBack: () -> Unit, onAdded: (ApplyKitResult) 
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
-                title = { Text((shared as? Load.Ready)?.value?.title ?: "Shared kit") },
-                navigationIcon = { BackLink("Kits", onBack) },
+            PageHeader(
+                title = (shared as? Load.Ready)?.value?.title ?: "Shared kit",
+                navigation = { BackLink("Kits", onBack) },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },

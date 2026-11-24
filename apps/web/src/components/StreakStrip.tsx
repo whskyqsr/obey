@@ -1,12 +1,12 @@
 import { useStreaks } from "../api/hooks";
 import type { TaskStreak } from "../api/types";
 import { useRel } from "../lib/relationship";
-import { cx } from "./ui";
+import { Diamond, cx } from "./ui";
 
 const SLOTS = 7;
 const WORD = { completed: "done", missed: "missed", excused: "excused" } as const;
 
-/** The last few results as dots (done filled, excused hollow, missed red) and the current streak. Renders nothing for a task with no history. */
+/** The last few results as small diamonds (done filled, excused muted, missed in the accent) and the current streak. Renders nothing for a task with no history. */
 export function StreakStrip({ taskId, className, compact }: { taskId: string; className?: string; compact?: boolean }) {
   const { rel } = useRel();
   const s = useStreaks(rel.id).data?.find((x) => x.taskId === taskId);
@@ -24,20 +24,12 @@ export function Strip({ s, className, compact }: { s: TaskStreak; className?: st
       aria-label={`Streak ${s.streak}. Last ${s.recent.length}: ${s.recent.map((r) => WORD[r]).join(", ")}`}
       className={cx("inline-flex items-center gap-1.5", className)}
     >
-      <span className="inline-flex items-center gap-1">
+      <span className="inline-flex items-center gap-1.5">
         {Array.from({ length: pad }, (_, i) => (
-          <span key={`p${i}`} className="size-2 rounded-full bg-outline-variant/50" />
+          <Diamond key={`p${i}`} state="off" size={7} className="opacity-50" />
         ))}
         {recent.map((r, i) => (
-          <span
-            key={i}
-            className={cx(
-              "size-2 rounded-full",
-              r === "completed" && "bg-on-surface",
-              r === "missed" && "bg-error",
-              r === "excused" && "border-[1.5px] border-outline",
-            )}
-          />
+          <Diamond key={i} size={7} state={r === "completed" ? "done" : r === "missed" ? "owed" : "off"} />
         ))}
       </span>
       <span className={cx("text-label-medium tabular-nums", "text-on-surface-variant")}>{s.streak} in a row</span>

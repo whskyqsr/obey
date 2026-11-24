@@ -126,7 +126,7 @@ export function CurfewPage() {
       <div className="flex max-w-xl flex-col pb-10">
         {header}
         <div className="flex flex-col items-start gap-4 px-4 md:px-6">
-          <p className="text-body-large text-on-surface-variant">Curfew checks that they're at a place. Add Home first.</p>
+          <p className="text-body-large text-on-surface-variant">Curfew checks that {form.assigneeId === me.user.id ? "you're" : `${who} is`} at a place. Add Home first.</p>
           <Button variant="outlined" onClick={() => navigate({ to: "/location" })}>
             Add a place
           </Button>

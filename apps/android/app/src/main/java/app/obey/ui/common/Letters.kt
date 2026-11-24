@@ -3,6 +3,8 @@ package app.obey.ui.common
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.layout.layout
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.background
@@ -177,6 +179,18 @@ fun AccentBox(modifier: Modifier = Modifier, content: @Composable ColumnScope.()
         content = content,
     )
 }
+
+/**
+ * A tappable row between hairlines: its text stays on the page edge and the ripple reaches 12dp past it on each side
+ * (DESIGN.md), square so it meets the hairlines.
+ */
+fun Modifier.rowClickable(enabled: Boolean = true, onClick: () -> Unit): Modifier =
+    layout { measurable, constraints ->
+        val extra = 24.dp.roundToPx()
+        val wide = if (constraints.hasBoundedWidth) constraints.copy(minWidth = constraints.minWidth + extra, maxWidth = constraints.maxWidth + extra) else constraints
+        val p = measurable.measure(wide)
+        layout(p.width - extra, p.height) { p.place(-extra / 2, 0) }
+    }.clickable(enabled = enabled, onClick = onClick).padding(horizontal = 12.dp)
 
 /** A rule down the left edge, the way plans and status lines carry their tone. */
 fun Modifier.sideRule(color: Color): Modifier =

@@ -110,35 +110,29 @@ function KitReview({ drafts }: { drafts: Task[] }) {
   const who = [...new Set(drafts.map((t) => memberName(t.assigneeId)))].join(" and ");
   const edit = (t: Task) => navigate({ to: "/tasks/$taskId/edit", params: { taskId: t.id } });
   return (
-    <section
-      aria-label="From a kit"
-      className="mx-4 mb-4 flex flex-col gap-3 rounded-md border border-primary bg-surface-container-lowest p-5 text-on-surface md:mx-6"
-    >
-      <div>
-        <h2 className="text-title-medium">Look these over before {who} gets them</h2>
-        <p className="text-body-medium opacity-85">Added from a kit. Change or drop any of them, then send. {who} hears once, when you do.</p>
-      </div>
-      <div className="flex flex-col gap-px overflow-hidden rounded-lg">
+    <section aria-label="From a kit" className="mt-2 mb-6 px-4 md:px-6">
+      <h2 className="eyebrow">From a kit</h2>
+      <p className="mt-1 mb-2 text-body-large text-on-surface">{who} gets these once you send them.</p>
+      <ul className="border-t border-outline-variant">
         {drafts.map((t) => (
-          <div key={t.id} className="flex items-center gap-1 bg-surface-container-low pr-1 text-on-surface">
-            <button type="button" onClick={() => edit(t)} className="state-layer flex min-w-0 flex-1 flex-col items-start px-4 py-3 text-left">
-              <span className="truncate text-body-large">{t.title}</span>
+          <li key={t.id} className="flex items-center gap-1 border-b border-outline-variant">
+            <button type="button" onClick={() => edit(t)} className="state-layer state-row flex min-w-0 flex-1 flex-col items-start py-3 text-left">
+              <span className="truncate text-body-large text-on-surface">{t.title}</span>
               <span className="truncate text-body-medium text-on-surface-variant">
                 {t.summary}
                 {t.dueTime ? ` at ${fmtClock(t.dueTime)}` : ""}
               </span>
             </button>
-            <IconButton icon="edit" label={`Edit “${t.title}”`} onClick={() => edit(t)} />
             <IconButton
               icon="delete"
               label={`Drop “${t.title}”`}
               disabled={remove.isPending}
               onClick={() => remove.mutate(t.id, { onSuccess: () => snack(`Dropped “${t.title}”`), onError: (e) => snack(errorMessage(e)) })}
             />
-          </div>
+          </li>
         ))}
-      </div>
-      <div>
+      </ul>
+      <div className="mt-4">
         <Button
           icon="send"
           busy={send.isPending}
