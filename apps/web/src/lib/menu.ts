@@ -9,6 +9,8 @@ export interface Menu {
    * reached from it. Desktop has the sidebar instead.
    */
   lead: "switcher" | "back" | null;
+  /** Where the back lead goes: the page this one was opened from, or Us. */
+  back?: { label: string; go(): void };
   /** Opens the safe-word sheet; set for subs and switches, who get its button on every page header. */
   safeWord?(): void;
   /** Opens the invite sheet; set when someone is on their own (solo mode). */

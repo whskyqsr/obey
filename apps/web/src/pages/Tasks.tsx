@@ -6,7 +6,7 @@ import { errorMessage } from "../api/client";
 import type { Occurrence, Task } from "../api/types";
 import { CompleteDialog, isOverdue } from "../components/OccurrenceCard";
 import { RitualDialog, isRitual } from "../components/Ritual";
-import { Button, Chip, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, TextField, useSnackbar } from "../components/ui";
+import { Button, Chip, Diamond, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, TextField, useSnackbar } from "../components/ui";
 import { useCurrentOccurrences } from "../lib/currentOccurrences";
 import { fmtClock, localDateOf, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
@@ -165,16 +165,18 @@ function NowStatus({ occurrences, mine, onComplete }: { occurrences: Occurrence[
     return <CountRing o={open} onTap={mine && canCount(open, true, false) && !readyToSend(open) ? () => countTap(open) : undefined} disabled={!mine} />;
   if (open && mine)
     return (
-      <IconButton
-        icon={isRitual(open) ? "play_circle" : "check_circle"}
-        label={`${isRitual(open) ? "Start" : "Mark"} “${open.title}”${isRitual(open) ? "" : " done"}`}
-        className={isOverdue(open) ? "text-error" : "text-primary"}
+      <button
+        type="button"
+        aria-label={`${isRitual(open) ? "Start" : "Mark"} “${open.title}”${isRitual(open) ? "" : " done"}`}
+        className="state-layer grid size-10 shrink-0 place-items-center rounded-full"
         onClick={() => onComplete(open)}
-      />
+      >
+        <Diamond state={isOverdue(open) ? "owed" : "open"} />
+      </button>
     );
   const todays = occurrences.find((o) => localDateOf(new Date(o.dueAt)) === t);
-  if (todays?.status === "completed") return <Icon name="check_circle" filled className="m-2 text-primary" />;
-  if (occurrences.some((o) => o.status === "submitted")) return <Icon name="hourglass_top" className="m-2 text-tertiary" />;
+  if (todays?.status === "completed") return <span className="shrink-0 text-body-small text-on-surface-variant">done today</span>;
+  if (occurrences.some((o) => o.status === "submitted")) return <span className="shrink-0 text-body-small text-on-surface-variant">waiting</span>;
   if (open && isOverdue(open)) return <span className="shrink-0 text-body-small text-error">overdue</span>;
   return null;
 }
