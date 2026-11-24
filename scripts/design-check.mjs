@@ -25,7 +25,6 @@ const rules = [
     files: android,
     test: /\b(Card|ElevatedCard|OutlinedCard)\(/,
     allow: [
-      "ui/stats/MonthReviewScreen.kt",
       "ui/chastity/Chastity.kt",
       "ui/today/DayExtension.kt",
       "ui/onboarding/WelcomeScreen.kt",

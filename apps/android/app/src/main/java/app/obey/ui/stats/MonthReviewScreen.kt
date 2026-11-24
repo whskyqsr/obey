@@ -97,6 +97,17 @@ import app.obey.ui.common.loadCatching
 import app.obey.ui.common.local
 import app.obey.ui.common.moodIcon
 import app.obey.ui.common.parseInstant
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material.icons.automirrored.outlined.ShowChart
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.unit.sp
+import app.obey.ui.common.Diamond
+import app.obey.ui.common.DiamondState
+import app.obey.ui.common.Eyebrow
+import app.obey.ui.common.FormScreen
+import app.obey.ui.common.LettersChip
+import app.obey.ui.common.inkButtonColors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
 import java.time.YearMonth
@@ -206,133 +217,127 @@ fun MonthReviewScreen(onOpenSettings: () -> Unit, onOpenStats: (month: String, w
     val scroll = rememberScrollState()
     val summary = (state as? Load.Ready)?.value
     val pick = remember(tasks, session) { pickable(session, tasks) }
-    val titles = remember(tasks) { tasks.associate { it.id to it.title } }
+    var changing by remember(month) { mutableStateOf(false) }
+    val mine = summary?.reviews?.firstOrNull { it.userId == session.userId }
+    val revealed = summary != null && summary.reviewOpen && mine != null && summary.waitingOn.isEmpty() && summary.reviews.size > 1 && !changing
+    val name = monthName(month)
+    val title = when {
+        revealed -> "$name, together."
+        summary?.reviewOpen == true -> "Looking back on $name"
+        viewingPast -> monthName(month, true)
+        else -> "$name so far"
+    }
+    val eyebrow = when {
+        summary == null -> "Monthly review"
+        summary.reviewOpen && viewingPast -> "Monthly review · ${month.take(4)}"
+        summary.reviewOpen -> "Monthly review · open now"
+        else -> "Monthly review · opens ${shortDate(summary.reviewOpensOn)}"
+    }
+    val colors = MaterialTheme.colorScheme
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
-                title = {
-                    Column {
-                        Text("Monthly review")
-                        Text(
-                            monthName(month, true) + if (summary?.reviewOpen == true && !viewingPast) " · review open" else "",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+            TopAppBar(
+                title = {},
+                navigationIcon = { MenuButton() },
+                actions = {
+                    if (viewingPast) TextButton(onClick = { vm.load(current) }) { Text("This month", color = colors.primary) }
+                    val subject = summary?.subjectId
+                    if (LocalFeatures.current.stats && subject != null) {
+                        IconButton(onClick = { onOpenStats(month, subject) }) { Icon(Icons.AutoMirrored.Outlined.ShowChart, "See $name in Stats") }
                     }
+                    SafeWordAction()
                 },
-                navigationIcon = {
-                    if (viewingPast) IconButton(onClick = { vm.load(current) }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "This month") } else MenuButton()
-                },
-                actions = { SafeWordAction() },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Column(
-            Modifier.padding(padding).fillMaxSize().verticalScroll(scroll).padding(horizontal = 16.dp).padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            Modifier.padding(padding).fillMaxSize().verticalScroll(scroll).padding(horizontal = 16.dp).padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(36.dp),
         ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Eyebrow(eyebrow)
+                Text(title, style = MaterialTheme.typography.displayMedium)
+                if (revealed) {
+                    Text(
+                        "${if (summary!!.reviews.size > 2) "You all" else "You both"} finished. Here's what you each said.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = colors.onSurfaceVariant,
+                    )
+                }
+            }
             when (val s = state) {
                 Load.Loading -> LoadingBox()
                 is Load.Failed -> ErrorBox(s.message, { vm.load() })
                 is Load.Ready -> {
                     val m = s.value
-                    FocusCard(m, session, titles, pick, busy) { goal, ids, done -> vm.setFocus(m.month, goal, ids, done) }
-                    ProgressCard(m, session, onOpenStats)
-                    if (m.reviewOpen) {
-                        LookBack(m, session, busy, vm::loadAvatar) { input, done -> vm.saveReview(m.month, input, done) }
-                        if (!viewingPast && session.canManage) {
-                            (next as? Load.Ready)?.let { n ->
-                                NextFocus(n.value.month, n.value.focus, pick, busy) { goal, ids, done -> vm.setFocus(n.value.month, goal, ids, done) }
-                            }
-                        }
+                    if (revealed) {
+                        Together(m, session) { changing = true }
                     } else {
-                        ReviewSoon(m, session)
+                        if (m.reviewOpen) Questions(m, session, mine, busy) { input -> vm.saveReview(m.month, input) { changing = false } }
+                        Focus(m, session, pick, busy) { goal, ids, done -> vm.setFocus(m.month, goal, ids, done) }
+                    }
+                    TheMonth(m, session, onOpenStats)
+                    if (m.reviewOpen && !viewingPast && session.canManage) {
+                        (next as? Load.Ready)?.let { n ->
+                            NextFocus(n.value.month, n.value.focus, pick, busy) { goal, ids, done -> vm.setFocus(n.value.month, goal, ids, done) }
+                        }
                     }
                 }
             }
-            if (past.isNotEmpty()) {
-                PastMonths(past, month, current) { picked ->
-                    vm.load(picked)
-                }
-            }
+            if (past.isNotEmpty()) PastMonths(past, month, current) { vm.load(it) }
         }
     }
     LaunchedEffect(month) { scroll.scrollTo(0) }
 }
 
+/** The month's focus and how its tasks are going. */
 @Composable
-private fun Card(color: Color = MaterialTheme.colorScheme.surfaceContainerLow, content: @Composable () -> Unit) {
-    // Letters: a hairline box on paper; a highlighted card gets an oxblood rule instead of a fill.
-    val highlight = color != MaterialTheme.colorScheme.surfaceContainerLow
-    Surface(color = androidx.compose.ui.graphics.Color.Transparent, shape = MaterialTheme.shapes.medium, border = androidx.compose.foundation.BorderStroke(1.dp, if (highlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { content() }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun FocusCard(s: MonthSummary, session: Session, titles: Map<String, String>, pick: List<Task>, busy: Boolean, save: (String, List<String>, () -> Unit) -> Unit) {
+private fun Focus(s: MonthSummary, session: Session, pick: List<Task>, busy: Boolean, save: (String, List<String>, () -> Unit) -> Unit) {
     var editing by rememberSaveable { mutableStateOf(false) }
     val canEdit = session.canManage
     val f = s.focus
-    if (editing) FocusDialog(s.month, f, pick, busy, onDismiss = { editing = false }) { goal, ids -> save(goal, ids) { editing = false } }
-    if (f == null) {
-        Card {
-            Text("Focus for ${monthName(s.month)}", style = MaterialTheme.typography.titleMedium)
-            Text(
-                if (canEdit) "Pick one thing to work on this month, and the tasks that count towards it." else "No focus has been set for this month yet.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (canEdit) {
-                Button(onClick = { editing = true }) {
-                    Icon(Icons.Outlined.Flag, null, Modifier.size(18.dp))
-                    Text("  Set a focus")
-                }
-            }
-        }
-        return
-    }
     val colors = MaterialTheme.colorScheme
-    val isCurrent = s.month == currentMonth()
-    val setBy = f.setBy?.let { if (it == session.userId) "you" else session.nameOf(it) } ?: "a former member"
-    val end = ym(s.month).atEndOfMonth()
-    val left = ChronoUnit.DAYS.between(LocalDate.now(), end).toInt() + 1
-    Card(colors.primaryContainer) {
-        Row(verticalAlignment = Alignment.Top) {
-            Column(Modifier.weight(1f)) {
-                Text("FOCUS FOR ${monthName(s.month).uppercase()}", style = MaterialTheme.typography.labelMedium, color = colors.onPrimaryContainer.copy(alpha = 0.8f))
-                Text(f.goal, style = MaterialTheme.typography.headlineSmall, color = colors.onPrimaryContainer, modifier = Modifier.padding(top = 8.dp))
-                Text(
-                    "Set by $setBy" + when {
-                        !isCurrent -> ""
-                        s.reviewOpen -> " · ends ${end.format(DateTimeFormatter.ofPattern("MMM d"))}"
-                        else -> " · $left days left"
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.onPrimaryContainer.copy(alpha = 0.8f),
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
-            if (canEdit) IconButton(onClick = { editing = true }) { Icon(Icons.Outlined.Edit, "Change the focus", tint = colors.onPrimaryContainer) }
+    if (editing) FocusSheet(s.month, f, pick, busy, onDismiss = { editing = false }) { goal, ids -> save(goal, ids) { editing = false } }
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Eyebrow("Focus", Modifier.weight(1f))
+            if (f != null && canEdit) IconButton(onClick = { editing = true }) { Icon(Icons.Outlined.Edit, "Change the focus") }
         }
-        if (f.taskIds.isNotEmpty()) {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                f.taskIds.forEach { id ->
-                    Row(
-                        Modifier.height(32.dp).border(BorderStroke(1.dp, colors.onPrimaryContainer), MaterialTheme.shapes.small).padding(horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(Icons.Outlined.CheckCircle, null, Modifier.size(18.dp), tint = colors.onPrimaryContainer)
-                        Text(
-                            "  " + (titles[id] ?: s.focusTasks.firstOrNull { it.taskId == id }?.title ?: "A task"),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = colors.onPrimaryContainer,
-                        )
-                    }
+        if (f == null) {
+            if (canEdit) {
+                Text("Set ${monthName(s.month)}'s focus", style = MaterialTheme.typography.bodyLarge, color = colors.primary, modifier = Modifier.padding(top = 8.dp).clickable { editing = true })
+            } else {
+                Text("No focus set for ${monthName(s.month)}.", style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+            }
+            return@Column
+        }
+        val isCurrent = s.month == currentMonth()
+        val setBy = f.setBy?.let { if (it == session.userId) "you" else session.nameOf(it) } ?: "a former member"
+        val end = ym(s.month).atEndOfMonth()
+        val left = ChronoUnit.DAYS.between(LocalDate.now(), end).toInt() + 1
+        Text(f.goal, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 4.dp))
+        Text(
+            "Set by $setBy" + when {
+                !isCurrent -> ""
+                s.reviewOpen -> " · ends ${end.format(DateTimeFormatter.ofPattern("MMM d"))}"
+                else -> " · $left days left"
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        s.focusTasks.forEach { t ->
+            Column(Modifier.padding(top = 12.dp)) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(t.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Text(pct(t.rate), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
                 }
+                Box(Modifier.padding(top = 8.dp).fillMaxWidth().height(3.dp).background(colors.outlineVariant.copy(alpha = 0.6f))) {
+                    Box(Modifier.fillMaxWidth((t.rate ?: 0.0).toFloat().coerceIn(0f, 1f)).fillMaxHeight().background(colors.onSurface))
+                }
+                HorizontalDivider(Modifier.padding(top = 12.dp), color = colors.outlineVariant)
             }
         }
     }
@@ -350,264 +355,226 @@ private fun FocusFields(goal: String, onGoal: (String) -> Unit, picked: List<Str
         modifier = Modifier.fillMaxWidth(),
     )
     if (tasks.isNotEmpty()) {
-        Text("Tasks that count towards it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Eyebrow("Tasks that count towards it")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             tasks.forEach { t ->
                 val on = t.id in picked
-                FilterChip(
-                    selected = on,
-                    onClick = { onPicked(if (on) picked - t.id else (picked + t.id).take(10)) },
-                    label = { Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    leadingIcon = if (on) ({ Icon(Icons.Outlined.Check, null, Modifier.size(18.dp)) }) else null,
-                )
+                LettersChip(t.title, on, { onPicked(if (on) picked - t.id else (picked + t.id).take(10)) })
             }
         }
     }
 }
 
 @Composable
-private fun FocusDialog(month: String, focus: MonthFocus?, tasks: List<Task>, busy: Boolean, onDismiss: () -> Unit, onSave: (String, List<String>) -> Unit) {
+private fun FocusSheet(month: String, focus: MonthFocus?, tasks: List<Task>, busy: Boolean, onDismiss: () -> Unit, onSave: (String, List<String>) -> Unit) {
     var goal by rememberSaveable { mutableStateOf(focus?.goal ?: "") }
     var picked by remember { mutableStateOf(focus?.taskIds ?: emptyList()) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Focus for ${monthName(month)}") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                FocusFields(goal, { goal = it }, picked, { picked = it }, tasks)
-            }
-        },
-        confirmButton = { TextButton(onClick = { onSave(goal, picked) }, enabled = goal.isNotBlank() && !busy) { Text("Save") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
+    FormScreen("${monthName(month)}'s focus", onCancel = onDismiss, onSave = { onSave(goal, picked) }, canSave = goal.isNotBlank() && !busy) {
+        FocusFields(goal, { goal = it }, picked, { picked = it }, tasks)
+    }
 }
 
-/** The focus tasks and mood for the month. The full numbers live in Stats, which counts the same calendar month. */
+/** How the sub's month went: the numbers in a line, the mood line, and the way to Stats. */
 @Composable
-private fun ProgressCard(s: MonthSummary, session: Session, onOpenStats: (String, String) -> Unit) {
+private fun TheMonth(s: MonthSummary, session: Session, onOpenStats: (String, String) -> Unit) {
     val colors = MaterialTheme.colorScheme
     val subject = s.subjectId ?: return
     val t = s.totals
     val isCurrent = s.month == currentMonth()
-    if (t.done + t.missed + t.excused == 0) {
-        Card {
-            EmptyBox(
-                if (isCurrent) "Nothing finished yet this month" else "No tasks were due in ${monthName(s.month)}",
-                if (isCurrent) "This fills in as tasks are done or missed." else null,
-                icon = Icons.Outlined.Insights,
-            )
+    val any = t.done + t.missed + t.excused > 0
+    Column {
+        Eyebrow(if (subject == session.userId) "Your month" else "${session.nameOf(subject)}'s month")
+        Text(
+            when {
+                any -> "${pct(t.rate)} of tasks done" + (if (isCurrent) " so far" else "") + " · ${t.done} done, ${t.missed} missed"
+                isCurrent -> "Nothing finished yet this month."
+                else -> "No tasks were due in ${monthName(s.month)}."
+            },
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        if (s.moods.isNotEmpty()) MonthMoodLine(s.month, s.moods) else Spacer(Modifier.height(12.dp))
+        HorizontalDivider(color = colors.outlineVariant)
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(if (s.moods.isNotEmpty()) "Mood" else "", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.weight(1f))
+            if (LocalFeatures.current.stats) {
+                Text(
+                    "See ${monthName(s.month)} in Stats",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.primary,
+                    modifier = Modifier.clickable { onOpenStats(s.month, subject) },
+                )
+            }
         }
-        return
     }
-    val stats = LocalFeatures.current.stats
-    Surface(color = androidx.compose.ui.graphics.Color.Transparent, shape = MaterialTheme.shapes.medium, border = androidx.compose.foundation.BorderStroke(1.dp, colors.outlineVariant), modifier = Modifier.fillMaxWidth()) {
+}
+
+/** The sub's moods across the month as a line; no average and no comparison with last month, so it never reads as a score. */
+@Composable
+private fun MonthMoodLine(month: String, moods: List<app.obey.api.MoodPoint>) {
+    val ink = MaterialTheme.colorScheme.onSurface
+    val days = ym(month).lengthOfMonth()
+    androidx.compose.foundation.Canvas(
+        Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 6.dp).height(72.dp).semantics { contentDescription = "${moods.size} moods this month" },
+    ) {
+        val w = size.width
+        val h = size.height
+        val pad = 6.dp.toPx()
+        val pts = moods.map { e ->
+            val at = parseInstant(e.at).local()
+            val dayFrac = (at.dayOfMonth - 1 + (at.hour * 60 + at.minute) / 1440f) / days
+            androidx.compose.ui.geometry.Offset(dayFrac * w, h - pad - (e.mood - 1) / 4f * (h - 2 * pad))
+        }
+        if (pts.size > 1) {
+            val path = androidx.compose.ui.graphics.Path().apply {
+                moveTo(pts[0].x, pts[0].y)
+                pts.drop(1).forEach { lineTo(it.x, it.y) }
+            }
+            drawPath(path, ink, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5.dp.toPx(), join = androidx.compose.ui.graphics.StrokeJoin.Round))
+        } else {
+            drawCircle(ink, 3.dp.toPx(), pts[0])
+        }
+    }
+}
+
+private enum class Question(val q: String) { WentWell("What went well?"), WorkOn("What to work on"), Rating("How well was the focus kept?") }
+
+/**
+ * The review's questions as rows, a filled diamond for each one answered. A row opens in place to answer it; nothing
+ * is sent until Send, and the others' answers show once you've sent yours.
+ */
+@Composable
+private fun Questions(s: MonthSummary, session: Session, mine: MonthReview?, busy: Boolean, onSave: (MonthReviewInput) -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    var rating by rememberSaveable(s.month, mine) { mutableIntStateOf(mine?.rating ?: 0) }
+    var wentWell by rememberSaveable(s.month, mine) { mutableStateOf(mine?.wentWell ?: "") }
+    var workOn by rememberSaveable(s.month, mine) { mutableStateOf(mine?.workOn ?: "") }
+    var open by rememberSaveable(s.month) { mutableStateOf<Question?>(null) }
+    val dirty = rating != (mine?.rating ?: 0) || wentWell.trim() != (mine?.wentWell ?: "") || workOn.trim() != (mine?.workOn ?: "")
+    val readOnly = session.readOnly
+    fun answered(q: Question) = when (q) {
+        Question.WentWell -> wentWell.isNotBlank()
+        Question.WorkOn -> workOn.isNotBlank()
+        Question.Rating -> rating > 0
+    }
+    val members = session.relationship?.members.orEmpty()
+    val finished = members.filter { it.userId != session.userId && it.userId !in s.waitingOn }.map { session.nameOf(it.userId) }
+    val waiting = s.waitingOn.filter { it != session.userId }.map { session.nameOf(it) }
+    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Column {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row {
-                    Text(if (isCurrent) "How ${monthName(s.month)} is going" else "How ${monthName(s.month)} went", style = MaterialTheme.typography.titleMedium)
-                    if (subject != session.userId) Text(" for ${session.nameOf(subject)}", style = MaterialTheme.typography.titleMedium, color = colors.onSurfaceVariant)
+            Question.entries.forEachIndexed { i, q ->
+                if (i > 0) HorizontalDivider(color = colors.outlineVariant)
+                Row(
+                    Modifier.fillMaxWidth().then(if (readOnly) Modifier else Modifier.clickable { open = if (open == q) null else q }).padding(vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Diamond(if (answered(q)) DiamondState.Done else DiamondState.Open, Modifier.padding(horizontal = 4.dp), size = 18.dp)
+                    Text(q.q, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f).padding(start = 16.dp))
+                    if (answered(q)) Text("answered", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
                 }
-                if (s.focusTasks.isNotEmpty()) {
-                    Text("Tasks for the focus", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
-                    s.focusTasks.forEach { f ->
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text(f.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(128.dp))
-                            Box(Modifier.weight(1f).height(8.dp).clip(CircleShape).background(colors.surfaceContainerHighest)) {
-                                Box(Modifier.fillMaxWidth((f.rate ?: 0.0).toFloat()).fillMaxHeight().clip(CircleShape).background(colors.primary))
+                if (open == q) {
+                    Column(Modifier.padding(start = 42.dp, bottom = 16.dp)) {
+                        when (q) {
+                            Question.Rating -> {
+                                Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    (1..5).forEach { n ->
+                                        val on = rating == n
+                                        Box(
+                                            Modifier.size(44.dp).clip(CircleShape)
+                                                .then(if (on) Modifier.background(colors.onSurface) else Modifier.border(1.dp, colors.outlineVariant, CircleShape))
+                                                .selectable(selected = on, role = SemanticsRole.RadioButton, onClick = { rating = n }),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Text("$n", style = MaterialTheme.typography.titleLarge, color = if (on) colors.surface else colors.onSurface)
+                                        }
+                                    }
+                                }
+                                Row(Modifier.width(252.dp).padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("Not at all", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+                                    Text("Every day", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+                                }
                             }
-                            Text(pct(f.rate), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(40.dp), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                            Question.WentWell -> LettersField(wentWell, { wentWell = it.take(2000) }, minLines = 3, modifier = Modifier.fillMaxWidth())
+                            Question.WorkOn -> LettersField(workOn, { workOn = it.take(2000) }, minLines = 3, modifier = Modifier.fillMaxWidth())
                         }
                     }
                 }
-                if (s.moods.isNotEmpty()) MonthMoodLine(s.month, s.moods)
-            }
-            HorizontalDivider(color = colors.surfaceContainerHighest)
-            Row(
-                (if (stats) Modifier.clickable { onOpenStats(s.month, subject) } else Modifier).fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text("All of ${monthName(s.month)}'s tasks", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        "${pct(t.rate)} done" + (if (isCurrent) " so far" else "") + " · ${t.done} done, ${t.missed} missed",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.onSurfaceVariant,
-                    )
-                }
-                if (stats) {
-                    Text("Stats", style = MaterialTheme.typography.labelLarge, color = colors.primary)
-                    Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = colors.primary)
-                }
             }
         }
+        if (!readOnly && (dirty || mine == null)) {
+            Button(
+                onClick = { onSave(MonthReviewInput(rating, wentWell.trim(), workOn.trim())); open = null },
+                enabled = rating > 0 && !busy,
+                colors = inkButtonColors(),
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(if (mine != null) "Save my answers" else "Send my answers") }
+        }
+        if (mine == null && finished.isNotEmpty()) {
+            HiddenNote("${finished.joinToString(" and ")} ${if (finished.size > 1) "have" else "has"} finished. You'll see each other's answers when you finish yours.")
+        }
+        if (mine != null && waiting.isNotEmpty()) HiddenNote("Waiting on ${waiting.joinToString(" and ")}. You'll see their answers once they've written them.")
     }
 }
 
-/** The sub's check-in moods across the month, low ones picked out; no average and no comparison with last month. */
 @Composable
-private fun MonthMoodLine(month: String, moods: List<app.obey.api.MoodPoint>) {
+private fun HiddenNote(text: String) {
     val colors = MaterialTheme.colorScheme
-    val ym = java.time.YearMonth.parse(month)
-    val days = ym.lengthOfMonth()
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text("Mood this month", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
-        Row(Modifier.height(56.dp)) {
-            Column(Modifier.fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
-                Icon(moodIcon(5), null, Modifier.size(16.dp), tint = colors.onSurfaceVariant)
-                Icon(moodIcon(1), null, Modifier.size(16.dp), tint = colors.onSurfaceVariant)
-            }
-            androidx.compose.foundation.Canvas(
-                Modifier.weight(1f).fillMaxHeight().padding(start = 8.dp)
-                    .semantics { contentDescription = "${moods.size} moods this month" },
-            ) {
-                val w = size.width
-                val h = size.height
-                val pad = 4.dp.toPx()
-                val pts = moods.map { e ->
-                    val at = parseInstant(e.at).local()
-                    val dayFrac = (at.dayOfMonth - 1 + (at.hour * 60 + at.minute) / 1440f) / days
-                    androidx.compose.ui.geometry.Offset(dayFrac * w, h - pad - (e.mood - 1) / 4f * (h - 2 * pad)) to e.mood
-                }
-                drawLine(
-                    colors.outlineVariant,
-                    androidx.compose.ui.geometry.Offset(0f, h / 2),
-                    androidx.compose.ui.geometry.Offset(w, h / 2),
-                    strokeWidth = 1.dp.toPx(),
-                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 4.dp.toPx())),
-                )
-                if (pts.size > 1) {
-                    val path = androidx.compose.ui.graphics.Path().apply {
-                        moveTo(pts[0].first.x, pts[0].first.y)
-                        pts.drop(1).forEach { lineTo(it.first.x, it.first.y) }
+    Row(
+        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(colors.surfaceContainer).border(1.dp, colors.outlineVariant, MaterialTheme.shapes.medium).padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(Icons.Outlined.VisibilityOff, null, tint = colors.onSurfaceVariant)
+        Text(text, style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp))
+    }
+}
+
+/** Everyone has answered: each person's words, then each rating beside how the tasks went. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun Together(s: MonthSummary, session: Session, onChange: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val members = session.relationship?.members.orEmpty()
+    fun isSub(id: String) = members.firstOrNull { it.userId == id }?.role == Role.Submissive
+    val order = s.reviews.sortedBy { !isSub(it.userId) }
+    @Composable
+    fun Quotes(title: String, pick: (MonthReview) -> String) {
+        val said = order.filter { pick(it).isNotBlank() }
+        if (said.isEmpty()) return
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Eyebrow(title)
+            said.forEach { r ->
+                Row(Modifier.height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
+                    Box(Modifier.width(2.dp).fillMaxHeight().background(if (isSub(r.userId)) colors.primary else colors.onSurface))
+                    Column(Modifier.padding(start = 18.dp)) {
+                        Text("“${pick(r).trim()}”", style = MaterialTheme.typography.headlineSmall.copy(fontStyle = FontStyle.Italic, fontSize = 22.sp, lineHeight = 28.sp))
+                        Text(session.who(r.userId), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
                     }
-                    drawPath(path, colors.primary, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx()))
                 }
-                pts.forEach { (o, mood) -> drawCircle(if (mood <= 2) colors.tertiary else colors.primary, 3.dp.toPx(), o) }
             }
         }
     }
-}
-
-@Composable
-private fun ReviewSoon(s: MonthSummary, session: Session) {
-    val dom = session.partners.firstOrNull { it.role != Role.Submissive }?.displayName
-    val who = if (session.canManage) "you set" else "${dom ?: "your Dominant"} sets"
-    Card {
-        Row(verticalAlignment = Alignment.Top) {
-            Icon(Icons.Outlined.Event, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Column(Modifier.padding(start = 12.dp)) {
-                Text("Review opens ${shortDate(s.reviewOpensOn)}", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "You'll both look back on ${monthName(s.month)} and $who ${monthName(nextMonth(s.month))}'s focus.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-/** Each person's answers. Your own form until you've sent it; the others' only once you have. */
-@Composable
-private fun LookBack(s: MonthSummary, session: Session, busy: Boolean, loadAvatar: suspend (String, String) -> ImageBitmap?, save: (MonthReviewInput, () -> Unit) -> Unit) {
-    val mine = s.reviews.firstOrNull { it.userId == session.userId }
-    var editing by rememberSaveable(s.month, mine == null) { mutableStateOf(mine == null) }
-    if (editing && !session.readOnly) {
-        ReviewForm(s, session, mine, busy, onCancel = { editing = false }) { input -> save(input) { editing = false } }
-        return
-    }
-    val colors = MaterialTheme.colorScheme
-    val waiting = s.waitingOn.filter { it != session.userId }.map { session.nameOf(it) }
-    Card {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("${monthName(s.month)}, looking back", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            if (mine != null && !session.readOnly) IconButton(onClick = { editing = true }) { Icon(Icons.Outlined.Edit, "Change your answers") }
-        }
-        s.reviews.sortedBy { it.userId == session.userId }.forEachIndexed { i, r ->
-            if (i > 0) HorizontalDivider(color = colors.surfaceContainerHighest)
-            Answers(r, session, loadAvatar)
-        }
-        if (mine == null) {
-            Text("You see the others' answers once you've given yours.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-        } else if (waiting.isNotEmpty()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.HourglassTop, null, Modifier.size(20.dp), tint = colors.onSurfaceVariant)
-                Text(
-                    "  Waiting on ${waiting.joinToString(" and ")}. You'll see their answers once they've written them.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun Answers(r: MonthReview, session: Session, loadAvatar: suspend (String, String) -> ImageBitmap?) {
-    val member = session.relationship?.members?.firstOrNull { it.userId == r.userId }
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Avatar(r.userId, member?.displayName ?: "?", member?.avatarVersion, loadAvatar, size = 32.dp)
-            Column(Modifier.padding(start = 12.dp)) {
-                Text(session.who(r.userId), style = MaterialTheme.typography.titleSmall)
-                Text("Kept the focus ${r.rating} of 5", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        if (r.wentWell.isNotBlank()) Answer("What went well", r.wentWell)
-        if (r.workOn.isNotBlank()) Answer("What to work on", r.workOn)
-    }
-}
-
-@Composable
-private fun Answer(q: String, a: String) {
+    Quotes("What went well") { it.wentWell }
+    Quotes("What to work on") { it.workOn }
     Column {
-        Text(q, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(a, style = MaterialTheme.typography.bodyLarge)
+        Eyebrow(s.focus?.let { "Focus: ${it.goal}" } ?: "How it went")
+        FlowRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(36.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            order.forEach { r -> Figure("${r.rating}", "/5", if (r.userId == session.userId) "Your rating" else "${session.nameOf(r.userId)}'s rating") }
+            s.totals.rate?.let { Figure(pct(it), "", "tasks done") }
+        }
+        if (!session.readOnly) {
+            Text("Change my answers", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.padding(top = 20.dp).clickable(onClick = onChange))
+        }
     }
 }
 
 @Composable
-private fun ReviewForm(s: MonthSummary, session: Session, mine: MonthReview?, busy: Boolean, onCancel: () -> Unit, onSave: (MonthReviewInput) -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    var rating by rememberSaveable { mutableIntStateOf(mine?.rating ?: 0) }
-    var wentWell by rememberSaveable { mutableStateOf(mine?.wentWell ?: "") }
-    var workOn by rememberSaveable { mutableStateOf(mine?.workOn ?: "") }
-    val others = session.partners.filter { it.userId in s.waitingOn }.map { it.displayName }
-    Card {
-        Text("Look back on ${monthName(s.month)}", style = MaterialTheme.typography.titleMedium)
-        if (others.isNotEmpty()) {
-            Text(
-                "${others.joinToString(" and ")} ${if (others.size > 1) "see" else "sees"} your answers once they've written theirs, and you see theirs.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.onSurfaceVariant,
-            )
+private fun Figure(value: String, of: String, label: String) {
+    Column {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(value, style = MaterialTheme.typography.displayMedium)
+            if (of.isNotEmpty()) Text(of, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
         }
-        Text("How well was the focus kept?", style = MaterialTheme.typography.bodyLarge)
-        Column {
-            Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                (1..5).forEach { n ->
-                    val on = rating == n
-                    Box(
-                        Modifier.size(48.dp).clip(CircleShape)
-                            .then(if (on) Modifier.background(colors.primary) else Modifier.border(1.dp, colors.outlineVariant, CircleShape))
-                            .selectable(selected = on, role = SemanticsRole.RadioButton, onClick = { rating = n }),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text("$n", style = MaterialTheme.typography.titleMedium, color = if (on) colors.onPrimary else colors.onSurface)
-                    }
-                }
-            }
-            Row(Modifier.width(272.dp).padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Not at all", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
-                Text("Every day", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
-            }
-        }
-        LettersField(wentWell, { wentWell = it.take(2000) }, label = { Text("What went well") }, minLines = 3, modifier = Modifier.fillMaxWidth())
-        LettersField(workOn, { workOn = it.take(2000) }, label = { Text("What to work on") }, minLines = 3, modifier = Modifier.fillMaxWidth())
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            if (mine != null) TextButton(onClick = onCancel) { Text("Cancel") }
-            Button(onClick = { onSave(MonthReviewInput(rating, wentWell.trim(), workOn.trim())) }, enabled = rating > 0 && !busy) { Text(if (mine != null) "Save" else "Send") }
-        }
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -615,60 +582,40 @@ private fun ReviewForm(s: MonthSummary, session: Session, mine: MonthReview?, bu
 @Composable
 private fun NextFocus(month: String, focus: MonthFocus?, tasks: List<Task>, busy: Boolean, save: (String, List<String>, () -> Unit) -> Unit) {
     var editing by rememberSaveable(month) { mutableStateOf(false) }
-    var goal by rememberSaveable(focus) { mutableStateOf(focus?.goal ?: "") }
-    var picked by remember(focus) { mutableStateOf(focus?.taskIds ?: emptyList()) }
-    if (focus != null && !editing) {
-        Card {
-            Row(verticalAlignment = Alignment.Top) {
-                Icon(Icons.Outlined.Flag, null, tint = MaterialTheme.colorScheme.primary)
-                Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                    Text("Focus for ${monthName(month)}", style = MaterialTheme.typography.titleMedium)
-                    Text(focus.goal, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                IconButton(onClick = { editing = true }) { Icon(Icons.Outlined.Edit, "Change ${monthName(month)}'s focus") }
-            }
-        }
+    if (editing) FocusSheet(month, focus, tasks, busy, onDismiss = { editing = false }) { goal, ids -> save(goal, ids) { editing = false } }
+    if (focus == null) {
+        Text("Set ${monthName(month)}'s focus", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { editing = true })
         return
     }
-    Card {
-        Text("Focus for ${monthName(month)}", style = MaterialTheme.typography.titleMedium)
-        FocusFields(goal, { goal = it }, picked, { picked = it }, tasks)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            if (focus != null) TextButton(onClick = { editing = false }) { Text("Cancel") }
-            Button(onClick = { save(goal, picked) { editing = false } }, enabled = goal.isNotBlank() && !busy) { Text("Start ${monthName(month)}") }
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Eyebrow("${monthName(month)}'s focus", Modifier.weight(1f))
+            IconButton(onClick = { editing = true }) { Icon(Icons.Outlined.Edit, "Change ${monthName(month)}'s focus") }
         }
+        Text(focus.goal, style = MaterialTheme.typography.headlineSmall)
     }
 }
 
 @Composable
 private fun PastMonths(past: List<PastMonth>, selected: String, current: String, onOpen: (String) -> Unit) {
     val colors = MaterialTheme.colorScheme
-    Text("Past months", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 4.dp))
-    Surface(color = androidx.compose.ui.graphics.Color.Transparent, shape = MaterialTheme.shapes.medium, border = androidx.compose.foundation.BorderStroke(1.dp, colors.outlineVariant), modifier = Modifier.fillMaxWidth()) {
-        Column {
-            past.forEachIndexed { i, p ->
-                if (i > 0) HorizontalDivider(color = colors.surfaceContainerHighest)
-                Row(
-                    Modifier.fillMaxWidth()
-                        .background(if (p.month == selected) colors.secondaryContainer else Color.Transparent)
-                        .clickable { onOpen(p.month) }
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(monthName(p.month, p.month.take(4) < current.take(4)), style = MaterialTheme.typography.bodyLarge)
-                        Text(p.goal ?: "No focus set", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    p.myRating?.let {
-                        Surface(color = colors.secondaryContainer, shape = MaterialTheme.shapes.extraSmall) {
-                            Text("$it of 5", style = MaterialTheme.typography.labelMedium, color = colors.onSecondaryContainer, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
-                        }
-                    }
-                    Text(pct(p.rate), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-                    Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = colors.onSurfaceVariant)
+    Column {
+        Eyebrow("Past months")
+        past.forEach { p ->
+            Row(
+                Modifier.fillMaxWidth().clickable { onOpen(p.month) }.padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(monthName(p.month, p.month.take(4) < current.take(4)), style = MaterialTheme.typography.bodyLarge, color = if (p.month == selected) colors.primary else colors.onSurface)
+                    Text(p.goal ?: "No focus set", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
+                p.myRating?.let { Text("$it/5", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant) }
+                Text(pct(p.rate), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = colors.onSurfaceVariant)
             }
+            HorizontalDivider(color = colors.outlineVariant)
         }
     }
 }
