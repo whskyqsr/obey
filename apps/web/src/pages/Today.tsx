@@ -67,6 +67,8 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
   const part = dayPart(new Date().getHours());
   const weekday = fmtDate(t, { weekday: "long" });
   const tonight = part === "evening" || part === "night" ? "tonight" : "today";
+  // "two tasks", "one task": the noun stays, so the line reads as a sentence.
+  const tasks = (n: number) => `${count(n)} ${n === 1 ? "task" : "tasks"}`;
   const myLeft = groups.today.filter((o) => o.status === "pending" && o.assigneeId === me.user.id).length;
   const theirLeft = groups.today.filter((o) => o.status === "pending" && o.assigneeId !== me.user.id).length;
   // One line under the greeting: what's waiting, then what's left of the day.
@@ -76,7 +78,7 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
       ? [
           needs.count > 0 ? `${cap(count(needs.count))} ${needs.count === 1 ? "thing is" : "things are"} waiting on you.` : null,
           theirLeft > 0
-            ? `${partner ? memberName(partner.userId) : "They"} ${theirLeft === 1 ? "has one" : `has ${count(theirLeft)}`} left ${tonight}.`
+            ? `${partner ? memberName(partner.userId) : "They"} has ${tasks(theirLeft)} left ${tonight}.`
             : needs.count > 0
               ? "After that, nothing until tomorrow."
               : "Nothing else until tomorrow.",
@@ -87,7 +89,7 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
         ? "Nothing due today."
         : myLeft === 0
           ? "All done for today."
-          : `${cap(count(myLeft))} left ${tonight}.`;
+          : `${cap(tasks(myLeft))} left ${tonight}.`;
   const newTask = () => navigate({ to: "/tasks/$taskId", params: { taskId: "new" } });
   useRowShortcuts(isDom ? newTask : undefined);
 
