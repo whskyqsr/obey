@@ -3,6 +3,13 @@ package app.obey.ui.stats
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.offset
+import androidx.compose.material3.HorizontalDivider
+import app.obey.ui.common.Eyebrow
+import app.obey.ui.common.LettersChip
+import app.obey.ui.common.PillToggle
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -126,6 +133,15 @@ class StatsViewModel @Inject constructor(private val api: ObeyApi, private val s
         }
     }
 
+    private val _ledger = MutableStateFlow<List<app.obey.api.LedgerEntry>>(emptyList())
+    val ledger: StateFlow<List<app.obey.api.LedgerEntry>> = _ledger.asStateFlow()
+
+    fun loadLedger() {
+        val rel = session?.relationship ?: return
+        if (!rel.features.points) return
+        viewModelScope.launch { runCatching { api.ledger(rel.id) }.onSuccess { _ledger.value = it } }
+    }
+
     fun loadReview() {
         val rel = session?.relationship ?: return
         if (!rel.features.review || rel.endedAt != null) return
@@ -135,55 +151,69 @@ class StatsViewModel @Inject constructor(private val api: ObeyApi, private val s
 
 private fun pct(rate: Double) = "${(rate * 100).roundToInt()}%"
 
-/** How one person's tasks have gone: rate and trend, done and missed over time, weekdays, and each task. */
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Mockup 26: three serif numbers, then each task as a line with an ink bar, and points earned, spent and lost. Over
+ * time, weekdays and mood follow on hairlines.
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun StatsScreen(onOpenSettings: () -> Unit, onOpenTask: (String) -> Unit, onOpenReview: () -> Unit, vm: StatsViewModel = hiltViewModel()) {
     LaunchedEffect(Unit) {
         vm.load()
         vm.loadReview()
+        vm.loadLedger()
     }
     val state by vm.state.collectAsStateWithLifecycle()
     val days by vm.days.collectAsStateWithLifecycle()
     val month by vm.month.collectAsStateWithLifecycle()
     val who by vm.who.collectAsStateWithLifecycle()
     val review by vm.review.collectAsStateWithLifecycle()
+    val ledger by vm.ledger.collectAsStateWithLifecycle()
     val session = vm.session ?: return
     val members = session.relationship?.members.orEmpty()
     val sub = members.firstOrNull { it.role == Role.Submissive }?.userId
     val current = YearMonth.now()
     val shown = YearMonth.parse(month)
+    val c = MaterialTheme.colorScheme
+    val zone = ZoneId.systemDefault()
+    val from = if (days == MONTH) shown.atDay(1) else LocalDate.now().minusDays(days.toLong() - 1)
+    val to = if (days == MONTH) shown.atEndOfMonth() else LocalDate.now()
+    val points = ledger.filter { e ->
+        val d = app.obey.ui.common.parseInstant(e.createdAt).atZone(zone).toLocalDate()
+        e.userId == who && !d.isBefore(from) && !d.isAfter(to)
+    }
+    val spending = setOf(app.obey.api.LedgerKind.Redemption, app.obey.api.LedgerKind.Delay)
+    val earned = points.filter { it.delta > 0 }.sumOf { it.delta }
+    val spent = -points.filter { it.delta < 0 && it.kind in spending }.sumOf { it.delta }
+    val lost = -points.filter { it.delta < 0 && it.kind !in spending }.sumOf { it.delta }
 
     Scaffold(topBar = { LargeTopAppBar(title = { Text("Stats") }, navigationIcon = { MenuButton() }, actions = { SafeWordAction() }) }) { padding ->
         Column(
-            Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(32.dp),
         ) {
-            review?.takeIf { it.reviewOpen && session.userId in it.waitingOn }?.let { ReviewOpen(it, onOpenReview) }
-            if (members.size > 1) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    members.forEach { m ->
-                        FilterChip(selected = m.userId == who, onClick = { vm.load(who = m.userId) }, label = { Text(if (m.userId == session.userId) "You" else m.displayName) })
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                PillToggle(RANGES.map { it.second }, RANGES.indexOfFirst { it.first == days }) { vm.load(days = RANGES[it].first) }
+                if (members.size > 1) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        members.forEach { m -> LettersChip(if (m.userId == session.userId) "You" else m.displayName, m.userId == who, { vm.load(who = m.userId) }) }
                     }
                 }
-            }
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                RANGES.forEachIndexed { i, (d, label) ->
-                    SegmentedButton(selected = d == days, onClick = { vm.load(days = d) }, shape = SegmentedButtonDefaults.itemShape(i, RANGES.size)) {
-                        Text(label, maxLines = 1, softWrap = false)
+                if (days == MONTH) {
+                    Row(Modifier.offset(x = (-12).dp), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { vm.load(month = shown.minusMonths(1).toString()) }) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "The month before") }
+                        Text(shown.format(DateTimeFormatter.ofPattern("MMMM yyyy")), style = MaterialTheme.typography.bodyLarge)
+                        if (shown == current) Text(" so far", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
+                        IconButton(onClick = { vm.load(month = shown.plusMonths(1).toString()) }, enabled = shown < current) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, "The month after") }
                     }
                 }
-            }
-            if (days == MONTH) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { vm.load(month = shown.minusMonths(1).toString()) }) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "The month before") }
+                review?.takeIf { it.reviewOpen && session.userId in it.waitingOn }?.let { m ->
                     Text(
-                        shown.format(DateTimeFormatter.ofPattern("MMMM yyyy")) + if (shown == current) " so far" else "",
-                        style = MaterialTheme.typography.titleMedium,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.widthIn(min = 160.dp),
+                        "${YearMonth.parse(m.month).format(DateTimeFormatter.ofPattern("MMMM"))}'s review is open · Look back ›",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = c.primary,
+                        modifier = Modifier.clickable(onClick = onOpenReview),
                     )
-                    IconButton(onClick = { vm.load(month = shown.plusMonths(1).toString()) }, enabled = shown < current) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, "The month after") }
                 }
             }
             when (val s = state) {
@@ -192,120 +222,74 @@ fun StatsScreen(onOpenSettings: () -> Unit, onOpenTask: (String) -> Unit, onOpen
                 is Load.Ready -> {
                     val t = s.value.totals
                     if (t.done + t.missed + t.excused == 0) {
-                        val empty = if (days == MONTH && shown != current) "Nothing was due in ${shown.format(DateTimeFormatter.ofPattern("MMMM"))}." else "Nothing finished in this stretch."
-                        Text("$empty Stats fill in as tasks are done or missed.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 24.dp))
+                        val empty = if (days == MONTH && shown != current) "Nothing was due in ${shown.format(DateTimeFormatter.ofPattern("MMMM"))}." else "Nothing finished in this stretch yet."
+                        Text(empty, style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
                     } else {
                         val before = if (days == MONTH) shown.minusMonths(1).format(DateTimeFormatter.ofPattern("MMMM")) else RANGES.first { it.first == days }.third
-                        StatsBody(s.value, before, session.weekStart, onOpenTask)
+                        StatsBody(s.value, before, if (who == session.userId) null else session.nameOf(who ?: ""), session.weekStart, onOpenTask)
                     }
                 }
             }
-            if (who == sub) MoodCard(header = { Text("Mood", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp)) })
-        }
-    }
-}
-
-/** While this month's review is open and you haven't looked back yet, a way over to it. */
-@Composable
-private fun ReviewOpen(m: MonthSummary, onOpen: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    Surface(color = androidx.compose.ui.graphics.Color.Transparent, contentColor = colors.onSurface, border = androidx.compose.foundation.BorderStroke(1.dp, colors.primary), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(Icons.Outlined.Flag, null)
-                Column {
-                    Text("${YearMonth.parse(m.month).format(DateTimeFormatter.ofPattern("MMMM"))}'s review is open", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Look back on the month together" + (if (m.focus != null) " and how the focus went" else "") + ".",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.onSecondaryContainer.copy(alpha = 0.8f),
-                    )
+            if (points.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Eyebrow("Points")
+                    Text("Earned $earned · spent $spent · lost $lost", style = MaterialTheme.typography.bodyLarge)
                 }
             }
-            Button(onClick = onOpen, modifier = Modifier.align(Alignment.End)) { Text("Look back") }
+            if (days != MONTH || shown == current) MoodCard(header = { Eyebrow("Mood") }, days = if (days == MONTH) 30 else days, person = who)
         }
     }
 }
 
 @Composable
-private fun StatsCard(title: String? = null, flush: Boolean = false, content: @Composable () -> Unit) {
-    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(if (flush) PaddingFlush else PaddingFull), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            title?.let { Text(it, style = MaterialTheme.typography.titleMedium, modifier = if (flush) Modifier.padding(horizontal = 16.dp) else Modifier) }
-            content()
-        }
+private fun Figure(value: String, label: String) {
+    Column {
+        Text(value, style = MaterialTheme.typography.displayLarge)
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
-private val PaddingFull = androidx.compose.foundation.layout.PaddingValues(16.dp)
-private val PaddingFlush = androidx.compose.foundation.layout.PaddingValues(top = 16.dp, bottom = 8.dp)
+private fun trend(rate: Double?, previous: Double?, before: String): String? {
+    if (rate == null || previous == null) return null
+    val diff = ((rate - previous) * 100).roundToInt()
+    return if (diff == 0) "same as $before" else "${if (diff > 0) "up" else "down"} ${abs(diff)} ${if (abs(diff) == 1) "point" else "points"} on $before"
+}
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun StatsBody(s: DynamicStats, before: String, weekStart: DayOfWeek, onOpenTask: (String) -> Unit) {
+private fun StatsBody(s: DynamicStats, before: String, name: String?, weekStart: DayOfWeek, onOpenTask: (String) -> Unit) {
     val colors = MaterialTheme.colorScheme
     val t = s.totals
-    StatsCard {
-        Text(t.rate?.let(::pct) ?: "–", style = MaterialTheme.typography.displayMedium)
-        Text("done of what was due", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.padding(top = 0.dp))
-        Trend(t.rate, s.previous.rate, before)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Count("Done", t.done, colors.primary)
-            Count("Missed", t.missed, colors.outline)
-            Count("Excused", t.excused, colors.outlineVariant)
+    val due = t.done + t.missed
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Figure(if (due > 0) pct(t.onTime.toDouble() / due) else "–", "on time")
+            Figure("${s.tasks.maxOfOrNull { it.streak } ?: 0}", "best streak")
+            Figure("${t.missed}", "missed")
         }
-        if (t.done > 0 || t.moved > 0) {
-            val parts = listOfNotNull(
-                if (t.done > 0) "${pct(t.onTime.toDouble() / t.done)} of done tasks were on time" else null,
-                if (t.moved > 0) "${t.moved} ${if (t.moved == 1) "deadline" else "deadlines"} moved" else null,
-            )
-            Text(parts.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-        }
-    }
-    StatsCard("Over time") { Bars(s) }
-    StatsCard("By weekday") { Weekdays(s.weekdays, weekStart) }
-    StatsCard("By task", flush = true) { Tasks(s.tasks, onOpenTask) }
-}
-
-@Composable
-private fun Trend(rate: Double?, previous: Double?, before: String) {
-    if (rate == null || previous == null) return
-    val diff = ((rate - previous) * 100).roundToInt()
-    val colors = MaterialTheme.colorScheme
-    val tint = when {
-        diff == 0 -> colors.onSurfaceVariant
-        diff > 0 -> colors.primary
-        else -> colors.error
-    }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Icon(
-            when {
-                diff == 0 -> Icons.AutoMirrored.Outlined.TrendingFlat
-                diff > 0 -> Icons.AutoMirrored.Outlined.TrendingUp
-                else -> Icons.AutoMirrored.Outlined.TrendingDown
-            },
-            null,
-            Modifier.size(20.dp),
-            tint = tint,
-        )
         Text(
-            if (diff == 0) "Same as $before" else "${if (diff > 0) "Up" else "Down"} ${abs(diff)} ${if (abs(diff) == 1) "point" else "points"} on $before",
-            style = MaterialTheme.typography.labelLarge,
-            color = tint,
+            listOfNotNull(
+                name?.let { "$it's tasks" },
+                t.rate?.let { "${pct(it)} done" },
+                trend(t.rate, s.previous.rate, before),
+                if (t.excused > 0) "${t.excused} excused" else null,
+                if (t.moved > 0) "${t.moved} ${if (t.moved == 1) "deadline" else "deadlines"} moved" else null,
+            ).joinToString(" · "),
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.onSurfaceVariant,
         )
     }
-}
-
-@Composable
-private fun Count(label: String, value: Int, dot: Color) {
-    val colors = MaterialTheme.colorScheme
-    Surface(color = colors.surfaceContainer, shape = MaterialTheme.shapes.medium) {
-        Column(Modifier.widthIn(min = 72.dp).padding(horizontal = 12.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("$value", style = MaterialTheme.typography.titleLarge)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(8.dp).background(dot, CircleShape))
-                Text("  $label", style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
-            }
-        }
+    Column {
+        Eyebrow("By task")
+        Tasks(s.tasks, onOpenTask)
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Eyebrow("Over time")
+        Bars(s)
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Eyebrow("By weekday")
+        Weekdays(s.weekdays, weekStart)
     }
 }
 
@@ -319,7 +303,7 @@ private fun bucketLabel(start: String, bucket: String, days: Int): String {
     }
 }
 
-/** Stacked bars per day, week or month: done at the bottom, then missed, then excused. Empty stretches before the first task are left off. */
+/** Stacked bars per day, week or month: done in ink at the bottom, then missed in the accent, then excused. */
 @Composable
 private fun Bars(s: DynamicStats) {
     val colors = MaterialTheme.colorScheme
@@ -328,22 +312,21 @@ private fun Bars(s: DynamicStats) {
     val max = (buckets.maxOfOrNull { it.done + it.missed + it.excused } ?: 0).coerceAtLeast(1)
     val every = if (buckets.size > 16) 5 else if (buckets.size > 8) 2 else 1
     Column {
-        Row(Modifier.fillMaxWidth().height(140.dp).semantics { contentDescription = "Done and missed by ${s.bucket}" }, horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.Bottom) {
+        Row(Modifier.fillMaxWidth().height(120.dp).semantics { contentDescription = "Done and missed by ${s.bucket}" }, horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.Bottom) {
             buckets.forEach { b ->
                 val total = b.done + b.missed + b.excused
                 Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.Bottom) {
-                    if (total == 0) {
-                        Box(Modifier.fillMaxWidth().height(2.dp).background(colors.outlineVariant.copy(alpha = 0.6f), CircleShape))
-                    } else {
-                        Column(Modifier.fillMaxWidth().fillMaxHeight(total.toFloat() / max).clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))) {
+                    if (total > 0) {
+                        Column(Modifier.fillMaxWidth().fillMaxHeight(total.toFloat() / max)) {
                             if (b.excused > 0) Box(Modifier.fillMaxWidth().weight(b.excused.toFloat()).background(colors.outlineVariant))
-                            if (b.missed > 0) Box(Modifier.fillMaxWidth().weight(b.missed.toFloat()).background(colors.outline))
-                            if (b.done > 0) Box(Modifier.fillMaxWidth().weight(b.done.toFloat()).background(colors.primary))
+                            if (b.missed > 0) Box(Modifier.fillMaxWidth().weight(b.missed.toFloat()).background(colors.primary))
+                            if (b.done > 0) Box(Modifier.fillMaxWidth().weight(b.done.toFloat()).background(colors.onSurface))
                         }
                     }
                 }
             }
         }
+        HorizontalDivider(color = colors.outlineVariant)
         Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             buckets.forEachIndexed { i, b ->
                 Text(
@@ -358,10 +341,18 @@ private fun Bars(s: DynamicStats) {
                 )
             }
         }
+        Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            listOf(colors.onSurface to "done", colors.primary to "missed", colors.outlineVariant to "excused").forEach { (color, label) ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(10.dp).background(color))
+                    Text("  $label", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                }
+            }
+        }
     }
 }
 
-/** Done rate for each weekday, with the day that slips most called out. */
+/** Done rate for each weekday as a thin ink bar, with the day that slips most called out. */
 @Composable
 private fun Weekdays(days: List<Tally>, weekStart: DayOfWeek) {
     val colors = MaterialTheme.colorScheme
@@ -371,15 +362,11 @@ private fun Weekdays(days: List<Tally>, weekStart: DayOfWeek) {
         order.forEach { i ->
             val d = days[i]
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Box(Modifier.fillMaxWidth().height(72.dp).clip(RoundedCornerShape(4.dp)).background(colors.surfaceContainer), contentAlignment = Alignment.BottomCenter) {
-                    d.rate?.let { Box(Modifier.fillMaxWidth().fillMaxHeight(it.toFloat().coerceAtLeast(0.04f)).background(colors.primary)) }
+                Box(Modifier.fillMaxWidth().height(64.dp), contentAlignment = Alignment.BottomCenter) {
+                    d.rate?.let { Box(Modifier.width(8.dp).fillMaxHeight(it.toFloat().coerceAtLeast(0.04f)).background(colors.onSurface)) }
                 }
-                Text(
-                    WEEKDAYS[i].take(3),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = if (i == worst) FontWeight.Bold else null,
-                    color = if (i == worst) colors.onSurface else colors.onSurfaceVariant,
-                )
+                HorizontalDivider(color = colors.outlineVariant)
+                Text(WEEKDAYS[i].take(3), style = MaterialTheme.typography.labelMedium, color = if (i == worst) colors.primary else colors.onSurfaceVariant)
                 Text(d.rate?.let(::pct) ?: "–", style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
             }
         }
@@ -387,39 +374,28 @@ private fun Weekdays(days: List<Tally>, weekStart: DayOfWeek) {
     worst?.let { Text("Most misses on ${WEEKDAYS[it]}s (${days[it].missed}).", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant) }
 }
 
-/** Each task, lowest done rate first, so what's slipping is at the top. */
+/** Each task as a line with an ink bar, lowest done rate first, so what's slipping is at the top. */
 @Composable
 private fun Tasks(tasks: List<TaskTally>, onOpenTask: (String) -> Unit) {
     val colors = MaterialTheme.colorScheme
     val sorted = tasks.sortedWith(compareBy<TaskTally> { it.rate ?: 2.0 }.thenByDescending { it.done + it.missed })
     Column {
         sorted.forEach { t ->
-            Row(
-                Modifier.fillMaxWidth().clickable(enabled = t.active) { onOpenTask(t.taskId) }.padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(t.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Column(Modifier.fillMaxWidth().clickable(enabled = t.active) { onOpenTask(t.taskId) }.padding(vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(t.title + if (!t.active) " · ended" else "", style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Spacer(Modifier.width(12.dp))
                     Text(
-                        "${t.done} of ${t.done + t.missed} done" + (if (t.excused > 0) ", ${t.excused} excused" else "") + (if (!t.active) " · ended" else ""),
+                        "${t.done} of ${t.done + t.missed}" + if (t.excused > 0) " · ${t.excused} excused" else "",
                         style = MaterialTheme.typography.bodyMedium,
                         color = colors.onSurfaceVariant,
                     )
-                    Box(Modifier.padding(top = 6.dp).fillMaxWidth().height(6.dp).clip(CircleShape).background(colors.surfaceContainerHighest)) {
-                        t.rate?.let { Box(Modifier.fillMaxWidth(it.toFloat()).fillMaxHeight().clip(CircleShape).background(colors.primary)) }
-                    }
                 }
-                Spacer(Modifier.width(16.dp))
-                Column(Modifier.width(56.dp), horizontalAlignment = Alignment.End) {
-                    Text(t.rate?.let(::pct) ?: "–", style = MaterialTheme.typography.titleMedium)
-                    if (t.streak > 1) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.LocalFireDepartment, "Streak", Modifier.size(14.dp), tint = colors.onSurfaceVariant)
-                            Text("${t.streak}", style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
-                        }
-                    }
+                Box(Modifier.fillMaxWidth().height(4.dp).background(colors.outlineVariant.copy(alpha = 0.6f))) {
+                    t.rate?.let { Box(Modifier.fillMaxWidth(it.toFloat()).fillMaxHeight().background(colors.onSurface)) }
                 }
             }
+            HorizontalDivider(color = colors.outlineVariant)
         }
     }
 }

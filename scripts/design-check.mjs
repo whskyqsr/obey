@@ -36,7 +36,7 @@ const rules = [
     name: "Card on web (use hairlines)",
     files: web,
     test: /<Card\b/,
-    allow: ["pages/Welcome.tsx", "pages/Stats.tsx", "pages/Kits.tsx"],
+    allow: ["pages/Welcome.tsx", "pages/Kits.tsx"],
   },
   {
     name: "Raw colour on web (use theme tokens)",
