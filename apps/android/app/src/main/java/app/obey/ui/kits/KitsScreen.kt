@@ -48,7 +48,6 @@ import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.AlertDialog
 import app.obey.ui.common.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -493,7 +492,7 @@ internal fun KitSheet(title: String, description: String, kitItems: List<KitItem
             Spacer(Modifier.height(8.dp))
             items.forEach { i ->
                 Row(Modifier.fillMaxWidth().clickable { toggle(i, i.key !in picked) }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = i.key in picked, onCheckedChange = { toggle(i, it) })
+                    app.obey.ui.common.DiamondCheckbox(checked = i.key in picked, onCheckedChange = { toggle(i, it) })
                     Spacer(Modifier.width(8.dp))
                     Column {
                         Text(i.title, style = MaterialTheme.typography.bodyLarge)
@@ -707,7 +706,7 @@ private fun EditKitDialog(kit: Kit, onDismiss: () -> Unit, onSave: (String, Stri
                 Text("Untick anything to take out of the kit.", style = MaterialTheme.typography.bodyMedium)
                 items.forEach { i ->
                     Row(Modifier.fillMaxWidth().clickable { keep = if (i.key in keep) keep - i.key else keep + i.key }, verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = i.key in keep, onCheckedChange = { keep = if (it) keep + i.key else keep - i.key })
+                        app.obey.ui.common.DiamondCheckbox(checked = i.key in keep, onCheckedChange = { keep = if (it) keep + i.key else keep - i.key })
                         Text(i.title, style = MaterialTheme.typography.bodyLarge)
                     }
                 }
@@ -789,7 +788,7 @@ fun NewKitScreen(onBack: () -> Unit, onSaved: (String) -> Unit, vm: KitsViewMode
                         Modifier.fillMaxWidth().clickable(enabled = forced == null) { picked = if (id in picked) picked - id else picked + id }.padding(vertical = 4.dp),
                         verticalAlignment = Alignment.Top,
                     ) {
-                        Checkbox(checked = on, enabled = forced == null, onCheckedChange = { picked = if (it) picked + id else picked - id })
+                        app.obey.ui.common.DiamondCheckbox(checked = on, enabled = forced == null, onCheckedChange = { picked = if (it) picked + id else picked - id })
                         Spacer(Modifier.width(8.dp))
                         Column(Modifier.padding(top = 10.dp)) {
                             Text(headline, style = MaterialTheme.typography.bodyLarge)

@@ -555,10 +555,23 @@ export function Switch({ checked, onChange, label, help }: { checked: boolean; o
   );
 }
 
+/** The checkbox: an open diamond, filled ink with a check drawn inside when ticked (Jake, 2026-11-24). */
 export function Checkbox({ checked, onChange, label }: { checked: boolean; onChange(v: boolean): void; label: ReactNode }) {
   return (
     <label className="flex cursor-pointer items-center gap-3 py-1 text-body-large">
-      <input type="checkbox" className="diamond" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <input type="checkbox" className="peer sr-only" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <svg
+        aria-hidden
+        width="20"
+        height="20"
+        viewBox="0 0 20 20"
+        className="shrink-0 rounded-sm text-on-surface peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary"
+      >
+        <path d="M10 0.75 L19.25 10 L10 19.25 L0.75 10 Z" fill={checked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5" />
+        {checked && (
+          <path d="M6.6 10.2 L9 12.6 L13.6 7.8" fill="none" stroke="var(--md-surface)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        )}
+      </svg>
       {label}
     </label>
   );

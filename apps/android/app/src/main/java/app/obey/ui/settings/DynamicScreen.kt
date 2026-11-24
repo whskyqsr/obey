@@ -724,7 +724,7 @@ private fun LeaveDialog(
                     partners.forEach { p ->
                         val on = p.userId in block
                         Row(Modifier.fillMaxWidth().clickable { block = if (on) block - p.userId else block + p.userId }, verticalAlignment = Alignment.CenterVertically) {
-                            androidx.compose.material3.Checkbox(checked = on, onCheckedChange = { block = if (it) block + p.userId else block - p.userId })
+                            app.obey.ui.common.DiamondCheckbox(checked = on, onCheckedChange = { block = if (it) block + p.userId else block - p.userId })
                             Text("Also block ${p.displayName}, so they can't pair with you again")
                         }
                     }

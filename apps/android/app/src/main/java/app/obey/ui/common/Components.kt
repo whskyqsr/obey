@@ -1,5 +1,7 @@
 package app.obey.ui.common
 
+import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.selection.selectableGroup
@@ -134,6 +136,45 @@ fun Diamond(state: DiamondState, modifier: Modifier = Modifier, size: Dp = 14.dp
             )
             .border(1.5.dp, line),
     )
+}
+
+/**
+ * The checkbox: an open diamond, filled ink with a check drawn inside when ticked (Jake, 2026-11-24), so it reads as a
+ * choice rather than a status. Pass a null onCheckedChange when the row around it handles the tap.
+ */
+@Composable
+fun DiamondCheckbox(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    val c = MaterialTheme.colorScheme
+    val ink = c.onSurface
+    val paper = c.surface
+    val toggle = if (onCheckedChange != null) {
+        Modifier.toggleable(value = checked, enabled = enabled, role = androidx.compose.ui.semantics.Role.Checkbox, onValueChange = onCheckedChange)
+    } else {
+        Modifier
+    }
+    androidx.compose.foundation.Canvas(
+        modifier.then(toggle).size(48.dp).padding(14.dp).then(if (enabled) Modifier else Modifier.alpha(0.4f)),
+    ) {
+        val w = size.width
+        val half = w / 2
+        val stroke = 1.5.dp.toPx()
+        val r = half - stroke / 2
+        val shape = androidx.compose.ui.graphics.Path().apply {
+            moveTo(half, half - r); lineTo(half + r, half); lineTo(half, half + r); lineTo(half - r, half); close()
+        }
+        if (checked) drawPath(shape, ink)
+        drawPath(shape, ink, style = androidx.compose.ui.graphics.drawscope.Stroke(stroke, join = androidx.compose.ui.graphics.StrokeJoin.Miter))
+        if (checked) {
+            val tick = androidx.compose.ui.graphics.Path().apply {
+                moveTo(w * 0.33f, w * 0.51f); lineTo(w * 0.45f, w * 0.63f); lineTo(w * 0.68f, w * 0.39f)
+            }
+            drawPath(
+                tick,
+                paper,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(1.6.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round),
+            )
+        }
+    }
 }
 
 /** What leads a main screen's top bar: the dynamic switcher (Today, Week, Us) or back to Us (the pages listed there). */

@@ -229,26 +229,6 @@ body {
     color: var(--md-outline);
   }
 
-  /* The diamond: the checkbox, open, filled in ink when checked. */
-  .diamond {
-    appearance: none;
-    flex: none;
-    width: 14px;
-    height: 14px;
-    margin: 0 3px;
-    transform: rotate(45deg);
-    border: 1.5px solid var(--md-on-surface);
-    background: transparent;
-    cursor: pointer;
-    transition: background-color 150ms;
-  }
-  .diamond:checked {
-    background: var(--md-on-surface);
-  }
-  .diamond:disabled {
-    opacity: 0.4;
-  }
-
   /* State layer: an overlay in the current text color, per M3 (8% hover, 10% focus/press). */
   .state-layer {
     position: relative;

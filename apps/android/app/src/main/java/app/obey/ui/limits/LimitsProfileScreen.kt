@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -59,8 +60,7 @@ import app.obey.data.Session
 import app.obey.data.SessionRepository
 import app.obey.ui.common.BackLink
 import app.obey.ui.common.BaseViewModel
-import app.obey.ui.common.Diamond
-import app.obey.ui.common.DiamondState
+import app.obey.ui.common.DiamondCheckbox
 import app.obey.ui.common.ErrorBox
 import app.obey.ui.common.Eyebrow
 import app.obey.ui.common.LettersField
@@ -242,9 +242,9 @@ fun LimitsProfileScreen(onClose: () -> Unit, vm: LimitsProfileViewModel = hiltVi
                             .clickable { picked = if (on) picked - m.relationshipId else picked + m.relationshipId }
                             .semantics { role = Role.Checkbox; stateDescription = if (on) "Ticked" else "Not ticked" },
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(0.dp),
                     ) {
-                        Diamond(if (on) DiamondState.Done else DiamondState.Open, size = 16.dp)
+                        DiamondCheckbox(on, null, Modifier.offset(x = (-14).dp))
                         Text(m.name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                         Text("${m.differ} differ${if (m.finished) " · finished" else ""}", style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
                     }

@@ -25,6 +25,7 @@ These rules are binding for every change to the web or Android UI. The approved 
 - Use hairlines (`border-outline-variant`, `HorizontalDivider`) instead of cards, filled boxes or bordered panels. Menus, dialogs, sheets and popovers may have a surface and border. List content may not.
 - A tappable row between hairlines keeps its text on the page edge, and its hover or pressed highlight reaches 12px (web) or 12dp (Android) past the text on each side with a small radius, so it never sits tight against the words. On web that is `state-layer state-row`; on Android, put `clickable` before the row's padding so the ripple includes it. (Jake, 2026-11-24.)
 - The diamond is the checkbox and the active marker: open, filled when done, accent when missed or owed, half when waiting. Don't use dots, ticks or strikethrough for task state.
+- A checkbox for picking things (not a task's state) is the diamond too, filled ink with a check drawn inside when ticked, so it can't be read as a status or a rating (Jake, 2026-11-24).
 - Form fields are Letters fields: a small label above, the value, and one hairline under it. On web that's the `ui.tsx` fields (`data-field`). On Android it's `LettersField`. Never use a boxed or outlined field, and never put a focus ring around a field.
 - Material icons stay. A down arrow appears only where a menu expands.
 - No logo inside the app UI.
