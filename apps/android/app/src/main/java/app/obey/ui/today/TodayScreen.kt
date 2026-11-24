@@ -587,20 +587,13 @@ fun TodayScreen(
                         item(key = "h-over") { SectionHeader("Overdue") }
                         items(d.overdue, key = { "o-" + it.id }) { o -> row(o)() }
                     }
+                    // Whole-day extension: the user's own open tasks for today, plus today's that already slipped.
+                    val mine = myOpenToday(d, me)
                     if (isDom && !solo && partner != null) {
                         item(key = "h-today") { PartnerDayHeader("${partner.displayName}'s ${if (part == "night") "evening" else part}", doneToday, todays.size) }
                     } else {
-                        item(key = "h-today") { SectionHeader(if (next != null) "Later $tonight" else "Today") }
-                    }
-                    // Whole-day extension: the user's own open tasks for today, plus today's that already slipped.
-                    // Tasks that already have a request waiting aren't offered again.
-                    val mine = myOpenToday(d, me)
-                    if (mine.size > 1) {
-                        item(key = "a-day") {
-                            TonalButton(onClick = { dayTasks = mine }, modifier = Modifier.padding(horizontal = 16.dp)) {
-                                Icon(Icons.Outlined.MoreTime, contentDescription = null)
-                                Text("  More time for today")
-                            }
+                        item(key = "h-today") {
+                            SectionHeader(if (next != null) "Later $tonight" else "Today", action = if (mine.size > 1) ("More time for today" to { dayTasks = mine }) else null)
                         }
                     }
                     if (restOfToday.isEmpty()) {
