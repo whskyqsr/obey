@@ -6,7 +6,8 @@ import { addDays, fmtDate, fmtTime, fromLocalInput, localDateOf, toLocalInput, t
 import { useRel } from "../lib/relationship";
 import { afterEvent } from "./RescheduleSheet";
 import { useAskWho } from "./CurfewStrip";
-import { Button, Chip, Dialog, Icon, SegmentedButtons, Switch, TextArea, TextField, useSnackbar } from "./ui";
+import { createPortal } from "react-dom";
+import { Button, Chip, Diamond, Dialog, Icon, SegmentedButtons, TextArea, TextField, cx, useSnackbar } from "./ui";
 
 /** "Sat, Oct 18, 7:00 – 11:00 PM", or the dates for an all-day plan (its end is the next midnight, so show the day before). */
 export function eventWhen(e: CalendarEvent) {
@@ -124,11 +125,25 @@ export function EventDialog({ event, day, open, onClose }: { event: CalendarEven
   const valid = draft.title.trim() && (draft.allDay ? draft.endDay >= draft.startDay : draft.end > draft.start);
 
   if (!editing && current) {
+    // A plan that runs into tasks opens on them first (mockup 58).
+    if (clashes.body)
+      return (
+        <Dialog open={open} onClose={onClose} title={<span className="font-serif text-[32px] leading-tight">{clashes.title}</span>}>
+          {clashes.body}
+          {mine && (
+            <div className="flex justify-center pb-2">
+              <Button variant="plain" onClick={() => setEditing(true)}>
+                Change the plan
+              </Button>
+            </div>
+          )}
+        </Dialog>
+      );
     return (
       <Dialog
         open={open}
         onClose={onClose}
-        title={current.title}
+        title={<span className="font-serif text-[32px] leading-tight">{current.title}</span>}
         actions={
           <>
             {mine && (
@@ -150,94 +165,255 @@ export function EventDialog({ event, day, open, onClose }: { event: CalendarEven
               </Button>
             )}
             {mine && (
-              <Button variant="text" onClick={() => setEditing(true)}>
+              <Button variant="outlined" onClick={() => setEditing(true)}>
                 Edit
               </Button>
             )}
-            {clashes.apply}
-            <Button variant={clashes.apply ? "text" : "filled"} onClick={onClose}>
-              Done
-            </Button>
+            <Button onClick={onClose}>Done</Button>
           </>
         }
       >
         <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-2 text-body-large text-on-surface">
-            <Icon name="event" className="text-tertiary" />
+          <div className="-mt-2 text-body-large text-on-surface-variant">
             {eventWhen(current)}
+            {current.withPartner ? " · both of you" : ""}
           </div>
-          <div className="text-body-medium">
-            {current.withPartner ? "For both of you" : `For ${current.authorId === me.user.id ? "you" : memberName(current.authorId)}`} · added by{" "}
-            {current.authorId === me.user.id ? "you" : memberName(current.authorId)}
-          </div>
-          {current.noteMd && <p className="rounded-sm bg-surface-container px-3 py-2 whitespace-pre-wrap">{current.noteMd}</p>}
+          {current.noteMd && <p className="border-l-2 border-outline-variant pl-3 whitespace-pre-wrap text-on-surface">{current.noteMd}</p>}
           {curfew.waiting}
-          {clashes.body}
         </div>
       </Dialog>
     );
   }
 
+  if (!open) return null;
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
+    <PlanEditor
+      draft={draft}
+      set={set}
       title={current ? "Edit plan" : "New plan"}
-      actions={
-        <>
-          <Button variant="text" onClick={current ? () => setEditing(false) : onClose}>
-            Cancel
-          </Button>
-          <Button onClick={submit} busy={save.isPending} disabled={!valid}>
-            {curfew.ask ? `Save and ask ${curfew.who}` : "Save"}
-          </Button>
-        </>
-      }
+      partner={partner}
+      curfew={curfew}
+      busy={save.isPending}
+      valid={!!valid}
+      onCancel={current ? () => setEditing(false) : onClose}
+      onSave={submit}
+    />
+  );
+}
+
+type Slot = "day" | "start" | "end" | "from" | "until";
+
+/** "7:00" before "11:30 PM", "11 AM" before "1:00 PM": the first time drops its AM/PM when the second has the same. */
+function timePair(startIso: string, endIso: string) {
+  const a = fmtTime(startIso);
+  const b = fmtTime(endIso);
+  return a.slice(-2) === b.slice(-2) ? [a.slice(0, -3), b] : [a, b];
+}
+
+/** "today", "tomorrow", "Friday" within the week, else "Fri, Dec 4". */
+function dayWord(d: string) {
+  if (d === today()) return "today";
+  if (d === addDays(today(), 1)) return "tomorrow";
+  if (d > today() && d < addDays(today(), 7)) return fmtDate(d, { weekday: "long" });
+  return fmtDate(d);
+}
+
+/**
+ * The plan editor (mockup 14): full screen, the plan as one sentence with tappable parts ("I'll be at ___ on ___ from ___
+ * to ___."), a curfew notice when it runs late, what else it is, and the buttons at the bottom.
+ */
+function PlanEditor({
+  draft,
+  set,
+  title,
+  partner,
+  curfew,
+  busy,
+  valid,
+  onCancel,
+  onSave,
+}: {
+  draft: Draft;
+  set(p: Partial<Draft>): void;
+  title: string;
+  partner: string | null;
+  curfew: ReturnType<typeof useCurfewWarning>;
+  busy: boolean;
+  valid: boolean;
+  onCancel(): void;
+  onSave(): void;
+}) {
+  const [panel, setPanel] = useState<Slot | null>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCancel();
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onCancel]);
+  const toggle = (p: Slot) => setPanel((o) => (o === p ? null : p));
+  const slot = (p: Slot, text: ReactNode, label: string) => (
+    <button
+      type="button"
+      aria-label={label}
+      aria-expanded={panel === p}
+      onClick={() => toggle(p)}
+      className={cx("border-b-[1.5px] border-primary text-left transition-colors", panel === p ? "bg-primary-container/60" : "hover:bg-primary-container/30")}
     >
-      <div className="flex flex-col gap-4">
-        <TextField label="What's the plan?" value={draft.title} onChange={(e) => set({ title: e.target.value })} maxLength={80} placeholder="Dinner with family" />
-        <SegmentedButtons<"me" | "both">
-          value={draft.withPartner ? "both" : "me"}
-          onChange={(v) => set({ withPartner: v === "both" })}
-          className="w-full"
-          options={[
-            { value: "me", label: "Just me" },
-            { value: "both", label: partner ? `Me and ${partner}` : "Both of us" },
-          ]}
-        />
-        <p className="-mt-2 px-1 text-body-small">{draft.withPartner ? "Both of your tasks are checked for clashes." : "Only your tasks are checked for clashes."}</p>
-        <Switch checked={draft.allDay} onChange={(allDay) => set({ allDay })} label="All day" />
-        {draft.allDay ? (
-          <div className="grid grid-cols-2 gap-3">
-            <TextField
-              label="From"
-              type="date"
-              value={draft.startDay}
-              onChange={(e) => e.target.value && set({ startDay: e.target.value, endDay: e.target.value > draft.endDay ? e.target.value : draft.endDay })}
-            />
-            <TextField label="Until" type="date" value={draft.endDay} min={draft.startDay} onChange={(e) => e.target.value && set({ endDay: e.target.value })} />
-          </div>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <TextField
-              label="Starts"
-              type="datetime-local"
-              value={draft.start}
-              onChange={(e) => {
-                const start = e.target.value;
-                if (!start) return;
-                // Keep the length when the start moves, like any calendar.
-                const length = new Date(draft.end).getTime() - new Date(draft.start).getTime();
-                set({ start, end: toLocalInput(new Date(new Date(start).getTime() + Math.max(length, 3_600_000)).toISOString()) });
-              }}
-            />
-            <TextField label="Ends" type="datetime-local" value={draft.end} min={draft.start} onChange={(e) => e.target.value && set({ end: e.target.value })} />
-          </div>
-        )}
-        {curfew.form(set)}
-        <TextArea label="Note (optional)" value={draft.note} onChange={(e) => set({ note: e.target.value })} maxLength={2000} rows={2} />
+      {text}
+    </button>
+  );
+  const day = draft.start.slice(0, 10);
+  const startTime = draft.start.slice(11, 16);
+  const endTime = draft.end.slice(11, 16);
+  // The end is always the first time after the start: 1:00 AM after 7:00 PM is the next day.
+  const setTimes = (start: string, end: string, d = day) => set({ start: `${d}T${start}`, end: `${end > start ? d : addDays(d, 1)}T${end}` });
+  const [a, b] = timePair(fromLocalInput(draft.start), fromLocalInput(draft.end));
+  const nextDay = draft.end.slice(0, 10) > day;
+
+  const done = (
+    <div className="flex justify-end pt-2">
+      <Button variant="text" onClick={() => setPanel(null)}>
+        Done
+      </Button>
+    </div>
+  );
+  const dayPanel = (value: string, pick: (d: string) => void) => (
+    <div className="flex flex-col gap-4 py-3">
+      <div className="flex flex-wrap gap-2">
+        {[today(), addDays(today(), 1)].map((d) => (
+          <Chip key={d} plain selected={value === d} onClick={() => (pick(d), setPanel(null))}>
+            {d === today() ? "Today" : "Tomorrow"}
+          </Chip>
+        ))}
       </div>
-    </Dialog>
+      <TextField label="Date" type="date" value={value} onChange={(e) => e.target.value && pick(e.target.value)} className="w-48" />
+      {done}
+    </div>
+  );
+  const timePanel = (label: string, value: string, pick: (t: string) => void) => (
+    <div className="flex flex-col gap-4 py-3">
+      <TextField label={label} type="time" value={value} onChange={(e) => e.target.value && pick(e.target.value)} className="w-40" />
+      {done}
+    </div>
+  );
+  const panels: Record<Slot, () => ReactNode> = {
+    day: () => dayPanel(day, (d) => setTimes(startTime, endTime, d)),
+    start: () =>
+      timePanel("Starts", startTime, (t) => {
+        // Keep the length when the start moves, like any calendar.
+        const length = new Date(draft.end).getTime() - new Date(draft.start).getTime();
+        const end = toLocalInput(new Date(new Date(`${day}T${t}`).getTime() + Math.max(length, 3_600_000)).toISOString());
+        set({ start: `${day}T${t}`, end });
+      }),
+    end: () => timePanel("Ends", endTime, (t) => setTimes(startTime, t)),
+    from: () => (
+      <div className="flex flex-col gap-4 py-3">
+        <div className="grid max-w-md grid-cols-2 gap-4">
+          <TextField
+            label="From"
+            type="date"
+            value={draft.startDay}
+            onChange={(e) => e.target.value && set({ startDay: e.target.value, endDay: e.target.value > draft.endDay ? e.target.value : draft.endDay })}
+          />
+          <TextField label="Until" type="date" value={draft.endDay} min={draft.startDay} onChange={(e) => e.target.value && set({ endDay: e.target.value })} />
+        </div>
+        {done}
+      </div>
+    ),
+    until: () => dayPanel(draft.endDay, (d) => d >= draft.startDay && set({ endDay: d })),
+  };
+
+  const what = (
+    <span className="inline-grid max-w-full align-baseline">
+      <span aria-hidden className="invisible col-start-1 row-start-1 overflow-hidden pr-1 whitespace-pre">
+        {draft.title || "what"}
+      </span>
+      <input
+        aria-label="What's the plan?"
+        data-field
+        size={1}
+        value={draft.title}
+        onChange={(e) => set({ title: e.target.value })}
+        placeholder="what"
+        maxLength={80}
+        autoFocus={!draft.title}
+        className="col-start-1 row-start-1 w-full min-w-[4ch] border-b-[1.5px] border-primary bg-transparent p-0 text-inherit outline-none placeholder:text-on-surface-variant/50"
+      />
+    </span>
+  );
+
+  const sentence = (
+    <p className="font-serif text-[34px] leading-[1.3] tracking-[-0.01em] text-on-surface md:text-[44px]">
+      {draft.withPartner ? "We'll" : "I'll"} be at {what}{" "}
+      {draft.allDay ? (
+        draft.startDay === draft.endDay ? (
+          <>
+            {draft.startDay === today() || draft.startDay === addDays(today(), 1) ? "" : "on "}
+            {slot("from", dayWord(draft.startDay), "Days")}, all day.
+          </>
+        ) : (
+          <>
+            from {slot("from", dayWord(draft.startDay), "Days")} to {slot("until", dayWord(draft.endDay), "Last day")}.
+          </>
+        )
+      ) : (
+        <>
+          {day === today() || day === addDays(today(), 1) ? "" : "on "}
+          {slot("day", dayWord(day), "Day")} from {slot("start", a, "Starts")} to {slot("end", b, "Ends")}
+          {nextDay ? " the next day" : ""}.
+        </>
+      )}
+    </p>
+  );
+
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-50 flex flex-col bg-surface text-on-surface">
+      <div className="relative flex h-14 shrink-0 items-center justify-center px-4 md:px-8">
+        <button type="button" onClick={onCancel} className="state-layer absolute left-2 rounded-sm px-3 py-2 text-body-large text-on-surface-variant md:left-6">
+          Cancel
+        </button>
+        <h2 className="text-title-medium">{title}</h2>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto flex max-w-[720px] flex-col gap-6 px-6 pt-6 pb-10 md:pt-12">
+          {sentence}
+          {panel && <div className="rounded-md border border-outline-variant bg-surface-container-lowest px-4">{panels[panel]()}</div>}
+          {curfew.notice}
+          <section>
+            <h3 className="eyebrow mb-3">Also</h3>
+            <div className="flex flex-wrap gap-2">
+              {partner && (
+                <Chip selected={draft.withPartner} onClick={() => set({ withPartner: !draft.withPartner })}>
+                  With {partner}
+                </Chip>
+              )}
+              <Chip
+                selected={draft.allDay}
+                onClick={() => (setPanel(null), set(draft.allDay ? { allDay: false } : { allDay: true, startDay: day, endDay: draft.endDay < day ? day : draft.endDay }))}
+              >
+                All day
+              </Chip>
+            </div>
+          </section>
+          <TextArea label="Note (optional)" value={draft.note} onChange={(e) => set({ note: e.target.value })} maxLength={2000} rows={2} />
+        </div>
+      </div>
+      <div className="mx-auto flex w-full max-w-[720px] shrink-0 gap-3 px-6 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+        {curfew.endAt && (
+          <Button variant="outlined" className="h-12 flex-1" onClick={() => curfew.endAt!(set)}>
+            End at {curfew.endLabel}
+          </Button>
+        )}
+        <Button className="h-12 flex-[1.3]" onClick={onSave} busy={busy} disabled={!valid}>
+          {curfew.ask ? `Save and ask ${curfew.who}` : "Save"}
+        </Button>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -255,13 +431,11 @@ function useCurfewWarning(active: boolean, draft: Draft, current: CalendarEvent 
   const endsAt = draft.allDay || !draft.end ? null : fromLocalInput(draft.end);
   const check = useCurfewCheck(rel.id, startsAt, endsAt, active && onCurfew);
   const askCurfew = useAskCurfew(rel.id);
-  const [choice, setChoice] = useState<"end" | "ask" | null>(null);
   const [reason, setReason] = useState("");
   // Remembered so "Ends at curfew" still shows once the plan no longer runs past it.
   const [endedAt, setEndedAt] = useState<string | null>(null);
   useEffect(() => {
     if (!active) {
-      setChoice(null);
       setReason("");
       setEndedAt(null);
     }
@@ -269,74 +443,47 @@ function useCurfewWarning(active: boolean, draft: Draft, current: CalendarEvent 
   const pending = (curfewQ.data?.requests ?? []).find((r) => r.eventId && r.eventId === current?.id);
   const night = check.data?.night ?? null;
   const canAsk = !!night && !!endsAt && Date.parse(endsAt) < Date.parse(night.endsAt) && !pending;
-  const asking = choice === "ask" && canAsk;
+  // Running past curfew asks by default (mockup 14); "End at" pulls the plan back to curfew instead.
+  const asking = onCurfew && !draft.allDay && canAsk;
 
   const waiting = pending && (
-    <div className="flex items-center gap-3 rounded-lg bg-surface-container px-4 py-3">
-      <Icon name="hourglass_top" className="text-on-surface-variant" />
-      <div>
-        <div className="text-title-medium text-on-surface">Waiting on {who}</div>
-        <div className="text-body-medium">
-          You asked to move {fmtDate(localDateOf(new Date(Date.parse(pending.fromDueAt) - 12 * 3_600_000)), { weekday: "long" })}'s curfew from {fmtTime(pending.fromDueAt)} to{" "}
-          {fmtTime(pending.untilAt)}
-        </div>
+    <div className="border-l-2 border-outline-variant pl-3">
+      <div className="text-body-large text-on-surface">Waiting on {who}</div>
+      <div className="text-body-medium text-on-surface-variant">
+        You asked to move {fmtDate(localDateOf(new Date(Date.parse(pending.fromDueAt) - 12 * 3_600_000)), { weekday: "long" })}'s curfew from {fmtTime(pending.fromDueAt)} to{" "}
+        {fmtTime(pending.untilAt)}
       </div>
     </div>
   );
 
-  function form(set: (p: Partial<Draft>) => void) {
-    if (!onCurfew || draft.allDay) return null;
-    if (pending) return waiting;
-    if (!night) {
-      if (!endedAt || draft.end !== toLocalInput(endedAt)) return null;
-      return (
-        <div className="flex items-start gap-3 rounded-lg bg-surface-container px-4 py-3">
-          <Icon name="bedtime" className="text-on-surface-variant" />
-          <div>
-            <div className="text-title-small text-on-surface">Ends at curfew</div>
-            <div className="text-body-medium">Curfew that night is {fmtTime(endedAt)}.</div>
+  let notice: ReactNode = null;
+  if (onCurfew && !draft.allDay) {
+    if (pending) notice = waiting;
+    else if (!night) {
+      if (endedAt && draft.end === toLocalInput(endedAt)) notice = <p className="text-body-medium text-on-surface-variant">Ends at curfew, {fmtTime(endedAt)}.</p>;
+    } else {
+      const past = Math.round((Date.parse(endsAt!) - Date.parse(night.dueAt)) / 60_000);
+      const howLong = past < 60 ? `${past} minutes` : past % 60 ? `${(past / 60).toFixed(1)} hours` : past === 60 ? "an hour" : `${past / 60} hours`;
+      notice = (
+        <>
+          <div className="flex items-start gap-4 rounded-md border border-primary bg-surface-container-lowest px-5 py-4">
+            <Icon name="home" className="mt-0.5 shrink-0 text-primary" />
+            <p className="text-body-large text-on-surface">
+              This runs {howLong} past your {fmtTime(night.dueAt).replace(":00", "")} curfew.{" "}
+              {canAsk
+                ? `${who} will be asked, and can approve it or pick another end time.`
+                : `It runs past the stay-in time (${fmtTime(night.endsAt)}), so end it earlier.`}
+            </p>
           </div>
-        </div>
+          {asking && <TextField label={`Why, for ${who} (optional)`} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={280} />}
+        </>
       );
     }
-    const past = Math.round((Date.parse(endsAt!) - Date.parse(night.dueAt)) / 60_000);
-    const howLong = past < 60 ? `${past} min` : past % 60 ? `${(past / 60).toFixed(1)} hours` : past === 60 ? "an hour" : `${past / 60} hours`;
-    const nightName = fmtDate(localDateOf(new Date(Date.parse(night.dueAt) - 12 * 3_600_000)), { weekday: "long" });
-    return (
-      <div className="flex flex-col gap-3 rounded-lg bg-error-container px-4 py-3 text-on-error-container">
-        <div className="flex items-start gap-3">
-          <Icon name="bedtime" />
-          <div>
-            <div className="text-title-small">Runs {howLong} past curfew</div>
-            <div className="text-body-medium opacity-85">
-              Curfew {nightName} is {fmtTime(night.dueAt)}.{!canAsk && ` It runs past the stay-in time (${fmtTime(night.endsAt)}), so end it earlier.`}
-            </div>
-          </div>
-        </div>
-        <SegmentedButtons<"end" | "ask" | "">
-          value={asking ? "ask" : ""}
-          onChange={(v) => {
-            if (v === "end") {
-              setEndedAt(night.dueAt);
-              setChoice(null);
-              set({ end: toLocalInput(night.dueAt) });
-            } else if (v === "ask") setChoice("ask");
-          }}
-          className="w-full whitespace-nowrap"
-          options={[{ value: "end", label: `End at ${fmtTime(night.dueAt)}` }, ...(canAsk ? [{ value: "ask" as const, label: `Ask until ${fmtTime(endsAt!)}` }] : [])]}
-        />
-        {asking && <TextField label={`Tell ${who} why (optional)`} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={280} />}
-        {asking && (
-          <p className="text-body-small">
-            {who} is asked to move {nightName}'s curfew to {fmtTime(endsAt!)}. The plan is saved either way; if {who} says no, curfew stays at {fmtTime(night.dueAt)}.
-          </p>
-        )}
-      </div>
-    );
   }
 
+  const endAt = night && onCurfew && !draft.allDay && !pending ? (set: (p: Partial<Draft>) => void) => (setEndedAt(night.dueAt), set({ end: toLocalInput(night.dueAt) })) : null;
   const ask = asking ? (eventId: string, until: string) => askCurfew.mutateAsync({ occurrenceId: night!.occurrenceId, until, reason: reason.trim() || null, eventId }) : null;
-  return { form, ask, who, waiting: !active && waiting };
+  return { notice, endAt, endLabel: night ? fmtTime(night.dueAt).replace(" PM", "").replace(" AM", "") : "", ask, who, waiting: !active && waiting };
 }
 
 type ClashChoice = "keep" | "move" | "cancel";
@@ -346,7 +493,7 @@ type ClashChoice = "keep" | "move" | "cancel";
  * after the plan, or called off. A Dominant's choices apply at once; a sub's moves and call-offs go out as one request
  * (moves may apply straight away, depending on the dynamic's rules).
  */
-function useClashes(event: CalendarEvent | null): { body: ReactNode; apply: ReactNode } {
+function useClashes(event: CalendarEvent | null): { title: string; body: ReactNode; apply: ReactNode } {
   const { rel, me, isDom, memberName } = useRel();
   const snack = useSnackbar();
   const from = event ? localDateOf(new Date(event.startsAt)) : today();
@@ -357,7 +504,8 @@ function useClashes(event: CalendarEvent | null): { body: ReactNode; apply: Reac
   const [choices, setChoices] = useState<Record<string, ClashChoice>>({});
   const [times, setTimes] = useState<Record<string, string>>({});
   const [reason, setReason] = useState("");
-  const none = { body: null, apply: null };
+  const [picking, setPicking] = useState(false);
+  const none = { title: "", body: null, apply: null };
   if (!event?.conflictIds.length) return none;
   const items = (occ.data ?? []).filter((o) => event.conflictIds.includes(o.id) && o.status === "pending");
   if (!items.length && !occ.isLoading) return none;
@@ -374,8 +522,6 @@ function useClashes(event: CalendarEvent | null): { body: ReactNode; apply: Reac
   // One tap for the lot: a long plan can run into dozens of tasks.
   const actionable = items.filter(canAct);
   const allMovable = actionable.every(canMove);
-  const allAre = (c: ClashChoice) => actionable.length > 0 && actionable.every((o) => choiceOf(o) === c);
-  const setAll = (c: ClashChoice) => setChoices(allAre(c) ? {} : Object.fromEntries(actionable.map((o) => [o.id, c])));
 
   async function submit() {
     if (!event) return;
@@ -391,77 +537,118 @@ function useClashes(event: CalendarEvent | null): { body: ReactNode; apply: Reac
       });
       setChoices({});
       setReason("");
+      setPicking(false);
       snack(r.applied ? "Done" : r.requests.some((x) => x.status === "applied") ? "Moved what you could; the rest is waiting for approval" : "Sent for approval");
     } catch (e) {
       snack(errorMessage(e));
     }
   }
 
-  const body = (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2 text-title-small text-error">
-        <Icon name="warning" size={20} />
-        {items.length === 1 ? "Overlaps a task" : `Overlaps ${items.length} tasks`}
-      </div>
-      {actionable.length > 1 && (
-        <div className="flex flex-wrap gap-2">
-          <Chip icon="done_all" selected={allAre("keep")} onClick={() => setAll("keep")}>
-            Keep all
-          </Chip>
-          {allMovable && (
-            <>
-              <Chip selected={allAre("move")} onClick={() => setAll("move")}>
-                Move all after
-              </Chip>
-              <Chip selected={allAre("cancel")} onClick={() => setAll("cancel")}>
-                {isDom ? "Call off all" : "Ask off all"}
-              </Chip>
-            </>
-          )}
-        </div>
-      )}
-      {items.map((o) => {
-        const mine = o.assigneeId === me.user.id;
-        const choice = choiceOf(o);
-        return (
-          <div key={o.id} className="flex flex-col gap-2 rounded-md bg-surface-container px-3 py-2">
-            <div className="min-w-0">
-              <div className="truncate text-body-large text-on-surface">{o.title}</div>
-              <div className="text-body-small">
-                Due {fmtTime(o.dueAt)}
-                {!mine && ` · ${memberName(o.assigneeId)}`}
-              </div>
+  const n = items.length;
+  const title = n === 1 ? "A task falls during this plan" : `${NUMBER_WORDS[n] ?? n} tasks fall during this plan`;
+  const after = fmtTime(event.endsAt);
+  const dom = rel.members.find((m) => m.role === "dominant" && m.userId !== me.user.id);
+  const asksAboutMoves = !isDom && rel.reschedulePolicy !== "allowance" && !subBlocked;
+
+  async function all(c: "keep" | "move") {
+    if (!event) return;
+    try {
+      if (c === "keep") {
+        await dismiss.mutateAsync({ id: event.id, occurrenceIds: actionable.map((o) => o.id) });
+        return snack(actionable.length === 1 ? "Kept as it is" : "Kept as they are");
+      }
+      const r = await plan.mutateAsync({ items: actionable.map((o) => ({ occurrenceId: o.id, action: "move", dueAt: afterEvent(o.dueAt, event) })) });
+      snack(r.applied ? "Moved" : r.requests.some((x) => x.status === "applied") ? "Moved what you could; the rest is waiting for approval" : "Sent for approval");
+    } catch (e) {
+      snack(errorMessage(e));
+    }
+  }
+
+  const rows = items.map((o) => {
+    const mine = o.assigneeId === me.user.id;
+    const choice = choiceOf(o);
+    return (
+      <div key={o.id} className="flex flex-col gap-3 border-b border-outline-variant py-3">
+        <div className="flex items-center gap-4">
+          <Diamond size={16} className="shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-body-large text-on-surface">{o.title}</div>
+            <div className="text-body-medium text-on-surface-variant">
+              {fmtTime(o.dueAt)}
+              {!mine && ` · ${memberName(o.assigneeId)}`}
             </div>
-            {canAct(o) && (
-              <SegmentedButtons<ClashChoice | "">
-                value={choice ?? ""}
-                onChange={(v) => v && setChoices((c) => ({ ...c, [o.id]: v }))}
-                className="w-full"
-                options={[
-                  { value: "keep", label: "Keep" },
-                  ...(canMove(o)
-                    ? [
-                        { value: "move" as const, label: "Move" },
-                        { value: "cancel" as const, label: isDom ? "Call off" : "Ask off" },
-                      ]
-                    : []),
-                ]}
-              />
-            )}
-            {choice === "move" && <TextField type="datetime-local" label="New deadline" value={timeOf(o)} onChange={(e) => setTimes((t) => ({ ...t, [o.id]: e.target.value }))} />}
           </div>
-        );
-      })}
-      <p className="px-1 text-body-small">Keep means the task is fine alongside the plan, and it stops counting as a clash.</p>
-      {subBlocked && <p className="px-1 text-body-small">Only your Dominant can move or call off tasks in this dynamic.</p>}
-      {picked.length > 0 && asks && <TextField label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} />}
+        </div>
+        {picking && canAct(o) && (
+          <div className="flex flex-wrap gap-2 pl-8">
+            <Chip plain selected={choice === "keep"} onClick={() => setChoices((c) => ({ ...c, [o.id]: "keep" }))}>
+              Keep
+            </Chip>
+            {canMove(o) && (
+              <>
+                <Chip plain selected={choice === "move"} onClick={() => setChoices((c) => ({ ...c, [o.id]: "move" }))}>
+                  Move
+                </Chip>
+                <Chip plain selected={choice === "cancel"} onClick={() => setChoices((c) => ({ ...c, [o.id]: "cancel" }))}>
+                  {isDom ? "Call off" : "Ask off"}
+                </Chip>
+              </>
+            )}
+          </div>
+        )}
+        {picking && choice === "move" && (
+          <div className="pl-8">
+            <TextField type="datetime-local" label="New time" value={timeOf(o)} onChange={(e) => setTimes((t) => ({ ...t, [o.id]: e.target.value }))} />
+          </div>
+        )}
+      </div>
+    );
+  });
+
+  const busy = plan.isPending || dismiss.isPending;
+  const body = (
+    <div className="flex flex-col">
+      <p className="-mt-2 mb-2 text-body-large text-on-surface-variant">
+        {event.title} · {eventWhen(event)}
+      </p>
+      {rows}
+      <div className="mt-5 flex flex-col gap-3">
+        {!picking ? (
+          <>
+            {allMovable && actionable.length > 0 && (
+              <Button className="h-12 w-full" busy={busy} onClick={() => void all("move")}>
+                Move {n === 1 ? "it" : "them"} to after {after}
+              </Button>
+            )}
+            {allMovable && actionable.length > 0 && (
+              <Button variant="outlined" className="h-12 w-full" onClick={() => setPicking(true)}>
+                {n === 1 ? "Pick a new time" : "Pick new times one by one"}
+              </Button>
+            )}
+            {actionable.length > 0 && (
+              <Button variant="plain" className="h-12 w-full" busy={busy && !allMovable} onClick={() => void all("keep")}>
+                Keep {n === 1 ? "it as it is" : "them as they are"}
+              </Button>
+            )}
+          </>
+        ) : (
+          <>
+            {picked.length > 0 && asks && <TextField label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} />}
+            <Button className="h-12 w-full" disabled={!picked.length} busy={busy} onClick={() => void submit()}>
+              {asks ? "Ask" : "Save"}
+              {picked.length ? ` (${picked.length})` : ""}
+            </Button>
+            <Button variant="plain" className="h-12 w-full" onClick={() => (setPicking(false), setChoices({}))}>
+              Back
+            </Button>
+          </>
+        )}
+      </div>
+      {asksAboutMoves && dom && <p className="mt-3 text-center text-body-small text-on-surface-variant">{dom.displayName} is asked about any move, unless your dynamic lets you.</p>}
+      {subBlocked && <p className="mt-3 text-center text-body-small text-on-surface-variant">Only {dom?.displayName ?? "your Dominant"} can move tasks in this dynamic.</p>}
     </div>
   );
-  // In the dialog's own button row, so a long list doesn't need scrolling to the end.
-  const apply = picked.length > 0 && (
-    <Button icon={asks ? "send" : "check"} busy={plan.isPending || dismiss.isPending} onClick={() => void submit()}>
-      {asks ? "Ask" : "Apply"} ({picked.length})
-    </Button>
-  );
-  return { body, apply };
+  return { title, body, apply: null };
 }
+
+const NUMBER_WORDS: Record<number, string> = { 2: "Two", 3: "Three", 4: "Four", 5: "Five", 6: "Six", 7: "Seven", 8: "Eight", 9: "Nine", 10: "Ten" };

@@ -1,5 +1,7 @@
 package app.obey.ui
 
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.outlined.FrontHand
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -53,8 +55,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-private val Yellow = Color(0xFFF6D57A)
-private val OnYellow = Color(0xFF3A2E00)
+// Safe call keeps its own yellow and red (allowlisted in the design check): they have to read as yellow and red.
+private val Yellow = Color(0xFFD9A13B)
+private val OnYellow = Color(0xFF2B2108)
 
 /** The dynamic's open safe call, checked often so a partner sees one soon even without a push. */
 @HiltViewModel
@@ -92,86 +95,92 @@ private fun partnersOf(vm: SafeCallViewModel): String {
     return s.relationship?.members?.filter { it.userId != s.userId }?.joinToString(" and ") { it.displayName }?.ifEmpty { null } ?: "Your partner"
 }
 
-/** Calling yellow or red, with an optional note. Calling again while one is open changes its level. */
+/** Calling yellow or red, with an optional note (mockup 20). Calling again while one is open changes its level. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SafeWordSheet(vm: SafeCallViewModel, onDismiss: () -> Unit) {
     var note by rememberSaveable { mutableStateOf("") }
     val who = partnersOf(vm)
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    val c = MaterialTheme.colorScheme
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = c.surface) {
         Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Use your safe word", style = MaterialTheme.typography.headlineSmall)
-            Text("$who is told straight away, even during quiet hours.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Safe call", style = MaterialTheme.typography.displaySmall)
+            Text("$who is told straight away, even during quiet hours. Only you can clear it.", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
             Spacer(Modifier.height(4.dp))
-            LevelButton(Icons.Filled.PanTool, "Yellow", "Slow down and check in with me", Yellow, OnYellow) { vm.call(SafeLevel.Yellow, note, onDismiss) }
-            LevelButton(Icons.Filled.FrontHand, "Red", "Stop. Tasks that slip are excused until you clear it", MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.onError) {
-                vm.call(SafeLevel.Red, note, onDismiss)
-            }
-            LettersField(note, { note = it.take(500) }, Modifier.fillMaxWidth(), label = { Text("Add a note (optional)") }, minLines = 2)
+            LevelButton("Yellow", "Slow down and check in with me.", Yellow) { vm.call(SafeLevel.Yellow, note, onDismiss) }
+            LevelButton("Red", "Stop. Anything that slips while it's open is excused.", c.error) { vm.call(SafeLevel.Red, note, onDismiss) }
+            Spacer(Modifier.height(4.dp))
+            LettersField(note, { note = it.take(500) }, Modifier.fillMaxWidth(), label = { Text("A note for $who (optional)") }, minLines = 2)
         }
     }
 }
 
+/** An outlined card in the level's colour, with its dot. */
 @Composable
-private fun LevelButton(icon: ImageVector, label: String, line: String, container: Color, content: Color, onClick: () -> Unit) {
+private fun LevelButton(label: String, line: String, color: Color, onClick: () -> Unit) {
+    val c = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(8.dp)
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(container).clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 16.dp),
+        Modifier.fillMaxWidth().clip(shape).border(1.dp, color, shape).background(c.surfaceContainerLowest).clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(44.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.35f)), contentAlignment = Alignment.Center) { Icon(icon, null, tint = content) }
+        Box(Modifier.size(14.dp).clip(CircleShape).background(color))
         Column {
-            Text(label, style = MaterialTheme.typography.titleLarge, color = content)
-            Text(line, style = MaterialTheme.typography.bodyMedium, color = content.copy(alpha = 0.9f))
+            Text(label, style = MaterialTheme.typography.headlineSmall, color = c.onSurface)
+            Text(line, style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
         }
     }
 }
 
-/** Shown to everyone in the dynamic while a safe call is open; only whoever called it can clear it. */
+/** Shown to everyone in the dynamic while a safe call is open, as a band across the top (mockups 42, 43); only whoever called it can clear it. */
 @Composable
 fun SafeCallBanner(vm: SafeCallViewModel, call: SafeCall, modifier: Modifier = Modifier) {
     val session = vm.session ?: return
     val mine = call.callerId == session.userId
     val red = call.level == SafeLevel.Red
-    val caller = if (mine) "You" else session.relationship?.members?.firstOrNull { it.userId == call.callerId }?.displayName ?: "Your partner"
+    val caller = session.relationship?.members?.firstOrNull { it.userId == call.callerId }?.displayName ?: "Your partner"
     val scheme = MaterialTheme.colorScheme
-    val (container, content) = when {
-        !red -> Yellow to OnYellow
-        mine -> scheme.errorContainer to scheme.onErrorContainer
-        else -> scheme.error to scheme.onError
-    }
+    val (container, content) = if (red) scheme.error to scheme.onError else Yellow to OnYellow
     val level = if (red) "red" else "yellow"
+    val told = partnersOf(vm)
     Column(
-        modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(20.dp)).background(container).padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier.fillMaxWidth().background(container).padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Icon(if (red) Icons.Filled.FrontHand else Icons.Filled.PanTool, null, tint = content)
+            Icon(Icons.Outlined.FrontHand, null, tint = content)
             Column {
-                Text("$caller called $level at ${formatTime(call.createdAt)}", style = MaterialTheme.typography.titleMedium, color = content)
-                if (call.note.isNotBlank()) Text("“${call.note}”", style = MaterialTheme.typography.bodyMedium, color = content)
                 Text(
-                    (if (mine) "${partnersOf(vm)} has been told. " else "") +
-                        when {
-                            red -> "Tasks that slip are excused until ${if (mine) "you clear" else "$caller clears"} it."
-                            mine -> "Slow down and check in."
-                            else -> "Slow down and check in. Only $caller can clear it."
-                        },
+                    if (mine) "${level.replaceFirstChar { it.uppercase() }} · you called it at ${formatTime(call.createdAt)}" else "$caller called $level · ${formatTime(call.createdAt)}",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
+                    color = content,
+                )
+                Text(
+                    if (mine) "${if (red) "Everything is paused" else "Slow down and check in"}. $told has been told."
+                    else "${if (red) "Stop" else "Slow down"} and check in. Only $caller can clear it.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = content.copy(alpha = 0.9f),
+                    color = content,
                 )
             }
         }
+        if (call.note.isNotBlank()) Text("“${call.note}”", style = MaterialTheme.typography.headlineSmall.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = content)
         if (mine) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                TextButton(onClick = { vm.call(if (red) SafeLevel.Yellow else SafeLevel.Red, "") }) { Text("Change to ${if (red) "yellow" else "red"}", color = content) }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                androidx.compose.material3.OutlinedButton(
+                    onClick = { vm.call(if (red) SafeLevel.Yellow else SafeLevel.Red, "") },
+                    modifier = Modifier.weight(1f).height(44.dp),
+                    shape = MaterialTheme.shapes.small,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, content),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = content),
+                ) { Text("Change to ${if (red) "yellow" else "red"}") }
                 Button(
                     onClick = { vm.clear(call.id) },
-                    colors = ButtonDefaults.buttonColors(containerColor = if (red) scheme.error else OnYellow, contentColor = if (red) scheme.onError else Yellow),
+                    modifier = Modifier.weight(1f).height(44.dp),
+                    shape = MaterialTheme.shapes.small,
+                    colors = ButtonDefaults.buttonColors(containerColor = scheme.surfaceContainerLowest, contentColor = if (red) scheme.error else scheme.onSurface),
                 ) { Text("I'm okay now") }
             }
-        } else {
-            Spacer(Modifier.height(8.dp))
         }
     }
 }

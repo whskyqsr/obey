@@ -56,13 +56,15 @@ export function Diamond({ state = "open", size = 14, className }: { state?: Diam
 
 // ---------- Buttons
 
-type Variant = "filled" | "tonal" | "outlined" | "text" | "elevated" | "danger";
+type Variant = "filled" | "tonal" | "outlined" | "text" | "plain" | "elevated" | "danger";
 const VARIANTS: Record<Variant, string> = {
   // Letters: ink is the main action, a hairline the second, the accent stays for what needs attention.
   filled: "bg-on-surface text-surface",
   tonal: "border border-outline-variant bg-surface-container-lowest text-on-surface",
   outlined: "border border-on-surface text-on-surface",
   text: "text-primary px-3",
+  /** A text button in ink, for a quiet way out ("Not now", "Keep them as they are"). */
+  plain: "text-on-surface px-3",
   elevated: "border border-outline-variant bg-surface-container-lowest text-on-surface",
   danger: "bg-error text-on-error",
 };
@@ -722,9 +724,12 @@ export function PageHeader({
   actions,
   tools,
   hero,
+  eyebrow,
 }: {
   /** Today's greeting: the large serif line from the mockups. */
   hero?: boolean;
+  /** A small spaced line above the title. */
+  eyebrow?: ReactNode;
   title: ReactNode;
   subtitle?: ReactNode;
   actions?: ReactNode;
@@ -745,6 +750,7 @@ export function PageHeader({
   );
   return (
     <>
+      {menu?.banner}
       <header className="px-4 pt-3 pb-4 md:px-6 md:pt-6">
         <div className={cx("-mx-2 flex min-h-10 items-center gap-1", !tools && !hand && "md:hidden")}>
           <div className="min-w-0 flex-1 md:hidden">
@@ -758,6 +764,7 @@ export function PageHeader({
         </div>
         <div className="mt-2 flex items-end gap-2 md:mt-0">
           <div className="min-w-0 flex-1">
+            {eyebrow && <div className="eyebrow mb-1">{eyebrow}</div>}
             <h1
               className={
                 hero
@@ -773,7 +780,6 @@ export function PageHeader({
           <HeaderSlot wide />
         </div>
       </header>
-      {menu?.banner}
     </>
   );
 }

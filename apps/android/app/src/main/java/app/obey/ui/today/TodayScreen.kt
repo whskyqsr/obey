@@ -93,6 +93,7 @@ fun TodayScreen(
     onOpenRules: () -> Unit = {},
     onOpenProtocol: (String) -> Unit = {},
     onOpenScene: (String) -> Unit = {},
+    onOpenChastity: () -> Unit = {},
     vm: TodayViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -523,7 +524,7 @@ fun TodayScreen(
                         }
                     }
                     if (session != null && !session.readOnly) item(key = "solo") { SoloCards(session, onInvite, onOpenTasks) }
-                    if (session != null && session.relationship?.features?.chastity == true && !session.readOnly && !session.solo) item(key = "chastity") { app.obey.ui.chastity.ChastityTodayCard(session) }
+                    if (session != null && session.relationship?.features?.chastity == true && !session.readOnly && !session.solo) item(key = "chastity") { app.obey.ui.chastity.ChastityTodayCard(session, onOpenChastity) }
                     curfew?.night?.let { n ->
                         item(key = "curfew") {
                             val mine = n.assigneeId == me

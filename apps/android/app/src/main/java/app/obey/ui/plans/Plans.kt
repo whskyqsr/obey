@@ -1,5 +1,14 @@
 package app.obey.ui.plans
 
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxSize
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -313,7 +322,7 @@ private data class Draft(
  * Adds, edits or shows a plan on the shared calendar. Either partner adds plans and each changes only their own.
  * Tasks due during the plan are listed with a one-tap reschedule, as on the web.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onChanged: () -> Unit) {
     val vm: PlanViewModel = hiltViewModel(key = "plan-${event?.id ?: "new"}")
@@ -337,7 +346,6 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
     val askWho = session?.partners.orEmpty().filter { it.role != app.obey.api.Role.Submissive }.let { if (it.size == 1) it[0].displayName else "your Dominant" }
     // Asked from this plan and still waiting.
     val pending = curfew?.requests?.firstOrNull { it.eventId != null && it.eventId == saved?.id }
-    var asking by remember { mutableStateOf(false) }
     var askReason by remember { mutableStateOf("") }
     var endedAt by remember { mutableStateOf<String?>(null) }
     val clashItems by vm.clashes.collectAsStateWithLifecycle()
@@ -346,47 +354,31 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
     val current = saved
     if (!editing && current != null) {
         val mine = current.authorId == session?.userId
-        val author = if (mine) "you" else session?.nameOf(current.authorId) ?: "your partner"
         val plan = session?.let { ClashPlan(clashItems, it, current, form) }
+        if (session != null && plan != null && clashItems.isNotEmpty()) {
+            // A plan that runs into tasks opens on them first (mockup 58).
+            ClashSheet(current, clashItems, plan, form, session, busy, vm, onDismiss, onChanged, onChange = if (mine) ({ draft = Draft.of(current, day); editing = true }) else null)
+            return
+        }
+        val c = MaterialTheme.colorScheme
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text(current.title) },
+            containerColor = c.surface,
+            title = { Text(current.title, style = MaterialTheme.typography.headlineMedium) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Event, null, tint = MaterialTheme.colorScheme.tertiary)
-                        Spacer(Modifier.width(8.dp))
-                        Text(current.whenLabel(), style = MaterialTheme.typography.bodyLarge)
-                    }
-                    Text(
-                        "${if (current.withPartner) "For both of you" else "For ${author}"} · added by $author",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    current.noteMd?.let {
-                        Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(8.dp)) {
-                            Text(it, Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp))
-                        }
-                    }
+                    Text(current.whenLabel() + if (current.withPartner) " · both of you" else "", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
+                    current.noteMd?.let { Text(it, Modifier.fillMaxWidth().drawBehind { drawRect(c.outlineVariant, size = androidx.compose.ui.geometry.Size(2.dp.toPx(), size.height)) }.padding(start = 12.dp)) }
                     pending?.let { WaitingOn(askWho, it) }
-                    if (session != null && plan != null) Clashes(clashItems, plan, form, session)
                 }
             },
-            // Apply sits with Done, so a long list of clashes doesn't need scrolling to the end.
-            confirmButton = {
-                if (plan != null && plan.picked.isNotEmpty()) Row {
-                    TextButton(onClick = onDismiss) { Text("Done") }
-                    Button(onClick = { plan.apply(vm, onChanged) }, enabled = !busy) {
-                        Text("${if (plan.asks) "Ask" else "Apply"} (${plan.picked.size})")
-                    }
-                } else Button(onClick = onDismiss) { Text("Done") }
-            },
+            confirmButton = { Button(onClick = onDismiss) { Text("Done") } },
             dismissButton = {
                 if (mine) Row {
                     TextButton(onClick = { vm.delete(current) { onChanged(); onDismiss() } }, enabled = !busy) {
-                        Text("Remove", color = MaterialTheme.colorScheme.error)
+                        Text("Remove", color = c.error)
                     }
-                    TextButton(onClick = { draft = Draft.of(current, day); editing = true }) { Text("Edit") }
+                    TextButton(onClick = { draft = Draft.of(current, day); editing = true }) { Text("Edit", color = c.onSurface) }
                 }
             },
         )
@@ -395,61 +387,88 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
 
     var picking by remember { mutableStateOf<String?>(null) }
     val partner = session?.partners?.firstOrNull()?.let { session.nameOf(it.userId) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (current == null) "New plan" else "Edit plan") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                LettersField(
-                    value = draft.title,
-                    onValueChange = { draft = draft.copy(title = it.take(80)) },
-                    label = { Text("What's the plan?") },
-                    placeholder = { Text("Dinner with family") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+    val zone = ZoneId.systemDefault()
+    if (onCurfew && !draft.allDay) {
+        LaunchedEffect(draft.start, draft.end) {
+            kotlinx.coroutines.delay(300)
+            vm.checkCurfew(draft.start.atZone(zone).iso(), draft.end.atZone(zone).iso())
+        }
+    }
+    val n = night?.takeIf { onCurfew && !draft.allDay && pending == null }
+    val canAsk = n != null && draft.end.atZone(zone).toInstant().isBefore(parseInstant(n.endsAt))
+    // Running past curfew asks by default (mockup 14); "End at" pulls the plan back to curfew instead.
+    val willAsk = canAsk
+    val c = MaterialTheme.colorScheme
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = { if (current == null) onDismiss() else editing = false },
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        androidx.compose.material3.Scaffold(
+            containerColor = c.surface,
+            topBar = {
+                androidx.compose.material3.CenterAlignedTopAppBar(
+                    title = { Text(if (current == null) "New plan" else "Edit plan", style = MaterialTheme.typography.titleMedium) },
+                    navigationIcon = { TextButton(onClick = { if (current == null) onDismiss() else editing = false }) { Text("Cancel", color = c.onSurfaceVariant) } },
+                    colors = androidx.compose.material3.TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = c.surface),
                 )
-                PillRow(Modifier.fillMaxWidth()) {
-                    PillSegment(
-                        selected = !draft.withPartner,
-                        onClick = { draft = draft.copy(withPartner = false) },
-                    ) { Text("Just me") }
-                    PillSegment(
-                        selected = draft.withPartner,
-                        onClick = { draft = draft.copy(withPartner = true) },
-                    ) { Text(partner?.let { "Me and $it" } ?: "Both of us", maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                }
-                Text(
-                    if (draft.withPartner) "Both of your tasks are checked for clashes." else "Only your tasks are checked for clashes.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("All day", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                    Switch(checked = draft.allDay, onCheckedChange = { draft = draft.copy(allDay = it) })
-                }
-                if (draft.allDay) {
-                    WhenRow("From", formatDate(draft.startDay), null, onDate = { picking = "startDay" }, onTime = {})
-                    WhenRow("Until", formatDate(draft.endDay), null, onDate = { picking = "endDay" }, onTime = {})
-                } else {
-                    WhenRow("Starts", formatDate(draft.start.toLocalDate()), timeOf(draft.start), onDate = { picking = "startDate" }, onTime = { picking = "startTime" })
-                    WhenRow("Ends", formatDate(draft.end.toLocalDate()), timeOf(draft.end), onDate = { picking = "endDate" }, onTime = { picking = "endTime" })
-                    if (onCurfew) {
-                        val zone = ZoneId.systemDefault()
-                        val endIso = draft.end.atZone(zone).iso()
-                        LaunchedEffect(draft.start, draft.end) {
-                            kotlinx.coroutines.delay(300)
-                            vm.checkCurfew(draft.start.atZone(zone).iso(), endIso)
-                        }
-                        val n = night
-                        when {
-                            pending != null -> WaitingOn(askWho, pending)
-                            n != null -> CurfewWarning(n, draft.end.atZone(zone).toInstant(), asking, askReason, askWho, onAsking = { asking = it }, onReason = { askReason = it }) {
-                                endedAt = n.dueAt
-                                asking = false
-                                draft = draft.copy(end = parseInstant(n.dueAt).local().toLocalDateTime())
+            },
+            bottomBar = {
+                Row(Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(horizontal = 24.dp, vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (n != null) {
+                        OutlinedButton(
+                            onClick = { endedAt = n.dueAt; draft = draft.copy(end = parseInstant(n.dueAt).local().toLocalDateTime()) },
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = MaterialTheme.shapes.small,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, c.onSurface),
+                            colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = c.onSurface),
+                        ) { Text("End at ${shortTime(n.dueAt)}", maxLines = 1) }
+                    }
+                    Button(
+                        enabled = draft.valid && !busy,
+                        modifier = Modifier.weight(1.3f).height(48.dp),
+                        onClick = {
+                            val ask = if (willAsk && n != null) n to askReason.trim().ifEmpty { null } else null
+                            vm.save(current?.id, draft.toInput(), ask, askWho) { e ->
+                                onChanged()
+                                if (e.conflictIds.isEmpty()) onDismiss()
+                                else {
+                                    // Stay open on the clashes, so they can be moved right away.
+                                    saved = e
+                                    editing = false
+                                }
                             }
-                            endedAt?.let { parseInstant(it).local().toLocalDateTime() == draft.end } == true -> EndsAtCurfew(endedAt!!)
-                        }
+                        },
+                    ) { Text(if (willAsk) "Save and ask $askWho" else "Save", maxLines = 1) }
+                }
+            },
+        ) { padding ->
+            Column(
+                Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(top = 16.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+            ) {
+                PlanSentence(draft, onTitle = { draft = draft.copy(title = it.take(80)) }, onPick = { picking = it })
+                when {
+                    !onCurfew || draft.allDay -> {}
+                    pending != null -> WaitingOn(askWho, pending)
+                    n != null -> {
+                        CurfewNotice(n, draft.end.atZone(zone).toInstant(), canAsk, askWho)
+                        if (canAsk) LettersField(askReason, { askReason = it.take(280) }, label = { Text("Why, for $askWho (optional)") }, modifier = Modifier.fillMaxWidth())
+                    }
+                    endedAt?.let { parseInstant(it).local().toLocalDateTime() == draft.end } == true -> EndsAtCurfew(endedAt!!)
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    app.obey.ui.common.Eyebrow("Also")
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (partner != null) app.obey.ui.common.LettersChip("With $partner", draft.withPartner, { draft = draft.copy(withPartner = !draft.withPartner) }, check = true)
+                        app.obey.ui.common.LettersChip(
+                            "All day",
+                            draft.allDay,
+                            {
+                                val d = draft.start.toLocalDate()
+                                draft = if (draft.allDay) draft.copy(allDay = false) else draft.copy(allDay = true, startDay = d, endDay = if (draft.endDay.isBefore(d)) d else draft.endDay)
+                            },
+                            check = true,
+                        )
                     }
                 }
                 LettersField(
@@ -459,27 +478,8 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-        },
-        confirmButton = {
-            Button(
-                enabled = draft.valid && !busy,
-                onClick = {
-                    val n = night
-                    val ask = if (onCurfew && asking && n != null && pending == null && !draft.allDay) n to askReason.trim().ifEmpty { null } else null
-                    vm.save(current?.id, draft.toInput(), ask, askWho) { e ->
-                        onChanged()
-                        if (e.conflictIds.isEmpty()) onDismiss()
-                        else {
-                            // Stay open on the clashes, so they can be moved right away.
-                            saved = e
-                            editing = false
-                        }
-                    }
-                },
-            ) { Text(if (onCurfew && asking && night != null && pending == null && !draft.allDay) "Save and ask $askWho" else "Save") }
-        },
-        dismissButton = { TextButton(onClick = { if (current == null) onDismiss() else editing = false }) { Text("Cancel") } },
-    )
+        }
+    }
 
     when (val p = picking) {
         "startDay", "endDay", "startDate", "endDate" -> {
@@ -571,12 +571,11 @@ private class ClashPlan(items: List<Occurrence>, session: Session, private val e
     // One tap for the lot: a long plan can run into dozens of tasks.
     val actionable = items.filter { canAct(it) }
     val allMovable = actionable.all { canMove(it) }
-    fun allAre(c: ClashChoice) = actionable.isNotEmpty() && actionable.all { choiceOf(it) == c }
-    fun setAll(c: ClashChoice) {
-        val clear = allAre(c)
-        form.choices.clear()
-        if (!clear) actionable.forEach { form.choices[it.id] = c }
-    }
+
+    fun moveAll(vm: PlanViewModel, onChanged: () -> Unit) =
+        vm.sortOut(e.id, emptyList(), actionable.map { PlanRescheduleItem(it.id, "move", afterPlan(it.dueAt, e).iso()) }, null) { onChanged() }
+
+    fun keepAll(vm: PlanViewModel, onChanged: () -> Unit) = vm.sortOut(e.id, actionable.map { it.id }, emptyList(), null) { onChanged() }
 
     fun apply(vm: PlanViewModel, onChanged: () -> Unit) {
         val sent = changed.map { o ->
@@ -587,91 +586,201 @@ private class ClashPlan(items: List<Occurrence>, session: Session, private val e
     }
 }
 
+/** "11:00" from "11:00 PM": a time whose half of the day is already plain. */
+private fun shortTime(iso: String) = formatTime(iso).replace(Regex("[\\s\\u202f\\u00a0]?[AaPp]\\.?[Mm]\\.?$"), "")
+
+/** "today", "tomorrow", "Friday" within the week, else "Fri 4 Dec". */
+private fun dayWord(d: LocalDate): String {
+    val today = LocalDate.now()
+    return when {
+        d == today -> "today"
+        d == today.plusDays(1) -> "tomorrow"
+        d.isAfter(today) && d.isBefore(today.plusDays(7)) -> d.format(java.time.format.DateTimeFormatter.ofPattern("EEEE"))
+        else -> formatDate(d)
+    }
+}
+
 /**
- * The tasks a plan runs into, each sorted out its own way: kept, moved (after the plan unless changed), or called off.
- * A Dominant's choices apply at once; a sub's go out as one request.
+ * The plan as one sentence with tappable parts (mockup 14): "I'll be at ___ on ___ from ___ to ___." The title is typed
+ * in place; the day and times open the pickers.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PlanSentence(draft: Draft, onTitle: (String) -> Unit, onPick: (String) -> Unit) {
+    val c = MaterialTheme.colorScheme
+    val style = MaterialTheme.typography.displaySmall.copy(fontSize = 34.sp, lineHeight = 44.sp, color = c.onSurface)
+    val underline = Modifier.drawBehind {
+        val y = size.height - 2.dp.toPx()
+        drawRect(c.primary, topLeft = androidx.compose.ui.geometry.Offset(0f, y), size = androidx.compose.ui.geometry.Size(size.width, 1.5.dp.toPx()))
+    }
+    @Composable
+    fun word(t: String) = Text(t, style = style)
+    @Composable
+    fun slot(t: String, key: String) = Text(t, style = style, modifier = underline.clickable { onPick(key) })
+    val zone = ZoneId.systemDefault()
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(9.dp), verticalArrangement = Arrangement.spacedBy(0.dp)) {
+        word(if (draft.withPartner) "We'll" else "I'll")
+        word("be")
+        word("at")
+        Box(underline) {
+            // The field is as wide as what's typed, like the web's.
+            Text(draft.title.ifEmpty { "what" }, style = style.copy(color = androidx.compose.ui.graphics.Color.Transparent), modifier = Modifier.padding(end = 4.dp))
+            androidx.compose.foundation.text.BasicTextField(
+                value = draft.title,
+                onValueChange = onTitle,
+                textStyle = style,
+                singleLine = true,
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(c.primary),
+                modifier = Modifier.matchParentSize(),
+                decorationBox = { inner ->
+                    Box {
+                        if (draft.title.isEmpty()) Text("what", style = style.copy(color = c.onSurfaceVariant.copy(alpha = 0.5f)))
+                        inner()
+                    }
+                },
+            )
+        }
+        if (draft.allDay) {
+            if (draft.startDay == draft.endDay) {
+                if (draft.startDay.isAfter(LocalDate.now().plusDays(1))) word("on")
+                slot(dayWord(draft.startDay) + ",", "startDay")
+                word("all")
+                word("day.")
+            } else {
+                word("from")
+                slot(dayWord(draft.startDay), "startDay")
+                word("to")
+                slot(dayWord(draft.endDay) + ".", "endDay")
+            }
+        } else {
+            val d = draft.start.toLocalDate()
+            if (d.isAfter(LocalDate.now().plusDays(1))) word("on")
+            slot(dayWord(d), "startDate")
+            word("from")
+            val a = formatTime(draft.start.atZone(zone).iso())
+            val b = formatTime(draft.end.atZone(zone).iso())
+            slot(if (a.takeLast(2) == b.takeLast(2)) shortTime(draft.start.atZone(zone).iso()) else a, "startTime")
+            word("to")
+            slot(b + if (draft.end.toLocalDate().isAfter(d)) "" else ".", "endTime")
+            if (draft.end.toLocalDate().isAfter(d)) word("the next day.")
+        }
+    }
+}
+
+/** The curfew notice in the plan editor: how far past curfew it runs, and that the Dominant will be asked. */
+@Composable
+private fun CurfewNotice(night: app.obey.api.CurfewCheckNight, end: Instant, canAsk: Boolean, who: String) {
+    val c = MaterialTheme.colorScheme
+    val past = java.time.Duration.between(parseInstant(night.dueAt), end).toMinutes()
+    val howLong = when {
+        past < 60 -> "$past minutes"
+        past == 60L -> "an hour"
+        past % 60 == 0L -> "${past / 60} hours"
+        else -> "${past / 60} h ${past % 60} min"
+    }
+    val shape = RoundedCornerShape(8.dp)
+    Row(
+        Modifier.fillMaxWidth().clip(shape).border(1.dp, c.primary, shape).background(c.surfaceContainerLowest).padding(horizontal = 20.dp, vertical = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Icon(Icons.Outlined.Home, null, tint = c.primary)
+        Text(
+            "This runs $howLong past your ${shortTime(night.dueAt)} curfew. " +
+                if (canAsk) "$who will be asked, and can approve it or pick another end time." else "It runs past the stay-in time (${formatTime(night.endsAt)}), so end it earlier.",
+            style = MaterialTheme.typography.bodyLarge,
+        )
+    }
+}
+
+private val NUMBER_WORDS = mapOf(2 to "Two", 3 to "Three", 4 to "Four", 5 to "Five", 6 to "Six", 7 to "Seven", 8 to "Eight", 9 to "Nine", 10 to "Ten")
+
+/**
+ * The tasks a plan runs into (mockup 58): move them all to after the plan, pick new times one by one, or keep them as
+ * they are. A Dominant's choices apply at once; a sub's go out as one request.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun Clashes(items: List<Occurrence>, plan: ClashPlan, form: ClashForm, session: Session) {
+private fun ClashSheet(
+    e: CalendarEvent,
+    items: List<Occurrence>,
+    plan: ClashPlan,
+    form: ClashForm,
+    session: Session,
+    busy: Boolean,
+    vm: PlanViewModel,
+    onDismiss: () -> Unit,
+    onChanged: () -> Unit,
+    onChange: (() -> Unit)?,
+) {
+    val c = MaterialTheme.colorScheme
+    var pickingTimes by remember { mutableStateOf(false) }
     var picking by remember { mutableStateOf<Occurrence?>(null) }
-    if (items.isEmpty()) return
-    val isDom = plan.isDom
-    val subBlocked = plan.subBlocked
-    val choices = form.choices
-    val times = form.times
-    fun canMove(o: Occurrence) = plan.canMove(o)
-    fun canAct(o: Occurrence) = plan.canAct(o)
-    fun choiceOf(o: Occurrence) = plan.choiceOf(o)
-    fun timeOf(o: Occurrence) = plan.timeOf(o)
-    val picked = plan.picked
-    val asks = plan.asks
-    val actionable = plan.actionable
-    val allMovable = plan.allMovable
-    fun allAre(c: ClashChoice) = plan.allAre(c)
-    fun setAll(c: ClashChoice) = plan.setAll(c)
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.WarningAmber, null, tint = MaterialTheme.colorScheme.error)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                if (items.size == 1) "Overlaps a task" else "Overlaps ${items.size} tasks",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-        if (actionable.size > 1) {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val all = listOf(ClashChoice.Keep to "Keep all") +
-                    if (allMovable) listOf(ClashChoice.Move to "Move all after", ClashChoice.Cancel to if (isDom) "Call off all" else "Ask off all") else emptyList()
-                all.forEach { (c, label) ->
-                    ChoiceChip(
-                        selected = allAre(c),
-                        onClick = { setAll(c) },
-                        label = { Text(label) },
-                        leadingIcon = if (allAre(c)) ({ Icon(Icons.Filled.Check, null, Modifier.size(18.dp)) }) else null,
-                    )
-                }
-            }
-        }
-        items.forEach { o ->
-            val mine = o.assigneeId == session.userId
-            Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape = MaterialTheme.shapes.medium) {
-                Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Column {
-                        Text(o.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(
-                            "Due ${formatTime(o.dueAt)}" + if (mine) "" else " · ${session.nameOf(o.assigneeId)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+    val n = items.size
+    val dom = session.partners.firstOrNull { it.role == app.obey.api.Role.Dominant }?.displayName
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss, containerColor = c.surface, sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(bottom = 24.dp)) {
+            Text(if (n == 1) "A task falls during this plan" else "${NUMBER_WORDS[n] ?: n} tasks fall during this plan", style = MaterialTheme.typography.headlineLarge)
+            Text("${e.title} · ${e.whenLabel()}", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp, bottom = 8.dp))
+            items.forEach { o ->
+                val mine = o.assigneeId == session.userId
+                Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        app.obey.ui.common.Diamond(app.obey.ui.common.DiamondState.Open, size = 16.dp)
+                        Column(Modifier.weight(1f)) {
+                            Text(o.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(formatTime(o.dueAt) + if (mine) "" else " · ${session.nameOf(o.assigneeId)}", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
+                        }
                     }
-                    if (canAct(o)) {
-                        val labels = listOf(ClashChoice.Keep to "Keep") +
-                            if (canMove(o)) listOf(ClashChoice.Move to "Move", ClashChoice.Cancel to if (isDom) "Call off" else "Ask off") else emptyList()
-                        PillRow(Modifier.fillMaxWidth()) {
-                            labels.forEachIndexed { i, (c, label) ->
-                                PillSegment(selected = choiceOf(o) == c, onClick = { choices[o.id] = c }) { Text(label, maxLines = 1) }
+                    if (pickingTimes && plan.canAct(o)) {
+                        FlowRow(Modifier.padding(start = 32.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            app.obey.ui.common.LettersChip("Keep", plan.choiceOf(o) == ClashChoice.Keep, { form.choices[o.id] = ClashChoice.Keep })
+                            if (plan.canMove(o)) {
+                                app.obey.ui.common.LettersChip("Move", plan.choiceOf(o) == ClashChoice.Move, { form.choices[o.id] = ClashChoice.Move })
+                                app.obey.ui.common.LettersChip(if (plan.isDom) "Call off" else "Ask off", plan.choiceOf(o) == ClashChoice.Cancel, { form.choices[o.id] = ClashChoice.Cancel })
                             }
                         }
-                        if (choiceOf(o) == ClashChoice.Move) {
-                            OutlinedButton(onClick = { picking = o }, modifier = Modifier.fillMaxWidth()) {
-                                Text("New deadline: ${formatDateTime(timeOf(o).iso())}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (plan.choiceOf(o) == ClashChoice.Move) {
+                            TextButton(onClick = { picking = o }, modifier = Modifier.padding(start = 20.dp)) {
+                                Text("New time: ${formatDateTime(plan.timeOf(o).iso())}", color = c.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
                 }
+                androidx.compose.material3.HorizontalDivider(color = c.outlineVariant)
             }
-        }
-        Text("Keep means the task is fine alongside the plan, and it stops counting as a clash.", style = MaterialTheme.typography.bodySmall)
-        if (subBlocked) Text("Only your Dominant can move or call off tasks in this dynamic.", style = MaterialTheme.typography.bodySmall)
-        if (picked.isNotEmpty() && asks) {
-            LettersField(form.reason, { form.reason = it.take(1000) }, label = { Text("Reason (optional)") }, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(20.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                val full = Modifier.fillMaxWidth().height(48.dp)
+                if (!pickingTimes) {
+                    if (plan.allMovable && plan.actionable.isNotEmpty()) {
+                        Button(onClick = { plan.moveAll(vm) { onChanged(); onDismiss() } }, enabled = !busy, modifier = full) { Text("Move ${if (n == 1) "it" else "them"} to after ${formatTime(e.endsAt)}") }
+                        OutlinedButton(
+                            onClick = { pickingTimes = true },
+                            modifier = full,
+                            shape = MaterialTheme.shapes.small,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, c.onSurface),
+                            colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = c.onSurface),
+                        ) { Text(if (n == 1) "Pick a new time" else "Pick new times one by one") }
+                    }
+                    if (plan.actionable.isNotEmpty()) {
+                        TextButton(onClick = { plan.keepAll(vm) { onChanged(); onDismiss() } }, enabled = !busy, modifier = full) { Text(if (n == 1) "Keep it as it is" else "Keep them as they are", color = c.onSurface) }
+                    }
+                } else {
+                    if (plan.picked.isNotEmpty() && plan.asks) LettersField(form.reason, { form.reason = it.take(1000) }, label = { Text("Reason (optional)") }, modifier = Modifier.fillMaxWidth())
+                    Button(onClick = { plan.apply(vm) { onChanged(); onDismiss() } }, enabled = !busy && plan.picked.isNotEmpty(), modifier = full) {
+                        Text((if (plan.asks) "Ask" else "Save") + if (plan.picked.isNotEmpty()) " (${plan.picked.size})" else "")
+                    }
+                    TextButton(onClick = { pickingTimes = false; form.choices.clear() }, modifier = full) { Text("Back", color = c.onSurface) }
+                }
+            }
+            val asksAboutMoves = !plan.isDom && !plan.subBlocked && plan.policy != ReschedulePolicy.Allowance
+            if (asksAboutMoves && dom != null) Text("$dom is asked about any move, unless your dynamic lets you.", style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 12.dp))
+            if (plan.subBlocked) Text("Only ${dom ?: "your Dominant"} can move tasks in this dynamic.", style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 12.dp))
+            if (onChange != null) TextButton(onClick = onChange, modifier = Modifier.fillMaxWidth()) { Text("Change the plan", color = c.onSurface) }
         }
     }
     picking?.let { o ->
-        DeadlinePicker(timeOf(o), onPicked = { times[o.id] = it; picking = null }, onDismiss = { picking = null })
+        DeadlinePicker(plan.timeOf(o), onPicked = { form.times[o.id] = it; picking = null }, onDismiss = { picking = null })
     }
 }
 
@@ -704,60 +813,6 @@ private fun EndsAtCurfew(dueAt: String) {
             Column {
                 Text("Ends at curfew", style = MaterialTheme.typography.titleSmall)
                 Text("Curfew that night is ${formatTime(dueAt)}.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-/** A plan of mine running past one of my curfew nights: end it at curfew, or ask for that night's curfew to move to its end. */
-@Composable
-private fun CurfewWarning(
-    night: app.obey.api.CurfewCheckNight,
-    end: Instant,
-    asking: Boolean,
-    reason: String,
-    who: String,
-    onAsking: (Boolean) -> Unit,
-    onReason: (String) -> Unit,
-    onEndAtCurfew: () -> Unit,
-) {
-    val due = parseInstant(night.dueAt)
-    val canAsk = end.isBefore(parseInstant(night.endsAt))
-    val past = java.time.Duration.between(due, end).toMinutes()
-    val howLong = when {
-        past < 60 -> "$past min"
-        past == 60L -> "an hour"
-        past % 60 == 0L -> "${past / 60} hours"
-        else -> "${past / 60} h ${past % 60} min"
-    }
-    val nightName = due.minusSeconds(12 * 3600).local().format(java.time.format.DateTimeFormatter.ofPattern("EEEE"))
-    val c = MaterialTheme.colorScheme
-    Box(Modifier.fillMaxWidth()) {
-        Column(Modifier.fillMaxWidth().drawBehind { drawRect(c.error, size = androidx.compose.ui.geometry.Size(2.dp.toPx(), size.height)) }.padding(start = 16.dp, top = 2.dp, bottom = 2.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row {
-                Icon(Icons.Outlined.Bedtime, null, tint = c.error)
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text("Runs $howLong past curfew", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        "Curfew $nightName is ${formatTime(night.dueAt)}." + if (canAsk) "" else " It runs past the stay-in time (${formatTime(night.endsAt)}), so end it earlier.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-            }
-            PillRow(Modifier.fillMaxWidth()) {
-                val n = if (canAsk) 2 else 1
-                PillSegment(selected = false, onClick = onEndAtCurfew) { Text("End at ${formatTime(night.dueAt)}", maxLines = 1) }
-                if (canAsk) PillSegment(selected = asking, onClick = { onAsking(!asking) }) {
-                    Text("Ask until ${formatTime(end.toString())}", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            if (asking && canAsk) {
-                LettersField(reason, { onReason(it.take(280)) }, label = { Text("Tell $who why (optional)") }, modifier = Modifier.fillMaxWidth())
-                Text(
-                    "$who is asked to move $nightName's curfew to ${formatTime(end.toString())}. The plan is saved either way; if $who says no, curfew stays at ${formatTime(night.dueAt)}.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
             }
         }
     }

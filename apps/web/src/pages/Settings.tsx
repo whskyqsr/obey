@@ -172,7 +172,7 @@ function SettingsList() {
             onChange={(blur) => (blur ? updateMe.mutate({ revealProofs: false }, { onError: (e) => snack(errorMessage(e)) }) : setConfirmReveal(true))}
             label="Blur proof photos"
           />
-          <ValueRow label="Theme and accent" value={{ system: "System", light: "Light", dark: "Dark" }[theme.mode]} to="/settings/look" />
+          <ValueRow label="Theme and accent" value={{ system: "Like my phone", light: "Light", dark: "Dark" }[theme.mode]} to="/settings/look" />
         </Rows>
 
         <Eyebrow>This dynamic</Eyebrow>
@@ -368,9 +368,9 @@ function LookSection() {
           value={theme.mode}
           onChange={theme.setMode}
           options={[
-            { value: "system", label: "System", icon: "brightness_auto" },
-            { value: "light", label: "Light", icon: "light_mode" },
-            { value: "dark", label: "Dark", icon: "dark_mode" },
+            { value: "light", label: "Light" },
+            { value: "dark", label: "Dark" },
+            { value: "system", label: "Like my phone" },
           ]}
         />
       </div>

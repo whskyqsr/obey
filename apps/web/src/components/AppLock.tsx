@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { signOut } from "../auth/session";
 import { checkPin, clearPin, setLockAfter, setPin, useLockConfig } from "../lib/appLock";
-import { Button, Dialog, Icon, SegmentedButtons, Switch, TextField, cx, useSnackbar } from "./ui";
+import { Button, Diamond, Dialog, Icon, SegmentedButtons, Switch, TextField, cx, useSnackbar } from "./ui";
 
 const MAX_TRIES = 5;
 
@@ -64,9 +64,11 @@ function LockScreen({ uid, onUnlock }: { uid: string; onUnlock(): void }) {
     setPinText((p) => (p.length < 8 ? p + d : p));
   };
 
+  // Mockup 39: a diamond per digit (four, or more once a longer PIN is typed), then a keypad of serif numbers.
+  const dots = Math.max(4, pin.length);
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-surface p-6">
-      <Icon name="lock" size={40} className="text-primary" />
+      <Icon name="lock" size={32} className="text-on-surface-variant" />
       <h1 className="font-serif text-[36px] leading-tight text-on-surface">Enter your PIN</h1>
       <form
         className="flex flex-col items-center gap-4"
@@ -75,54 +77,50 @@ function LockScreen({ uid, onUnlock }: { uid: string; onUnlock(): void }) {
           void submit(pin);
         }}
       >
-        <input
-          autoFocus
-          aria-label="PIN"
-          type="password"
-          inputMode="numeric"
-          autoComplete="off"
-          value={pin}
-          disabled={waiting}
-          onChange={(e) => {
-            setError("");
-            setPinText(e.target.value.replace(/\D/g, "").slice(0, 8));
-          }}
-          className="h-14 w-56 rounded-md border border-outline bg-transparent text-center text-headline-small tracking-[0.5em] text-on-surface outline-none focus:border-2 focus:border-primary"
-        />
+        <label className="flex gap-5 py-2" aria-label="PIN">
+          {Array.from({ length: dots }, (_, i) => (
+            <Diamond key={i} state={i < pin.length ? "done" : "open"} size={16} />
+          ))}
+          <input
+            autoFocus
+            aria-label="PIN"
+            type="password"
+            inputMode="numeric"
+            autoComplete="off"
+            value={pin}
+            disabled={waiting}
+            onChange={(e) => {
+              setError("");
+              setPinText(e.target.value.replace(/\D/g, "").slice(0, 8));
+            }}
+            className="sr-only"
+          />
+        </label>
         <div className="h-5 text-body-medium text-error">{waiting ? `Too many tries. Wait ${Math.ceil((waitUntil - now) / 1000)} s.` : error}</div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-x-10 gap-y-3">
           {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
-            <button
-              key={d}
-              type="button"
-              onClick={() => press(d)}
-              className="state-layer size-16 rounded-full bg-surface-container-high text-headline-small text-on-surface"
-            >
+            <button key={d} type="button" onClick={() => press(d)} className="state-layer flex size-[72px] items-center justify-center rounded-full font-serif text-[40px] leading-none text-on-surface">
               {d}
             </button>
           ))}
           <button
-            type="button"
-            aria-label="Delete"
-            onClick={() => setPinText((p) => p.slice(0, -1))}
-            className="state-layer flex size-16 items-center justify-center rounded-full text-on-surface-variant"
-          >
-            <Icon name="backspace" />
-          </button>
-          <button
-            type="button"
-            onClick={() => press("0")}
-            className="state-layer size-16 rounded-full bg-surface-container-high text-headline-small text-on-surface"
-          >
-            0
-          </button>
-          <button
             type="submit"
             aria-label="Unlock"
             disabled={pin.length < 4 || waiting}
-            className="state-layer flex size-16 items-center justify-center rounded-full bg-primary text-on-primary disabled:opacity-40"
+            className="state-layer flex size-[72px] items-center justify-center rounded-full text-on-surface disabled:opacity-30"
           >
-            <Icon name="arrow_forward" />
+            <Icon name="arrow_forward" size={28} />
+          </button>
+          <button type="button" onClick={() => press("0")} className="state-layer flex size-[72px] items-center justify-center rounded-full font-serif text-[40px] leading-none text-on-surface">
+            0
+          </button>
+          <button
+            type="button"
+            aria-label="Delete"
+            onClick={() => setPinText((p) => p.slice(0, -1))}
+            className="state-layer flex size-[72px] items-center justify-center rounded-full text-on-surface"
+          >
+            <Icon name="backspace" size={28} />
           </button>
         </div>
       </form>
