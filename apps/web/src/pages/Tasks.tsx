@@ -74,7 +74,7 @@ export function TasksPage() {
               <button
                 type="button"
                 onClick={() => navigate({ to: "/tasks/$taskId", params: { taskId: t.id } })}
-                className="state-layer flex min-w-0 flex-1 items-center gap-3 py-3.5 text-left"
+                className="state-layer state-row flex min-w-0 flex-1 items-center gap-3 py-3.5 text-left"
               >
                 <span className="min-w-0 flex-1">
                   <span className={t.active ? "block truncate text-body-large text-on-surface" : "block truncate text-body-large text-on-surface-variant"}>

@@ -233,7 +233,7 @@ export function CalendarPage() {
                   type="button"
                   aria-expanded={open}
                   onClick={() => setOpenDay(open ? "" : d)}
-                  className="state-layer flex min-h-[68px] w-full items-center gap-4 py-2 text-left"
+                  className="state-layer state-row flex min-h-[68px] w-full items-center gap-4 py-2 text-left"
                 >
                   <span className="flex w-10 shrink-0 flex-col">
                     <span className="text-label-medium text-on-surface-variant">{fmtDate(d, { weekday: "short" })}</span>
@@ -297,7 +297,7 @@ export function CalendarPage() {
 function EventItem({ e, onOpen, large }: { e: CalendarEvent; onOpen(): void; large?: boolean }) {
   const { rel } = useRel();
   return (
-    <button type="button" onClick={onOpen} className={cx("state-layer flex w-full text-left", large ? "border-b border-outline-variant py-3" : "py-1")}>
+    <button type="button" onClick={onOpen} className={cx("state-layer state-row flex w-full text-left", large ? "border-b border-outline-variant py-3" : "py-1")}>
       <span className={cx("min-w-0 flex-1 border-l-2", planTone(e, rel).rule, large ? "pl-4" : "pl-2")}>
         <span className={cx("line-clamp-2 block break-words text-on-surface", large ? "text-body-large" : "text-body-small")}>{e.title}</span>
         <span className={cx("block text-on-surface-variant", large ? "text-body-medium" : "text-label-small")}>
@@ -324,7 +324,7 @@ function DayRow({ o, clash, onOpen }: { o: Occurrence; clash?: boolean; onOpen()
     <button
       type="button"
       onClick={onOpen}
-      className="state-layer flex w-full items-center gap-4 border-b border-outline-variant py-3.5 text-left last:border-b-0"
+      className="state-layer state-row flex w-full items-center gap-4 border-b border-outline-variant py-3.5 text-left last:border-b-0"
     >
       <Diamond state={dayState(o)} size={16} />
       <span className="min-w-0 flex-1 text-body-large break-words text-on-surface">{o.title}</span>
@@ -377,7 +377,7 @@ function ColumnItem({ o, clash, onOpen }: { o: Occurrence; clash?: boolean; onOp
 function WeekItem({ o, clash, onOpen }: { o: Occurrence; clash?: boolean; onOpen(): void }) {
   const state = dayState(o);
   return (
-    <button type="button" onClick={onOpen} className="state-layer flex w-full items-center gap-3 py-1.5 text-left">
+    <button type="button" onClick={onOpen} className="state-layer state-row flex w-full items-center gap-3 py-1.5 text-left">
       <Diamond state={state} size={11} className="shrink-0" />
       <span className={cx("min-w-0 flex-1 text-body-medium break-words", state === "done" || state === "off" ? "text-on-surface-variant" : "text-on-surface")}>
         {o.title}

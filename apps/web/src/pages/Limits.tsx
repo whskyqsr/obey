@@ -195,7 +195,7 @@ function Rows({ rows, names, onOpen }: { rows: LimitRow[]; names: string[]; onOp
                 key={`${r.item.key}-${r.side}`}
                 type="button"
                 onClick={() => onOpen(r.item)}
-                className="state-layer flex min-h-14 w-full items-center gap-3 py-3 text-left"
+                className="state-layer state-row flex min-h-14 w-full items-center gap-3 py-3 text-left"
               >
                 <span className="min-w-0 flex-1">
                   <span className="block text-body-large text-on-surface">{r.text}</span>

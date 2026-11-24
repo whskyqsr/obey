@@ -151,7 +151,7 @@ export function Row({
     <Comp
       type={onClick ? "button" : undefined}
       onClick={onClick}
-      className={cx("flex min-h-16 w-full items-center gap-4 py-3.5 text-left", onClick && "state-layer")}
+      className={cx("flex min-h-16 w-full items-center gap-4 py-3.5 text-left", onClick && "state-layer state-row")}
     >
       {leading}
       <span className="min-w-0 flex-1">
@@ -225,7 +225,7 @@ export function DynamicPage() {
                 <button
                   type="button"
                   onClick={() => setEditingDate({ id: "", label: "", date: "" })}
-                  className="state-layer py-3.5 text-left text-body-large text-primary"
+                  className="state-layer state-row py-3.5 text-left text-body-large text-primary"
                 >
                   Add a date
                 </button>
@@ -449,7 +449,7 @@ export function PeoplePage() {
                 }}
               />
             ))}
-          <button type="button" onClick={() => void navigate({ to: "/onboarding" })} className="state-layer py-3.5 text-left text-body-large text-primary">
+          <button type="button" onClick={() => void navigate({ to: "/onboarding" })} className="state-layer state-row py-3.5 text-left text-body-large text-primary">
             Join or start another
           </button>
         </Group>

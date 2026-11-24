@@ -103,7 +103,7 @@ export function RuleLogPage() {
         {log.data && !!log.data.length && !shown.length && <p className="py-6 text-body-medium text-on-surface-variant">Nothing logged here.</p>}
         {shown.map((e) => (
           <li key={e.id}>
-            <button type="button" onClick={() => setOpen(e)} className="state-layer flex w-full items-start gap-3 py-4 text-left">
+            <button type="button" onClick={() => setOpen(e)} className="state-layer state-row flex w-full items-start gap-3 py-4 text-left">
               <div className="min-w-0 flex-1">
                 <div className="font-serif text-[26px] leading-tight text-on-surface">{e.title}</div>
                 <div className="mt-1 text-body-medium text-on-surface-variant">

@@ -23,6 +23,7 @@ These rules are binding for every change to the web or Android UI. The approved 
 - Paper `--md-surface` and ink `--md-on-surface`. Oxblood (or the chosen accent) is the only accent. Use theme tokens and never raw colours. The only exceptions are maps, Safe call and the Limits chart, which are allowlisted in the check.
 - Instrument Serif is for anything human: page titles, names, dates, quoted words and big numbers. Geist is for controls and labels.
 - Use hairlines (`border-outline-variant`, `HorizontalDivider`) instead of cards, filled boxes or bordered panels. Menus, dialogs, sheets and popovers may have a surface and border. List content may not.
+- A tappable row between hairlines keeps its text on the page edge, and its hover or pressed highlight reaches 12px (web) or 12dp (Android) past the text on each side with a small radius, so it never sits tight against the words. On web that is `state-layer state-row`; on Android, put `clickable` before the row's padding so the ripple includes it. (Jake, 2026-11-24.)
 - The diamond is the checkbox and the active marker: open, filled when done, accent when missed or owed, half when waiting. Don't use dots, ticks or strikethrough for task state.
 - Form fields are Letters fields: a small label above, the value, and one hairline under it. On web that's the `ui.tsx` fields (`data-field`). On Android it's `LettersField`. Never use a boxed or outlined field, and never put a focus ring around a field.
 - Material icons stay. A down arrow appears only where a menu expands.

@@ -45,7 +45,7 @@ export function TaskHistory({ taskId }: { taskId: string }) {
                   type="button"
                   disabled={!isDom || h.status === "cancelled"}
                   onClick={() => setEditing(h)}
-                  className="state-layer flex w-full items-center gap-3 py-4 text-left disabled:cursor-default"
+                  className="state-layer state-row flex w-full items-center gap-3 py-4 text-left disabled:cursor-default"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="text-body-large text-on-surface">

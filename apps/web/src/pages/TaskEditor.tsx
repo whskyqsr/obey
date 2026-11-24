@@ -381,7 +381,7 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
       key={key}
       type="button"
       onClick={onClick}
-      className="state-layer flex w-full items-center gap-3 border-b border-outline-variant py-3.5 text-left last:border-b-0"
+      className="state-layer state-row flex w-full items-center gap-3 border-b border-outline-variant py-3.5 text-left last:border-b-0"
     >
       <span className="min-w-0 flex-1">
         <span className={cx("block text-body-large", on ? "text-on-surface" : "text-on-surface-variant")}>{label}</span>

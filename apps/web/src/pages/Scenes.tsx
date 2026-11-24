@@ -116,7 +116,7 @@ function SceneRow({ s }: { s: Scene }) {
     .filter(Boolean)
     .join(" · ");
   return (
-    <Link to="/scenes/$sceneId" params={{ sceneId: s.id }} className="state-layer flex flex-col gap-1 py-5">
+    <Link to="/scenes/$sceneId" params={{ sceneId: s.id }} className="state-layer state-row flex flex-col gap-1 py-5">
       <span className="font-serif text-[30px] leading-9 text-on-surface">{sceneName(s)}</span>
       <span className="text-body-large text-on-surface-variant">{line}</span>
     </Link>

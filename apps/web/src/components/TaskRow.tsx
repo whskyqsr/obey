@@ -94,7 +94,7 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
     <div
       data-row
       className={cx(
-        "group/row state-layer flex min-h-16 items-center gap-2 py-1 pr-1 pl-0 has-[a[data-card-link]:focus-visible]:outline-2 has-[a[data-card-link]:focus-visible]:-outline-offset-2 has-[a[data-card-link]:focus-visible]:outline-primary",
+        "group/row state-layer state-row flex min-h-16 items-center gap-2 py-1 pr-1 pl-0 has-[a[data-card-link]:focus-visible]:outline-2 has-[a[data-card-link]:focus-visible]:-outline-offset-2 has-[a[data-card-link]:focus-visible]:outline-primary",
         current && "bg-surface-container-lowest",
       )}
     >

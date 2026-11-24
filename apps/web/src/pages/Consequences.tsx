@@ -80,7 +80,7 @@ export function ConsequencesPage() {
                   type="button"
                   disabled={!isDom}
                   onClick={() => setEditing(c)}
-                  className="state-layer flex min-w-0 flex-1 flex-col py-3 text-left disabled:cursor-default"
+                  className="state-layer state-row flex min-w-0 flex-1 flex-col py-3 text-left disabled:cursor-default"
                 >
                   <span className="text-body-large text-on-surface">{c.title}</span>
                   {notes.length > 0 && <span className="line-clamp-2 text-body-medium whitespace-pre-wrap text-on-surface-variant">{notes.join(" · ")}</span>}
