@@ -11,10 +11,10 @@ def dump():
     return ET.fromstring("<x/>")
 def anr():
     # The emulator's launcher sometimes stalls on a cold boot; wave its "isn't responding" dialog away.
-    for _ in range(3):
+    for i in range(8):
         r = adb("shell", "uiautomator", "dump", "/sdcard/a.xml"); x = adb("shell", "cat", "/sdcard/a.xml").stdout.decode("utf8", "ignore")
         if "isn't responding" not in x: return
-        m = re.search(r'text="Wait"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', x)
+        m = re.search(r'text="%s"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"' % ("Wait" if i < 2 else "Close app"), x)
         if m: a, b, c, d = map(int, m.groups()); adb("shell", "input", "tap", str((a + c) // 2), str((b + d) // 2))
         else: adb("shell", "input", "keyevent", "4")
         time.sleep(2)
@@ -43,9 +43,10 @@ def home():
 def back(): adb("shell", "input", "keyevent", "4"); time.sleep(1.5)
 def scroll(): adb("shell", "input", "swipe", "540", "1700", "540", "500", "400"); time.sleep(1.2)
 def signin(uid):
+    adb("shell", "settings", "put", "global", "hide_error_dialogs", "1"); anr()
     adb("shell", "pm", "clear", PKG); adb("shell", "pm", "grant", PKG, "android.permission.POST_NOTIFICATIONS")
     adb("shell", "monkey", "-p", PKG, "-c", "android.intent.category.LAUNCHER", "1"); time.sleep(8)
-    anr(); shot("signin")
+    anr(); adb("shell", "monkey", "-p", PKG, "-c", "android.intent.category.LAUNCHER", "1"); time.sleep(4); anr(); shot("signin")
     for _ in range(4):
         if find("Dev user id (UUID)", exact=False) or find("Use dev user"): break
         scroll()
