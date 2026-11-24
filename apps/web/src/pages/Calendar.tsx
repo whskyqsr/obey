@@ -81,20 +81,22 @@ export function CalendarPage() {
       <PageHeader
         hero
         title={heading}
+        // Phones keep the icons in the header row; desktop puts All tasks with the rest so it doesn't sit on a row of its own.
         tools={
-          <>
-            <IconButton icon="checklist" label="All tasks" onClick={() => void navigate({ to: "/tasks" })} />
-            {!desk && (
+          desk ? undefined : (
+            <>
+              <IconButton icon="checklist" label="All tasks" onClick={() => void navigate({ to: "/tasks" })} />
               <IconButton
                 icon={view === "month" ? "view_week" : "calendar_month"}
                 label={view === "month" ? "Show the week" : "Show the month"}
                 onClick={() => setView(view === "month" ? "week" : "month")}
               />
-            )}
-          </>
+            </>
+          )
         }
         actions={
           <>
+            {desk && <IconButton icon="checklist" label="All tasks" onClick={() => void navigate({ to: "/tasks" })} className="mr-1" />}
             {view === "week" && heading !== range && <span className="mr-1 text-body-large text-on-surface-variant">{range}</span>}
             <IconButton icon="chevron_left" label={view === "month" ? "Previous month" : "Previous week"} onClick={() => step(-1)} />
             <IconButton icon="chevron_right" label={view === "month" ? "Next month" : "Next week"} onClick={() => step(1)} />

@@ -181,3 +181,23 @@ fun AccentBox(modifier: Modifier = Modifier, content: @Composable ColumnScope.()
 /** A rule down the left edge, the way plans and status lines carry their tone. */
 fun Modifier.sideRule(color: Color): Modifier =
     drawBehind { drawRect(color, size = androidx.compose.ui.geometry.Size(2.dp.toPx(), size.height)) }.padding(start = 16.dp)
+
+/** The Letters switch: an ink track when on, as on the web. Use it in place of Material's, whose track is the oxblood accent. */
+@Composable
+fun Switch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    val c = MaterialTheme.colorScheme
+    androidx.compose.material3.Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        modifier = modifier,
+        enabled = enabled,
+        colors = androidx.compose.material3.SwitchDefaults.colors(
+            checkedTrackColor = c.onSurface,
+            checkedThumbColor = c.surface,
+            checkedBorderColor = c.onSurface,
+            uncheckedThumbColor = c.outlineVariant,
+            uncheckedTrackColor = c.surfaceContainerLowest,
+            uncheckedBorderColor = c.outline,
+        ),
+    )
+}

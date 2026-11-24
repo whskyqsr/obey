@@ -347,6 +347,7 @@ function Editor({ task, readOnly, defaultAssignee, start }: { task?: Task; readO
         </span>
         <input
           aria-label="Title"
+          data-field
           size={1}
           value={form.title}
           onChange={(e) => set({ title: e.target.value })}
