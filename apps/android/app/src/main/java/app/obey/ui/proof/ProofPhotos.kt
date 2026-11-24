@@ -1,5 +1,6 @@
 package app.obey.ui.proof
 
+import androidx.compose.material.icons.outlined.Check
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
@@ -200,22 +201,26 @@ private fun PhotoViewer(
     if (reporting) ReportDialog(photo = true, onDismiss = { reporting = false }, onSubmit = { r, d -> onReport(r, d); reporting = false })
 }
 
-/** Reports go to the people running Fealty, never to the partner. */
+/** Reports go to the people running Fealty, never to the partner (mockup 93). */
 @Composable
 fun ReportDialog(photo: Boolean, onDismiss: () -> Unit, onSubmit: (ReportReason, String) -> Unit) {
     var reason by remember { mutableStateOf(ReportReason.Other) }
     var details by remember { mutableStateOf("") }
+    val c = MaterialTheme.colorScheme
+    val order = listOf(ReportReason.NonConsensual, ReportReason.Minor, ReportReason.Illegal, ReportReason.Other)
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (photo) "Report this photo" else "Report") },
+        containerColor = c.surface,
+        title = { Text("What's wrong?", style = MaterialTheme.typography.headlineMedium) },
         text = {
             Column {
-                Text("Reports go to the Fealty team, not to your partner.", style = MaterialTheme.typography.bodyMedium)
-                ReportReason.entries.forEach { r ->
-                    Row(Modifier.fillMaxWidth().clickable { reason = r }.padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(selected = reason == r, onClick = { reason = r })
-                        Text(r.label)
+                Text("Reports go to the Fealty team, not to your partner.", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
+                order.forEach { r ->
+                    Row(Modifier.fillMaxWidth().clickable { reason = r }.padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        app.obey.ui.common.Diamond(if (reason == r) app.obey.ui.common.DiamondState.Done else app.obey.ui.common.DiamondState.Open, size = 14.dp)
+                        Text(r.label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 16.dp))
                     }
+                    androidx.compose.material3.HorizontalDivider(color = c.outlineVariant)
                 }
                 LettersField(
                     value = details,
@@ -226,34 +231,40 @@ fun ReportDialog(photo: Boolean, onDismiss: () -> Unit, onSubmit: (ReportReason,
             }
         },
         confirmButton = { Button(onClick = { onSubmit(reason, details) }) { Text("Report") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = c.onSurface) } },
     )
 }
 
-/** The one-time 18+ and rules check before a first proof photo. Both boxes, no way around them. */
+/** The one-time 18+ and rules check before a first proof photo (mockup 92). Both boxes, no way around them. */
 @Composable
 fun ProofTermsDialog(onDismiss: () -> Unit, onAgree: () -> Unit) {
     var adult by remember { mutableStateOf(false) }
     var rules by remember { mutableStateOf(false) }
+    val c = MaterialTheme.colorScheme
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Before your first photo") },
+        containerColor = c.surface,
+        title = { Text("Before your first photo", style = MaterialTheme.typography.headlineMedium) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Proof photos are seen only by the people in this dynamic. You can delete yours at any time, and either of you can report a photo.")
-                Text("Never share anything showing someone under 18, anyone who hasn't agreed to be in it, or anything illegal. Breaking these rules gets an account removed.")
-                Row(Modifier.fillMaxWidth().clickable { adult = !adult }, verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(adult, { adult = it })
-                    Text("I'm 18 or older")
+                Text("Proof photos are only for you and your partner. They're blurred until opened and deleted after the time your dynamic set.", color = c.onSurfaceVariant)
+                listOf("Only photos of yourself, with consent", "Nothing illegal, nobody under 18", "Either of you can report a photo to the Fealty team").forEach { t ->
+                    Row {
+                        androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.Check, null, Modifier.padding(top = 2.dp, end = 10.dp).size(16.dp), tint = c.primary)
+                        Text(t, style = MaterialTheme.typography.bodyLarge)
+                    }
                 }
-                Row(Modifier.fillMaxWidth().clickable { rules = !rules }, verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(rules, { rules = it })
-                    Text("I'll follow these rules")
+                listOf(Triple("I'm 18 or older", adult) { v: Boolean -> adult = v }, Triple("I'll follow these rules", rules) { v: Boolean -> rules = v }).forEach { (label, on, set) ->
+                    Row(Modifier.fillMaxWidth().clickable { set(!on) }, verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(on, { set(it) }, colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = c.onSurface, checkmarkColor = c.surface))
+                        Text(label, style = MaterialTheme.typography.bodyLarge)
+                    }
+                    androidx.compose.material3.HorizontalDivider(color = c.outlineVariant)
                 }
             }
         },
         confirmButton = { Button(onClick = onAgree, enabled = adult && rules) { Text("Agree") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Not now") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Not now", color = c.onSurface) } },
     )
 }
 

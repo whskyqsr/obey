@@ -322,7 +322,7 @@ private data class Draft(
  * Adds, edits or shows a plan on the shared calendar. Either partner adds plans and each changes only their own.
  * Tasks due during the plan are listed with a one-tap reschedule, as on the web.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onChanged: () -> Unit) {
     val vm: PlanViewModel = hiltViewModel(key = "plan-${event?.id ?: "new"}")
