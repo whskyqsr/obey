@@ -55,8 +55,23 @@ export const libraryRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         title: item.title,
       });
     }
-    const push = { title: "Fealty", body: `${by.displayName} ${verb} a ${kind}`, data: { type: "library_changed", kind: kinds } };
-    await sendWithWords(db, notifier, others, push, { ...push, body: `${by.displayName} ${verb} the ${kind} “${item.title}”` });
+    // One notification per dynamic that counts what's changed since they last looked, so setting up twenty rules
+    // (or fixing one three times) doesn't arrive as twenty pushes.
+    for (const userId of others) {
+      const waiting = await db
+        .select({ kind: libraryChanges.kind })
+        .from(libraryChanges)
+        .where(and(eq(libraryChanges.userId, userId), eq(libraryChanges.relationshipId, relationshipId)));
+      const tag = `library:${relationshipId}`;
+      if (waiting.length > 1) {
+        const both = new Set(waiting.map((w) => w.kind)).size > 1;
+        const data = { type: "library_changed", kind: both ? "rules" : waiting[0]!.kind };
+        await notifier.send([userId], { title: "Fealty", body: `${by.displayName} made ${waiting.length} changes to ${both ? "rules and protocols" : waiting[0]!.kind}`, data, tag });
+        continue;
+      }
+      const push = { title: "Fealty", body: `${by.displayName} ${verb} a ${kind}`, data: { type: "library_changed", kind: kinds }, tag };
+      await sendWithWords(db, notifier, [userId], push, { ...push, body: `${by.displayName} ${verb} the ${kind} “${item.title}”` });
+    }
   };
 
   app.get<{ Params: { id: string } }>("/relationships/:id/library-changes", async (req) => {

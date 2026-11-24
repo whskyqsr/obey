@@ -7,7 +7,7 @@ import type { Deps } from "../app.js";
 import type { Tx } from "../db/index.js";
 import { blocks, consequences, devices, invites, memberships, relationships, rewards, rules, taskSeries, users } from "../db/schema.js";
 import { HttpError, notFound } from "../errors.js";
-import { managers, membership, requireManager, requireMember } from "../services/access.js";
+import { membership, requireManager, requireMember } from "../services/access.js";
 import { deleteAccount, endRelationship } from "../services/account.js";
 import { openSwaps, swapDto } from "../services/roleSwaps.js";
 
@@ -316,7 +316,9 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
       await tx.insert(memberships).values({ relationshipId: invite.relationshipId, userId: req.user.id, role });
       return invite.relationshipId;
     });
-    await deps.notifier.send(await managers(db, relId, req.user.id), {
+    // Everyone already in the dynamic hears, whoever sent the invite.
+    const already = (await db.select({ id: memberships.userId }).from(memberships).where(eq(memberships.relationshipId, relId))).map((m) => m.id).filter((id) => id !== req.user.id);
+    await deps.notifier.send(already, {
       title: "Fealty",
       body: `${req.user.displayName} joined`,
       data: { type: "member_joined", relationshipId: relId },

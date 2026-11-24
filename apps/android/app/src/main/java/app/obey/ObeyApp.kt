@@ -21,6 +21,12 @@ class ObeyApp : Application() {
             getString(R.string.notification_channel_quiet_name),
             NotificationManager.IMPORTANCE_LOW,
         )
-        getSystemService(NotificationManager::class.java).createNotificationChannels(listOf(channel, quiet))
+        // Safe calls: sound even in quiet hours, shown as a heads-up.
+        val urgent = NotificationChannel(
+            getString(R.string.notification_channel_urgent),
+            getString(R.string.notification_channel_urgent_name),
+            NotificationManager.IMPORTANCE_HIGH,
+        )
+        getSystemService(NotificationManager::class.java).createNotificationChannels(listOf(channel, quiet, urgent))
     }
 }

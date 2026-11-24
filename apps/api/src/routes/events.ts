@@ -73,6 +73,9 @@ function clock(at: Date, zone: string | null | undefined) {
   }
 }
 
+/** Every notification about one plan (or one repeating plan) shares a tag, so the latest replaces the rest. */
+const planTag = (e: { id: string; seriesId: string | null }) => `plan:${e.seriesId ?? e.id}`;
+
 export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   const { db, notifier } = deps;
 
@@ -95,19 +98,22 @@ export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       .select({ userId: memberships.userId })
       .from(memberships)
       .where(and(eq(memberships.relationshipId, e.relationshipId), ne(memberships.userId, e.authorId)));
-    const due = clashes(e, await pendingBetween(db, e.relationshipId, e.startsAt, e.endsAt));
     const asks = e.pauseStatus === "asked";
-    for (const { userId } of others) {
-      const theirs = asks || e.pauseStatus === "approved" ? 0 : due.filter((o) => o.assigneeId === userId).length;
-      const what = `${repeating ? "a repeating plan" : "a plan"} on the calendar`;
-      await notifier.send([userId], {
-        title: "Fealty",
-        body: asks
-          ? `${authorName} ${verb} ${what} and asks to pause tasks during ${e.title}`
-          : `${authorName} ${verb} ${what}${theirs ? `; it overlaps ${theirs === 1 ? "one of your tasks" : `${theirs} of your tasks`}` : ""}`,
-        data: { type: "event_changed", eventId: e.id },
-      });
-    }
+    const what = `${repeating ? "a repeating plan" : "a plan"} on the calendar`;
+    // One notification per plan: moving it again replaces the last one instead of adding another.
+    const push = {
+      title: "Fealty",
+      body: asks ? `${authorName} ${verb} ${what} and asks to pause tasks during it` : `${authorName} ${verb} ${what}`,
+      data: { type: "event_changed", eventId: e.id },
+      tag: planTag(e),
+    };
+    await sendWithWords(
+      db,
+      notifier,
+      others.map((o) => o.userId),
+      push,
+      asks ? { ...push, body: `${authorName} ${verb} ${what} and asks to pause tasks during ${e.title}` } : null,
+    );
   }
 
   /** Events overlapping the dates (inclusive), padded a day each side like occurrences since dates are local. */
@@ -197,12 +203,10 @@ export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         const [rel] = await db.select({ curfew: relationships.curfew }).from(relationships).where(eq(relationships.id, found.relationshipId));
         const [author] = await db.select({ timezone: users.timezone }).from(users).where(eq(users.id, found.authorId));
         const at = clock(end, author?.timezone ?? rel?.curfew?.timezone);
-        const push = {
-          title: "Fealty",
-          body: `${req.user.displayName} changed ${found.title}: it now ends at ${at}${movesCurfew ? `, and curfew moves to ${at} that night` : ""}`,
-          data: { type: "event_changed", eventId: found.id },
-        };
-        await sendWithWords(db, notifier, [found.authorId], push, e!.changeNote ? { ...push, body: `${push.body}. “${e!.changeNote}”` } : null);
+        const tail = `: it now ends at ${at}${movesCurfew ? `, and curfew moves to ${at} that night` : ""}`;
+        const push = { title: "Fealty", body: `${req.user.displayName} changed your plan${tail}`, data: { type: "event_changed", eventId: found.id }, tag: planTag(found) };
+        const words = `${req.user.displayName} changed ${found.title}${tail}${e!.changeNote ? `. “${e!.changeNote}”` : ""}`;
+        await sendWithWords(db, notifier, [found.authorId], push, { ...push, body: words });
       }
       return withConflicts(e!);
     }
@@ -362,11 +366,9 @@ export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       .update(calendarEvents)
       .set({ pauseStatus: approve ? "approved" : "declined", pauseDecidedBy: req.user.id, updatedAt: deps.now() })
       .where(inArray(calendarEvents.id, ids));
-    await notifier.send([e.authorId], {
-      title: "Fealty",
-      body: approve ? `${req.user.displayName} OK'd pausing your tasks during ${e.title}` : `${req.user.displayName} said no to pausing your tasks during ${e.title}`,
-      data: { type: "event_changed", eventId: e.id },
-    });
+    const said = approve ? "OK'd pausing your tasks during" : "said no to pausing your tasks during";
+    const push = { title: "Fealty", body: `${req.user.displayName} ${said} your plan`, data: { type: "event_changed", eventId: e.id }, tag: planTag(e) };
+    await sendWithWords(db, notifier, [e.authorId], push, { ...push, body: `${req.user.displayName} ${said} ${e.title}` });
     const [updated] = await db.select().from(calendarEvents).where(eq(calendarEvents.id, e.id));
     return withConflicts(updated!);
   });

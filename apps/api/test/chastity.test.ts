@@ -85,7 +85,7 @@ describe("chastity", () => {
     // Not back in time: the keyholder hears once; relocking closes the break.
     ctx.clock.now = new Date("2026-10-22T20:25:00Z");
     await runJobs(ctx.db, ctx.notifier, ctx.clock.now, opts);
-    expect(lastTo(domId)?.body).toMatch(/haven't relocked/);
+    expect(lastTo(domId)?.body).toMatch(/isn't back on/);
     const sent = ctx.notifier.sent.length;
     await runJobs(ctx.db, ctx.notifier, ctx.clock.now, opts);
     expect(ctx.notifier.sent.length).toBe(sent);
@@ -103,11 +103,11 @@ describe("chastity", () => {
     const rel1 = (await sub.post(`/chastity/${lockId}/asks`, { kind: "release", note: "Please" })).body;
     await dom.post(`/chastity/asks/${rel1.id}/decide`, { approve: false, note: "Saturday, if you're good" });
     // Discreet unless the wearer lets partners' words through.
-    expect(lastTo(subId)?.body).toMatch(/not yet to release$/);
+    expect(lastTo(subId)?.body).toMatch(/said no to releasing you$/);
     await sub.patch("/me", { notifyDetails: true });
     const rel1b = (await sub.post(`/chastity/${lockId}/asks`, { kind: "release" })).body;
     await dom.post(`/chastity/asks/${rel1b.id}/decide`, { approve: false, note: "Saturday, if you're good" });
-    expect(lastTo(subId)?.body).toMatch(/not yet to release: “Saturday, if you're good”$/);
+    expect(lastTo(subId)?.body).toMatch(/said no to releasing you: “Saturday, if you're good”$/);
     const rel2 = (await sub.post(`/chastity/${lockId}/asks`, { kind: "release" })).body;
     expect((await dom.post(`/chastity/asks/${rel2.id}/decide`, { approve: true })).body).toMatchObject({ status: "ended", endReason: "released" });
   });
@@ -136,7 +136,7 @@ describe("chastity", () => {
     await runJobs(ctx.db, ctx.notifier, ctx.clock.now, opts);
     expect(await endsAt()).toBe("2026-10-25T12:00:00.000Z");
     // The push says what the miss did, since there's no task to show for it.
-    expect(ctx.notifier.sent.some((n) => n.userIds.includes(subId) && n.push.body === "A task was missed, and 1 day was added to your lock")).toBe(true);
+    expect(ctx.notifier.sent.some((n) => n.userIds.includes(subId) && n.push.body === "You missed a task, and 1 day was added to your lock")).toBe(true);
     // No task for it: lock time isn't something to do.
     expect((await dom.get(`/relationships/${relId}/tasks`)).body.map((t: { title: string }) => t.title)).toEqual(["Write lines"]);
     await runJobs(ctx.db, ctx.notifier, ctx.clock.now, opts);

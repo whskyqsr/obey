@@ -269,7 +269,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     }
     const series = (await db.transaction((tx) => issueConsequence(tx, c, { ...body, createdBy: req.user.id }, deps.now())))!;
     if (series.assigneeId !== req.user.id)
-      await notifier.send([series.assigneeId], { title: "Fealty", body: "You've been given a consequence", data: { type: "task_assigned", taskId: series.id } });
+      await notifier.send([series.assigneeId], { title: "Fealty", body: `${req.user.displayName} gave you a consequence`, data: { type: "task_assigned", taskId: series.id } });
     reply.status(201);
     return taskDto(series);
   });
@@ -541,7 +541,8 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
           : submitted
             ? `${req.user.displayName} submitted a task for review`
             : `${req.user.displayName} completed a task`,
-        data: { type: submitted ? "occurrence_submitted" : "occurrence_completed", occurrenceId: occ.id },
+        // A low check-in has its own type, so muting "Done and reviewed" never mutes someone reaching out.
+        data: { type: low ? "mood_low" : submitted ? "occurrence_submitted" : "occurrence_completed", occurrenceId: occ.id },
       });
     }
     return occurrenceDto(updated, series);
@@ -551,12 +552,15 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const body = countBody.parse(req.body);
     const { occ, series, member } = await loadOccurrence(db, req.params.id, req.user.id);
     const updated = await db.transaction((tx) => countOccurrence(tx, series, occ, { userId: req.user.id, role: member.role }, body, deps.now()));
-    if (req.user.id === series.assigneeId && occ.status !== updated.status && (updated.status === "completed" || updated.status === "missed"))
-      await notifier.send(await managers(db, series.relationshipId, req.user.id), {
+    if (req.user.id === series.assigneeId && occ.status !== updated.status && (updated.status === "completed" || updated.status === "missed")) {
+      const done = updated.status === "completed";
+      const push = {
         title: "Fealty",
-        body: updated.status === "completed" ? `${req.user.displayName} completed a task` : `${req.user.displayName} went over on “${series.title}”`,
-        data: { type: updated.status === "completed" ? "occurrence_completed" : "occurrence_missed", occurrenceId: occ.id },
-      });
+        body: done ? `${req.user.displayName} completed a task` : `${req.user.displayName} went over on a task`,
+        data: { type: done ? "occurrence_completed" : "occurrence_missed", occurrenceId: occ.id },
+      };
+      await sendWithWords(db, notifier, await managers(db, series.relationshipId, req.user.id), push, done ? null : { ...push, body: `${req.user.displayName} went over on “${series.title}”` });
+    }
     return occurrenceDto(updated, series);
   });
 
@@ -605,11 +609,12 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         .returning();
       return u!;
     });
-    await notifier.send([series.assigneeId], {
+    const push = {
       title: "Fealty",
-      body: `${req.user.displayName} dropped “${title}” for “${series.title}”. It still counts as missed.`,
+      body: `${req.user.displayName} dropped a consequence. The task still counts as missed.`,
       data: { type: "consequence_dropped", occurrenceId: occ.id },
-    });
+    };
+    await sendWithWords(db, notifier, [series.assigneeId], push, { ...push, body: `${req.user.displayName} dropped “${title}” for “${series.title}”. It still counts as missed.` });
     return occurrenceDto(updated, series);
   });
 
@@ -626,11 +631,13 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       }
       return reviewed;
     });
-    await notifier.send([series.assigneeId], {
+    const push = {
       title: "Fealty",
-      body: body.approve ? "Your task was approved" : "Your task needs another try",
+      body: body.approve ? `${req.user.displayName} approved your task` : `${req.user.displayName} sent your task back`,
       data: { type: "occurrence_reviewed", occurrenceId: occ.id },
-    });
+    };
+    // The comment left with the review rides along for someone who lets partners' words onto their lock screen.
+    await sendWithWords(db, notifier, [series.assigneeId], push, body.comment ? { ...push, body: `${push.body}: “${body.comment}”` } : null);
     return occurrenceDto(updated, series);
   });
 
@@ -646,7 +653,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         data: { type: "reschedule_requested", requestId: result.request.id },
       });
     } else if (req.user.id !== series.assigneeId) {
-      await notifier.send([series.assigneeId], { title: "Fealty", body: "A deadline changed", data: { type: "rescheduled", occurrenceId: result.occurrence.id } });
+      await notifier.send([series.assigneeId], { title: "Fealty", body: `${req.user.displayName} changed a deadline`, data: { type: "rescheduled", occurrenceId: result.occurrence.id } });
     } else if (result.request.usedAllowance) {
       await tellDelay(rel, req.user, result.request.reason);
     }
@@ -717,7 +724,7 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       });
     }
     const changedFor = [...new Set(items.filter((it, i) => result.requests[i]!.status === "applied" && it.series.assigneeId !== req.user.id).map((it) => it.series.assigneeId))];
-    if (changedFor.length) await notifier.send(changedFor, { title: "Fealty", body: "Some of your tasks changed around a plan", data: { type: "rescheduled" } });
+    if (changedFor.length) await notifier.send(changedFor, { title: "Fealty", body: `${req.user.displayName} moved some of your tasks around a plan`, data: { type: "rescheduled" } });
     return {
       applied: result.asked === 0,
       groupId: result.groupId,
@@ -807,12 +814,13 @@ export const taskRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       decideReschedule(tx, request, req.user.id, approve, deps.now(), deps.materializeDays, { dueAt: dueAt ? new Date(dueAt) : undefined, item }),
     );
     const n = results.length;
-    const what = request.kind === "cancel" && n === 1 ? "request to call off a task" : `extension${n > 1 ? ` for ${n} tasks` : ""}`;
-    await notifier.send([request.requestedBy], {
+    const what = request.kind === "cancel" && n === 1 ? "calling off your task" : `your extension${n > 1 ? ` for ${n} tasks` : ""}`;
+    const push = {
       title: "Fealty",
-      body: dueAt && approve ? `${results[0]!.series.title} was rescheduled instead` : `Your ${what} was ${approve ? "approved" : "declined"}`,
+      body: dueAt && approve ? `${req.user.displayName} rescheduled your task instead` : `${req.user.displayName} ${approve ? "OK'd" : "said no to"} ${what}`,
       data: { type: "reschedule_decided", requestId: request.id },
-    });
+    };
+    await sendWithWords(db, notifier, [request.requestedBy], push, dueAt && approve ? { ...push, body: `${req.user.displayName} rescheduled ${results[0]!.series.title} instead` } : null);
     const dtos = results.map((x) => ({ request: rescheduleDto(x.request, x.series.title), occurrence: occurrenceDto(x.occurrence, x.series) }));
     // `request`/`occurrence` describe the one that was tapped; `requests`/`occurrences` cover its whole group.
     const tapped = dtos.find((d) => d.request.id === request.id) ?? dtos[0]!;

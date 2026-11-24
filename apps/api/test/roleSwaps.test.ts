@@ -70,7 +70,7 @@ describe("swapping roles", () => {
     const { dom, sub, relId, domId, subId } = await ctx.pair();
     await sub.post(`/relationships/${relId}/role-swap`, { pauseTasks: false });
     expect((await dom.del(`/relationships/${relId}/role-swap`)).status).toBe(204);
-    expect(lastTo(subId)?.body).toMatch(/declined/);
+    expect(lastTo(subId)?.body).toMatch(/said no to the role swap/);
     await sub.post(`/relationships/${relId}/role-swap`, {});
     await sub.del(`/relationships/${relId}/role-swap`);
     expect((await dom.get("/me")).body.relationships[0].roleSwap).toBeNull();

@@ -13,6 +13,11 @@ export interface Push {
   data?: Record<string, string>;
   /** Comes through quiet hours with sound; only for safe calls. */
   urgent?: boolean;
+  /**
+   * Pushes with the same tag replace each other on the device instead of stacking up, e.g. every edit to one plan.
+   * A replacement doesn't buzz again while the earlier one is still showing.
+   */
+  tag?: string;
 }
 
 export interface Notifier {
@@ -33,8 +38,10 @@ const CATEGORY: Record<string, NotifyCategory> = {
   rescheduled: "requests",
   occurrence_comment: "comments",
   note_comment: "comments",
+  scene_comment: "comments",
   task_assigned: "assigned",
   occurrence_edited: "assigned",
+  consequence_dropped: "assigned",
   rule_log: "assigned",
   library_changed: "assigned",
   event_changed: "plans",
@@ -106,6 +113,7 @@ export function isQuiet(q: { start: string; end: string; timezone: string } | nu
  */
 export function fcmMessages(rows: { token: string; platform: "android" | "web"; quiet?: boolean }[], push: Push): MulticastMessage[] {
   const messages: MulticastMessage[] = [];
+  const extra: Record<string, string> = { ...(push.tag && { tag: push.tag }), ...(push.urgent && { urgent: "1" }) };
   for (const quiet of [false, true]) {
     const mine = rows.filter((r) => !!r.quiet === quiet);
     const web = mine.filter((r) => r.platform === "web").map((r) => r.token);
@@ -115,11 +123,11 @@ export function fcmMessages(rows: { token: string; platform: "android" | "web"; 
         tokens: web,
         notification: { title: push.title, body: push.body },
         // Our service worker draws the notification, so it reads the flag from data.
-        data: quiet ? { ...push.data, quiet: "1" } : push.data,
+        data: { ...push.data, ...extra, ...(quiet && { quiet: "1" }) },
         ...(quiet && { webpush: { notification: { silent: true } } }),
       });
     }
-    if (android.length) messages.push({ tokens: android, data: { ...push.data, body: push.body, ...(quiet && { quiet: "1" }) }, android: { priority: "high" } });
+    if (android.length) messages.push({ tokens: android, data: { ...push.data, ...extra, body: push.body, ...(quiet && { quiet: "1" }) }, android: { priority: "high" } });
   }
   return messages;
 }
