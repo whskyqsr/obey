@@ -83,6 +83,7 @@ export const keys = {
   tasks: (rel: string) => ["rel", rel, "tasks"] as const,
   occurrences: (rel: string, from: string, to: string) => ["rel", rel, "occurrences", from, to] as const,
   events: (rel: string, from: string, to: string) => ["rel", rel, "events", from, to] as const,
+  pauseAsks: (rel: string) => ["rel", rel, "events", "pause-asks"] as const,
   reschedules: (rel: string) => ["rel", rel, "reschedules"] as const,
   ledger: (rel: string) => ["rel", rel, "ledger"] as const,
   balances: (rel: string) => ["rel", rel, "balances"] as const,
@@ -414,7 +415,7 @@ export function useEvents(rel: string, from: string, to: string) {
 export function useSaveEvent(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({
-    mutationFn: ({ id, input }: { id?: string; input: CalendarEventInput }) =>
+    mutationFn: ({ id, input }: { id?: string; input: CalendarEventInput & { applyTo?: "one" | "following" } }) =>
       id ? api<CalendarEvent>(`/events/${id}`, { method: "PATCH", body: input }) : api<CalendarEvent>(`/relationships/${rel}/events`, { method: "POST", body: input }),
     onSuccess: () => invalidate(),
   });
@@ -432,7 +433,23 @@ export function useDismissClashes(rel: string) {
 export function useDeleteEvent(rel: string) {
   const invalidate = useInvalidateRel(rel);
   return useMutation({
-    mutationFn: (id: string) => api(`/events/${id}`, { method: "DELETE" }),
+    mutationFn: (arg: string | { id: string; following?: boolean }) => {
+      const { id, following } = typeof arg === "string" ? { id: arg, following: false } : arg;
+      return api(`/events/${id}`, { method: "DELETE", query: following ? { following: "1" } : undefined });
+    },
+    onSuccess: () => invalidate(),
+  });
+}
+
+/** Plans someone asked to pause their tasks during, for a Dominant to answer. */
+export function usePauseAsks(rel: string, enabled: boolean) {
+  return useQuery({ queryKey: keys.pauseAsks(rel), queryFn: () => api<CalendarEvent[]>(`/relationships/${rel}/events/pause-asks`), enabled });
+}
+
+export function useAnswerPause(rel: string) {
+  const invalidate = useInvalidateRel(rel);
+  return useMutation({
+    mutationFn: ({ id, approve }: { id: string; approve: boolean }) => api<CalendarEvent>(`/events/${id}/pause`, { method: "POST", body: { approve } }),
     onSuccess: () => invalidate(),
   });
 }

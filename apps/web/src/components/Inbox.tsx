@@ -11,6 +11,8 @@ import {
   useLibraryChanges,
   usePendingReschedules,
   usePlanChanges,
+  usePauseAsks,
+  useAnswerPause,
   useReviewOccurrence,
   useSeenDelay,
   useSeenLibraryChanges,
@@ -23,7 +25,7 @@ import { useRel } from "../lib/relationship";
 import { useNeedsYou } from "../lib/today";
 import { Clash } from "./CurfewStrip";
 import { useNoteAfter } from "./DecisionNote";
-import { EventDialog, eventOn, eventWhen } from "./EventDialog";
+import { EventDialog, eventOn, eventWhen, repeatLine } from "./EventDialog";
 import { MOOD_LABELS } from "./Mood";
 import { MoodRow, RedemptionCard, SceneCheckRow } from "./NeedsYou";
 import { MissActions, MissCard, RowGroup, TaskRow } from "./TaskRow";
@@ -66,6 +68,7 @@ export function TodayInbox() {
   const delays = useDelays(rel.id, isDom && rel.reschedulePolicy === "allowance");
   const seenDelay = useSeenDelay(rel.id);
   const planChanges = usePlanChanges(rel.id);
+  const pauseAsks = usePauseAsks(rel.id, isDom && live);
   const seenPlan = useSeenPlanChange(rel.id);
   const library = useLibraryChanges(rel.id, features.rules || features.protocols);
   const seenLibrary = useSeenLibraryChanges(rel.id);
@@ -282,6 +285,24 @@ export function TodayInbox() {
       ),
     });
   }
+  const asks = pauseAsks.data ?? [];
+  if (asks.length) {
+    groups.push({
+      key: "pause",
+      icon: "pause_circle",
+      tone: "tertiary",
+      title: new Set(asks.map((e) => e.authorId)).size === 1 ? `${memberName(asks[0]!.authorId)} asks to pause tasks` : "Asks to pause tasks",
+      sub: names(asks.map((e) => e.title)),
+      count: asks.length,
+      body: (
+        <RowGroup>
+          {asks.map((e) => (
+            <PauseAskRow key={e.id} e={e} />
+          ))}
+        </RowGroup>
+      ),
+    });
+  }
   const changed = planChanges.data ?? [];
   if (changed.length) {
     groups.push({
@@ -477,6 +498,34 @@ function DelayRow({ d, onSeen }: { d: DelayUsed; onSeen(): void }) {
         </div>
       </div>
       <IconButton icon="close" label="Got it" onClick={onSeen} />
+    </div>
+  );
+}
+
+/** A plan someone asked to pause their tasks during: pause them, or not. */
+function PauseAskRow({ e }: { e: CalendarEvent }) {
+  const { rel } = useRel();
+  const answer = useAnswerPause(rel.id);
+  const snack = useSnackbar();
+  const decide = (approve: boolean) =>
+    answer.mutate({ id: e.id, approve }, { onSuccess: () => snack(approve ? "Tasks paused" : "Tasks stay on"), onError: (err) => snack(errorMessage(err)) });
+  return (
+    <div className="flex flex-col gap-3 py-3">
+      <div>
+        <div className="text-body-large text-on-surface">{e.title}</div>
+        <div className="text-body-medium text-on-surface-variant">
+          {eventWhen(e)}
+          {e.repeat && ` · ${repeatLine(e.repeat)}`}
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <Button busy={answer.isPending} onClick={() => decide(true)}>
+          Pause them
+        </Button>
+        <Button variant="outlined" disabled={answer.isPending} onClick={() => decide(false)}>
+          Not now
+        </Button>
+      </div>
     </div>
   );
 }

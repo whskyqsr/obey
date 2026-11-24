@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { CalendarEvent, Occurrence } from "../api/types";
-import { useAskCurfew, useCurfew, useCurfewCheck, useDeleteEvent, useDismissClashes, useOccurrences, usePlanReschedule, useSaveEvent } from "../api/hooks";
+import { useAnswerPause, useAskCurfew, useCurfew, useCurfewCheck, useDeleteEvent, useDismissClashes, useOccurrences, usePlanReschedule, useSaveEvent } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { addDays, fmtDate, fmtTime, fromLocalInput, localDateOf, toLocalInput, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
@@ -29,7 +29,30 @@ export function eventOn(e: CalendarEvent, day: string) {
   return localDateOf(new Date(e.startsAt)) <= day && localDateOf(new Date(new Date(e.endsAt).getTime() - 1)) >= day;
 }
 
-type Draft = { title: string; allDay: boolean; withPartner: boolean; start: string; end: string; startDay: string; endDay: string; note: string };
+type Every = NonNullable<CalendarEvent["repeat"]>["every"];
+type Draft = {
+  title: string;
+  allDay: boolean;
+  withPartner: boolean;
+  start: string;
+  end: string;
+  startDay: string;
+  endDay: string;
+  note: string;
+  repeat: { every: Every; until: string } | null;
+  pause: boolean;
+  /** Editing one plan of a repeating plan: just it, or it and the ones after. */
+  applyTo: "one" | "following";
+};
+
+const EVERY: Record<Every, string> = { day: "Every day", week: "Every week", "2weeks": "Every 2 weeks", month: "Every month" };
+/** How far a new repeat runs before they pick an end. */
+const DEFAULT_RUN: Record<Every, number> = { day: 13, week: 49, "2weeks": 98, month: 151 };
+
+/** "Every week until Fri, Dec 18". */
+export function repeatLine(r: { every: Every; until: string }) {
+  return `${EVERY[r.every]} until ${fmtDate(r.until)}`;
+}
 
 function draftFor(e: CalendarEvent | null, day: string): Draft {
   if (e) {
@@ -42,12 +65,15 @@ function draftFor(e: CalendarEvent | null, day: string): Draft {
       startDay: localDateOf(new Date(e.startsAt)),
       endDay: addDays(localDateOf(new Date(e.endsAt)), -1),
       note: e.noteMd ?? "",
+      repeat: e.repeat ? { every: e.repeat.every, until: e.repeat.until } : null,
+      pause: e.pauseTasks,
+      applyTo: "one",
     };
   }
   // Evening by default; later today if the evening has started.
   const hour = day === today() ? Math.max(18, new Date().getHours() + 1) : 18;
   const at = (h: number) => (h < 24 ? `${day}T${String(h).padStart(2, "0")}:00` : `${addDays(day, 1)}T${String(h - 24).padStart(2, "0")}:00`);
-  return { title: "", allDay: false, withPartner: false, start: at(hour), end: at(hour + 2), startDay: day, endDay: day, note: "" };
+  return { title: "", allDay: false, withPartner: false, start: at(hour), end: at(hour + 2), startDay: day, endDay: day, note: "", repeat: null, pause: false, applyTo: "one" };
 }
 
 /**
@@ -55,7 +81,10 @@ function draftFor(e: CalendarEvent | null, day: string): Draft {
  * Tasks due during the plan are listed underneath with a one-tap reschedule.
  */
 export function EventDialog({ event, day, open, onClose }: { event: CalendarEvent | null; day?: string; open: boolean; onClose(): void }) {
-  const { rel, me, memberName } = useRel();
+  const { rel, me, memberName, isDom } = useRel();
+  const who = useAskWho();
+  const answer = useAnswerPause(rel.id);
+  const [removing, setRemoving] = useState(false);
   const partnerId = rel.members.find((m) => m.userId !== me.user.id)?.userId;
   const partner = partnerId ? memberName(partnerId) : null;
   const snack = useSnackbar();
@@ -70,6 +99,7 @@ export function EventDialog({ event, day, open, onClose }: { event: CalendarEven
     setSaved(event);
     setDraft(draftFor(event, day ?? today()));
     setEditing(!event);
+    setRemoving(false);
   }, [open, event, day]);
 
   const current = saved;
@@ -78,24 +108,25 @@ export function EventDialog({ event, day, open, onClose }: { event: CalendarEven
   const clashes = useClashes(open && !editing ? current : null);
   const set = (p: Partial<Draft>) => setDraft((d) => ({ ...d, ...p }));
 
+  const times = draft.allDay
+    ? { startsAt: fromLocalInput(`${draft.startDay}T00:00`), endsAt: fromLocalInput(`${addDays(draft.endDay, 1)}T00:00`) }
+    : { startsAt: fromLocalInput(draft.start), endsAt: fromLocalInput(draft.end) };
+  // A submissive's pause waits on a Dominant, again whenever the plan moves or takes in the partner.
+  const moved = !!current && (Date.parse(current.startsAt) !== Date.parse(times.startsAt) || Date.parse(current.endsAt) !== Date.parse(times.endsAt));
+  const asksPause =
+    draft.pause && !isDom && (!current || !current.pauseTasks || current.pauseStatus === "declined" || moved || current.withPartner !== draft.withPartner);
+
   function submit() {
-    const input = draft.allDay
-      ? {
-          title: draft.title,
-          allDay: true,
-          withPartner: draft.withPartner,
-          startsAt: fromLocalInput(`${draft.startDay}T00:00`),
-          endsAt: fromLocalInput(`${addDays(draft.endDay, 1)}T00:00`),
-          noteMd: draft.note.trim() || null,
-        }
-      : {
-          title: draft.title,
-          allDay: false,
-          withPartner: draft.withPartner,
-          startsAt: fromLocalInput(draft.start),
-          endsAt: fromLocalInput(draft.end),
-          noteMd: draft.note.trim() || null,
-        };
+    const input = {
+      title: draft.title,
+      allDay: draft.allDay,
+      withPartner: draft.withPartner,
+      ...times,
+      noteMd: draft.note.trim() || null,
+      pauseTasks: draft.pause,
+      ...(!current && draft.repeat ? { repeat: { ...draft.repeat, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone } } : {}),
+      ...(current?.seriesId ? { applyTo: draft.applyTo } : {}),
+    };
     save.mutate(
       { id: current?.id, input },
       {
@@ -107,6 +138,8 @@ export function EventDialog({ event, day, open, onClose }: { event: CalendarEven
             } catch (e) {
               snack(errorMessage(e));
             }
+          } else if (res.pauseStatus === "asked" && asksPause) {
+            snack(`${current ? "Plan updated" : "Plan added"}. Asked ${who}.`);
           }
           if (res.conflictIds.length) {
             // Stay open on the clashes, so they can be moved right away.
@@ -114,11 +147,31 @@ export function EventDialog({ event, day, open, onClose }: { event: CalendarEven
             setEditing(false);
           } else {
             onClose();
-            if (!curfew.ask) snack(current ? "Plan updated" : "Plan added");
+            if (!curfew.ask && !(res.pauseStatus === "asked" && asksPause)) snack(current ? "Plan updated" : "Plan added");
           }
         },
         onError: (e) => snack(errorMessage(e)),
       },
+    );
+  }
+
+  function remove(following: boolean) {
+    del.mutate(
+      { id: current!.id, following },
+      {
+        onSuccess: () => {
+          onClose();
+          snack(following ? "Plans removed" : "Plan removed");
+        },
+        onError: (e) => snack(errorMessage(e)),
+      },
+    );
+  }
+
+  function decide(approve: boolean) {
+    answer.mutate(
+      { id: current!.id, approve },
+      { onSuccess: (res) => (setSaved(res), snack(approve ? "Tasks paused" : "Tasks stay on")), onError: (e) => snack(errorMessage(e)) },
     );
   }
 
@@ -146,30 +199,31 @@ export function EventDialog({ event, day, open, onClose }: { event: CalendarEven
         title={<span className="font-serif text-[32px] leading-tight">{current.title}</span>}
         actions={
           <>
-            {mine && (
-              <Button
-                variant="text"
-                className="mr-auto text-error"
-                busy={del.isPending}
-                onClick={() =>
-                  del.mutate(current.id, {
-                    onSuccess: () => {
-                      onClose();
-                      snack("Plan removed");
-                    },
-                    onError: (e) => snack(errorMessage(e)),
-                  })
-                }
-              >
-                Remove
-              </Button>
+            {mine && removing && current.seriesId ? (
+              <>
+                <Button variant="outlined" busy={del.isPending} onClick={() => remove(false)}>
+                  This one
+                </Button>
+                <Button variant="outlined" busy={del.isPending} onClick={() => remove(true)}>
+                  This and later ones
+                </Button>
+                <Button variant="plain" onClick={() => setRemoving(false)}>
+                  Back
+                </Button>
+              </>
+            ) : (
+              mine && (
+                <Button variant="text" className="mr-auto text-error" busy={del.isPending} onClick={() => (current.seriesId ? setRemoving(true) : remove(false))}>
+                  Remove
+                </Button>
+              )
             )}
-            {mine && (
+            {mine && !removing && (
               <Button variant="outlined" onClick={() => setEditing(true)}>
                 Edit
               </Button>
             )}
-            <Button onClick={onClose}>Done</Button>
+            {!removing && <Button onClick={onClose}>Done</Button>}
           </>
         }
       >
@@ -178,7 +232,19 @@ export function EventDialog({ event, day, open, onClose }: { event: CalendarEven
             {eventWhen(current)}
             {current.withPartner ? " · both of you" : ""}
           </div>
+          {current.repeat && <div className="-mt-3 text-body-medium text-on-surface-variant">{repeatLine(current.repeat)}</div>}
           {current.noteMd && <p className="border-l-2 border-outline-variant pl-3 whitespace-pre-wrap text-on-surface">{current.noteMd}</p>}
+          {current.pauseTasks && <PauseLine e={current} mine={mine} who={who} author={memberName(current.authorId)} />}
+          {!mine && isDom && current.pauseStatus === "asked" && (
+            <div className="flex gap-2">
+              <Button busy={answer.isPending} onClick={() => decide(true)}>
+                Pause them
+              </Button>
+              <Button variant="outlined" disabled={answer.isPending} onClick={() => decide(false)}>
+                Not now
+              </Button>
+            </div>
+          )}
           {curfew.waiting}
         </div>
       </Dialog>
@@ -193,6 +259,9 @@ export function EventDialog({ event, day, open, onClose }: { event: CalendarEven
       title={current ? "Edit plan" : "New plan"}
       partner={partner}
       curfew={curfew}
+      isNew={!current}
+      repeating={!!current?.seriesId}
+      ask={curfew.ask ? curfew.who : asksPause ? who : null}
       busy={save.isPending}
       valid={!!valid}
       onCancel={current ? () => setEditing(false) : onClose}
@@ -201,7 +270,7 @@ export function EventDialog({ event, day, open, onClose }: { event: CalendarEven
   );
 }
 
-type Slot = "day" | "start" | "end" | "from" | "until";
+type Slot = "day" | "start" | "end" | "from" | "until" | "repeat";
 
 /** "7:00" before "11:30 PM", "11 AM" before "1:00 PM": the first time drops its AM/PM when the second has the same. */
 function timePair(startIso: string, endIso: string) {
@@ -218,6 +287,19 @@ function dayWord(d: string) {
   return fmtDate(d);
 }
 
+/** Whether a plan's tasks are paused, waiting on a Dominant, or turned down. */
+function PauseLine({ e, mine, who, author }: { e: CalendarEvent; mine: boolean; who: string; author: string }) {
+  const text =
+    e.pauseStatus === "approved"
+      ? "Tasks during it are paused."
+      : e.pauseStatus === "asked"
+        ? mine
+          ? `Waiting for ${who} to pause tasks during it.`
+          : `${author} asks to pause tasks during it.`
+        : `${mine ? who : "You"} said no to pausing tasks during it.`;
+  return <div className="text-body-medium text-on-surface-variant">{text}</div>;
+}
+
 /**
  * The plan editor (mockup 14): full screen, the plan as one sentence with tappable parts ("I'll be at ___ on ___ from ___
  * to ___."), a curfew notice when it runs late, what else it is, and the buttons at the bottom.
@@ -228,6 +310,9 @@ function PlanEditor({
   title,
   partner,
   curfew,
+  isNew,
+  repeating,
+  ask,
   busy,
   valid,
   onCancel,
@@ -238,6 +323,10 @@ function PlanEditor({
   title: string;
   partner: string | null;
   curfew: ReturnType<typeof useCurfewWarning>;
+  isNew: boolean;
+  repeating: boolean;
+  /** Who saving asks, about curfew or paused tasks. */
+  ask: string | null;
   busy: boolean;
   valid: boolean;
   onCancel(): void;
@@ -325,6 +414,39 @@ function PlanEditor({
       </div>
     ),
     until: () => dayPanel(draft.endDay, (d) => d >= draft.startDay && set({ endDay: d })),
+    repeat: () => {
+      const first = draft.allDay ? draft.startDay : day;
+      const pick = (every: Every) => set({ repeat: { every, until: draft.repeat && draft.repeat.until >= first ? draft.repeat.until : addDays(first, DEFAULT_RUN[every]) } });
+      return (
+        <div className="flex flex-col gap-4 py-3">
+          <div className="flex flex-wrap gap-2">
+            {(Object.keys(EVERY) as Every[]).map((k) => (
+              <Chip key={k} plain selected={draft.repeat?.every === k} onClick={() => pick(k)}>
+                {EVERY[k]}
+              </Chip>
+            ))}
+          </div>
+          {draft.repeat && (
+            <TextField
+              label="Until"
+              type="date"
+              value={draft.repeat.until}
+              min={first}
+              onChange={(e) => e.target.value && set({ repeat: { ...draft.repeat!, until: e.target.value } })}
+              className="w-48"
+            />
+          )}
+          <div className="flex justify-between pt-2">
+            <Button variant="plain" onClick={() => (set({ repeat: null }), setPanel(null))}>
+              Doesn't repeat
+            </Button>
+            <Button variant="text" onClick={() => setPanel(null)}>
+              Done
+            </Button>
+          </div>
+        </div>
+      );
+    },
   };
 
   const what = (
@@ -397,8 +519,29 @@ function PlanEditor({
               >
                 All day
               </Chip>
+              {isNew && (
+                <Chip selected={!!draft.repeat} onClick={() => (draft.repeat ? toggle("repeat") : (set({ repeat: { every: "week", until: addDays(draft.allDay ? draft.startDay : day, DEFAULT_RUN.week) } }), setPanel("repeat")))}>
+                  {draft.repeat ? repeatLine(draft.repeat) : "Repeats"}
+                </Chip>
+              )}
+              <Chip selected={draft.pause} onClick={() => set({ pause: !draft.pause })}>
+                Pause tasks during it
+              </Chip>
             </div>
           </section>
+          {repeating && (
+            <section>
+              <h3 className="eyebrow mb-3">Change</h3>
+              <div className="flex flex-wrap gap-2">
+                <Chip plain selected={draft.applyTo === "one"} onClick={() => set({ applyTo: "one" })}>
+                  This one
+                </Chip>
+                <Chip plain selected={draft.applyTo === "following"} onClick={() => set({ applyTo: "following" })}>
+                  This and later ones
+                </Chip>
+              </div>
+            </section>
+          )}
           <TextArea label="Note (optional)" value={draft.note} onChange={(e) => set({ note: e.target.value })} maxLength={2000} rows={2} />
         </div>
       </div>
@@ -409,7 +552,7 @@ function PlanEditor({
           </Button>
         )}
         <Button className="h-12 flex-[1.3]" onClick={onSave} busy={busy} disabled={!valid}>
-          {curfew.ask ? `Save and ask ${curfew.who}` : "Save"}
+          {ask ? `Save and ask ${ask}` : "Save"}
         </Button>
       </div>
     </div>,
