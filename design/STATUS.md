@@ -30,7 +30,7 @@ Last full sweep: 2026-11-24, web at 390px and 1440px, local seed data.
 | Protocol page | 66 | Matched | Matched | "‹ Protocols", pencil and ⋯ (Delete), serif title and body, "Spells out rule iii" line, and Broken this month from the rule log. Editing is Cancel / Save with the Letters editor. |
 | Rule log | 67, 68 | Matched (#112) | Matched | |
 | Notes | 28, 70, 72, desktop 20 | Matched (#110, fixes in #114) | Matched | |
-| Journal | 07, 71, desktop 15 | Close (#109) | Not matched | Partner replies aren't quoted under entries. Desktop should show the entry with an "Earlier" list beside it and a "Write tonight's entry" button. |
+| Journal | 07, 71, desktop 15 | Close (#114) | Close (#114) | Partner replies are quoted under entries (the latest one). Desktop reads one entry with "Earlier" and "Write tonight's entry" beside it; search, mood chart and edit/reply are small icons over the entry. The phone header keeps the Notes/Journal switch. |
 | Limits | 24, 73 | Not matched | Not matched | Cards, an explainer, and coloured dots. The mockup has pills grouped by "You both want", "Worth talking about" and "Off the table", plus a diamond table. |
 | Agreement | 23, 74, 75 | Not matched | Not matched | The empty state is a card with an explainer. The proposal and diff view wasn't reachable with seed data. |
 | Scenes, aftercare | 21, 44, 76, 77 | Not matched | Not matched | The aftercare plan should sit at the top of Scenes. The Aftercare page uses cards. The empty state has an explainer. |

@@ -1,11 +1,11 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { useLibrary, useSaveLibraryItem } from "../api/hooks";
-import { errorMessage } from "../api/client";
+import { useLibrary, useNoteComments } from "../api/hooks";
 import type { Note } from "../api/types";
-import { MOODS, MOOD_LABELS, MoodCard } from "../components/Mood";
-import { Chip, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, SegmentedButtons, TextField, cx, useSnackbar } from "../components/ui";
-import { fmtDate, fmtDateTime, localDateOf } from "../lib/dates";
+import { MOOD_LABELS, MoodCard } from "../components/Mood";
+import { MarkdownEditor } from "../components/MarkdownEditor";
+import { Chip, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, SegmentedButtons, TextField, cx } from "../components/ui";
+import { fmtDate, localDateOf } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 import { storage } from "../lib/storage";
 import { importPage } from "../lib/staleBuild";
@@ -52,6 +52,52 @@ export function excerpt(md: string, max = 160): string {
   return text.length > max ? text.slice(0, max - 1) + "…" : text;
 }
 
+const entryDay = (n: Note, weekday: "long" | "short" = "long") => fmtDate(localDateOf(new Date(n.createdAt)), { weekday, month: "short", day: "numeric" });
+const clock = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+
+/** The partner's latest reply to a journal entry; fetched only when the entry has replies. */
+function usePartnerReply(n: Note) {
+  const comments = useNoteComments(n.id, n.commentCount > 0);
+  return (comments.data ?? [])
+    .filter((c) => c.authorId !== n.authorId)
+    .reduce<(typeof comments.data & {})[number] | undefined>((last, c) => (!last || c.createdAt > last.createdAt ? c : last), undefined);
+}
+
+/** A reply quoted under its entry with an accent rule, as in mockups 07 and 15. */
+function ReplyQuote({ n, large }: { n: Note; large?: boolean }) {
+  const { memberName } = useRel();
+  const reply = usePartnerReply(n);
+  if (!reply) return null;
+  return (
+    <blockquote className={cx("border-l-2 border-primary", large ? "mt-6 pl-6" : "mt-3 ml-6 pl-5")}>
+      <p className={cx("font-serif text-on-surface italic", large ? "text-[26px] leading-10" : "text-[20px] leading-7")}>
+        “{excerpt(reply.body, large ? 600 : 220)}”
+      </p>
+      <p className="mt-1.5 text-body-small text-on-surface-variant">
+        {memberName(reply.authorId)} · {clock(reply.createdAt)}
+      </p>
+    </blockquote>
+  );
+}
+
+/** A row in the desktop journal's "Earlier" column. */
+function EarlierRow({ n, onOpen }: { n: Note; onOpen(): void }) {
+  const { memberName } = useRel();
+  const reply = usePartnerReply(n);
+  return (
+    <button type="button" onClick={onOpen} className="state-layer flex w-full flex-col gap-1.5 py-5 text-left">
+      <span className="flex items-baseline gap-2 text-body-medium text-on-surface-variant">
+        <span className="min-w-0 flex-1 truncate">
+          {entryDay(n, "short")}
+          {n.mood ? ` · ${MOOD_LABELS[n.mood - 1]!.toLowerCase()}` : ""}
+        </span>
+        {reply && <span className="shrink-0">{memberName(reply.authorId)} replied</span>}
+      </span>
+      <span className="line-clamp-2 font-serif text-[21px] leading-8 text-on-surface">{excerpt(n.bodyMd, 160) || n.title || "Untitled"}</span>
+    </button>
+  );
+}
+
 const COPY = {
   note: {
     title: "Notes",
@@ -81,7 +127,10 @@ export function NotesPage({ kind, selected }: { kind: "note" | "journal"; select
   const canWrite = kind === "journal" || isDom || rel.subNotes;
   const navigate = useNavigate();
   const notes = useLibrary(rel.id, "notes");
-  const split = useMediaQuery(SPLIT) && kind === "note";
+  const wide = useMediaQuery(SPLIT);
+  const split = wide && kind === "note";
+  const wideJournal = wide && kind === "journal";
+  const [shown, setShown] = useState<string>();
   const sub = rel.members.find((m) => m.role === "submissive");
   const [q, setQ] = useState("");
   const [tag, setTag] = useState<string | null>(null);
@@ -169,6 +218,80 @@ export function NotesPage({ kind, selected }: { kind: "note" | "journal"; select
   useEffect(() => {
     if (blank) void navigate({ to: "/notes/$noteId", params: { noteId: "new" }, replace: true });
   }, [blank, navigate]);
+
+  if (wideJournal) {
+    // Desktop journal (mockup desktop-15): one entry read in full, the rest listed beside it.
+    const entry = list.find((n) => n.id === shown) ?? list[0];
+    const rest = list.filter((n) => n !== entry);
+    const mine = entry?.authorId === me.user.id;
+    return (
+      <div className="-mb-10 flex min-h-dvh">
+        <article className="min-w-0 flex-1 px-16 pt-10 pb-16">
+          <div className="mx-auto max-w-[720px]">
+            <div className="flex items-center gap-1">
+              <div className="eyebrow min-w-0 flex-1">Journal{entry && !mine ? ` · ${memberName(entry.authorId)}'s` : ""}</div>
+              <IconButton icon="search" label={copy.search} onClick={() => setSearching((v) => !v)} />
+              <IconButton
+                icon="show_chart"
+                label={chart ? "Hide the mood chart" : "Show the mood chart"}
+                aria-pressed={chart}
+                onClick={() => setChart(!chart)}
+              />
+              {entry && <IconButton icon={mine ? "edit" : "reply"} label={mine ? "Edit" : "Reply"} onClick={() => openNote(entry.id)} />}
+            </div>
+            {(searching || q) && (
+              <div className="mt-3">
+                <TextField autoFocus placeholder={copy.search} value={q} onChange={(e) => setQ(e.target.value)} aria-label={copy.search} type="search" />
+              </div>
+            )}
+            {chart && !q && !tag && (
+              <div className="mt-4">
+                <MoodCard />
+              </div>
+            )}
+            {tagChips && <div className="mt-3">{tagChips}</div>}
+            {notes.isLoading && <Loading />}
+            {notes.error && <ErrorBox error={notes.error} onRetry={() => notes.refetch()} />}
+            {empty}
+            {entry && (
+              <>
+                <h1 className="mt-3 font-serif text-[64px] leading-[72px] text-on-surface">{entryDay(entry)}</h1>
+                <p className="mt-2 text-body-medium text-on-surface-variant">
+                  {[
+                    entry.mood ? `Feeling ${MOOD_LABELS[entry.mood - 1]!.toLowerCase()}` : null,
+                    entry.visibility === "private" ? "Private" : null,
+                    `written ${clock(entry.createdAt)}`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+                {entry.title && entry.title !== "Untitled" && <h2 className="mt-8 text-title-large text-on-surface">{entry.title}</h2>}
+                <div className="mt-6">
+                  <MarkdownEditor key={entry.id} value={entry.bodyMd} onChange={() => {}} editable={false} letters />
+                </div>
+                <ReplyQuote n={entry} large />
+              </>
+            )}
+          </div>
+        </article>
+        <aside className="sticky top-0 h-dvh w-[400px] shrink-0 overflow-y-auto border-l border-outline-variant px-10 pt-12 pb-10">
+          <div className="eyebrow">Earlier</div>
+          {rest.length > 0 && (
+            <div className="mt-2 flex flex-col divide-y divide-outline-variant border-b border-outline-variant">
+              {rest.map((n) => (
+                <EarlierRow key={n.id} n={n} onOpen={() => setShown(n.id)} />
+              ))}
+            </div>
+          )}
+          {canWrite && !rel.endedAt && (
+            <button type="button" onClick={newEntry} className="state-layer mt-8 h-12 rounded-md bg-on-surface px-6 text-label-large text-surface">
+              Write tonight's entry
+            </button>
+          )}
+        </aside>
+      </div>
+    );
+  }
 
   if (split) {
     // The open note: the one in the address, else the top of the list (or a blank one to write in when there are none).
@@ -266,7 +389,6 @@ export function NotesPage({ kind, selected }: { kind: "note" | "journal"; select
               <div key={n.id} className="group relative flex flex-col gap-1.5 py-4">
                 <button type="button" className="state-layer absolute inset-0" aria-label={`Open ${n.title || "entry"}`} onClick={() => openNote(n.id)} />
                 <div className="eyebrow pointer-events-none flex items-center gap-1.5">
-                  {n.mood && <Icon name={MOODS[n.mood - 1]!} size={16} />}
                   {n.visibility === "private" && <Icon name="lock" size={14} />}
                   <span>
                     {fmtDate(localDateOf(new Date(n.createdAt)), { weekday: "long", month: "short", day: "numeric" })}
@@ -276,18 +398,16 @@ export function NotesPage({ kind, selected }: { kind: "note" | "journal"; select
                 </div>
                 {n.title && n.title !== "Untitled" && <div className="pointer-events-none text-title-medium text-on-surface">{n.title}</div>}
                 {n.bodyMd && <p className="pointer-events-none line-clamp-4 font-serif text-[23px] leading-8 text-on-surface">{excerpt(n.bodyMd, 280)}</p>}
-                {(n.tags.length > 0 || n.commentCount > 0) && (
+                {n.tags.length > 0 && (
                   <div className="pointer-events-none flex flex-wrap items-center gap-2 text-label-medium text-on-surface-variant">
                     {n.tags.map((t) => (
                       <span key={t}>#{t}</span>
                     ))}
-                    {n.commentCount > 0 && (
-                      <span className="flex items-center gap-0.5 text-primary">
-                        <Icon name="chat_bubble" size={14} /> {n.commentCount === 1 ? "1 reply" : `${n.commentCount} replies`}
-                      </span>
-                    )}
                   </div>
                 )}
+                <div className="pointer-events-none">
+                  <ReplyQuote n={n} />
+                </div>
               </div>
             ))}
       </div>

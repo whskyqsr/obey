@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import app.obey.api.Note
+import app.obey.api.NoteComment
 import app.obey.api.NoteInput
 import app.obey.api.NoteKind
 import app.obey.api.NoteRevision
@@ -21,6 +22,9 @@ import javax.inject.Inject
 import app.obey.api.userMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -52,7 +56,27 @@ class NotesViewModel @Inject constructor(
                 api.notes(sessions.requireRelationshipId())
                     .sortedWith(compareByDescending<Note> { it.pinned }.thenByDescending { it.updatedAt })
             }
+            (_state.value as? Load.Ready)?.value?.let { loadReplies(it) }
         }
+    }
+
+    private val _replies = MutableStateFlow<Map<String, NoteComment>>(emptyMap())
+    /** The partner's latest reply to each recent journal entry, quoted under it (mockup 07). */
+    val replies: StateFlow<Map<String, NoteComment>> = _replies.asStateFlow()
+
+    private suspend fun loadReplies(notes: List<Note>) {
+        val entries = notes.filter { it.kind == NoteKind.Journal && it.commentCount > 0 }.sortedByDescending { it.createdAt }.take(30)
+        val found = coroutineScope {
+            entries.map { n ->
+                async {
+                    runCatching { api.noteComments(n.id) }.getOrNull()
+                        ?.filter { it.authorId != n.authorId }
+                        ?.maxByOrNull { it.createdAt }
+                        ?.let { n.id to it }
+                }
+            }.awaitAll().filterNotNull().toMap()
+        }
+        _replies.value = found
     }
 
     /** Ticks a checklist item straight from the list's preview. */
