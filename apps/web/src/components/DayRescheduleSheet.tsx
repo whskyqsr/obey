@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
+import { createContext, useEffect, useState } from "react";
 import type { Occurrence } from "../api/types";
 import { useRescheduleDay } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { fmtDateTime, fmtTime } from "../lib/dates";
 import { useRel } from "../lib/relationship";
 import { Button, Checkbox, Chip, Dialog, TextArea, useSnackbar } from "./ui";
+
+/** Set by Today while two or more of the user's tasks are open, so a single task's More time sheet can offer the whole day. */
+export const WholeDayContext = createContext<(() => void) | null>(null);
 
 const DELAYS = [2, 12, 24, 48] as const;
 

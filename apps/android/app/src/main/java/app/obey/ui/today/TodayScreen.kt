@@ -587,24 +587,13 @@ fun TodayScreen(
                         item(key = "h-over") { SectionHeader("Overdue") }
                         items(d.overdue, key = { "o-" + it.id }) { o -> row(o)() }
                     }
+                    // Whole-day extension: the user's own open tasks for today, plus today's that already slipped.
+                    val mine = myOpenToday(d, me)
                     if (isDom && !solo && partner != null) {
                         item(key = "h-today") { PartnerDayHeader("${partner.displayName}'s ${if (part == "night") "evening" else part}", doneToday, todays.size) }
                     } else {
-                        item(key = "h-today") { SectionHeader(if (next != null) "Later $tonight" else "Today") }
-                    }
-                    // Whole-day extension: the user's own open tasks for today, plus today's that already slipped.
-                    // Tasks that already have a request waiting aren't offered again.
-                    val asked = d.requests.flatten().map { it.occurrenceId }.toSet()
-                    val mine = (d.overdue + d.today).filter {
-                        it.assigneeId == me && it.status == OccurrenceStatus.Pending && it.id !in asked &&
-                            parseInstant(it.dueAt).local().toLocalDate() == LocalDate.now()
-                    }
-                    if (mine.size > 1) {
-                        item(key = "a-day") {
-                            TonalButton(onClick = { dayTasks = mine }, modifier = Modifier.padding(horizontal = 16.dp)) {
-                                Icon(Icons.Outlined.MoreTime, contentDescription = null)
-                                Text("  More time for today")
-                            }
+                        item(key = "h-today") {
+                            SectionHeader(if (next != null) "Later $tonight" else "Today", action = if (mine.size > 1) ("More time for today" to { dayTasks = mine }) else null)
                         }
                     }
                     if (restOfToday.isEmpty()) {
@@ -654,7 +643,15 @@ fun TodayScreen(
         SendBackDialog(o, onDismiss = { sendingBack = null }, onConfirm = { vm.review(o, false, it); sendingBack = null })
     }
     rescheduling?.let { o ->
-        RescheduleSheet(o, onDismiss = { rescheduling = null }, onSubmit = { vm.reschedule(o, it) })
+        val mine = (state as? Load.Ready)?.value?.let { myOpenToday(it, session?.userId) }.orEmpty()
+        val dueToday = parseInstant(o.dueAt).local().toLocalDate() == LocalDate.now()
+        RescheduleSheet(
+            o,
+            onDismiss = { rescheduling = null },
+            onSubmit = { vm.reschedule(o, it) },
+            session = session,
+            onWholeDay = if (dueToday && mine.size > 1) ({ dayTasks = mine }) else null,
+        )
     }
 
     plan?.let { e ->
@@ -772,5 +769,14 @@ private fun PartnerDayHeader(title: String, done: Int, total: Int) {
                 }
             }
         }
+    }
+}
+
+/** Whole-day extension: the user's own open tasks for today, plus today's that already slipped. Ones with a request waiting aren't offered again. */
+private fun myOpenToday(d: TodayData, me: String?): List<Occurrence> {
+    val asked = d.requests.flatten().map { it.occurrenceId }.toSet()
+    return (d.overdue + d.today).filter {
+        it.assigneeId == me && it.status == OccurrenceStatus.Pending && it.id !in asked &&
+            parseInstant(it.dueAt).local().toLocalDate() == LocalDate.now()
     }
 }
