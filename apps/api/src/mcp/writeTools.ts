@@ -4,7 +4,7 @@ import { recurrenceRule, type Features } from "@obey/contracts";
 import { z } from "zod";
 import { type Call, failed, text } from "./tools.js";
 
-type Logged = <A extends { relationshipId?: string }>(tool: string, run: (args: A) => Promise<CallToolResult>) => (args: A) => Promise<CallToolResult>;
+type Logged = <A extends object>(tool: string, run: (args: A) => Promise<CallToolResult>) => (args: A) => Promise<CallToolResult>;
 
 /**
  * Every app route a write tool reaches. Invites, blocking, safe calls, leaving or ending a dynamic, account changes and

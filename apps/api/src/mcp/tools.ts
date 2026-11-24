@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { Features } from "@obey/contracts";
 
 export type Call = (method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE", url: string, payload?: unknown) => Promise<{ status: number; body: unknown }>;
-type Logged = <A extends { relationshipId?: string }>(tool: string, run: (args: A) => Promise<CallToolResult>) => (args: A) => Promise<CallToolResult>;
+type Logged = <A extends object>(tool: string, run: (args: A) => Promise<CallToolResult>) => (args: A) => Promise<CallToolResult>;
 
 /** Every app route a user tool reaches, by method and route pattern. app.ts refuses any other route for an AI call. */
 export const USER_ROUTES = [

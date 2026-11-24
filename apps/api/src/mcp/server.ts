@@ -9,6 +9,8 @@ import { aiReachable, grantForAccessToken } from "../services/aiAccess.js";
 import { publicApiUrl } from "../routes/oauth.js";
 import { type Call, USER_ROUTES, failed, registerUserTools, text } from "./tools.js";
 import { WRITE_ROUTES, registerWriteTools } from "./writeTools.js";
+import { STAFF_ROUTES, registerStaffTools } from "./staffTools.js";
+import { SCOPE_STAFF } from "../services/aiAccess.js";
 
 export const AI_INTERNAL_HEADER = "x-fealty-ai-internal";
 
@@ -16,7 +18,7 @@ export const AI_INTERNAL_HEADER = "x-fealty-ai-internal";
  * The app routes MCP tools may call, by method and route pattern. Anything not listed (photos, the keybox, location,
  * safe calls, settings, AI access itself) can't be reached by an AI app even by mistake.
  */
-const AI_ROUTES = new Set<string>([...USER_ROUTES, ...WRITE_ROUTES]);
+const AI_ROUTES = new Set<string>([...USER_ROUTES, ...WRITE_ROUTES, ...STAFF_ROUTES]);
 
 export const aiRouteAllowed = (method: string, routeUrl: string | undefined) => routeUrl !== undefined && AI_ROUTES.has(`${method} ${routeUrl}`);
 
@@ -45,7 +47,7 @@ function buildServer(deps: Deps, grant: Grant, call: Call, touched: Set<string>)
 
   /** Runs a tool and logs the call, without its content. */
   const logged =
-    <A extends { relationshipId?: string }>(tool: string, run: (args: A) => Promise<CallToolResult>) =>
+    <A extends object>(tool: string, run: (args: A) => Promise<CallToolResult>) =>
     async (args: A): Promise<CallToolResult> => {
       let result: CallToolResult;
       touched.clear();
@@ -97,6 +99,8 @@ function buildServer(deps: Deps, grant: Grant, call: Call, touched: Set<string>)
 
   registerUserTools(server, call, logged);
   registerWriteTools(server, call, logged);
+  // Listed only on a staff connection; the admin routes check the address list again on every call.
+  if (grant.scope.split(" ").includes(SCOPE_STAFF)) registerStaffTools(server, call, logged, (deps.appUrl ?? "https://app.fealty.me").replace(/\/$/, ""));
   return server;
 }
 
