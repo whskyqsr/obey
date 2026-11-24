@@ -498,7 +498,7 @@ fun TodayScreen(
                     listOfNotNull(
                         if (waiting > 0) "${countWord(waiting).replaceFirstChar { it.uppercase() }} ${if (waiting == 1) "thing is" else "things are"} waiting on you." else null,
                         when {
-                            theirLeft > 0 -> "${partner?.displayName ?: "They"} has ${countWord(theirLeft)} left $tonight."
+                            theirLeft > 0 -> "${partner?.displayName ?: "They"} has ${tasksWord(theirLeft)} left $tonight."
                             waiting > 0 -> "After that, nothing until tomorrow."
                             else -> "Nothing else until tomorrow."
                         },
@@ -506,7 +506,7 @@ fun TodayScreen(
                 } else when {
                     todays.isEmpty() -> "Nothing due today."
                     myLeft == 0 -> "All done for today."
-                    else -> "${countWord(myLeft).replaceFirstChar { it.uppercase() }} left $tonight."
+                    else -> "${tasksWord(myLeft).replaceFirstChar { it.uppercase() }} left $tonight."
                 }
 
                 LazyColumn(Modifier.fillMaxSize()) {
@@ -746,6 +746,9 @@ internal fun dayPart(hour: Int) = when {
 
 private val WORDS = listOf("no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")
 internal fun countWord(n: Int) = WORDS.getOrNull(n) ?: n.toString()
+
+/** "two tasks", "one task": the noun stays, so the line reads as a sentence. */
+internal fun tasksWord(n: Int) = "${countWord(n)} ${if (n == 1) "task" else "tasks"}"
 
 /** Today's greeting: the large serif line, and one line on what's waiting. */
 @Composable

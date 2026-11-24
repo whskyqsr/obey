@@ -33,7 +33,7 @@ These rules are binding for every change to the web or Android UI. The approved 
 - Don't put explanatory lines under a feature name, setting, menu item or section. Keep only text that changes what someone will do, such as a constraint ("4 to 8 digits"), a consequence ("This can't be undone") or a status ("Notifications are blocked for this site").
 - "submissive" is always lowercase, even at the start of a sentence.
 - A create button reads "+ New", never "+ New rule" or "+ New protocol", so it doesn't change width between tabs.
-- Write it the way you'd say it: partners speak in their own words, and requests read as sentences.
+- Write it the way you'd say it: partners speak in their own words, and requests read as sentences. Dropping words the page already gives never goes as far as dropping the noun a sentence needs: "Felicia has two tasks left today.", not "Felicia has two left today." (Jake, 2026-11-24.)
 
 ## Nothing from the old design
 
