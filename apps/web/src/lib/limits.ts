@@ -1,4 +1,5 @@
-import type { LimitAnswer, LimitItem, LimitList, LimitRating } from "../api/types";
+import { limitSentence, type Role } from "@obey/contracts";
+import type { LimitAnswer, LimitItem, LimitList, LimitRating, LimitSide } from "../api/types";
 
 /** The five answers, best to worst. Each shows as a diamond: filled, half, open, accent outline, filled accent. */
 export const RATINGS: { value: LimitRating; label: string }[] = [
@@ -17,29 +18,58 @@ export function byCategory(items: LimitItem[]) {
   return [...groups.entries()];
 }
 
-type Answers = Record<string, LimitAnswer>;
 const keen = (r: LimitRating | null | undefined) => r === "love" || r === "like";
+export const otherSide = (s: LimitSide): LimitSide => (s === "dom" ? "sub" : "dom");
 
-/**
- * The comparison once both have finished: anything either rated a hard limit is off the table; both loving or liking
- * it is something they both want; and where one is curious or wants to go slow, it's worth a talk.
- */
-export function together(items: LimitItem[], a: Answers, b: Answers) {
-  const off: LimitItem[] = [];
-  const want: LimitItem[] = [];
-  const talk: LimitItem[] = [];
-  for (const i of items) {
-    const x = a[i.key]?.rating;
-    const y = b[i.key]?.rating;
-    if (x === "hard" || y === "hard") off.push(i);
-    else if (keen(x) && keen(y)) want.push(i);
-    else if (x && y && (x === "curious" || x === "soft" || y === "curious" || y === "soft")) talk.push(i);
-  }
-  return { off, want, talk };
+/** The side someone usually answers on: their role's, or for a switch the side opposite their partner's role. */
+export function usualSide(role: Role, partnerRole: Role | undefined): LimitSide {
+  if (role === "dominant") return "dom";
+  if (role === "submissive") return "sub";
+  return partnerRole === "dominant" ? "sub" : "dom";
 }
 
-/** Draws the diamond table (both people's, or one person's) to a PNG in the current theme's colours, for saving or sharing. */
-export async function chartImage(list: LimitList, people: { userId: string; name: string }[], _dark: boolean): Promise<Blob> {
+/** One way round for one item, said to you: your answer for your side beside your partner's for theirs. */
+export type LimitRow = { item: LimitItem; side: LimitSide; text: string; mine?: LimitAnswer; theirs?: LimitAnswer };
+
+/** What an item says for one side, with the partner's name in it; items people added keep their title in front. */
+export function rowText(item: LimitItem, side: LimitSide, partnerName: string | undefined) {
+  const s = limitSentence(item.sentences[side], partnerName);
+  return item.custom ? `${item.title}, ${s.charAt(0).toLowerCase()}${s.slice(1)}` : s;
+}
+
+/** Every item both ways round, in category order, your usual side first. */
+export function limitRows(list: LimitList, meId: string, partnerId: string | undefined, partnerName: string | undefined, usual: LimitSide): LimitRow[] {
+  const me = list.people.find((p) => p.userId === meId)?.sides;
+  const them = partnerId ? list.people.find((p) => p.userId === partnerId)?.sides : undefined;
+  return byCategory(list.items).flatMap(([, items]) =>
+    items.flatMap((item) =>
+      [usual, otherSide(usual)].map((side) => ({
+        item,
+        side,
+        text: rowText(item, side, partnerName),
+        mine: me?.[side][item.key],
+        theirs: them?.[otherSide(side)][item.key],
+      })),
+    ),
+  );
+}
+
+export type Verdict = "yes" | "maybe" | "no";
+/**
+ * Where a row lands once both have finished: a hard limit from either of you is off the table; both loving or liking it
+ * is something you both want; and where one of you is curious or wants to go slow, it's worth a talk.
+ */
+export function verdict(r: LimitRow): Verdict | null {
+  const x = r.mine?.rating;
+  const y = r.theirs?.rating;
+  if (x === "hard" || y === "hard") return "no";
+  if (keen(x) && keen(y)) return "yes";
+  if (x && y && (x === "curious" || x === "soft" || y === "curious" || y === "soft")) return "maybe";
+  return null;
+}
+
+/** Draws the rows (both people's answers, or just yours) to a PNG in the current theme's colours, for saving or sharing. */
+export async function chartImage(rows: LimitRow[], names: string[]): Promise<Blob> {
   const css = getComputedStyle(document.documentElement);
   const token = (name: string) => css.getPropertyValue(`--md-${name}`).trim();
   const ink = token("on-surface");
@@ -49,10 +79,11 @@ export async function chartImage(list: LimitList, people: { userId: string; name
   const paper = token("surface");
   const serif = css.getPropertyValue("--font-serif").trim() || "Georgia, serif";
   const sans = css.getPropertyValue("--font-sans").trim() || "system-ui, sans-serif";
-  const answersOf = (id: string) => list.people.find((x) => x.userId === id)?.answers ?? {};
-  const groups = byCategory(list.items)
-    .map(([category, items]) => ({ category, items: items.filter((i) => people.some((p) => answersOf(p.userId)[i.key]?.rating)) }))
-    .filter((g) => g.items.length);
+  const both = names.length > 1;
+  const shown = rows.filter((r) => r.mine?.rating || (both && r.theirs?.rating));
+  const cats = new Map<string, LimitRow[]>();
+  for (const r of shown) cats.set(r.item.category, [...(cats.get(r.item.category) ?? []), r]);
+  const groups = [...cats.entries()].map(([category, items]) => ({ category, items }));
   const cols = 2;
   const colW = 520;
   const row = 40;
@@ -81,7 +112,7 @@ export async function chartImage(list: LimitList, people: { userId: string; name
   ctx.fillText("Limits", pad, 86);
   ctx.font = `400 16px ${sans}`;
   ctx.fillStyle = muted;
-  ctx.fillText(people.map((p) => p.name).join(" and "), pad, 118);
+  ctx.fillText(names.join(" and "), pad, 118);
   // The key, right-aligned on the name line.
   let kx = width - pad;
   for (const r of [...RATINGS].reverse()) {
@@ -93,26 +124,23 @@ export async function chartImage(list: LimitList, people: { userId: string; name
     diamond(ctx, kx + 6, 112, 5, r.value, { ink, accent });
     kx -= 22;
   }
+  const colX = (x: number, i: number) => x + colW - 20 - (names.length - 1 - i) * 56;
   for (const { g, x, y } of placed) {
     ctx.font = `400 15px ${sans}`;
     ctx.fillStyle = muted;
     ctx.fillText(g.category, x, y + 20);
-    people.forEach((p, i) => {
-      const label = p.name.length > 6 ? p.name.charAt(0).toUpperCase() : p.name;
-      const cx = x + colW - 20 - (people.length - 1 - i) * 56;
+    names.forEach((n, i) => {
       ctx.textAlign = "center";
-      ctx.fillText(label, cx, y + 20);
+      ctx.fillText(n.length > 6 ? n.charAt(0).toUpperCase() : n, colX(x, i), y + 20);
       ctx.textAlign = "left";
     });
-    g.items.forEach((item, n) => {
+    g.items.forEach((r, n) => {
       const ry = y + 40 + n * row;
       ctx.fillStyle = ink;
       ctx.font = `400 18px ${sans}`;
-      ctx.fillText(clip(ctx, item.title, colW - 40 - people.length * 56), x, ry + 26);
-      people.forEach((p, i) => {
-        const r = answersOf(p.userId)[item.key]?.rating;
-        const cx = x + colW - 20 - (people.length - 1 - i) * 56;
-        if (r) diamond(ctx, cx, ry + 20, 8, r, { ink, accent });
+      ctx.fillText(clip(ctx, r.text, colW - 40 - names.length * 56), x, ry + 26);
+      [r.mine, r.theirs].slice(0, names.length).forEach((a, i) => {
+        if (a?.rating) diamond(ctx, colX(x, i), ry + 20, 8, a.rating, { ink, accent });
       });
       ctx.strokeStyle = line;
       ctx.lineWidth = 1;

@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { LIMIT_CATEGORIES, OWN_CATEGORY } from "@obey/contracts";
+import { LIMIT_CATEGORIES, OWN_CATEGORY, limitSentence } from "@obey/contracts";
 import { errorMessage } from "../api/client";
 import { useAddLimitItem, useAnswerLimit, useFinishLimits, useLimitList, useRemoveLimitItem } from "../api/hooks";
-import type { LimitAnswer, LimitItem, LimitList, LimitRating, Member } from "../api/types";
+import type { LimitAnswer, LimitItem, LimitRating, LimitSide } from "../api/types";
 import {
   BackLink,
   Button,
@@ -14,13 +14,14 @@ import {
   Loading,
   OverflowMenu,
   PageHeader,
+  SegmentedButtons,
   Select,
   TextField,
   cx,
   useSnackbar,
 } from "../components/ui";
-import { RATINGS, byCategory, chartImage, ratingOf, together } from "../lib/limits";
-import { ROLE_LABEL, useRel } from "../lib/relationship";
+import { type LimitRow, RATINGS, type Verdict, byCategory, chartImage, limitRows, otherSide, ratingOf, usualSide, verdict } from "../lib/limits";
+import { useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
 
 /** A rating as a diamond: love filled, like half, curious open, a soft limit in the accent's outline, a hard limit filled accent. */
@@ -60,14 +61,9 @@ function Key() {
   );
 }
 
-async function saveImage(list: LimitList, people: Member[], snack: (m: string) => void) {
+async function saveImage(rows: LimitRow[], names: string[], snack: (m: string) => void) {
   try {
-    const dark = document.documentElement.classList.contains("dark") || matchMedia("(prefers-color-scheme: dark)").matches;
-    const blob = await chartImage(
-      list,
-      people.map((m) => ({ userId: m.userId, name: m.displayName })),
-      dark,
-    );
+    const blob = await chartImage(rows, names);
     const file = new File([blob], "limits.png", { type: "image/png" });
     if (navigator.canShare?.({ files: [file] })) return await navigator.share({ files: [file], title: "Limits" });
     const a = document.createElement("a");
@@ -83,14 +79,27 @@ async function saveImage(list: LimitList, people: Member[], snack: (m: string) =
 /** The item the fill-in page opens on, when the list sends someone to change one answer. */
 let openAt: string | undefined;
 
-/** Mockup 24: what you both want, what's worth a talk and what's off the table, then every answer as diamonds. */
+const TABS: { value: Verdict | "all"; label: string }[] = [
+  { value: "yes", label: "Yes" },
+  { value: "maybe", label: "Maybe" },
+  { value: "no", label: "No" },
+  { value: "all", label: "All" },
+];
+
+/**
+ * Mockup 24, with each item said both ways round (limits-sides/4-tabs): once you've both finished, tabs for what you
+ * both want, what's worth a talk, what's off the table and every answer; each row is a sentence with your diamond and
+ * your partner's.
+ */
 export function LimitsPage() {
   const { rel, me, partners, solo } = useRel();
   const list = useLimitList(rel.id);
   const navigate = useNavigate();
   const snack = useSnackbar();
+  const [picked, setPicked] = useState<Verdict | "all" | null>(null);
   const partner = solo ? undefined : partners[0];
   const self = rel.members.find((m) => m.userId === me.user.id)!;
+  const usual = usualSide(self.role, partner?.role);
   const edit = (key?: string) => {
     openAt = key;
     void navigate({ to: "/limits/edit" });
@@ -99,9 +108,21 @@ export function LimitsPage() {
   const data = list.data;
   const mine = data?.people.find((p) => p.userId === me.user.id);
   const theirs = partner ? data?.people.find((p) => p.userId === partner.userId) : undefined;
-  const both = !!partner && !!mine?.answers && !!theirs?.answers;
-  const people = both ? [self, partner!] : [self];
+  const both = !!partner && !!mine?.sides && !!theirs?.sides;
   const total = data?.items.length ?? 0;
+  const rows = useMemo(
+    () => (data ? limitRows(data, me.user.id, both ? partner!.userId : undefined, partner?.displayName, usual) : []),
+    [data, me.user.id, both, partner, usual],
+  );
+  const counts = { yes: 0, maybe: 0, no: 0 } as Record<Verdict, number>;
+  for (const r of rows) {
+    const v = verdict(r);
+    if (v) counts[v]++;
+  }
+  const answered = rows.filter((r) => r.mine?.rating || r.mine?.note || (both && (r.theirs?.rating || r.theirs?.note)));
+  const tab: Verdict | "all" = picked ?? TABS.find((t) => t.value !== "all" && counts[t.value] > 0)?.value ?? "all";
+  const shown = !both || tab === "all" ? answered : rows.filter((r) => verdict(r) === tab);
+  const names = both ? [self.displayName, partner!.displayName] : [self.displayName];
 
   const status = !mine
     ? undefined
@@ -122,19 +143,26 @@ export function LimitsPage() {
       <PageHeader
         title="Limits"
         subtitle={status}
-        tools={data && <IconButton icon="ios_share" label="Save as image" onClick={() => void saveImage(data, people, snack)} />}
+        tools={data && <IconButton icon="ios_share" label="Save as image" onClick={() => void saveImage(rows, names, snack)} />}
       />
       {list.isLoading && <Loading />}
       {list.error && <ErrorBox error={list.error} onRetry={() => list.refetch()} />}
       {data && mine && (
-        <div className="flex max-w-3xl flex-col gap-8 px-4 pb-12 md:px-6">
+        <div className="flex max-w-3xl flex-col gap-6 px-4 pb-12 md:px-6">
           {!mine.finishedAt && (
             <div>
               <Button onClick={() => edit()}>{mine.rated ? "Carry on" : "Start"}</Button>
             </div>
           )}
-          {both && <Together list={data} a={mine.answers!} b={theirs!.answers!} />}
-          <Table list={data} people={people} onOpen={(i) => edit(i.key)} />
+          {both && (
+            <SegmentedButtons
+              className="self-start"
+              value={tab}
+              onChange={(v) => setPicked(v as Verdict | "all")}
+              options={TABS.map((t) => ({ value: t.value, label: `${t.label} ${t.value === "all" ? answered.length : counts[t.value]}` }))}
+            />
+          )}
+          <Rows rows={shown} names={both ? ["You", partner!.displayName] : ["You"]} onOpen={(i) => edit(i.key)} />
           {mine.finishedAt && (
             <div>
               <Button variant="tonal" onClick={() => edit()}>
@@ -148,69 +176,40 @@ export function LimitsPage() {
   );
 }
 
-function PillGroup({ title, items, tone }: { title: string; items: LimitItem[]; tone: "ink" | "outline" | "accent" }) {
-  if (!items.length) return null;
+/** Rows by category, a diamond per person; notes sit under their row, and tapping a row changes your answer. */
+function Rows({ rows, names, onOpen }: { rows: LimitRow[]; names: string[]; onOpen(i: LimitItem): void }) {
+  const groups = new Map<string, LimitRow[]>();
+  for (const r of rows) groups.set(r.item.category, [...(groups.get(r.item.category) ?? []), r]);
+  if (!rows.length) return null;
   return (
-    <section>
-      <h2 className="eyebrow">{title}</h2>
-      <div className="mt-3 flex flex-wrap gap-2.5">
-        {items.map((i) => (
-          <span
-            key={i.key}
-            className={cx(
-              "rounded-full border px-5 py-2 text-body-large",
-              tone === "ink" && "border-on-surface bg-on-surface text-surface",
-              tone === "outline" && "border-on-surface text-on-surface",
-              tone === "accent" && "border-primary text-primary",
-            )}
-          >
-            {i.title}
-          </span>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function Together({ list, a, b }: { list: LimitList; a: Record<string, LimitAnswer>; b: Record<string, LimitAnswer> }) {
-  const { off, want, talk } = useMemo(() => together(list.items, a, b), [list.items, a, b]);
-  return (
-    <>
-      <PillGroup title="You both want" items={want} tone="ink" />
-      <PillGroup title="Worth talking about" items={talk} tone="outline" />
-      <PillGroup title="Off the table" items={off} tone="accent" />
-    </>
-  );
-}
-
-/** Every rated item by category, a column of diamonds per person; tapping a row changes your answer. */
-function Table({ list, people, onOpen }: { list: LimitList; people: Member[]; onOpen(i: LimitItem): void }) {
-  const { me } = useRel();
-  const answersOf = (m: Member) => list.people.find((p) => p.userId === m.userId)?.answers ?? {};
-  const notes = people.flatMap((m) =>
-    list.items
-      .filter((i) => answersOf(m)[i.key]?.note)
-      .map((i) => ({ item: i, who: m.userId === me.user.id ? "You" : m.displayName, note: answersOf(m)[i.key]!.note })),
-  );
-  const groups = byCategory(list.items)
-    .map(([category, items]) => [category, items.filter((i) => people.some((m) => answersOf(m)[i.key]?.rating))] as const)
-    .filter(([, items]) => items.length);
-  if (!groups.length) return null;
-  return (
-    <div className="flex flex-col gap-6 border-t border-outline-variant pt-6">
-      {groups.map(([category, items]) => (
+    <div className="flex flex-col gap-6">
+      {[...groups.entries()].map(([category, items]) => (
         <section key={category}>
           <div className="flex items-baseline text-body-medium text-on-surface-variant">
             <h2 className="min-w-0 flex-1">{category}</h2>
-            <span>{people.map((m) => (m.userId === me.user.id ? "You" : m.displayName)).join(" · ")}</span>
+            <span>{names.join(" · ")}</span>
           </div>
           <div className="divide-y divide-outline-variant border-b border-outline-variant">
-            {items.map((i) => (
-              <button key={i.key} type="button" onClick={() => onOpen(i)} className="state-layer flex min-h-14 w-full items-center gap-3 py-3 text-left">
-                <span className="min-w-0 flex-1 text-body-large text-on-surface">{i.title}</span>
-                {people.map((m) => (
-                  <span key={m.userId} className="flex w-10 justify-center">
-                    <RatingMark rating={answersOf(m)[i.key]?.rating} size={18} />
+            {items.map((r) => (
+              <button
+                key={`${r.item.key}-${r.side}`}
+                type="button"
+                onClick={() => onOpen(r.item)}
+                className="state-layer flex min-h-14 w-full items-center gap-3 py-3 text-left"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block text-body-large text-on-surface">{r.text}</span>
+                  {[r.mine?.note && { who: "You", note: r.mine.note }, names.length > 1 && r.theirs?.note && { who: names[1], note: r.theirs.note }]
+                    .filter((n): n is { who: string; note: string } => !!n)
+                    .map((n) => (
+                      <span key={n.who} className="mt-1 block font-serif text-[18px] leading-6 text-on-surface-variant italic">
+                        “{n.note}” <span className="font-sans text-body-small not-italic">· {n.who}</span>
+                      </span>
+                    ))}
+                </span>
+                {[r.mine, r.theirs].slice(0, names.length).map((a, i) => (
+                  <span key={i} className="flex w-10 justify-center">
+                    <RatingMark rating={a?.rating} size={18} />
                   </span>
                 ))}
               </button>
@@ -219,24 +218,11 @@ function Table({ list, people, onOpen }: { list: LimitList; people: Member[]; on
         </section>
       ))}
       <Key />
-      {notes.length > 0 && (
-        <section>
-          <h2 className="eyebrow">Notes</h2>
-          <div className="mt-2 divide-y divide-outline-variant">
-            {notes.map((r) => (
-              <p key={`${r.item.key}-${r.who}`} className="py-3 text-body-large text-on-surface">
-                {r.item.title} <span className="text-on-surface-variant">· {r.who}</span>
-                <span className="mt-1 block font-serif text-[20px] leading-7 italic">“{r.note}”</span>
-              </p>
-            ))}
-          </div>
-        </section>
-      )}
     </div>
   );
 }
 
-/** Mockup 73: one item at a time, the five answers as rows, then on to the next. */
+/** Mockup 73, both ways round: one item at a time, a sentence for each side with the five answers under it. */
 export function LimitsEditPage() {
   const { rel, me, partners, solo } = useRel();
   const list = useLimitList(rel.id);
@@ -247,28 +233,31 @@ export function LimitsEditPage() {
   const navigate = useNavigate();
   const back = useBack(() => navigate({ to: "/limits" }));
   const [at, setAt] = useState<number | null>(null);
-  const [noting, setNoting] = useState<LimitItem | null>(null);
+  const [noting, setNoting] = useState<{ item: LimitItem; side: LimitSide } | null>(null);
   const [adding, setAdding] = useState(false);
   const self = rel.members.find((m) => m.userId === me.user.id)!;
   const partner = solo ? undefined : partners[0];
+  const usual = usualSide(self.role, partner?.role);
+  const sides = [usual, otherSide(usual)] as const;
 
   if (list.isLoading) return <Loading />;
   if (list.error || !list.data) return <ErrorBox error={list.error} onRetry={() => list.refetch()} />;
   const data = list.data;
   const mine = data.people.find((p) => p.userId === me.user.id)!;
-  const answers = mine.answers ?? {};
+  const answers = mine.sides ?? { dom: {}, sub: {} };
+  const rated = (key: string) => !!(answers.dom[key]?.rating || answers.sub[key]?.rating);
   // In category order, so "4 of 12" counts within a category.
   const items = byCategory(data.items).flatMap(([, xs]) => xs);
   const first = () => {
     const asked = openAt ? items.findIndex((i) => i.key === openAt) : -1;
     if (asked >= 0) return asked;
-    const unrated = items.findIndex((i) => !answers[i.key]?.rating);
+    const unrated = items.findIndex((i) => !rated(i.key));
     return unrated >= 0 ? unrated : items.length;
   };
   const index = at ?? first();
   const item = items[index];
-  const set = (i: LimitItem, rating: LimitRating | null, note = answers[i.key]?.note ?? "") =>
-    answer.mutate({ itemKey: i.key, rating, note }, { onError: (e) => snack(errorMessage(e)) });
+  const set = (i: LimitItem, side: LimitSide, rating: LimitRating | null, note = answers[side][i.key]?.note ?? "") =>
+    answer.mutate({ itemKey: i.key, side, rating, note }, { onError: (e) => snack(errorMessage(e)) });
   const go = (n: number) => {
     setAt(Math.max(0, Math.min(items.length, n)));
     window.scrollTo({ top: 0 });
@@ -313,48 +302,56 @@ export function LimitsEditPage() {
       {item ? (
         <>
           <h1 className="mt-12 font-serif text-[56px] leading-[60px] break-words text-on-surface">{item.title}</h1>
-          <p className="mt-3 text-body-large text-on-surface-variant">For you, as the {ROLE_LABEL[self.role]}.</p>
-          <div role="radiogroup" aria-label={item.title} className="mt-6 flex flex-col gap-3">
-            {RATINGS.map((r) => {
-              const on = answers[item.key]?.rating === r.value;
-              return (
-                <button
-                  key={r.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  onClick={() => {
-                    set(item, on ? null : r.value);
-                    if (!on) go(index + 1);
-                  }}
-                  className={cx(
-                    "state-layer flex h-16 items-center gap-5 rounded-lg border px-6 text-left text-body-large text-on-surface",
-                    on ? "border-on-surface bg-surface-container" : "border-outline-variant bg-surface-container-lowest",
-                  )}
-                >
-                  {r.value === "hard" ? (
-                    <span aria-hidden className={cx("inline-block size-4 shrink-0 rotate-45 border-[1.5px] border-primary", on && "bg-primary")} />
-                  ) : (
-                    <Diamond state={on ? "done" : "open"} size={16} />
-                  )}
-                  {r.value === "soft" ? "Soft limit, go slow" : r.label}
-                </button>
-              );
-            })}
-          </div>
-          {answers[item.key]?.note && <p className="mt-4 font-serif text-[20px] leading-7 text-on-surface-variant italic">“{answers[item.key]!.note}”</p>}
-          <div className="mt-6 flex items-center gap-4">
-            <button type="button" onClick={() => setNoting(item)} className="text-label-large text-primary">
-              {answers[item.key]?.note ? "Change the note" : "Add a note"}
-            </button>
-            <span className="flex-1" />
+          {sides.map((side) => {
+            const a = answers[side][item.key];
+            const text = limitSentence(item.sentences[side], partner?.displayName);
+            return (
+              <section key={side} className="mt-7">
+                <div className="flex items-baseline gap-4">
+                  <h2 className="min-w-0 flex-1 text-body-large text-on-surface">
+                    {text}
+                    {side !== usual && <span className="ml-2 text-body-medium text-on-surface-variant">Optional</span>}
+                  </h2>
+                  <button type="button" onClick={() => setNoting({ item, side })} className="text-label-large text-primary">
+                    {a?.note ? "Change the note" : "Add a note"}
+                  </button>
+                </div>
+                <div role="radiogroup" aria-label={text} className="mt-3 grid grid-cols-5 gap-1.5">
+                  {RATINGS.map((r) => {
+                    const on = a?.rating === r.value;
+                    return (
+                      <button
+                        key={r.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        onClick={() => {
+                          set(item, side, on ? null : r.value);
+                          if (!on && answers[otherSide(side)][item.key]?.rating) go(index + 1);
+                        }}
+                        className={cx(
+                          "state-layer flex h-16 flex-col items-center justify-center gap-2 rounded-lg border px-1 text-body-small whitespace-nowrap text-on-surface",
+                          on ? "border-on-surface bg-surface-container" : "border-outline-variant bg-surface-container-lowest",
+                        )}
+                      >
+                        <RatingMark rating={r.value} size={13} />
+                        {r.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {a?.note && <p className="mt-3 font-serif text-[20px] leading-7 text-on-surface-variant italic">“{a.note}”</p>}
+              </section>
+            );
+          })}
+          <div className="mt-7 flex items-center justify-end gap-4">
             {index > 0 && (
               <button type="button" onClick={() => go(index - 1)} className="text-label-large text-on-surface-variant">
                 Previous
               </button>
             )}
             <button type="button" onClick={() => go(index + 1)} className="text-label-large text-on-surface-variant">
-              {answers[item.key]?.rating ? "Next" : "Skip"}
+              {rated(item.key) ? "Next" : "Skip"}
             </button>
           </div>
         </>
@@ -386,10 +383,10 @@ export function LimitsEditPage() {
 
       {noting && (
         <NoteDialog
-          item={noting}
-          answer={answers[noting.key]}
+          title={limitSentence(noting.item.sentences[noting.side], partner?.displayName)}
+          answer={answers[noting.side][noting.item.key]}
           onClose={() => setNoting(null)}
-          onSave={(note) => set(noting, answers[noting.key]?.rating ?? null, note)}
+          onSave={(note) => set(noting.item, noting.side, answers[noting.side][noting.item.key]?.rating ?? null, note)}
         />
       )}
       {adding && (
@@ -406,13 +403,13 @@ export function LimitsEditPage() {
   );
 }
 
-function NoteDialog({ item, answer, onClose, onSave }: { item: LimitItem; answer: LimitAnswer | undefined; onClose(): void; onSave(note: string): void }) {
+function NoteDialog({ title, answer, onClose, onSave }: { title: string; answer: LimitAnswer | undefined; onClose(): void; onSave(note: string): void }) {
   const [note, setNote] = useState(answer?.note ?? "");
   return (
     <Dialog
       open
       onClose={onClose}
-      title={item.title}
+      title={title}
       actions={
         <>
           <Button variant="text" onClick={onClose}>
