@@ -21,7 +21,7 @@ import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.MoreTime
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import app.obey.ui.common.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import app.obey.ui.common.ChoiceChip
 import androidx.compose.material3.Icon

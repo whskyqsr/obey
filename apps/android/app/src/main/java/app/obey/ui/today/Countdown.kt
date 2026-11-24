@@ -194,7 +194,7 @@ fun NextUp(o: Occurrence, by: String?, onDone: () -> Unit, onMoreTime: () -> Uni
         )
         Text(meta, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
         Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            androidx.compose.material3.Button(onClick = onDone, modifier = Modifier.weight(1f).height(48.dp)) {
+            app.obey.ui.common.Button(onClick = onDone, modifier = Modifier.weight(1f).height(48.dp)) {
                 Text(if (o.isRitual) (if (o.stepsDone.isNotEmpty()) "Carry on" else "Start") else "Done")
             }
             androidx.compose.material3.OutlinedButton(onClick = onMoreTime, modifier = Modifier.weight(1f).height(48.dp)) {

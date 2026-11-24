@@ -58,7 +58,7 @@ import androidx.compose.material.icons.outlined.Handshake
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.UnfoldMore
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import app.obey.ui.common.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
