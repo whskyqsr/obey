@@ -11,10 +11,12 @@ def dump():
 def center(n):
     x1, y1, x2, y2 = map(int, re.findall(r"\d+", n.get("bounds"))); return (x1 + x2) // 2, (y1 + y2) // 2
 def find(label, desc=False, exact=True):
+    # Last match: tabs sit at the bottom, below any same-named chip. A dict, because a leaf Element is falsy.
+    hit = None
     for n in dump().iter("node"):
         v = n.get("content-desc" if desc else "text") or ""
-        if (v == label) if exact else (label.lower() in v.lower()): return n
-    return None
+        if (v == label) if exact else (label.lower() in v.lower()): hit = dict(n.attrib)
+    return hit
 def tap(label, desc=False, exact=True, wait=2.5):
     n = find(label, desc, exact) or (find(label, not desc, exact))
     if n is None:
@@ -75,6 +77,23 @@ def run(who, uid):
     if tap("Rules", wait=3):
         if tap("Protocols", wait=2): shot(f"{who}-protocols")
         back()
+    # Back behaviour: Week > All tasks, then the phone's back; then again with the back link.
+    tap("Week"); tap("Week")
+    if tap("All tasks", desc=True, exact=False):
+        shot(f"{who}-back-0-alltasks"); back(); shot(f"{who}-back-1-after-system-back")
+        print("after system back:", [x.get("text") for x in dump().iter("node") if x.get("selected") == "true"], [x.get("text") for x in dump().iter("node") if x.get("text")][:8])
+    tap("Week")
+    if tap("All tasks", desc=True, exact=False):
+        print("back link texts:", [(x.get("text"), x.get("content-desc")) for x in dump().iter("node") if x.get("clickable") == "true"][:6])
+        if tap("Week", wait=2): shot(f"{who}-back-2-after-back-link")
+    if who == "sub":
+        tap("Today"); tap("Today")
+        if tap("Start", exact=False, wait=3):
+            shot("sub-ritual-1")
+            if tap("Done, next", wait=2): shot("sub-ritual-2")
+            back()
+        tap("Today")
+        if tap("More time", desc=True) or tap("More time"): shot("sub-moretime-sheet"); back()
     if who == "dom":
         tap("Today")
         if tap("New", desc=True) and tap("Task", wait=3): shot("dom-newtask"); scroll(); shot("dom-newtask-2"); back(); back()
