@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -405,7 +406,17 @@ private fun Rows(rows: List<LimitRow>, names: List<String>, onOpen: (LimitItem) 
             Column {
                 Row {
                     Text(category, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant, modifier = Modifier.weight(1f))
-                    Text(names.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
+                    // Each name sits centred over its column of diamonds.
+                    names.forEach { n ->
+                        Text(
+                            n,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = c.onSurfaceVariant,
+                            maxLines = 1,
+                            softWrap = false,
+                            modifier = Modifier.width(40.dp).wrapContentWidth(Alignment.CenterHorizontally, unbounded = true),
+                        )
+                    }
                 }
                 items.forEach { r ->
                     Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable { onOpen(r.item) }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
