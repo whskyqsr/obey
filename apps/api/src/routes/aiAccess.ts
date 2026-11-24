@@ -1,13 +1,19 @@
 import { and, desc, eq, gt, inArray, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { z } from "zod";
+import { aiAccessInput } from "@obey/contracts";
 import type { Deps } from "../app.js";
 import { aiCalls, aiGrants, memberships, oauthClients } from "../db/schema.js";
 import { notFound } from "../errors.js";
 import { membership, requireMember } from "../services/access.js";
-import { aiReachable } from "../services/aiAccess.js";
+import { aiReachable, knownApp } from "../services/aiAccess.js";
 
 const CALLS_SHOWN_DAYS = 30;
+
+/** The app's name and, for an app we recognise, its kind (which picks its mark) and its own name. */
+const appDto = (name: string | null, redirectUris: string[] | null) => {
+  const known = redirectUris ? knownApp(redirectUris) : null;
+  return { app: known?.name ?? name ?? "An AI app", kind: known?.kind ?? null };
+};
 
 /** AI access for a dynamic: each member's switch, the apps connected to it, and the recent calls they made. App only. */
 export const aiAccessRoutes = (deps: Deps) => async (app: FastifyInstance) => {
@@ -15,7 +21,7 @@ export const aiAccessRoutes = (deps: Deps) => async (app: FastifyInstance) => {
 
   const liveGrants = (userIds: string[]) =>
     db
-      .select({ id: aiGrants.id, userId: aiGrants.userId, app: oauthClients.name, connectedAt: aiGrants.createdAt, lastUsedAt: aiGrants.lastUsedAt })
+      .select({ id: aiGrants.id, userId: aiGrants.userId, app: oauthClients.name, redirectUris: oauthClients.redirectUris, connectedAt: aiGrants.createdAt, lastUsedAt: aiGrants.lastUsedAt })
       .from(aiGrants)
       .innerJoin(oauthClients, eq(oauthClients.id, aiGrants.clientId))
       .where(and(inArray(aiGrants.userId, userIds), isNull(aiGrants.revokedAt), gt(aiGrants.refreshExpiresAt, deps.now())))
@@ -24,7 +30,7 @@ export const aiAccessRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   const grantDto = (g: Awaited<ReturnType<typeof liveGrants>>[number]) => ({
     id: g.id,
     userId: g.userId,
-    app: g.app,
+    ...appDto(g.app, g.redirectUris),
     connectedAt: g.connectedAt.toISOString(),
     lastUsedAt: g.lastUsedAt?.toISOString() ?? null,
   });
@@ -35,7 +41,7 @@ export const aiAccessRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const apps = await liveGrants(members.map((m) => m.userId));
     const since = new Date(deps.now().getTime() - CALLS_SHOWN_DAYS * 86_400_000);
     const calls = await db
-      .select({ tool: aiCalls.tool, userId: aiCalls.userId, ok: aiCalls.ok, at: aiCalls.createdAt, app: oauthClients.name })
+      .select({ tool: aiCalls.tool, userId: aiCalls.userId, ok: aiCalls.ok, at: aiCalls.createdAt, app: oauthClients.name, redirectUris: oauthClients.redirectUris })
       .from(aiCalls)
       .leftJoin(aiGrants, eq(aiGrants.id, aiCalls.grantId))
       .leftJoin(oauthClients, eq(oauthClients.id, aiGrants.clientId))
@@ -46,20 +52,27 @@ export const aiAccessRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       reachable: await aiReachable(db, req.params.id),
       members,
       apps: apps.map(grantDto),
-      calls: calls.map((c) => ({ tool: c.tool, userId: c.userId, ok: c.ok, app: c.app, at: c.at.toISOString() })),
+      calls: calls.map((c) => ({ tool: c.tool, userId: c.userId, ok: c.ok, ...appDto(c.app, c.redirectUris), at: c.at.toISOString() })),
     };
   });
 
   /** Your own switch. Turning it off always works, even in an ended dynamic; turning it on needs a live one. */
   app.put<{ Params: { id: string } }>("/relationships/:id/ai-access", async (req) => {
-    const { allowed } = z.object({ allowed: z.boolean() }).parse(req.body);
+    const { allowed } = aiAccessInput.parse(req.body);
     if (allowed) await requireMember(db, req.params.id, req.user.id);
-    else if (!(await membership(db, req.params.id, req.user.id))) throw notFound();
+    const before = await membership(db, req.params.id, req.user.id);
+    if (!before) throw notFound();
     await db
       .update(memberships)
       .set({ aiAccess: allowed })
       .where(and(eq(memberships.relationshipId, req.params.id), eq(memberships.userId, req.user.id)));
-    return { allowed, reachable: await aiReachable(db, req.params.id) };
+    const reachable = await aiReachable(db, req.params.id);
+    if (allowed && !before.aiAccess && !reachable) {
+      // The one-tap ask: everyone who hasn't allowed it yet hears that their partner would like to.
+      const waiting = (await db.select({ userId: memberships.userId }).from(memberships).where(and(eq(memberships.relationshipId, req.params.id), eq(memberships.aiAccess, false)))).map((m) => m.userId);
+      await deps.notifier.send(waiting, { title: "Fealty", body: `${req.user.displayName} wants to use Fealty with an AI app.`, data: { type: "ai_access_asked", relationshipId: req.params.id } });
+    }
+    return { allowed, reachable };
   });
 
   app.get("/me/ai-apps", async (req) => (await liveGrants([req.user.id])).map(grantDto));

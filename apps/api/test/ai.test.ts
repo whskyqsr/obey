@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { requestScope, requireMember } from "../src/services/access.js";
+import { knownApp } from "../src/services/aiAccess.js";
 import { setup } from "./helpers.js";
 import { REDIRECT, connect, mcp, tool } from "./aiHelpers.js";
 
@@ -46,6 +47,25 @@ describe("AI access over MCP", () => {
     expect(access.apps).toHaveLength(1);
     expect(access.apps[0]).toMatchObject({ app: "Claude" });
     expect(access.members).toHaveLength(2);
+  });
+
+  it("asks the partner once when someone allows it, and names apps it recognises by their return address", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    const before = ctx.notifier.sent.length;
+    await dom.put(`/relationships/${relId}/ai-access`, { allowed: true });
+    await dom.put(`/relationships/${relId}/ai-access`, { allowed: true });
+    const asks = ctx.notifier.sent.slice(before).filter((s) => s.push.data?.type === "ai_access_asked");
+    expect(asks).toHaveLength(1);
+    expect(asks[0]).toMatchObject({ userIds: [subId], push: { body: "Dom wants to use Fealty with an AI app." } });
+    expect((await sub.get("/me")).body.relationships[0].members.find((m: { userId: string }) => m.userId !== subId).aiAccess).toBe(true);
+
+    await connect(ctx, dom);
+    const apps = (await sub.get(`/relationships/${relId}/ai-access`)).body.apps;
+    expect(apps[0]).toMatchObject({ app: "Claude", kind: "claude" });
+    // A look-alike name with someone else's return address gets no mark.
+    expect(knownApp(["https://evil.example/cb"])).toBeNull();
+    expect(knownApp(["https://claude.ai/api/mcp/auth_callback", "https://evil.example/cb"])).toBeNull();
+    expect(knownApp(["https://chatgpt.com/connector_platform_oauth_redirect"])?.kind).toBe("chatgpt");
   });
 
   it("tells the partner when an app is connected", async () => {
