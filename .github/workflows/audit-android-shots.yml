@@ -3,7 +3,7 @@ name: Audit Android screenshots
 on:
   push:
     branches: [claude/project-thread-0v7h6n]
-    paths: [".audit/drive.py", ".audit/run.sh", ".github/workflows/audit-android-shots.yml"]
+    paths: [".audit/seed3.mjs", ".audit/drive.py", ".audit/run.sh", ".github/workflows/audit-android-shots.yml"]
 permissions:
   contents: write
 jobs:
@@ -31,7 +31,7 @@ jobs:
           for i in $(seq 1 30); do curl -sf localhost:3000/health && break; sleep 2; done
       - name: Seed
         run: |
-          REL=$(node .audit/seed.mjs | tail -1); node .audit/seed2.mjs "$REL"
+          REL=$(node .audit/seed.mjs | tail -1); node .audit/seed2.mjs "$REL"; node .audit/seed3.mjs "$REL"
           PGPASSWORD=obey psql -h localhost -U obey obey -f .audit/backfill.sql
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }

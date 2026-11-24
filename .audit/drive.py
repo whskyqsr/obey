@@ -47,56 +47,34 @@ def signin(uid):
         if not find("Use dev user"): break
         adb("shell", "input", "keyevent", "4"); time.sleep(1.5)
     print("after signin texts:", [x.get("text") for x in dump().iter("node") if x.get("text")][:30])
-US = ["Rules", "Rewards", "Consequences", "Notes", "Journal", "Limits", "Agreement", "Scenes", "Location", "Stats", "Monthly review", "Kits", "All tasks"]
 def run(who, uid):
     signin(uid)
     for _ in range(3):
         if find("Today"): break
         time.sleep(3)
     shot(f"{who}-today"); scroll(); shot(f"{who}-today-2"); scroll(); shot(f"{who}-today-3")
-    if tap("New", desc=True): shot(f"{who}-plus"); back()
     tap("Today")
-    if who == "sub" and tap("More time"): shot(f"{who}-moretime"); back()
-    if tap("Drink water"): shot(f"{who}-task-count"); back()
+    if tap("New", desc=True): shot(f"{who}-plus")
+    if tap("Plan", wait=3): shot(f"{who}-plan-editor"); scroll(); shot(f"{who}-plan-editor-2"); back(); back()
+    tap("Today")
     tap("Week"); shot(f"{who}-week")
+    for d in range(7):
+        if tap(str(__import__("datetime").date.today().day + d - 1), wait=1.5): pass
+    shot(f"{who}-week-open")
+    if tap("Off work", exact=False, wait=3): shot(f"{who}-plan-open"); scroll(); shot(f"{who}-plan-open-2"); back()
     if tap("Show the month", desc=True): shot(f"{who}-month"); back()
-    tap("Week")
-    if tap("All tasks", desc=True, exact=False): shot(f"{who}-alltasks"); back()
     tap("Us"); shot(f"{who}-us")
-    for item in US:
-        tap("Us")
-        if not find(item):
-            scroll()
-        if tap(item, wait=3):
-            shot(f"{who}-{item.lower().replace(' ', '-')}"); scroll(); shot(f"{who}-{item.lower().replace(' ', '-')}-2"); back()
     tap("Us")
-    if tap("Your dynamic", wait=3): shot(f"{who}-dynamic"); scroll(); shot(f"{who}-dynamic-2"); back()
+    if not find("Chastity"): scroll()
+    if tap("Chastity", wait=3): shot(f"{who}-chastity"); scroll(); shot(f"{who}-chastity-2"); back()
     tap("Us")
-    if tap("Settings", desc=True, wait=3): shot(f"{who}-settings"); scroll(); shot(f"{who}-settings-2"); back()
-    tap("Us")
-    if tap("Rules", wait=3):
-        if tap("Protocols", wait=2): shot(f"{who}-protocols")
+    if tap("Settings", desc=True, wait=3):
+        shot(f"{who}-settings")
+        if tap("Privacy", wait=3): shot(f"{who}-privacy"); scroll(); shot(f"{who}-privacy-2"); back()
         back()
-    # Back behaviour: Week > All tasks, then the phone's back; then again with the back link.
-    tap("Week"); tap("Week")
-    if tap("All tasks", desc=True, exact=False):
-        shot(f"{who}-back-0-alltasks"); back(); shot(f"{who}-back-1-after-system-back")
-        print("after system back:", [x.get("text") for x in dump().iter("node") if x.get("selected") == "true"], [x.get("text") for x in dump().iter("node") if x.get("text")][:8])
-    tap("Week")
-    if tap("All tasks", desc=True, exact=False):
-        print("back link texts:", [(x.get("text"), x.get("content-desc")) for x in dump().iter("node") if x.get("clickable") == "true"][:6])
-        if tap("Week", wait=2): shot(f"{who}-back-2-after-back-link")
     if who == "sub":
-        tap("Today"); tap("Today")
-        if tap("Start", exact=False, wait=3):
-            shot("sub-ritual-1")
-            if tap("Done, next", wait=2): shot("sub-ritual-2")
-            back()
         tap("Today")
-        if tap("More time", desc=True) or tap("More time"): shot("sub-moretime-sheet"); back()
-    if who == "dom":
-        tap("Today")
-        if tap("New", desc=True) and tap("Task", wait=3): shot("dom-newtask"); scroll(); shot("dom-newtask-2"); back(); back()
+        if tap("Safe word", desc=True, wait=3): shot("sub-safecall"); back()
 import traceback
 for who, uid in [("sub", "22222222-2222-4222-8222-222222222222"), ("dom", "11111111-1111-4111-8111-111111111111")]:
     try: run(who, uid)
