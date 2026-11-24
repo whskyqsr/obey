@@ -113,6 +113,8 @@ import app.obey.api.LimitItem
 import app.obey.api.LimitItemInput
 import app.obey.api.LimitList
 import app.obey.api.LimitPerson
+import app.obey.api.LimitSides
+import app.obey.api.Role as MemberRole
 import app.obey.api.Member
 import app.obey.api.ObeyApi
 import app.obey.data.Session
@@ -127,7 +129,6 @@ import app.obey.ui.common.MessageEffect
 import app.obey.ui.common.SafeWordAction
 import app.obey.ui.common.loadCatching
 import app.obey.ui.common.parseInstant
-import app.obey.ui.onboarding.label
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.io.File
 import java.time.ZoneId
@@ -160,24 +161,51 @@ fun byCategory(items: List<LimitItem>): List<Pair<String, List<LimitItem>>> = it
 
 private fun keen(r: String?) = r == "love" || r == "like"
 
-/**
- * The comparison once both have finished: anything either rated a hard limit is off the table; both loving or liking
- * it is something they both want; and where one is curious or wants to go slow, it's worth a talk.
- */
-fun together(items: List<LimitItem>, a: Map<String, LimitAnswer>, b: Map<String, LimitAnswer>): Triple<List<LimitItem>, List<LimitItem>, List<LimitItem>> {
-    val off = mutableListOf<LimitItem>()
-    val want = mutableListOf<LimitItem>()
-    val talk = mutableListOf<LimitItem>()
-    for (i in items) {
-        val x = a[i.key]?.rating
-        val y = b[i.key]?.rating
-        when {
-            x == "hard" || y == "hard" -> off += i
-            keen(x) && keen(y) -> want += i
-            x != null && y != null && listOf(x, y).any { it == "curious" || it == "soft" } -> talk += i
+fun otherSide(side: String) = if (side == "dom") "sub" else "dom"
+
+/** The side someone usually answers on: their role's, or for a switch the side opposite their partner's role. */
+fun usualSide(role: MemberRole, partner: MemberRole?): String = when (role) {
+    MemberRole.Dominant -> "dom"
+    MemberRole.Submissive -> "sub"
+    MemberRole.Switch -> if (partner == MemberRole.Dominant) "sub" else "dom"
+}
+
+/** A side's sentence with the partner's name in it, capitalised ("your partner" when there isn't one yet). */
+fun limitSentence(template: String, partner: String?) = template.replace("{name}", partner ?: "your partner").replaceFirstChar { it.uppercase() }
+
+/** One way round for one item, said to you: your answer for your side beside your partner's for theirs. */
+data class LimitRow(val item: LimitItem, val side: String, val text: String, val mine: LimitAnswer?, val theirs: LimitAnswer?)
+
+/** Every item both ways round, in category order, your usual side first. Items people added keep their title in front. */
+fun limitRows(list: LimitList, me: String, partnerId: String?, partnerName: String?, usual: String): List<LimitRow> {
+    val mine = list.people.firstOrNull { it.userId == me }?.sides
+    val theirs = partnerId?.let { id -> list.people.firstOrNull { it.userId == id }?.sides }
+    return byCategory(list.items).flatMap { (_, items) ->
+        items.flatMap { item ->
+            listOf(usual, otherSide(usual)).map { side ->
+                val said = limitSentence(if (side == "dom") item.sentences.dom else item.sentences.sub, partnerName)
+                val text = if (item.custom) "${item.title}, ${said.replaceFirstChar { it.lowercase() }}" else said
+                LimitRow(item, side, text, mine?.get(side)?.get(item.key), theirs?.get(otherSide(side))?.get(item.key))
+            }
         }
     }
-    return Triple(off, want, talk)
+}
+
+enum class Verdict(val label: String) { Yes("Yes"), Maybe("Maybe"), No("No") }
+
+/**
+ * Where a row lands once both have finished: a hard limit from either of you is off the table; both loving or liking it
+ * is something you both want; and where one of you is curious or wants to go slow, it's worth a talk.
+ */
+fun verdict(r: LimitRow): Verdict? {
+    val x = r.mine?.rating
+    val y = r.theirs?.rating
+    return when {
+        x == "hard" || y == "hard" -> Verdict.No
+        keen(x) && keen(y) -> Verdict.Yes
+        x != null && y != null && listOf(x, y).any { it == "curious" || it == "soft" } -> Verdict.Maybe
+        else -> null
+    }
 }
 
 @HiltViewModel
@@ -191,8 +219,8 @@ class LimitsViewModel @Inject constructor(private val api: ObeyApi, private val 
         viewModelScope.launch { _state.value = loadCatching { api.limitList(rel) } }
     }
 
-    /** Rates (or skips, with a null rating) one item, updating the list in place so tapping through stays quick. */
-    fun answer(item: LimitItem, rating: String?, note: String) {
+    /** Rates (or skips, with a null rating) one side of an item, updating the list in place so tapping through stays quick. */
+    fun answer(item: LimitItem, side: String, rating: String?, note: String) {
         val me = session?.userId ?: return
         val ready = (_state.value as? Load.Ready)?.value ?: return
         _state.value = Load.Ready(
@@ -200,14 +228,16 @@ class LimitsViewModel @Inject constructor(private val api: ObeyApi, private val 
                 people = ready.people.map { p ->
                     if (p.userId != me) p
                     else {
-                        val answers = p.answers.orEmpty().toMutableMap()
+                        val sides = p.sides ?: LimitSides()
+                        val answers = sides[side].toMutableMap()
                         if (rating != null || note.isNotEmpty()) answers[item.key] = LimitAnswer(rating, note) else answers.remove(item.key)
-                        p.copy(answers = answers, rated = answers.values.count { it.rating != null })
+                        val next = if (side == "dom") sides.copy(dom = answers) else sides.copy(sub = answers)
+                        p.copy(sides = next, rated = (next.dom.filterValues { it.rating != null }.keys + next.sub.filterValues { it.rating != null }.keys).size)
                     }
                 },
             ),
         )
-        action(onError = { load() }) { api.answerLimit(sessions.requireRelationshipId(), item.key, LimitAnswerInput(rating, note)) }
+        action(onError = { load() }) { api.answerLimit(sessions.requireRelationshipId(), item.key, LimitAnswerInput(rating, note, side)) }
     }
 
     fun add(category: String, title: String, done: () -> Unit) = action {
@@ -229,10 +259,10 @@ class LimitsViewModel @Inject constructor(private val api: ObeyApi, private val 
         done()
     }
 
-    /** Draws the diamond table to a PNG in the cache and opens the share sheet. */
-    fun share(context: Context, list: LimitList, people: List<Member>, colors: ChartColors) = action {
+    /** Draws the rows to a PNG in the cache and opens the share sheet. */
+    fun share(context: Context, rows: List<LimitRow>, names: List<String>, colors: ChartColors) = action {
         val file = withContext(Dispatchers.Default) {
-            val bitmap = chartBitmap(list, people, colors)
+            val bitmap = chartBitmap(rows, names, colors)
             val dir = File(context.cacheDir, "share").apply { mkdirs() }
             File(dir, "limits.png").also { f -> f.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) } }
         }
@@ -284,7 +314,11 @@ private fun Key() {
     }
 }
 
-/** Mockup 24: what you both want, what's worth a talk and what's off the table, then every answer as diamonds. */
+/**
+ * Mockup 24, with each item said both ways round (limits-sides/4-tabs): once you've both finished, tabs for what you
+ * both want, what's worth a talk, what's off the table and every answer; each row is a sentence with your diamond and
+ * your partner's.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LimitsScreen(onEdit: () -> Unit, vm: LimitsViewModel = hiltViewModel()) {
@@ -296,13 +330,20 @@ fun LimitsScreen(onEdit: () -> Unit, vm: LimitsViewModel = hiltViewModel()) {
     val session = vm.session ?: return
     val self = session.myMember ?: return
     val partner = if (session.solo) null else session.partners.firstOrNull()
+    val usual = usualSide(self.role, partner?.role)
     val context = LocalContext.current
     val colors = chartColors()
+    var picked by rememberSaveable { mutableStateOf<String?>(null) }
     val list = (state as? Load.Ready)?.value
     val mine = list?.people?.firstOrNull { it.userId == self.userId }
     val theirs = partner?.let { p -> list?.people?.firstOrNull { it.userId == p.userId } }
-    val both = partner != null && mine?.answers != null && theirs?.answers != null
-    val people = if (both) listOf(self, partner!!) else listOf(self)
+    val both = partner != null && mine?.sides != null && theirs?.sides != null
+    val rows = list?.let { limitRows(it, self.userId, if (both) partner!!.userId else null, partner?.displayName, usual) }.orEmpty()
+    val counts = Verdict.entries.associateWith { v -> rows.count { verdict(it) == v } }
+    val answered = rows.filter { r -> r.mine?.rating != null || r.mine?.note?.isNotEmpty() == true || (both && (r.theirs?.rating != null || r.theirs?.note?.isNotEmpty() == true)) }
+    val tab = picked ?: Verdict.entries.firstOrNull { counts[it]!! > 0 }?.name ?: "All"
+    val shown = if (!both || tab == "All") answered else rows.filter { verdict(it)?.name == tab }
+    val names = if (both) listOf(self.displayName, partner!!.displayName) else listOf(self.displayName)
     val total = list?.items?.size ?: 0
     val edit = { key: String? -> openAt = key; onEdit() }
     val status = when {
@@ -320,7 +361,7 @@ fun LimitsScreen(onEdit: () -> Unit, vm: LimitsViewModel = hiltViewModel()) {
                 title = { Text("Limits") },
                 navigationIcon = { MenuButton() },
                 actions = {
-                    if (list != null) IconButton(onClick = { vm.share(context, list, people, colors) }) { Icon(Icons.Outlined.IosShare, "Save as an image") }
+                    if (list != null) IconButton(onClick = { vm.share(context, rows, names, colors) }) { Icon(Icons.Outlined.IosShare, "Save as an image") }
                     SafeWordAction()
                 },
             )
@@ -329,23 +370,24 @@ fun LimitsScreen(onEdit: () -> Unit, vm: LimitsViewModel = hiltViewModel()) {
     ) { padding ->
         Column(
             Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(28.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             when (val s = state) {
                 Load.Loading -> LoadingBox()
                 is Load.Failed -> ErrorBox(s.message, { vm.load() })
                 is Load.Ready -> {
-                    val l = s.value
                     if (mine == null) return@Column
                     status?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     if (mine.finishedAt == null) Button(onClick = { edit(null) }, colors = inkButtonColors()) { Text(if (mine.rated > 0) "Carry on" else "Start") }
                     if (both) {
-                        val (off, want, talk) = together(l.items, mine.answers.orEmpty(), theirs?.answers.orEmpty())
-                        PillGroup("You both want", want, Tone.Ink)
-                        PillGroup("Worth talking about", talk, Tone.Outline)
-                        PillGroup("Off the table", off, Tone.Accent)
+                        PillRow {
+                            Verdict.entries.forEach { v ->
+                                PillSegment(selected = tab == v.name, onClick = { picked = v.name }) { Text("${v.label} ${counts[v]}", maxLines = 1) }
+                            }
+                            PillSegment(selected = tab == "All", onClick = { picked = "All" }) { Text("All ${answered.size}", maxLines = 1) }
+                        }
                     }
-                    Table(l, people, self.userId) { edit(it.key) }
+                    Rows(shown, if (both) listOf("You", partner!!.displayName) else listOf("You")) { edit(it.key) }
                     if (mine.finishedAt != null) OutlinedButton(onClick = { edit(null) }) { Text("Change your answers") }
                 }
             }
@@ -353,77 +395,45 @@ fun LimitsScreen(onEdit: () -> Unit, vm: LimitsViewModel = hiltViewModel()) {
     }
 }
 
-
-private enum class Tone { Ink, Outline, Accent }
-
-@OptIn(ExperimentalLayoutApi::class)
+/** Rows by category, a diamond per person; notes sit under their row, and tapping a row changes your answer. */
 @Composable
-private fun PillGroup(title: String, items: List<LimitItem>, tone: Tone) {
-    if (items.isEmpty()) return
+private fun Rows(rows: List<LimitRow>, names: List<String>, onOpen: (LimitItem) -> Unit) {
+    if (rows.isEmpty()) return
     val c = MaterialTheme.colorScheme
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Eyebrow(title)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            items.forEach { i ->
-                val (bg, line, fg) = when (tone) {
-                    Tone.Ink -> Triple(c.onSurface, c.onSurface, c.surface)
-                    Tone.Outline -> Triple(Color.Transparent, c.onSurface, c.onSurface)
-                    Tone.Accent -> Triple(Color.Transparent, c.primary, c.primary)
-                }
-                Text(
-                    i.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = fg,
-                    modifier = Modifier.clip(CircleShape).background(bg).border(1.dp, line, CircleShape).padding(horizontal = 18.dp, vertical = 8.dp),
-                )
-            }
-        }
-    }
-}
-
-/** Every rated item by category, a column of diamonds per person; tapping a row changes your answer. */
-@Composable
-private fun Table(list: LimitList, people: List<Member>, me: String, onOpen: (LimitItem) -> Unit) {
-    fun answersOf(m: Member) = list.people.firstOrNull { it.userId == m.userId }?.answers.orEmpty()
-    val c = MaterialTheme.colorScheme
-    val groups = byCategory(list.items).map { (cat, items) -> cat to items.filter { i -> people.any { answersOf(it)[i.key]?.rating != null } } }.filter { it.second.isNotEmpty() }
-    if (groups.isEmpty()) return
-    val names = people.joinToString(" · ") { if (it.userId == me) "You" else it.displayName }
     Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
-        HorizontalDivider(color = c.outlineVariant)
-        groups.forEach { (category, items) ->
+        rows.groupBy { it.item.category }.forEach { (category, items) ->
             Column {
                 Row {
                     Text(category, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant, modifier = Modifier.weight(1f))
-                    Text(names, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
+                    Text(names.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
                 }
-                items.forEach { i ->
-                    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable { onOpen(i) }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(i.title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                        people.forEach { m -> Box(Modifier.width(40.dp), contentAlignment = Alignment.Center) { RatingMark(answersOf(m)[i.key]?.rating, 18.dp) } }
+                items.forEach { r ->
+                    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable { onOpen(r.item) }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(r.text, style = MaterialTheme.typography.bodyLarge)
+                            listOfNotNull(
+                                r.mine?.note?.takeIf { it.isNotEmpty() }?.let { "You" to it },
+                                r.theirs?.note?.takeIf { it.isNotEmpty() && names.size > 1 }?.let { names[1] to it },
+                            ).forEach { (who, note) ->
+                                Text(
+                                    "“$note” · $who",
+                                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp, lineHeight = 24.sp, fontStyle = FontStyle.Italic),
+                                    color = c.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 4.dp),
+                                )
+                            }
+                        }
+                        listOf(r.mine, r.theirs).take(names.size).forEach { a -> Box(Modifier.width(40.dp), contentAlignment = Alignment.Center) { RatingMark(a?.rating, 18.dp) } }
                     }
                     HorizontalDivider(color = c.outlineVariant)
                 }
             }
         }
         Key()
-        val notes = people.flatMap { m -> list.items.filter { answersOf(m)[it.key]?.note?.isNotEmpty() == true }.map { Triple(it, if (m.userId == me) "You" else m.displayName, answersOf(m)[it.key]!!.note) } }
-        if (notes.isNotEmpty()) {
-            Column {
-                Eyebrow("Notes")
-                notes.forEach { (item, who, note) ->
-                    Column(Modifier.padding(vertical = 12.dp)) {
-                        Text("${item.title} · $who", style = MaterialTheme.typography.bodyLarge)
-                        Text("“$note”", style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 28.sp, fontStyle = FontStyle.Italic))
-                    }
-                    HorizontalDivider(color = c.outlineVariant)
-                }
-            }
-        }
     }
 }
 
-/** Mockup 73: one item at a time, the five answers as rows, then on to the next. */
+/** Mockup 73, both ways round: one item at a time, a sentence for each side with the five answers under it. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LimitsEditScreen(onClose: () -> Unit, vm: LimitsViewModel = hiltViewModel()) {
@@ -437,17 +447,19 @@ fun LimitsEditScreen(onClose: () -> Unit, vm: LimitsViewModel = hiltViewModel())
     val self = session.myMember ?: return
     val partner = if (session.solo) null else session.partners.firstOrNull()
     var at by rememberSaveable { mutableStateOf<Int?>(null) }
-    var noting by remember { mutableStateOf<LimitItem?>(null) }
+    var noting by remember { mutableStateOf<Pair<LimitItem, String>?>(null) }
     var adding by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     val list = (state as? Load.Ready)?.value
     val mine = list?.people?.firstOrNull { it.userId == self.userId }
-    val answers = mine?.answers.orEmpty()
+    val answers = mine?.sides ?: LimitSides()
+    val usual = usualSide(self.role, partner?.role)
+    fun rated(key: String) = answers.dom[key]?.rating != null || answers.sub[key]?.rating != null
     // In category order, so "4 of 12" counts within a category.
     val items = list?.let { byCategory(it.items).flatMap { (_, xs) -> xs } }.orEmpty()
     val index = at ?: run {
         val asked = openAt?.let { k -> items.indexOfFirst { it.key == k } } ?: -1
-        if (asked >= 0) asked else items.indexOfFirst { answers[it.key]?.rating == null }.let { if (it >= 0) it else items.size }
+        if (asked >= 0) asked else items.indexOfFirst { !rated(it.key) }.let { if (it >= 0) it else items.size }
     }
     val item = items.getOrNull(index)
     fun go(n: Int) { at = n.coerceIn(0, items.size) }
@@ -486,36 +498,48 @@ fun LimitsEditScreen(onClose: () -> Unit, vm: LimitsViewModel = hiltViewModel())
                     }
                     if (item != null) {
                         Text(item.title, style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 40.dp))
-                        Text("For you, as the ${self.role.label}.", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
-                        Column(Modifier.padding(top = 24.dp).selectableGroup(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Rating.entries.forEach { r ->
-                                val on = answers[item.key]?.rating == r.key
-                                Row(
-                                    Modifier.fillMaxWidth().height(64.dp).clip(RoundedCornerShape(12.dp))
-                                        .background(if (on) c.surfaceContainer else c.surfaceContainerLowest)
-                                        .border(1.dp, if (on) c.onSurface else c.outlineVariant, RoundedCornerShape(12.dp))
-                                        .selectable(selected = on, role = Role.RadioButton) {
-                                            vm.answer(item, if (on) null else r.key, answers[item.key]?.note.orEmpty())
-                                            if (!on) go(index + 1)
-                                        }
-                                        .padding(horizontal = 24.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(20.dp),
-                                ) {
-                                    if (r == Rating.Hard) Box(Modifier.size(16.dp).rotate(45f).background(if (on) c.primary else Color.Transparent).border(1.5.dp, c.primary))
-                                    else Diamond(if (on) DiamondState.Done else DiamondState.Open, size = 16.dp)
-                                    Text(if (r == Rating.Soft) "Soft limit, go slow" else r.label, style = MaterialTheme.typography.bodyLarge)
+                        listOf(usual, otherSide(usual)).forEach { side ->
+                            val a = answers[side][item.key]
+                            val said = limitSentence(if (side == "dom") item.sentences.dom else item.sentences.sub, partner?.displayName)
+                            Row(Modifier.padding(top = 28.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(said, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f, fill = false))
+                                    if (side != usual) Text("Optional", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant, modifier = Modifier.padding(start = 8.dp))
+                                }
+                                Text(
+                                    if (a?.note.isNullOrEmpty()) "Add a note" else "Change the note",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = c.primary,
+                                    modifier = Modifier.clickable { noting = item to side }.padding(vertical = 4.dp),
+                                )
+                            }
+                            Row(Modifier.padding(top = 12.dp).fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Rating.entries.forEach { r ->
+                                    val on = a?.rating == r.key
+                                    Column(
+                                        Modifier.weight(1f).height(64.dp).clip(RoundedCornerShape(12.dp))
+                                            .background(if (on) c.surfaceContainer else c.surfaceContainerLowest)
+                                            .border(1.dp, if (on) c.onSurface else c.outlineVariant, RoundedCornerShape(12.dp))
+                                            .selectable(selected = on, role = Role.RadioButton) {
+                                                vm.answer(item, side, if (on) null else r.key, a?.note.orEmpty())
+                                                if (!on && answers[otherSide(side)][item.key]?.rating != null) go(index + 1)
+                                            },
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center,
+                                    ) {
+                                        RatingMark(r.key, 13.dp)
+                                        Text(r.label, style = MaterialTheme.typography.bodySmall, maxLines = 1, softWrap = false, modifier = Modifier.padding(top = 8.dp))
+                                    }
                                 }
                             }
+                            a?.note?.takeIf { it.isNotEmpty() }?.let {
+                                Text("“$it”", style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 28.sp, fontStyle = FontStyle.Italic), color = c.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))
+                            }
                         }
-                        answers[item.key]?.note?.takeIf { it.isNotEmpty() }?.let {
-                            Text("“$it”", style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 28.sp, fontStyle = FontStyle.Italic), color = c.onSurfaceVariant, modifier = Modifier.padding(top = 16.dp))
-                        }
-                        Row(Modifier.padding(top = 16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            TextButton(onClick = { noting = item }) { Text(if (answers[item.key]?.note.isNullOrEmpty()) "Add a note" else "Change the note", color = c.primary) }
+                        Row(Modifier.padding(top = 20.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Spacer(Modifier.weight(1f))
                             if (index > 0) TextButton(onClick = { go(index - 1) }) { Text("Previous", color = c.onSurfaceVariant) }
-                            TextButton(onClick = { go(index + 1) }) { Text(if (answers[item.key]?.rating != null) "Next" else "Skip", color = c.onSurfaceVariant) }
+                            TextButton(onClick = { go(index + 1) }) { Text(if (rated(item.key)) "Next" else "Skip", color = c.onSurfaceVariant) }
                         }
                     } else {
                         Text(if (mine.finishedAt != null) "All saved" else "That's all of them", style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 40.dp))
@@ -540,13 +564,13 @@ fun LimitsEditScreen(onClose: () -> Unit, vm: LimitsViewModel = hiltViewModel())
         }
     }
 
-    noting?.let { noted ->
-        var note by remember(noted.key) { mutableStateOf(answers[noted.key]?.note.orEmpty()) }
+    noting?.let { (noted, side) ->
+        var note by remember(noted.key, side) { mutableStateOf(answers[side][noted.key]?.note.orEmpty()) }
         AlertDialog(
             onDismissRequest = { noting = null },
-            title = { Text(noted.title) },
+            title = { Text(limitSentence(if (side == "dom") noted.sentences.dom else noted.sentences.sub, partner?.displayName)) },
             text = { LettersField(note, { note = it.take(500) }, label = { Text("Note") }, placeholder = { Text("Only soft ones, and not for long") }, modifier = Modifier.fillMaxWidth()) },
-            confirmButton = { Button(onClick = { vm.answer(noted, answers[noted.key]?.rating, note.trim()); noting = null }, colors = inkButtonColors()) { Text("Save") } },
+            confirmButton = { Button(onClick = { vm.answer(noted, side, answers[side][noted.key]?.rating, note.trim()); noting = null }, colors = inkButtonColors()) { Text("Save") } },
             dismissButton = { TextButton(onClick = { noting = null }) { Text("Cancel") } },
         )
     }
@@ -590,10 +614,10 @@ fun LimitsEditScreen(onClose: () -> Unit, vm: LimitsViewModel = hiltViewModel())
     }
 }
 
-/** The diamond table as a picture, for sharing, in the theme's colours: one column for a phone. */
-private fun chartBitmap(list: LimitList, people: List<Member>, colors: ChartColors): Bitmap {
-    fun answersOf(m: Member) = list.people.firstOrNull { it.userId == m.userId }?.answers.orEmpty()
-    val groups = byCategory(list.items).map { (c, items) -> c to items.filter { i -> people.any { answersOf(it)[i.key]?.rating != null } } }.filter { it.second.isNotEmpty() }
+/** The rows as a picture, for sharing, in the theme's colours: one column for a phone. */
+private fun chartBitmap(rows: List<LimitRow>, names: List<String>, colors: ChartColors): Bitmap {
+    val both = names.size > 1
+    val groups = rows.filter { it.mine?.rating != null || (both && it.theirs?.rating != null) }.groupBy { it.item.category }.toList()
     val s = 2f
     val w = 520f
     val pad = 32f
@@ -623,7 +647,7 @@ private fun chartBitmap(list: LimitList, people: List<Member>, colors: ChartColo
         c.drawPath(path, paint)
     }
     c.drawText("Limits", pad, 80f, font(52f, serif = true))
-    c.drawText(people.joinToString(" and ") { it.displayName }, pad, 110f, font(15f, color = colors.muted))
+    c.drawText(names.joinToString(" and "), pad, 110f, font(15f, color = colors.muted))
     var kx = pad
     Rating.entries.forEach { r ->
         diamond(kx + 5, 130f, 5f, r)
@@ -634,21 +658,21 @@ private fun chartBitmap(list: LimitList, people: List<Member>, colors: ChartColo
     var y = top
     for ((category, items) in groups) {
         c.drawText(category, pad, y + 20, font(14f, color = colors.muted))
-        people.forEachIndexed { i, p ->
-            val cx = pad + colW - 20 - (people.size - 1 - i) * 52
+        names.forEachIndexed { i, p ->
+            val cx = pad + colW - 20 - (names.size - 1 - i) * 52
             font(14f, color = colors.muted).textAlign = Paint.Align.CENTER
-            c.drawText(if (p.displayName.length > 6) p.displayName.take(1).uppercase() else p.displayName, cx, y + 20, text)
+            c.drawText(if (p.length > 6) p.take(1).uppercase() else p, cx, y + 20, text)
         }
-        items.forEachIndexed { n, item ->
+        items.forEachIndexed { n, r ->
             val ry = y + 40 + n * row
             font(17f)
-            var t = item.title
-            val max = colW - 30 - people.size * 52
+            var t = r.text
+            val max = colW - 30 - names.size * 52
             while (text.measureText(t) > max && t.length > 1) t = t.dropLast(1)
-            c.drawText(if (t == item.title) t else "$t…", pad, ry + 26, text)
-            people.forEachIndexed { i, p ->
-                val cx = pad + colW - 20 - (people.size - 1 - i) * 52
-                Rating.of(answersOf(p)[item.key]?.rating)?.let { diamond(cx, ry + 20, 8f, it) }
+            c.drawText(if (t == r.text) t else "$t…", pad, ry + 26, text)
+            listOf(r.mine, r.theirs).take(names.size).forEachIndexed { i, a ->
+                val cx = pad + colW - 20 - (names.size - 1 - i) * 52
+                Rating.of(a?.rating)?.let { diamond(cx, ry + 20, 8f, it) }
             }
             paint.color = colors.line; paint.style = Paint.Style.STROKE; paint.strokeWidth = 1f
             c.drawLine(pad, ry + row, pad + colW, ry + row, paint)
