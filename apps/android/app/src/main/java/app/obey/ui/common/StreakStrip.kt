@@ -1,17 +1,13 @@
 package app.obey.ui.common
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
@@ -19,7 +15,7 @@ import app.obey.api.TaskStreak
 
 private const val SLOTS = 7
 
-/** The last few results as dots (done filled, excused hollow, missed red) and the current streak. Draws nothing without history. */
+/** The last few results as small diamonds (done filled, excused muted, missed in the accent) and the current streak. Draws nothing without history. */
 @Composable
 fun StreakStrip(streak: TaskStreak?, modifier: Modifier = Modifier) {
     if (streak == null || streak.recent.isEmpty()) return
@@ -30,18 +26,18 @@ fun StreakStrip(streak: TaskStreak?, modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             repeat(SLOTS - streak.recent.size.coerceAtMost(SLOTS)) {
-                Box(Modifier.size(8.dp).background(colors.outlineVariant.copy(alpha = 0.5f), CircleShape))
+                Diamond(DiamondState.Off, Modifier.alpha(0.5f), size = 7.dp)
             }
             streak.recent.takeLast(SLOTS).forEach { r ->
-                val dot = Modifier.size(8.dp)
-                Box(
+                Diamond(
                     when (r) {
-                        "completed" -> dot.background(colors.primary, CircleShape)
-                        "missed" -> dot.background(colors.error, CircleShape)
-                        else -> dot.border(1.5.dp, colors.outline, CircleShape)
+                        "completed" -> DiamondState.Done
+                        "missed" -> DiamondState.Owed
+                        else -> DiamondState.Off
                     },
+                    size = 7.dp,
                 )
             }
         }

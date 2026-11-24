@@ -5,6 +5,7 @@ import androidx.compose.ui.semantics.semantics
 import app.obey.ui.common.LocalFeatures
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Row
+import app.obey.ui.common.rowClickable
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
@@ -239,34 +240,31 @@ fun TaskListScreen(
 private fun KitReview(drafts: List<Task>, session: Session?, onOpen: (String) -> Unit, onSend: (String) -> Unit, onDrop: (Task) -> Unit) {
     val who = drafts.map { session?.nameOf(it.assigneeId) ?: "them" }.distinct().joinToString(" and ")
     val c = MaterialTheme.colorScheme
-    Surface(
-        color = androidx.compose.ui.graphics.Color.Transparent,
-        contentColor = c.onSurface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, c.primary),
-        shape = MaterialTheme.shapes.medium,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Look these over before $who gets them", style = MaterialTheme.typography.titleMedium)
-                Text("Added from a kit. Change or drop any of them, then send. $who hears once, when you do.", style = MaterialTheme.typography.bodyMedium)
-            }
-            Column(Modifier.clip(RoundedCornerShape(16.dp)), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                drafts.forEach { t ->
-                    ListItem(
-                        modifier = Modifier.clickable { onOpen(t.id) },
-                        colors = ListItemDefaults.colors(containerColor = c.surfaceContainerLow),
-                        headlineContent = { Text(t.title) },
-                        supportingContent = { Text(listOfNotNull(t.summary, t.dueTime?.let { "at ${formatClock(it)}" }).joinToString(" ")) },
-                        trailingContent = { IconButton(onClick = { onDrop(t) }) { Icon(Icons.Outlined.Delete, "Drop “${t.title}”") } },
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
+        app.obey.ui.common.Eyebrow("From a kit")
+        Text("$who gets these once you send them.", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
+        HorizontalDivider(color = c.outlineVariant)
+        drafts.forEach { t ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(
+                    Modifier.weight(1f).rowClickable { onOpen(t.id) }.padding(vertical = 12.dp),
+                ) {
+                    Text(t.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1)
+                    Text(
+                        listOfNotNull(t.summary, t.dueTime?.let { "at ${formatClock(it)}" }).joinToString(" "),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = c.onSurfaceVariant,
+                        maxLines = 1,
                     )
                 }
+                IconButton(onClick = { onDrop(t) }) { Icon(Icons.Outlined.Delete, "Drop “${t.title}”") }
             }
-            Button(onClick = { onSend(who) }) {
-                Icon(Icons.AutoMirrored.Outlined.Send, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Send to $who")
-            }
+            HorizontalDivider(color = c.outlineVariant)
+        }
+        Button(onClick = { onSend(who) }, modifier = Modifier.padding(top = 16.dp)) {
+            Icon(Icons.AutoMirrored.Outlined.Send, null, Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Send to $who")
         }
     }
 }

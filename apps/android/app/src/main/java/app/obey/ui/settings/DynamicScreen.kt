@@ -68,7 +68,6 @@ import androidx.compose.material3.SnackbarHostState
 import app.obey.ui.common.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -91,6 +90,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.obey.ui.common.BackLink
+import app.obey.ui.common.PageHeader
 import app.obey.api.DynamicDate
 import app.obey.api.Features
 import app.obey.api.Member
@@ -272,15 +272,18 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
     Scaffold(
         topBar = {
             if (people) {
-                LargeTopAppBar(title = { Text("People") }, navigationIcon = { BackLink("Your dynamic") { people = false } })
+                PageHeader(
+                title = "People", navigation = { BackLink("Your dynamic") { people = false } })
             } else if (ai) {
-                LargeTopAppBar(title = { Text("AI access") }, navigationIcon = { BackLink("Your dynamic") { ai = false } })
+                PageHeader(
+                title = "AI access", navigation = { BackLink("Your dynamic") { ai = false } })
             } else if (how) {
-                LargeTopAppBar(title = { Text("How it works") }, navigationIcon = { BackLink("Your dynamic") { how = false } })
+                PageHeader(
+                title = "How it works", navigation = { BackLink("Your dynamic") { how = false } })
             } else {
                 TopAppBar(
                     title = {},
-                    navigationIcon = { BackLink("Us", onBack) },
+                    navigation = { BackLink("Us", onBack) },
                     actions = {
                         if (!ended) IconButton(onClick = { vm.clearInvite(); dialog = "invite" }) { Icon(Icons.Outlined.PersonAdd, "Invite someone") }
                     },

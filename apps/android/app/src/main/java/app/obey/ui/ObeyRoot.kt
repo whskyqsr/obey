@@ -28,6 +28,7 @@ import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.Today
+import app.obey.ui.common.rowClickable
 import app.obey.ui.common.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -249,7 +250,7 @@ private fun NewSheet(items: List<NewItem>, onSwap: (() -> Unit)?, onInvite: (() 
             items.forEachIndexed { i, item ->
                 if (i > 0) HorizontalDivider(color = c.outlineVariant)
                 Row(
-                    Modifier.fillMaxWidth().clickable { onDismiss(); item.go() }.padding(vertical = 14.dp),
+                    Modifier.fillMaxWidth().rowClickable { onDismiss(); item.go() }.padding(vertical = 14.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {

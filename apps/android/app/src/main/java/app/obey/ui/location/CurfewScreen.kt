@@ -44,7 +44,6 @@ import app.obey.ui.common.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
@@ -61,6 +60,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.obey.ui.common.BackLink
+import app.obey.ui.common.PageHeader
 import app.obey.api.Consequence
 import app.obey.api.Curfew
 import app.obey.api.CurfewInput
@@ -158,9 +158,9 @@ fun CurfewScreen(onBack: () -> Unit, onPlaces: () -> Unit, vm: CurfewViewModel =
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
-                title = { Text("Curfew") },
-                navigationIcon = { BackLink("Location", onBack) },
+            PageHeader(
+                title = "Curfew",
+                navigation = { BackLink("Location", onBack) },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -193,7 +193,7 @@ fun CurfewScreen(onBack: () -> Unit, onPlaces: () -> Unit, vm: CurfewViewModel =
                     return@Column
                 }
                 if (list.isEmpty()) {
-                    Text("Curfew checks that they're at a place. Add Home first.", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
+                    Text("Curfew checks that ${if (mine) "you're" else "$who is"} at a place. Add Home first.", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
                     OutlinedButton(onClick = onPlaces, shape = MaterialTheme.shapes.small) { Text("Add a place") }
                     return@Column
                 }

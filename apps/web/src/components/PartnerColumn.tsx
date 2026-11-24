@@ -12,7 +12,7 @@ import { excerpt } from "../pages/Notes";
  * what's coming up, set on hairlines without boxes.
  */
 export function PartnerColumn() {
-  const { rel, me, isDom, solo, features, memberName } = useRel();
+  const { rel, me, isDom, solo, features } = useRel();
   const partner = rel.members.find((m) => m.userId !== me.user.id) ?? rel.members.find((m) => m.userId === me.user.id)!;
   // The numbers are about whoever earns: the submissive (for a Dominant), else yourself.
   const earner = isDom && !solo ? partner.userId : me.user.id;
@@ -77,7 +77,7 @@ export function PartnerColumn() {
           <h2 className="eyebrow">Coming up</h2>
           <div className="mt-2 flex flex-col divide-y divide-outline-variant">
             {coming.map((e) => (
-              <ComingRow key={e.id} title={e.title} sub={planLine(e, rel.members, me.user.id, memberName)} />
+              <ComingRow key={e.id} title={e.title} sub={planLine(e)} />
             ))}
             {opens && <ComingRow title="Monthly review opens" sub={fmtDate(opens, { month: "short", day: "numeric" })} />}
           </div>
@@ -105,11 +105,30 @@ function ComingRow({ title, sub }: { title: string; sub: string }) {
   );
 }
 
-/** "Fri 7–10 PM". */
-function planLine(e: CalendarEvent, members: { userId: string }[], myId: string, memberName: (id: string) => string) {
-  const day = fmtDate(localDateOf(new Date(e.startsAt)), { weekday: "short" });
-  const when = e.allDay ? `${day}, all day` : `${day} ${fmtTime(e.startsAt)}–${fmtTime(e.endsAt)}`;
-  return when;
+/** How a day reads in Coming up: "Today", "Tomorrow", a weekday within the week, otherwise "Dec 3". */
+function dayWord(d: string, lower = false) {
+  const t = today();
+  if (d === t) return lower ? "today" : "Today";
+  if (d === addDays(t, 1)) return lower ? "tomorrow" : "Tomorrow";
+  const ahead = (Date.parse(d) - Date.parse(t)) / 86_400_000;
+  return ahead > 0 && ahead < 7 ? fmtDate(d, { weekday: "short" }) : fmtDate(d, { month: "short", day: "numeric" });
+}
+
+/**
+ * When a plan is, said from now: "Tomorrow 7:00–10:00 PM", "Fri–Sun", or, once it has started, "Until Fri" (a plan
+ * that began days ago isn't named by its first day).
+ */
+export function planLine(e: CalendarEvent, now = new Date()) {
+  const first = localDateOf(new Date(e.startsAt));
+  // All-day plans end at midnight after their last day.
+  const last = localDateOf(new Date(Date.parse(e.endsAt) - (e.allDay ? 1 : 0)));
+  const started = Date.parse(e.startsAt) <= now.getTime();
+  if (started) {
+    if (last === today()) return e.allDay ? "Today" : `Until ${fmtTime(e.endsAt)}`;
+    return `Until ${dayWord(last, true)}`;
+  }
+  if (first !== last) return `${dayWord(first)}–${dayWord(last, true)}`;
+  return e.allDay ? `${dayWord(first)}, all day` : `${dayWord(first)} ${fmtTime(e.startsAt)}–${fmtTime(e.endsAt)}`;
 }
 
 /** Days in a row, counting back from yesterday (today counts once something's done), with tasks due and none missed. */

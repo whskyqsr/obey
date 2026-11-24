@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import app.obey.ui.common.rowClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -464,7 +465,7 @@ private fun Questions(s: MonthSummary, session: Session, mine: MonthReview?, bus
             Question.entries.forEachIndexed { i, q ->
                 if (i > 0) HorizontalDivider(color = colors.outlineVariant)
                 Row(
-                    Modifier.fillMaxWidth().then(if (readOnly) Modifier else Modifier.clickable { open = if (open == q) null else q }).padding(vertical = 16.dp),
+                    Modifier.fillMaxWidth().then(if (readOnly) Modifier else Modifier.rowClickable { open = if (open == q) null else q }).padding(vertical = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Diamond(if (answered(q)) DiamondState.Done else DiamondState.Open, Modifier.padding(horizontal = 4.dp), size = 18.dp)
@@ -602,7 +603,7 @@ private fun PastMonths(past: List<PastMonth>, selected: String, current: String,
         Eyebrow("Past months")
         past.forEach { p ->
             Row(
-                Modifier.fillMaxWidth().clickable { onOpen(p.month) }.padding(vertical = 12.dp),
+                Modifier.fillMaxWidth().rowClickable { onOpen(p.month) }.padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {

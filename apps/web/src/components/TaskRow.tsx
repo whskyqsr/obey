@@ -9,7 +9,6 @@ import { useRel } from "../lib/relationship";
 import { CompleteDialog, isOpen, isOverdue, opensLabel } from "./OccurrenceCard";
 import { RitualDialog, isRitual, stepProgress } from "./Ritual";
 import { RescheduleSheet } from "./RescheduleSheet";
-import { StreakStrip } from "./StreakStrip";
 import { useNoteAfter } from "./DecisionNote";
 import { skipLabel, useSkipOccurrence } from "./useSkipOccurrence";
 import { useSwipe, type SwipeAction } from "./useSwipe";
@@ -193,9 +192,6 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
       >
         <div className={cx("truncate text-body-large text-on-surface", done && !counted && "text-on-surface-variant")}>{o.title}</div>
         <div className={cx("flex flex-wrap items-center gap-x-2 text-body-medium empty:hidden", missed ? "text-error" : "text-on-surface-variant")}>
-          <span className="contents max-md:hidden">
-            <StreakStrip taskId={o.seriesId} compact />
-          </span>
           {parts.length > 0 && <span className="truncate">{parts.join(" · ")}</span>}
           {o.mood && <span>Felt {MOOD_LABELS[o.mood - 1]!.toLowerCase()}</span>}
           {o.commentCount > 0 && (

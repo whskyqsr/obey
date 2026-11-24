@@ -33,7 +33,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -49,6 +48,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.obey.ui.common.BackLink
+import app.obey.ui.common.PageHeader
 import app.obey.api.AftercarePlan
 import app.obey.api.AftercarePlanInput
 import app.obey.api.ObeyApi
@@ -103,9 +103,9 @@ fun AftercareScreen(onBack: () -> Unit, vm: AftercareViewModel = hiltViewModel()
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
-                title = { Text("Aftercare") },
-                navigationIcon = { BackLink("Scenes", onBack) },
+            PageHeader(
+                title = "Aftercare",
+                navigation = { BackLink("Scenes", onBack) },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },

@@ -50,7 +50,6 @@ import app.obey.ui.common.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
@@ -67,6 +66,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.obey.ui.common.BackLink
+import app.obey.ui.common.PageHeader
 import app.obey.api.Consequence
 import app.obey.api.ObeyApi
 import app.obey.api.Protocol
@@ -187,9 +187,9 @@ fun RuleLogScreen(onBack: () -> Unit, onOpenTask: (String) -> Unit, vm: RuleLogV
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
-                title = { Text("Broken rules") },
-                navigationIcon = { BackLink("Rules", onBack) },
+            PageHeader(
+                title = "Broken rules",
+                navigation = { BackLink("Rules", onBack) },
                 actions = {
                     if (!readOnly) IconButton(onClick = { adding = true }) { Icon(Icons.Outlined.Add, if (isDom) "Log a broken rule" else "Own up to one") }
                 },

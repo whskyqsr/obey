@@ -140,7 +140,6 @@ fun ScenesScreen(onOpenSettings: () -> Unit, onOpen: (String) -> Unit, onAfterca
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         LazyColumn(Modifier.padding(padding).fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp)) {
-            item { Text("Only your dynamic sees these.", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant) }
             if (mine != null) item {
                 Column(
                     Modifier.padding(top = 20.dp).fillMaxWidth().clip(MaterialTheme.shapes.medium).background(c.surfaceContainerLowest)
