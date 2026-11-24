@@ -224,7 +224,7 @@ class PlanViewModel @Inject constructor(
 /** A plan in a day's list: an accent rule down its side, its title, and when and whose. [tone] is kept for callers. */
 @Composable
 fun PlanRow(e: CalendarEvent, day: LocalDate, who: String?, @Suppress("UNUSED_PARAMETER") tone: PlanTone, onOpen: () -> Unit) {
-    PlanLine(e.title, listOfNotNull(e.dayLabel(day), who, if (e.conflictIds.isNotEmpty()) "overlaps ${if (e.conflictIds.size == 1) "a task" else "${e.conflictIds.size} tasks"}" else null).joinToString(" · "), e.conflictIds.isNotEmpty(), onOpen)
+    PlanLine(e.title, listOfNotNull(e.dayLabel(day), who).joinToString(" · "), onOpen)
 }
 
 /** An all-day or multi-day plan above a day's tasks, ruled the same way as [PlanRow]. */
@@ -232,12 +232,12 @@ fun PlanRow(e: CalendarEvent, day: LocalDate, who: String?, @Suppress("UNUSED_PA
 fun PlanChip(e: CalendarEvent, day: LocalDate, @Suppress("UNUSED_PARAMETER") tone: PlanTone, onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val span = if (e.allDay && e.firstDay() == e.lastDay()) "All day" else "${formatDate(e.firstDay())} – ${formatDate(e.lastDay())}"
     Box(modifier) {
-        PlanLine(e.title, listOfNotNull(span, if (e.conflictIds.isNotEmpty()) "overlaps a task" else null).joinToString(" · "), e.conflictIds.isNotEmpty(), onOpen)
+        PlanLine(e.title, span, onOpen)
     }
 }
 
 @Composable
-private fun PlanLine(title: String, sub: String, clash: Boolean, onOpen: () -> Unit) {
+private fun PlanLine(title: String, sub: String, onOpen: () -> Unit) {
     val c = MaterialTheme.colorScheme
     Column(
         Modifier
@@ -248,7 +248,7 @@ private fun PlanLine(title: String, sub: String, clash: Boolean, onOpen: () -> U
             .padding(start = 16.dp),
     ) {
         Text(title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Text(sub, style = MaterialTheme.typography.bodyMedium, color = if (clash) c.error else c.onSurfaceVariant)
+        Text(sub, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
     }
 }
 

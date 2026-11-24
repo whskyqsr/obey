@@ -7,6 +7,7 @@ import { useMediaQuery } from "../lib/useMediaQuery";
 import { OccurrenceCard, isOverdue } from "../components/OccurrenceCard";
 import { Button, Diamond, Dialog, type DiamondState, ErrorBox, Fab, IconButton, Loading, PageHeader, SegmentedButtons, cx } from "../components/ui";
 import { useOpenOnNew } from "../lib/newParam";
+import { WeekGrid } from "../components/WeekGrid";
 import { addDays, addMonths, daysBetween, fmtDate, fmtMonth, fmtTime, localDateOf, monthGrid, startOfWeek, today } from "../lib/dates";
 import { storage } from "../lib/storage";
 import { useRel } from "../lib/relationship";
@@ -40,27 +41,6 @@ export function CalendarPage() {
   const events = useEvents(rel.id, from, to);
   const eventsOn = (d: string) => (events.data ?? []).filter((e) => eventOn(e, d));
   const clashing = useMemo(() => new Set((events.data ?? []).flatMap((e) => e.conflictIds)), [events.data]);
-  // The desktop week's all-day lane: each all-day or multi-day plan as one bar over the days it covers, packed into as few
-  // rows as fit.
-  const lanes = useMemo(() => {
-    const ends: number[] = [];
-    const bars = (events.data ?? [])
-      .filter(inTopStrip)
-      .map((e) => {
-        const on = days.map((d) => eventOn(e, d));
-        return { e, from: on.indexOf(true), to: on.lastIndexOf(true), before: !eventOn(e, days[0]!) ? false : localDateOf(new Date(e.startsAt)) < days[0]!, after: false };
-      })
-      .filter((b) => b.from >= 0)
-      .map((b) => ({ ...b, after: localDateOf(new Date(new Date(b.e.endsAt).getTime() - 1)) > days[days.length - 1]! }))
-      .sort((x, y) => x.from - y.from || y.to - y.from - (x.to - x.from) || x.e.startsAt.localeCompare(y.e.startsAt))
-      .map((b) => {
-        let lane = ends.findIndex((end) => end < b.from);
-        if (lane < 0) lane = ends.push(-1) - 1;
-        ends[lane] = b.to;
-        return { ...b, lane };
-      });
-    return { bars, count: ends.length };
-  }, [events.data, days.join()]);
   // undefined: closed; null: a new plan; otherwise that plan.
   const [plan, setPlan] = useState<CalendarEvent | null | undefined>(undefined);
   // The + menu's "Plan".
@@ -223,45 +203,14 @@ export function CalendarPage() {
           </section>
         </div>
       ) : desk ? (
-        // Letters desktop: a column per day. All-day and multi-day plans sit in a lane under the dates, one bar across the
-        // days they cover; each column then lists its timed plans and its tasks in time order.
-        <div className="mx-6 grid grid-cols-7 border-y border-outline-variant" style={{ gridTemplateRows: `auto repeat(${lanes.count}, auto) 1fr` }}>
-          {days.map((d, i) => (
-            <div
-              key={`bg-${d}`}
-              aria-hidden
-              className={cx(i > 0 && "border-l border-outline-variant", d === t && "bg-surface-container-lowest")}
-              style={{ gridColumn: i + 1, gridRow: "1 / -1" }}
-            />
-          ))}
-          {days.map((d, i) => (
-            <div key={`head-${d}`} className="flex min-w-0 flex-col px-3 pt-3 pb-2" style={{ gridColumn: i + 1, gridRow: 1 }}>
-              <span className={cx("text-label-medium", d === t ? "text-primary" : "text-on-surface-variant")}>{fmtDate(d, { weekday: "short" })}</span>
-              <span className="font-serif text-[30px] leading-8 text-on-surface">{Number(d.slice(8))}</span>
-            </div>
-          ))}
-          {lanes.bars.map(({ e, from: a, to: b, lane, before, after }) => (
-            <div key={e.id} className="min-w-0 px-2 pb-1" style={{ gridColumn: `${a + 1} / ${b + 2}`, gridRow: lane + 2 }}>
-              <SpanItem e={e} before={before} after={after} onOpen={() => setPlan(e)} />
-            </div>
-          ))}
-          {days.map((d, i) => {
-            const items = byDay.get(d) ?? [];
-            const dayEvents = eventsOn(d)
-              .filter((e) => !inTopStrip(e))
-              .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
-            return (
-              <div key={d} className="flex min-h-[360px] min-w-0 flex-col gap-1 px-3 pt-2 pb-6" style={{ gridColumn: i + 1, gridRow: lanes.count + 2 }}>
-                {dayEvents.map((e) => (
-                  <EventItem key={e.id} e={e} onOpen={() => setPlan(e)} />
-                ))}
-                {items.map((o) => (
-                  <ColumnItem key={o.id} o={o} clash={clashing.has(o.id)} onOpen={() => setDetailId(o.id)} />
-                ))}
-              </div>
-            );
-          })}
-        </div>
+        <WeekGrid
+          days={days}
+          occurrences={(occ.data ?? []).filter((o) => o.status !== "cancelled")}
+          events={events.data ?? []}
+          clashing={clashing}
+          onOpenTask={(o) => setDetailId(o.id)}
+          onOpenEvent={setPlan}
+        />
       ) : (
         // Letters: one hairline row per day, a diamond for each task, and a word on how it went. Tap a day to open it.
         <div className="mx-4 border-t border-outline-variant md:mx-6">
@@ -358,7 +307,6 @@ function EventItem({ e, onOpen, large }: { e: CalendarEvent; onOpen(): void; lar
           {[
             e.allDay ? "All day" : `${fmtTime(e.startsAt)}–${fmtTime(e.endsAt)}`,
             whose,
-            e.conflictIds.length > 0 ? `overlaps ${e.conflictIds.length === 1 ? "a task" : `${e.conflictIds.length} tasks`}` : null,
           ]
             .filter(Boolean)
             .join(" · ")}
@@ -369,37 +317,6 @@ function EventItem({ e, onOpen, large }: { e: CalendarEvent; onOpen(): void; lar
 }
 
 /** One diamond for a day in the month: owed if anything was missed, filled once all is done, open while some are to do. */
-/**
- * An all-day or multi-day plan in the desktop week's lane: one bar across its days, with the same accent rule and owner
- * line as any plan ("Kitten"). A plan that runs on past the week shows an arrow at that edge.
- */
-function SpanItem({ e, before, after, onOpen }: { e: CalendarEvent; before: boolean; after: boolean; onOpen(): void }) {
-  const { rel, me } = useRel();
-  const whose =
-    e.withPartner || planPeople(rel).length < 2
-      ? null
-      : e.authorId === me.user.id
-        ? "You"
-        : (rel.members.find((m) => m.userId === e.authorId)?.displayName ?? "Them");
-  const meta = [
-    e.allDay ? null : `${fmtTime(e.startsAt)}–${fmtTime(e.endsAt)}`,
-    whose,
-    e.conflictIds.length > 0 ? `overlaps ${e.conflictIds.length === 1 ? "a task" : `${e.conflictIds.length} tasks`}` : null,
-  ].filter(Boolean);
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className={cx("state-layer flex w-full items-baseline gap-2 bg-primary-container/40 py-1 pr-2 text-left", before ? "pl-2" : "border-l-2 border-primary pl-2")}
-    >
-      {before && <span aria-label="continues from last week" className="text-label-small text-on-surface-variant">‹</span>}
-      <span className="max-w-full shrink-0 truncate text-body-small text-on-surface">{e.title}</span>
-      {meta.length > 0 && <span className="min-w-0 truncate text-label-small text-on-surface-variant">{meta.join(" · ")}</span>}
-      {after && <span aria-label="continues next week" className="ml-auto text-label-small text-on-surface-variant">›</span>}
-    </button>
-  );
-}
-
 function monthState(items: Occurrence[]): DiamondState | null {
   if (!items.length) return null;
   const states = items.map(dayState);

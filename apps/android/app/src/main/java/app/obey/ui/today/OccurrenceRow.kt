@@ -79,6 +79,8 @@ fun OccurrenceRow(
     /** Opens the task this occurrence belongs to. */
     onOpen: (() -> Unit)? = null,
     streak: TaskStreak? = null,
+    /** Runs into a plan that nobody has sorted out yet: the title turns oxblood. */
+    clash: Boolean = false,
 ) {
     var menu by remember { mutableStateOf(false) }
     val done = occurrence.status == OccurrenceStatus.Completed || occurrence.status == OccurrenceStatus.Excused
@@ -138,7 +140,7 @@ fun OccurrenceRow(
             }
         },
         headlineContent = {
-            Text(occurrence.title, textDecoration = if (done && !occurrence.isCounted) TextDecoration.LineThrough else null)
+            Text(occurrence.title, color = if (clash) MaterialTheme.colorScheme.error else androidx.compose.ui.graphics.Color.Unspecified, textDecoration = if (done && !occurrence.isCounted) TextDecoration.LineThrough else null)
         },
         supportingContent = if (supporting.isEmpty() && occurrence.mood == null && occurrence.commentCount == 0) null else ({
             Column {
