@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { usePendingReschedules } from "../api/hooks";
 import type { Occurrence } from "../api/types";
-import { DayRescheduleSheet } from "../components/DayRescheduleSheet";
+import { DayRescheduleSheet, WholeDayContext } from "../components/DayRescheduleSheet";
 import { isOverdue } from "../components/OccurrenceCard";
 import { RowGroup, RowLink, TaskRow } from "../components/TaskRow";
 import { CurfewStrip } from "../components/CurfewStrip";
@@ -35,7 +35,8 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
     const list = (occ.data ?? []).filter((o) => o.status !== "cancelled");
     const now = Date.now();
     const later = new Map<string, Occurrence[]>();
-    for (const o of list.filter((o) => dueDay(o) > t && o.status === "pending").sort(byDue)) later.set(dueDay(o), [...(later.get(dueDay(o)) ?? []), o]);
+    for (const o of list.filter((o) => dueDay(o) > t && o.status === "pending").sort(byDue))
+      later.set(dueDay(o), [...(later.get(dueDay(o)) ?? []), o]);
     return {
       overdue: list.filter((o) => isOverdue(o, now) && dueDay(o) < t).sort(byDue),
       today: list.filter((o) => dueDay(o) === t).sort(byDue),
@@ -50,6 +51,7 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
     const asked = new Set((pending.data ?? []).map((r) => r.occurrenceId));
     return groups.today.filter((o) => o.status === "pending" && o.assigneeId === me.user.id && !asked.has(o.id));
   }, [groups.today, me.user.id, pending.data]);
+  const openDaySheet = useCallback(() => setDaySheet(true), []);
   const name = me.user.displayName.split(" ")[0];
 
   // The Dom's "Needs you" rows are taken out of the rest of today.
@@ -89,105 +91,111 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
   useRowShortcuts(isDom ? newTask : undefined);
 
   return (
-    <RowLink.Provider value={wide ? (id) => ({ to: "/", search: { task: id }, current: id === selected }) : null}>
-      <div className="xl:flex xl:items-start">
-        <div className="min-w-0 flex-1 xl:mx-auto xl:max-w-4xl">
-          <PageHeader
-            actions={
-              wide && isDom ? (
-                <Button variant="tonal" icon="add" onClick={newTask}>
-                  New
-                </Button>
-              ) : undefined
-            }
-            hero
-            title={isDom && !solo ? `Good ${part === "night" ? "evening" : part}${name ? `, ${name}` : ""}.` : `${weekday} ${part}.`}
-            subtitle={summary}
-          />
-          {/* The Next block counts down on its own, so the separate countdown is only for what it doesn't cover. */}
-          <CountdownCard skip={next?.id} />
-          <RoleSwapCard />
-          <SoloCards />
-          <ChastityToday />
-          <CurfewStrip />
-          <SceneCards />
-          {next && <NextUp o={next} />}
-          <KitPrompt />
-          {isDom && <TodayInbox />}
-          {occ.isLoading && <Loading />}
-          {occ.error && <ErrorBox error={occ.error} onRetry={() => occ.refetch()} />}
-          {occ.data && (
-            <>
-              {groups.overdue.length > 0 && (
-                <Section title="Overdue">
-                  <RowGroup>
-                    {groups.overdue.map((o) => (
-                      <TaskRow key={o.id} o={o} showDate />
-                    ))}
-                  </RowGroup>
-                </Section>
-              )}
-              <Section
-                title={
-                  isDom && !solo && partner ? `${memberName(partner.userId)}'s ${part === "night" ? "evening" : part}` : next ? `Later ${tonight}` : "Today"
-                }
-                action={
-                  myOpenToday.length > 1 ? (
-                    <Button variant="text" icon="more_time" onClick={() => setDaySheet(true)}>
-                      More time
-                    </Button>
-                  ) : isDom && !solo && todays.length > 0 ? (
-                    <span className="text-body-small text-on-surface-variant tabular-nums">
-                      {doneToday} of {todays.length}
-                    </span>
-                  ) : undefined
-                }
-              >
-                {isDom && !solo && todays.length > 0 && <Segments done={doneToday} total={todays.length} />}
-                {restOfToday.length ? (
-                  <RowGroup>
-                    {restOfToday.map((o) => (
-                      <TaskRow key={o.id} o={o} />
-                    ))}
-                  </RowGroup>
-                ) : (
-                  <Empty
-                    icon="spa"
-                    title="Nothing due today"
-                    body={rel.endedAt ? "This dynamic has ended." : isDom ? "Add one with the button below." : "Enjoy it while it lasts."}
-                  />
+    <WholeDayContext.Provider value={myOpenToday.length > 1 ? openDaySheet : null}>
+      <RowLink.Provider value={wide ? (id) => ({ to: "/", search: { task: id }, current: id === selected }) : null}>
+        <div className="xl:flex xl:items-start">
+          <div className="min-w-0 flex-1 xl:mx-auto xl:max-w-4xl">
+            <PageHeader
+              actions={
+                wide && isDom ? (
+                  <Button variant="tonal" icon="add" onClick={newTask}>
+                    New
+                  </Button>
+                ) : undefined
+              }
+              hero
+              title={isDom && !solo ? `Good ${part === "night" ? "evening" : part}${name ? `, ${name}` : ""}.` : `${weekday} ${part}.`}
+              subtitle={summary}
+            />
+            {/* The Next block counts down on its own, so the separate countdown is only for what it doesn't cover. */}
+            <CountdownCard skip={next?.id} />
+            <RoleSwapCard />
+            <SoloCards />
+            <ChastityToday />
+            <CurfewStrip />
+            <SceneCards />
+            {next && <NextUp o={next} />}
+            <KitPrompt />
+            {isDom && <TodayInbox />}
+            {occ.isLoading && <Loading />}
+            {occ.error && <ErrorBox error={occ.error} onRetry={() => occ.refetch()} />}
+            {occ.data && (
+              <>
+                {groups.overdue.length > 0 && (
+                  <Section title="Overdue">
+                    <RowGroup>
+                      {groups.overdue.map((o) => (
+                        <TaskRow key={o.id} o={o} showDate />
+                      ))}
+                    </RowGroup>
+                  </Section>
                 )}
-              </Section>
-              {!isDom && <TodayInbox />}
-              {groups.later.length > 0 && (
-                <Section title="Later">
-                  <div className="flex flex-col gap-2">
-                    {groups.later.map(([day, items]) => (
-                      <LaterDay key={day} day={day} items={items} />
-                    ))}
-                    <Button variant="text" icon="calendar_month" className="self-start" onClick={() => navigate({ to: "/calendar" })}>
-                      See the week
-                    </Button>
-                  </div>
+                <Section
+                  title={
+                    isDom && !solo && partner
+                      ? `${memberName(partner.userId)}'s ${part === "night" ? "evening" : part}`
+                      : next
+                        ? `Later ${tonight}`
+                        : "Today"
+                  }
+                  action={
+                    myOpenToday.length > 1 ? (
+                      <button type="button" onClick={() => setDaySheet(true)} className="state-layer -mr-2 rounded-md px-2 py-1 text-body-medium text-primary">
+                        More time for today
+                      </button>
+                    ) : isDom && !solo && todays.length > 0 ? (
+                      <span className="text-body-small text-on-surface-variant tabular-nums">
+                        {doneToday} of {todays.length}
+                      </span>
+                    ) : undefined
+                  }
+                >
+                  {isDom && !solo && todays.length > 0 && <Segments done={doneToday} total={todays.length} />}
+                  {restOfToday.length ? (
+                    <RowGroup>
+                      {restOfToday.map((o) => (
+                        <TaskRow key={o.id} o={o} />
+                      ))}
+                    </RowGroup>
+                  ) : (
+                    <Empty
+                      icon="spa"
+                      title="Nothing due today"
+                      body={rel.endedAt ? "This dynamic has ended." : isDom ? "Add one with the button below." : "Enjoy it while it lasts."}
+                    />
+                  )}
                 </Section>
-              )}
-            </>
+                {!isDom && <TodayInbox />}
+                {groups.later.length > 0 && (
+                  <Section title="Later">
+                    <div className="flex flex-col gap-2">
+                      {groups.later.map(([day, items]) => (
+                        <LaterDay key={day} day={day} items={items} />
+                      ))}
+                      <Button variant="text" icon="calendar_month" className="self-start" onClick={() => navigate({ to: "/calendar" })}>
+                        See the week
+                      </Button>
+                    </div>
+                  </Section>
+                )}
+              </>
+            )}
+            {wide && occ.data && <ShortcutHints dom={isDom} />}
+            <DayRescheduleSheet tasks={myOpenToday} open={daySheet} onClose={() => setDaySheet(false)} />
+            {/* On phones the + in the tab bar starts a task. */}
+            {isDom && <Fab icon="add" label="New task" onClick={newTask} className="max-md:hidden xl:hidden" />}
+          </div>
+          {wide && (
+            <aside
+              className="sticky top-0 h-dvh w-[400px] shrink-0 overflow-y-auto border-l border-outline-variant bg-surface-container-lowest"
+              aria-label={selected ? "Task details" : "At a glance"}
+            >
+              {selected && renderTask ? renderTask(selected, () => navigate({ to: "/", search: {} })) : <PartnerColumn />}
+            </aside>
           )}
-          {wide && occ.data && <ShortcutHints dom={isDom} />}
-          <DayRescheduleSheet tasks={myOpenToday} open={daySheet} onClose={() => setDaySheet(false)} />
-          {/* On phones the + in the tab bar starts a task. */}
-          {isDom && <Fab icon="add" label="New task" onClick={newTask} className="max-md:hidden xl:hidden" />}
         </div>
-        {wide && (
-          <aside
-            className="sticky top-0 h-dvh w-[400px] shrink-0 overflow-y-auto border-l border-outline-variant bg-surface-container-lowest"
-            aria-label={selected ? "Task details" : "At a glance"}
-          >
-            {selected && renderTask ? renderTask(selected, () => navigate({ to: "/", search: {} })) : <PartnerColumn />}
-          </aside>
-        )}
-      </div>
-    </RowLink.Provider>
+      </RowLink.Provider>
+    </WholeDayContext.Provider>
   );
 }
 
@@ -205,7 +213,10 @@ function Segments({ done, total }: { done: number; total: number }) {
   return (
     <div className="mb-2 flex gap-1.5" aria-hidden>
       {Array.from({ length: Math.min(total, 12) }, (_, i) => (
-        <span key={i} className={i < Math.round((done / total) * Math.min(total, 12)) ? "h-[3px] flex-1 bg-on-surface" : "h-[3px] flex-1 bg-outline-variant"} />
+        <span
+          key={i}
+          className={i < Math.round((done / total) * Math.min(total, 12)) ? "h-[3px] flex-1 bg-on-surface" : "h-[3px] flex-1 bg-outline-variant"}
+        />
       ))}
     </div>
   );

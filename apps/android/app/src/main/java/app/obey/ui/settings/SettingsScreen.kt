@@ -163,7 +163,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, onOpenFeatures
                             if (!rel.ended) {
                                 ValueRow("Features", "${featureRows.count { it.get(rel.features) }} of ${featureRows.size} on") { page = "features" }
                             }
-                            ValueRow("Proof photos delete after", rel.proofDays?.let { if (it == 1) "1 day" else "$it days" } ?: "Never", onClick = onOpenDynamic)
+                            ValueRow("Proof photos delete after", rel.proofDays?.let { if (it == 1) "1 day" else "$it days" } ?: "Never", onClick = onOpenFeatures)
                         }
 
                         SectionHeader("Account")

@@ -75,13 +75,27 @@ fun EmptyBox(title: String, body: String? = null, modifier: Modifier = Modifier,
 
 /** A section's eyebrow: small capitals in the muted ink, the same as the web's `.eyebrow`. */
 @Composable
-fun SectionHeader(text: String, modifier: Modifier = Modifier, horizontalPadding: Dp = 16.dp) {
-    Text(
-        text.uppercase(),
-        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.padding(start = horizontalPadding, end = horizontalPadding, top = 24.dp, bottom = 8.dp),
-    )
+fun SectionHeader(text: String, modifier: Modifier = Modifier, horizontalPadding: Dp = 16.dp, action: Pair<String, () -> Unit>? = null) {
+    androidx.compose.foundation.layout.Row(
+        modifier.fillMaxWidth().padding(start = horizontalPadding, end = horizontalPadding, top = 24.dp, bottom = 8.dp),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+    ) {
+        Text(
+            text.uppercase(),
+            style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        // A quiet text link on the right, such as "More time for today".
+        action?.let { (label, go) ->
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable(onClick = go).padding(vertical = 2.dp),
+            )
+        }
+    }
 }
 
 enum class DiamondState { Open, Done, Owed, Waiting, Off }
