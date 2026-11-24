@@ -4,7 +4,7 @@ import { OwedList, useOwed } from "../components/Owed";
 import { errorMessage } from "../api/client";
 import type { Consequence } from "../api/types";
 import { ItemDialog, type FieldDef } from "../components/ItemDialog";
-import { Button, Dialog, Empty, ErrorBox, Fab, Loading, PageHeader, Section, Select, Switch, TextArea, TextField, useSnackbar } from "../components/ui";
+import { Button, Dialog, Empty, ErrorBox, Fab, Icon, Loading, PageHeader, Section, Select, Switch, TextArea, TextField, cx, useSnackbar } from "../components/ui";
 import { LOCK_TIME_OPTIONS, fmtMinutes } from "../components/Chastity";
 import { browserTimeZone, today } from "../lib/dates";
 import { useRel } from "../lib/relationship";
@@ -22,6 +22,17 @@ const FIELDS: FieldDef[] = [
 ];
 
 const SEVERITY = ["Light", "Mild", "Moderate", "Strict", "Severe"];
+
+/** Severity as five bolts, filled up to how heavy it is, as before the redesign (Jake, 2026-11-24). */
+function Severity({ level }: { level: number }) {
+  return (
+    <span className="flex shrink-0 pt-0.5 text-primary" role="img" aria-label={`Severity ${level} of 5`}>
+      {Array.from({ length: 5 }, (_, i) => (
+        <Icon key={i} name="bolt" size={16} filled={i < level} className={cx("-mx-px", i >= level && "opacity-30")} />
+      ))}
+    </span>
+  );
+}
 
 export function ConsequencesPage() {
   const { rel, me, isDom, solo, memberName, features } = useRel();
@@ -85,7 +96,10 @@ export function ConsequencesPage() {
                   className="state-layer state-row flex min-w-0 flex-1 flex-col py-3 text-left disabled:cursor-default"
                 >
                   <span className="text-body-large text-on-surface">{c.title}</span>
-                  {notes.length > 0 && <span className="line-clamp-2 text-body-medium whitespace-pre-wrap text-on-surface-variant">{notes.join(" · ")}</span>}
+                  <span className="flex items-start gap-2">
+                    <Severity level={c.severity} />
+                    <span className="line-clamp-2 min-w-0 text-body-medium whitespace-pre-wrap text-on-surface-variant">{notes.join(" · ")}</span>
+                  </span>
                 </button>
                 {isDom && (
                   <Button variant="text" className="-mr-3" onClick={() => setAssigning(c)}>

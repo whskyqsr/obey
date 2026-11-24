@@ -25,6 +25,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Exposure
 import androidx.compose.material.icons.outlined.History
@@ -242,7 +243,10 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
                                     .padding(vertical = 12.dp),
                             ) {
                                 Text(c.title, style = MaterialTheme.typography.bodyLarge)
-                                if (notes.isNotEmpty()) Text(notes.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    SeverityBolts(c.severity, Modifier.padding(top = 2.dp))
+                                    Text(notes.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                                }
                             }
                             if (canManage) TextButton(onClick = { assigning = c }) { Text("Assign") }
                         }
@@ -492,6 +496,22 @@ private fun AdjustDialog(
 }
 
 private val SEVERITY = listOf("Light", "Mild", "Moderate", "Strict", "Severe")
+
+/** Severity as five bolts, filled up to how heavy it is, as before the redesign (Jake, 2026-11-24). */
+@Composable
+private fun SeverityBolts(level: Int, modifier: Modifier = Modifier) {
+    val tint = MaterialTheme.colorScheme.primary
+    Row(modifier.semantics(mergeDescendants = true) { contentDescription = "Severity $level of 5" }) {
+        repeat(5) { i ->
+            Icon(
+                if (i < level) Icons.Filled.Bolt else Icons.Outlined.Bolt,
+                contentDescription = null,
+                tint = if (i < level) tint else tint.copy(alpha = 0.3f),
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
 
 /** "Kitten spent 20 on Choose tonight's movie." with Mark redeemed, and Add a word for a note with it. */
 @Composable

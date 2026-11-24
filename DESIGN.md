@@ -46,6 +46,7 @@ No style from the pre-Letters design may show through: no Material filled or ton
 Once Jake decides how something looks or behaves, apply it everywhere the same situation comes up, not just on the screen he pointed at. Record each decision here.
 
 - Create buttons read "+ New" (from Rules/Protocols, 2026-11-23). One per page, in the shared header; the calendar's opens Task / Plan (2026-11-24).
+- A consequence's severity shows as five oxblood bolts, filled up to its level, beside the word (Jake, 2026-11-24, bringing back the pre-redesign icons).
 - Every page header is the shared one, with its title in the same place whether or not the page has icons (2026-11-24, see Page headers).
 - No explainers under names or settings (2026-11-23).
 - Write for people who already know their dynamic: everyone who sees a screen is a partner who knows whose plans, tasks and notes are whose, so don't spell out what they already know (2026-11-24).
