@@ -1,102 +1,51 @@
 shot signin
 tap dev at 540 1433 [429,1407][652,1460]
-after signin texts: ['Tuesday morning.', 'Five left today.', 'How are you feeling after yesterday?', 'Awful', 'Low', 'Okay', 'Good', 'Great', 'Anything you still need? (optional)', 'Send', 'NEXT · 21:20 LEFT', 'Morning ritual', '8:30\u202fAM', 'Start', 'More time', 'LATER TODAY', '  More time for today', 'Make the bed', 'M', 'Us', 'Today', 'Week', 'Us']
+after signin texts: ['Tuesday morning.', 'Five left today.', 'How are you feeling after yesterday?', 'Awful', 'Low', 'Okay', 'Good', 'Great', 'Anything you still need? (optional)', 'Send', 'NEXT · IN 12H', 'Write 50 lines', '10:00\u202fPM', 'Done', 'More time', 'LATER TODAY', 'More time for today', '8:30\u202fAM', 'Morning ritual', 'Overdue', 'M', 'with Marcus', 'Today', 'Week', 'Us']
 shot sub-today
 shot sub-today-2
 shot sub-today-3
 shot sub-plus
-missing More time [('', 'More'), ('Drink water', ''), ('', 'Mark done'), ('11:59\u202fPM', ''), ('', 'More'), ('Tidy the desk', ''), ('FOR YOU · 8', ''), ('1 plan overlaps tasks', ''), ('Dinner with Jess', ''), ('1', ''), ('', 'Expand'), ('Agreement version 1', ''), ('Proposed by Marcus · “First go”', ''), ('Rules and protocols changed', ''), ('Marcus added 2 protocols, added 4 rules', ''), ('6', ''), ('', 'Expand'), ('LATER', ''), ('M', ''), ('Us', ''), ('', 'Safe word'), ('Today', ''), ('Week', ''), ('Us', ''), ('', 'New')]
-shot sub-task-count
+shot sub-plan-editor
+shot sub-plan-editor-2
 shot sub-week
+missing 24 [('', 'More'), ('Make the bed', ''), ('Yesterday 9:00\u202fAM', ''), ('', 'Completed'), ('', 'More'), ('Send a photo of your outfit', ''), ('Yesterday 10:00\u202fAM', ''), ('', 'Completed'), ('', 'More'), ('Evening walk, 30 minutes', ''), ('Yesterday 8:00\u202fPM', ''), ('', 'Completed'), ('', 'More'), ("Write tonight's journal entry", ''), ('Yesterday 10:30\u202fPM', ''), ('', 'Completed'), ('M', ''), ('with Marcus', ''), ('', 'All tasks'), ('', 'Show the month'), ('', 'Safe word'), ('Today', ''), ('Week', ''), ('Us', ''), ('', 'New')]
+missing 25 [('', 'More'), ('Make the bed', ''), ('Yesterday 9:00\u202fAM', ''), ('', 'Completed'), ('', 'More'), ('Send a photo of your outfit', ''), ('Yesterday 10:00\u202fAM', ''), ('', 'Completed'), ('', 'More'), ('Evening walk, 30 minutes', ''), ('Yesterday 8:00\u202fPM', ''), ('', 'Completed'), ('', 'More'), ("Write tonight's journal entry", ''), ('Yesterday 10:30\u202fPM', ''), ('', 'Completed'), ('M', ''), ('with Marcus', ''), ('', 'All tasks'), ('', 'Show the month'), ('', 'Safe word'), ('Today', ''), ('Week', ''), ('Us', ''), ('', 'New')]
+missing 26 [('', 'More'), ('Make the bed', ''), ('Yesterday 9:00\u202fAM', ''), ('', 'Completed'), ('', 'More'), ('Send a photo of your outfit', ''), ('Yesterday 10:00\u202fAM', ''), ('', 'Completed'), ('', 'More'), ('Evening walk, 30 minutes', ''), ('Yesterday 8:00\u202fPM', ''), ('', 'Completed'), ('', 'More'), ("Write tonight's journal entry", ''), ('Yesterday 10:30\u202fPM', ''), ('', 'Completed'), ('M', ''), ('with Marcus', ''), ('', 'All tasks'), ('', 'Show the month'), ('', 'Safe word'), ('Today', ''), ('Week', ''), ('Us', ''), ('', 'New')]
+missing 27 [('', 'More'), ('Make the bed', ''), ('Yesterday 9:00\u202fAM', ''), ('', 'Completed'), ('', 'More'), ('Send a photo of your outfit', ''), ('Yesterday 10:00\u202fAM', ''), ('', 'Completed'), ('', 'More'), ('Evening walk, 30 minutes', ''), ('Yesterday 8:00\u202fPM', ''), ('', 'Completed'), ('', 'More'), ("Write tonight's journal entry", ''), ('Yesterday 10:30\u202fPM', ''), ('', 'Completed'), ('M', ''), ('with Marcus', ''), ('', 'All tasks'), ('', 'Show the month'), ('', 'Safe word'), ('Today', ''), ('Week', ''), ('Us', ''), ('', 'New')]
+missing 28 [('', 'More'), ('Make the bed', ''), ('Yesterday 9:00\u202fAM', ''), ('', 'Completed'), ('', 'More'), ('Send a photo of your outfit', ''), ('Yesterday 10:00\u202fAM', ''), ('', 'Completed'), ('', 'More'), ('Evening walk, 30 minutes', ''), ('Yesterday 8:00\u202fPM', ''), ('', 'Completed'), ('', 'More'), ("Write tonight's journal entry", ''), ('Yesterday 10:30\u202fPM', ''), ('', 'Completed'), ('M', ''), ('with Marcus', ''), ('', 'All tasks'), ('', 'Show the month'), ('', 'Safe word'), ('Today', ''), ('Week', ''), ('Us', ''), ('', 'New')]
+missing 29 [('', 'More'), ('Make the bed', ''), ('Yesterday 9:00\u202fAM', ''), ('', 'Completed'), ('', 'More'), ('Send a photo of your outfit', ''), ('Yesterday 10:00\u202fAM', ''), ('', 'Completed'), ('', 'More'), ('Evening walk, 30 minutes', ''), ('Yesterday 8:00\u202fPM', ''), ('', 'Completed'), ('', 'More'), ("Write tonight's journal entry", ''), ('Yesterday 10:30\u202fPM', ''), ('', 'Completed'), ('M', ''), ('with Marcus', ''), ('', 'All tasks'), ('', 'Show the month'), ('', 'Safe word'), ('Today', ''), ('Week', ''), ('Us', ''), ('', 'New')]
+shot sub-week-open
+shot sub-plan-open
+shot sub-plan-open-2
 shot sub-month
-shot sub-alltasks
 shot sub-us
-shot sub-rules
-shot sub-rules-2
-shot sub-rewards
-shot sub-rewards-2
-shot sub-consequences
-shot sub-consequences-2
-shot sub-notes
-shot sub-notes-2
-shot sub-journal
-shot sub-journal-2
-shot sub-limits
-shot sub-limits-2
-shot sub-agreement
-shot sub-agreement-2
-shot sub-scenes
-shot sub-scenes-2
-shot sub-location
-shot sub-location-2
-shot sub-stats
-shot sub-stats-2
-shot sub-monthly-review
-shot sub-monthly-review-2
-shot sub-kits
-shot sub-kits-2
-shot sub-all-tasks
-shot sub-all-tasks-2
-shot sub-dynamic
-shot sub-dynamic-2
+shot sub-chastity
+shot sub-chastity-2
 shot sub-settings
-shot sub-settings-2
-shot sub-protocols
-shot sub-back-0-alltasks
-shot sub-back-1-after-system-back
-after system back: [''] ['November', 'Marcus', 'You', 'Both', 'S', 'M', 'T', 'W']
-back link texts: [('', ''), ('', ''), ('', ''), ('', 'Mark “Drink water” done'), ('', ''), ('', '')]
-shot sub-back-2-after-back-link
-missing Start [('', 'More'), ('Drink water', ''), ('', 'Mark done'), ('11:59\u202fPM', ''), ('', 'More'), ('Tidy the desk', ''), ('FOR YOU · 8', ''), ('1 plan overlaps tasks', ''), ('Dinner with Jess', ''), ('1', ''), ('', 'Expand'), ('Agreement version 1', ''), ('Proposed by Marcus · “First go”', ''), ('Rules and protocols changed', ''), ('Marcus added 2 protocols, added 4 rules', ''), ('6', ''), ('', 'Expand'), ('LATER', ''), ('M', ''), ('Us', ''), ('', 'Safe word'), ('Today', ''), ('Week', ''), ('Us', ''), ('', 'New')]
-missing More time [('', 'More'), ('Drink water', ''), ('', 'Mark done'), ('11:59\u202fPM', ''), ('', 'More'), ('Tidy the desk', ''), ('FOR YOU · 8', ''), ('1 plan overlaps tasks', ''), ('Dinner with Jess', ''), ('1', ''), ('', 'Expand'), ('Agreement version 1', ''), ('Proposed by Marcus · “First go”', ''), ('Rules and protocols changed', ''), ('Marcus added 2 protocols, added 4 rules', ''), ('6', ''), ('', 'Expand'), ('LATER', ''), ('M', ''), ('Us', ''), ('', 'Safe word'), ('Today', ''), ('Week', ''), ('Us', ''), ('', 'New')]
-missing More time [('', 'More'), ('Drink water', ''), ('', 'Mark done'), ('11:59\u202fPM', ''), ('', 'More'), ('Tidy the desk', ''), ('FOR YOU · 8', ''), ('1 plan overlaps tasks', ''), ('Dinner with Jess', ''), ('1', ''), ('', 'Expand'), ('Agreement version 1', ''), ('Proposed by Marcus · “First go”', ''), ('Rules and protocols changed', ''), ('Marcus added 2 protocols, added 4 rules', ''), ('6', ''), ('', 'Expand'), ('LATER', ''), ('M', ''), ('Us', ''), ('', 'Safe word'), ('Today', ''), ('Week', ''), ('Us', ''), ('', 'New')]
+missing Privacy [('YOU', ''), ('Kitten', ''), ('Name, photo, email', ''), ('Sunday', ''), ('Week starts on', ''), ('NOTIFICATIONS', ''), ('8 of 8', ''), ('What you hear about', ''), ('Off', ''), ('Quiet hours', ''), ("Show your partner's words", ''), ('PRIVACY', ''), ('Off', ''), ('App lock', ''), ('Blur proof photos', ''), ('Fealty', ''), ('Discreet app icon', ''), ('Widgets', ''), ('Us', ''), ('Settings', '')]
+shot sub-safecall
 shot signin
 tap dev at 540 1433 [429,1407][652,1460]
-after signin texts: ['Good morning, Marcus.', 'Three things are waiting on you. Kitten has five left today.', 'DUE IN', 'Morning ritual', 'For Kitten · 8:30\u202fAM', '14:41', "KITTEN'S AFTERCARE PLAN", 'Kitten likes: Water, Cuddles. Stay close for a while.', 'Done', 'Open the scene', 'How are you feeling after yesterday?', 'Awful', 'Low', 'Okay', 'Good', 'Great', 'Anything you still need? (optional)', 'Send', 'K', 'Us', 'Today', 'Week', 'Us']
+after signin texts: ['Good morning, Marcus.', 'Five things are waiting on you. Kitten has five left today.', "KITTEN'S AFTERCARE", 'Kitten likes: Water, Cuddles. Stay close for a while.', 'Done', 'Open the scene', 'How are you feeling after yesterday?', 'Awful', 'Low', 'Okay', 'Good', 'Great', 'Anything you still need? (optional)', 'Send', 'Kitten finished Evening walk, 30 minutes and sent a note.', 'K', 'with Kitten', 'Today', 'Week', 'Us']
 shot dom-today
 shot dom-today-2
 shot dom-today-3
 shot dom-plus
-missing Drink water [('8:30\u202fAM', ''), ('', 'More'), ('Morning ritual', ''), ('', 'Completed'), ('9:00\u202fAM', ''), ('', 'More'), ('Make the bed', ''), ('', 'Completed'), ('10:00\u202fAM', ''), ('', 'More'), ('Send a photo of your outfit', ''), ('', 'Mark done'), ('10:00\u202fPM', ''), ('', 'More'), ('Write 50 lines', ''), ('', 'Mark done'), ('10:30\u202fPM', ''), ('', 'More'), ("Write tonight's journal entry", ''), ('K', ''), ('Us', ''), ('Today', ''), ('Week', ''), ('Us', ''), ('', 'New')]
+shot dom-plan-editor
+shot dom-plan-editor-2
 shot dom-week
+missing 24 [('', 'Completed'), ('', 'More'), ('Make the bed', ''), ('Yesterday 9:00\u202fAM · Kitten', ''), ('', 'Completed'), ('', 'More'), ('Send a photo of your outfit', ''), ('Yesterday 10:00\u202fAM · Kitten', ''), ('', 'Completed'), ('', 'More'), ('Evening walk, 30 minutes', ''), ('Yesterday 8:00\u202fPM · Kitten', ''), ('', 'Completed'), ('', 'More'), ("Write tonight's journal entry", ''), ('Yesterday 10:30\u202fPM · Kitten', ''), ('', 'Completed'), ('K', ''), ('with Kitten', ''), ('', 'All tasks'), ('', 'Show the month'), ('Today', ''), ('Week', ''), ('Us', ''), ('', 'New')]
+missing 25 [('', 'Completed'), ('', 'More'), ('Make the bed', ''), ('Yesterday 9:00\u202fAM · Kitten', ''), ('', 'Completed'), ('', 'More'), ('Send a photo of your outfit', ''), ('Yesterday 10:00\u202fAM · Kitten', ''), ('', 'Completed'), ('', 'More'), ('Evening walk, 30 minutes', ''), ('Yesterday 8:00\u202fPM · Kitten', ''), ('', 'Completed'), ('', 'More'), ("Write tonight's journal entry", ''), ('Yesterday 10:30\u202fPM · Kitten', ''), ('', 'Completed'), ('K', ''), ('with Kitten', ''), ('', 'All tasks'), ('', 'Show the month'), ('Today', ''), ('Week', ''), ('Us', ''), ('', 'New')]
+missing 26 [('', 'Completed'), ('', 'More'), ('Make the bed', ''), ('Yesterday 9:00\u202fAM · Kitten', ''), ('', 'Completed'), ('', 'More'), ('Send a photo of your outfit', ''), ('Yesterday 10:00\u202fAM · Kitten', ''), ('', 'Completed'), ('', 'More'), ('Evening walk, 30 minutes', ''), ('Yesterday 8:00\u202fPM · Kitten', ''), ('', 'Completed'), ('', 'More'), ("Write tonight's journal entry", ''), ('Yesterday 10:30\u202fPM · Kitten', ''), ('', 'Completed'), ('K', ''), ('with Kitten', ''), ('', 'All tasks'), ('', 'Show the month'), ('Today', ''), ('Week', ''), ('Us', ''), ('', 'New')]
+missing 27 [('', 'Completed'), ('', 'More'), ('Make the bed', ''), ('Yesterday 9:00\u202fAM · Kitten', ''), ('', 'Completed'), ('', 'More'), ('Send a photo of your outfit', ''), ('Yesterday 10:00\u202fAM · Kitten', ''), ('', 'Completed'), ('', 'More'), ('Evening walk, 30 minutes', ''), ('Yesterday 8:00\u202fPM · Kitten', ''), ('', 'Completed'), ('', 'More'), ("Write tonight's journal entry", ''), ('Yesterday 10:30\u202fPM · Kitten', ''), ('', 'Completed'), ('K', ''), ('with Kitten', ''), ('', 'All tasks'), ('', 'Show the month'), ('Today', ''), ('Week', ''), ('Us', ''), ('', 'New')]
+missing 28 [('', 'Completed'), ('', 'More'), ('Make the bed', ''), ('Yesterday 9:00\u202fAM · Kitten', ''), ('', 'Completed'), ('', 'More'), ('Send a photo of your outfit', ''), ('Yesterday 10:00\u202fAM · Kitten', ''), ('', 'Completed'), ('', 'More'), ('Evening walk, 30 minutes', ''), ('Yesterday 8:00\u202fPM · Kitten', ''), ('', 'Completed'), ('', 'More'), ("Write tonight's journal entry", ''), ('Yesterday 10:30\u202fPM · Kitten', ''), ('', 'Completed'), ('K', ''), ('with Kitten', ''), ('', 'All tasks'), ('', 'Show the month'), ('Today', ''), ('Week', ''), ('Us', ''), ('', 'New')]
+missing 29 [('', 'Completed'), ('', 'More'), ('Make the bed', ''), ('Yesterday 9:00\u202fAM · Kitten', ''), ('', 'Completed'), ('', 'More'), ('Send a photo of your outfit', ''), ('Yesterday 10:00\u202fAM · Kitten', ''), ('', 'Completed'), ('', 'More'), ('Evening walk, 30 minutes', ''), ('Yesterday 8:00\u202fPM · Kitten', ''), ('', 'Completed'), ('', 'More'), ("Write tonight's journal entry", ''), ('Yesterday 10:30\u202fPM · Kitten', ''), ('', 'Completed'), ('K', ''), ('with Kitten', ''), ('', 'All tasks'), ('', 'Show the month'), ('Today', ''), ('Week', ''), ('Us', ''), ('', 'New')]
+shot dom-week-open
+shot dom-plan-open
+shot dom-plan-open-2
 shot dom-month
-shot dom-alltasks
 shot dom-us
-shot dom-rules
-shot dom-rules-2
-shot dom-rewards
-shot dom-rewards-2
-shot dom-consequences
-shot dom-consequences-2
-shot dom-notes
-shot dom-notes-2
-shot dom-journal
-shot dom-journal-2
-shot dom-limits
-shot dom-limits-2
-shot dom-agreement
-shot dom-agreement-2
-shot dom-scenes
-shot dom-scenes-2
-shot dom-location
-shot dom-location-2
-shot dom-stats
-shot dom-stats-2
-shot dom-monthly-review
-shot dom-monthly-review-2
-shot dom-kits
-shot dom-kits-2
-shot dom-all-tasks
-shot dom-all-tasks-2
-shot dom-dynamic
-shot dom-dynamic-2
+shot dom-chastity
+shot dom-chastity-2
 shot dom-settings
-shot dom-settings-2
-shot dom-protocols
-shot dom-back-0-alltasks
-shot dom-back-1-after-system-back
-after system back: [''] ['November', 'You', 'Kitten', 'Both', 'S', 'M', 'T', 'W']
-back link texts: [('', ''), ('', ''), ('', ''), ('', ''), ('', ''), ('', '')]
-shot dom-back-2-after-back-link
-shot dom-newtask
-shot dom-newtask-2
+missing Privacy [('YOU', ''), ('Marcus', ''), ('Name, photo, email', ''), ('Sunday', ''), ('Week starts on', ''), ('NOTIFICATIONS', ''), ('8 of 8', ''), ('What you hear about', ''), ('Off', ''), ('Quiet hours', ''), ("Show your partner's words", ''), ('PRIVACY', ''), ('Off', ''), ('App lock', ''), ('Blur proof photos', ''), ('Fealty', ''), ('Discreet app icon', ''), ('Widgets', ''), ('Us', ''), ('Settings', '')]
