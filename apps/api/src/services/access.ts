@@ -9,7 +9,7 @@ import { aiReachable } from "./aiAccess.js";
  * Whether the current request changes anything, set per request in app.ts. An ended dynamic stays readable, so every
  * membership check refuses writes to one without each route having to remember to.
  */
-export const requestScope = new AsyncLocalStorage<{ write: boolean; ai?: boolean }>();
+export const requestScope = new AsyncLocalStorage<{ write: boolean; ai?: boolean; touched?: Set<string> }>();
 
 export type Role = "dominant" | "submissive" | "switch";
 
@@ -37,7 +37,12 @@ export async function requireMember(db: Tx, relationshipId: string, userId: stri
     .where(and(eq(memberships.relationshipId, relationshipId), eq(memberships.userId, userId)));
   if (!row) throw notFound();
   // A call an AI app makes (over MCP) only reaches a dynamic that allows it, and gets the same 404 as one you're not in.
-  if (requestScope.getStore()?.ai && !(await aiReachable(db, relationshipId))) throw notFound();
+  const scope = requestScope.getStore();
+  if (scope?.ai) {
+    if (!(await aiReachable(db, relationshipId))) throw notFound();
+    // Which dynamic an AI call really touched, for the call log both partners see.
+    scope.touched?.add(relationshipId);
+  }
   if (row.endedAt && requestScope.getStore()?.write) throw new HttpError(409, "this dynamic has ended; it's kept read-only");
   if (row.members === 1 && !row.endedAt) return { ...row.m, role: "switch" as Role, solo: true };
   return { ...row.m, solo: false };

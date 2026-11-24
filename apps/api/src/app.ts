@@ -106,7 +106,15 @@ export function buildApp(deps: Deps) {
   });
   const admins = new Set((deps.adminEmails ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean));
   // Callback style so the rest of the request runs inside the scope.
-  app.addHook("onRequest", (req, _reply, done) => requestScope.run({ write: !["GET", "HEAD", "OPTIONS"].includes(req.method), ai: aiGrantOf(req) !== undefined }, done));
+  app.addHook("onRequest", (req, _reply, done) => {
+    const write = !["GET", "HEAD", "OPTIONS"].includes(req.method);
+    requestScope.run(aiGrantOf(req) !== undefined ? { write, ai: true, touched: new Set<string>() } : { write }, done);
+  });
+  // An AI call reports back which dynamics it touched, so the MCP layer logs the right one.
+  app.addHook("onSend", async (_req, reply) => {
+    const touched = requestScope.getStore()?.touched;
+    if (touched?.size) reply.header("x-ai-touched", [...touched].join(","));
+  });
   app.addHook("onRequest", async (req: FastifyRequest) => {
     if (req.method === "OPTIONS" || req.url === "/health" || req.routeOptions.config.signedLink || req.routeOptions.config.ownAuth) return;
     const grantId = aiGrantOf(req);

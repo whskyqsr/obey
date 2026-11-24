@@ -7,6 +7,10 @@ import type { Deps } from "../app.js";
 import { aiCalls, aiGrants } from "../db/schema.js";
 import { aiReachable, grantForAccessToken } from "../services/aiAccess.js";
 import { publicApiUrl } from "../routes/oauth.js";
+import { type Call, USER_ROUTES, failed, registerUserTools, text } from "./tools.js";
+import { WRITE_ROUTES, registerWriteTools } from "./writeTools.js";
+import { STAFF_ROUTES, registerStaffTools } from "./staffTools.js";
+import { SCOPE_STAFF } from "../services/aiAccess.js";
 
 export const AI_INTERNAL_HEADER = "x-fealty-ai-internal";
 
@@ -14,15 +18,11 @@ export const AI_INTERNAL_HEADER = "x-fealty-ai-internal";
  * The app routes MCP tools may call, by method and route pattern. Anything not listed (photos, the keybox, location,
  * safe calls, settings, AI access itself) can't be reached by an AI app even by mistake.
  */
-const AI_ROUTES = new Set<string>(["GET /me"]);
+const AI_ROUTES = new Set<string>([...USER_ROUTES, ...WRITE_ROUTES, ...STAFF_ROUTES]);
 
 export const aiRouteAllowed = (method: string, routeUrl: string | undefined) => routeUrl !== undefined && AI_ROUTES.has(`${method} ${routeUrl}`);
 
 type Grant = typeof aiGrants.$inferSelect;
-type Call = (method: "GET" | "POST" | "PATCH" | "PUT", url: string, payload?: unknown) => Promise<{ status: number; body: unknown }>;
-
-const text = (value: unknown): CallToolResult => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }] });
-const failed = (message: string): CallToolResult => ({ content: [{ type: "text", text: message }], isError: true });
 
 interface MeBody {
   user: { id: string; displayName: string };
@@ -35,7 +35,7 @@ interface MeBody {
   }[];
 }
 
-function buildServer(deps: Deps, grant: Grant, call: Call) {
+function buildServer(deps: Deps, grant: Grant, call: Call, touched: Set<string>) {
   const server = new McpServer(
     { name: "fealty", version: "1.0.0" },
     {
@@ -47,15 +47,19 @@ function buildServer(deps: Deps, grant: Grant, call: Call) {
 
   /** Runs a tool and logs the call, without its content. */
   const logged =
-    <A extends { relationshipId?: string }>(tool: string, run: (args: A) => Promise<CallToolResult>) =>
+    <A extends object>(tool: string, run: (args: A) => Promise<CallToolResult>) =>
     async (args: A): Promise<CallToolResult> => {
       let result: CallToolResult;
+      touched.clear();
       try {
         result = await run(args);
       } catch {
         result = failed("Something went wrong in Fealty. Try again in a moment.");
       }
-      await deps.db.insert(aiCalls).values({ grantId: grant.id, userId: grant.userId, relationshipId: args.relationshipId ?? null, tool, ok: !result.isError, createdAt: deps.now() });
+      // One row per dynamic the call really reached (not the one it named), or one with none.
+      const base = { grantId: grant.id, userId: grant.userId, tool, ok: !result.isError, createdAt: deps.now() };
+      const rows = touched.size ? [...touched].map((relationshipId) => ({ ...base, relationshipId })) : [{ ...base, relationshipId: null }];
+      await deps.db.insert(aiCalls).values(rows);
       return result;
     };
 
@@ -93,6 +97,10 @@ function buildServer(deps: Deps, grant: Grant, call: Call) {
     }),
   );
 
+  registerUserTools(server, call, logged);
+  registerWriteTools(server, call, logged);
+  // Listed only on a staff connection; the admin routes check the address list again on every call.
+  if (grant.scope.split(" ").includes(SCOPE_STAFF)) registerStaffTools(server, call, logged, (deps.appUrl ?? "https://app.fealty.me").replace(/\/$/, ""));
   return server;
 }
 
@@ -111,6 +119,7 @@ export const mcpRoutes = (deps: Deps, opts: { internalSecret: string }) => async
     const now = deps.now();
     if (!grant.lastUsedAt || now.getTime() - grant.lastUsedAt.getTime() > 60_000) await deps.db.update(aiGrants).set({ lastUsedAt: now }).where(eq(aiGrants.id, grant.id));
 
+    const touched = new Set<string>();
     const call: Call = async (method, url, payload) => {
       const res = await app.inject({
         method,
@@ -118,10 +127,12 @@ export const mcpRoutes = (deps: Deps, opts: { internalSecret: string }) => async
         payload: payload as object | undefined,
         headers: { [AI_INTERNAL_HEADER]: opts.internalSecret, "x-ai-grant": grant.id },
       });
+      const reached = res.headers["x-ai-touched"];
+      if (typeof reached === "string") for (const id of reached.split(",")) touched.add(id);
       return { status: res.statusCode, body: res.body ? JSON.parse(res.body) : undefined };
     };
 
-    const server = buildServer(deps, grant, call);
+    const server = buildServer(deps, grant, call, touched);
     const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     await server.connect(transport);
     const headers = new Headers();
