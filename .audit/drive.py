@@ -17,7 +17,8 @@ def find(label, desc=False, exact=True):
     return None
 def tap(label, desc=False, exact=True, wait=2.5):
     n = find(label, desc, exact) or (find(label, not desc, exact))
-    if n is None: print("missing", label); return False
+    if n is None:
+        print("missing", label, [(x.get("text"), x.get("content-desc")) for x in dump().iter("node") if x.get("text") or x.get("content-desc")][-25:]); return False
     x, y = center(n); adb("shell", "input", "tap", str(x), str(y)); time.sleep(wait); return True
 def shot(name):
     with open(f"{OUT}/{name}.png", "wb") as f: f.write(adb("exec-out", "screencap", "-p").stdout)
@@ -77,5 +78,8 @@ def run(who, uid):
     if who == "dom":
         tap("Today")
         if tap("New", desc=True) and tap("Task", wait=3): shot("dom-newtask"); scroll(); shot("dom-newtask-2"); back(); back()
-run("sub", "22222222-2222-4222-8222-222222222222")
-run("dom", "11111111-1111-4111-8111-111111111111")
+import traceback
+for who, uid in [("sub", "22222222-2222-4222-8222-222222222222"), ("dom", "11111111-1111-4111-8111-111111111111")]:
+    try: run(who, uid)
+    except Exception: traceback.print_exc()
+adb("shell", "uiautomator", "dump", "/sdcard/u.xml"); open(f"{OUT}/last-dump.xml", "wb").write(adb("shell", "cat", "/sdcard/u.xml").stdout)
