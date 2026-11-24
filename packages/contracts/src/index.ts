@@ -981,6 +981,14 @@ export type DeviceStatus = z.infer<typeof deviceStatus>;
 export const apiError = z.object({ error: z.string(), details: z.unknown().optional() });
 
 /** Plans either partner puts on the shared calendar. All-day events run from local midnight to the next. */
+/** How a plan repeats: each repeat is its own plan, made up front, up to [until] (a local date). */
+export const planRepeat = z.object({
+  every: z.enum(["day", "week", "2weeks", "month"]),
+  until: plainDate,
+  /** The author's zone, so each repeat lands at the same local time across DST. */
+  timezone: z.string().min(1).max(64),
+});
+export type PlanRepeat = z.infer<typeof planRepeat>;
 export const calendarEventInput = z
   .object({
     title: z.string().trim().min(1).max(80),
@@ -990,6 +998,10 @@ export const calendarEventInput = z
     /** Whether the partner is in on it too; only then do the partner's tasks count as clashing. */
     withPartner: z.boolean().default(false),
     noteMd: z.string().max(2_000).nullable().optional(),
+    /** Excuse the tasks that fall due during the plan. A submissive's plan asks a Dominant first. */
+    pauseTasks: z.boolean().default(false),
+    /** Only when making a plan; later edits change one plan, or that one and the ones after it. */
+    repeat: planRepeat.nullable().optional(),
   })
   .refine((e) => Date.parse(e.endsAt) > Date.parse(e.startsAt), { message: "an event has to end after it starts", path: ["endsAt"] })
   .refine((e) => Date.parse(e.endsAt) - Date.parse(e.startsAt) <= 31 * 86_400_000, { message: "an event can last a month at most", path: ["endsAt"] });
@@ -1003,6 +1015,12 @@ export const calendarEvent = z.object({
   allDay: z.boolean(),
   withPartner: z.boolean(),
   noteMd: z.string().nullable(),
+  /** Shared by the plans of one repeating plan. */
+  seriesId: id.nullable().default(null),
+  repeat: planRepeat.nullable().default(null),
+  pauseTasks: z.boolean().default(false),
+  /** asked: waiting on a Dominant; approved: tasks during it are excused; declined: they aren't. */
+  pauseStatus: z.enum(["asked", "approved", "declined"]).nullable().default(null),
   /** Timed tasks still to do that fall due during the event, for the people it involves. */
   conflictIds: z.array(id),
   /** Set when someone other than the author changed it (a Dominant moving its end). */
