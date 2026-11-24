@@ -107,3 +107,5 @@ export type LimitItem = c.LimitItem;
 export type LimitAnswer = c.LimitAnswer;
 export type LimitPerson = c.LimitPerson;
 export type LimitList = c.LimitList;
+export type LimitProfile = c.LimitProfile;
+export type LimitProfileMatch = c.LimitProfileMatch;

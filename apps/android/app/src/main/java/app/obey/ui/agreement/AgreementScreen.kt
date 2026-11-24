@@ -59,7 +59,6 @@ import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.UnfoldMore
 import androidx.compose.material3.AlertDialog
 import app.obey.ui.common.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
@@ -998,7 +997,7 @@ private fun AgreeSheet(v: AgreementVersion, inForce: Int?, last: Boolean, busy: 
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Row(Modifier.fillMaxWidth().clickable { read = !read }, verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(checked = read, onCheckedChange = { read = it })
+            app.obey.ui.common.DiamondCheckbox(checked = read, onCheckedChange = { read = it })
             Spacer(Modifier.width(8.dp))
             Text("I've read all of version ${v.number}, including the parts that didn't change.", style = MaterialTheme.typography.bodyMedium)
         }

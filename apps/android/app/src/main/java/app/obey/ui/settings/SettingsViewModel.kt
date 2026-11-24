@@ -64,6 +64,14 @@ class SettingsViewModel @Inject constructor(
     val devAuthAllowed: Boolean = BuildConfig.DEV_AUTH_ALLOWED
     val apiBaseUrl: String = BuildConfig.API_BASE_URL
 
+    private val _limits = MutableStateFlow<app.obey.api.LimitProfile?>(null)
+    /** Your own limits, for their row's "41 of 58". */
+    val limits: StateFlow<app.obey.api.LimitProfile?> = _limits.asStateFlow()
+
+    fun loadLimits() {
+        viewModelScope.launch { runCatching { api.limitProfile() }.onSuccess { _limits.value = it } }
+    }
+
     private val _invite = MutableStateFlow<Invite?>(null)
     val invite: StateFlow<Invite?> = _invite.asStateFlow()
 

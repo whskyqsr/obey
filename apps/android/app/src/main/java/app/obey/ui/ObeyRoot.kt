@@ -562,6 +562,7 @@ private fun ObeyNavHost(nav: NavHostController, usItems: List<UsItem>, switcher:
         composable<ChastityRoute> { ChastityScreen(onOpenSettings = settings) }
         composable<LimitsRoute> { LimitsScreen(onEdit = { nav.navigate(LimitsEditRoute) }) }
         composable<LimitsEditRoute> { LimitsEditScreen(onClose = { nav.popBackStack() }) }
+        composable<LimitsProfileRoute> { app.obey.ui.limits.LimitsProfileScreen(onClose = { nav.popBackStack() }) }
         composable<TaskListRoute> {
             TaskListScreen(
                 onOpen = openTask,
@@ -615,7 +616,7 @@ private fun ObeyNavHost(nav: NavHostController, usItems: List<UsItem>, switcher:
         composable<TaskHistoryRoute> { TaskHistoryScreen(onBack = { nav.popBackStack() }) }
         composable<TaskEditorRoute> { TaskEditorScreen(onDone = { nav.popBackStack() }, onKits = { nav.navigate(KitsRoute) }) }
         composable<NoteEditorRoute> { NoteEditorScreen(onDone = { nav.popBackStack() }) }
-        composable<SettingsRoute> { SettingsScreen(onBack = { nav.popBackStack() }, onOpenDynamic = { nav.navigate(DynamicRoute()) }, onOpenFeatures = { nav.navigate(DynamicRoute(features = true)) }) }
+        composable<SettingsRoute> { SettingsScreen(onBack = { nav.popBackStack() }, onOpenDynamic = { nav.navigate(DynamicRoute()) }, onOpenLimits = { nav.navigate(LimitsProfileRoute) }, onOpenFeatures = { nav.navigate(DynamicRoute(features = true)) }) }
         composable<DynamicRoute> { entry -> DynamicScreen(startInvite = entry.toRoute<DynamicRoute>().invite, startFeatures = entry.toRoute<DynamicRoute>().features, onBack = { nav.popBackStack() }, onPlaces = { nav.navigate(PlacesRoute) }, onLocation = { nav.navigate(LocationRoute) }, onCurfew = { nav.navigate(CurfewRoute) }) }
         composable<CurfewRoute> { app.obey.ui.location.CurfewScreen(onBack = { nav.popBackStack() }, onPlaces = { nav.navigate(PlacesRoute) }) }
         // Places are listed on Location now (mockup 22).

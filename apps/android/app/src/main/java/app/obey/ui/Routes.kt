@@ -31,6 +31,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object ChastityRoute
 @Serializable data object LimitsRoute
 @Serializable data object LimitsEditRoute
+@Serializable data object LimitsProfileRoute
 
 /** The agreement; [edit] opens the editor on your open proposal, [review] opens a partner's proposal to read (both from Today). */
 @Serializable data class AgreementRoute(val edit: Boolean = false, val review: Boolean = false)

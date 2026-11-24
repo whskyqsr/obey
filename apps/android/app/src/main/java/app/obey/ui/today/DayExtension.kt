@@ -14,7 +14,6 @@ import androidx.compose.material.icons.outlined.EditCalendar
 import app.obey.ui.common.TonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import app.obey.ui.common.ChoiceChip
 import androidx.compose.material3.MaterialTheme
@@ -73,7 +72,7 @@ fun DayRescheduleSheet(
             tasks.forEach { t ->
                 val on = t.id in selected
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = on, onCheckedChange = { selected = if (it) selected + t.id else selected - t.id })
+                    app.obey.ui.common.DiamondCheckbox(checked = on, onCheckedChange = { selected = if (it) selected + t.id else selected - t.id })
                     Column {
                         Text(t.title, style = MaterialTheme.typography.bodyLarge)
                         val moved = parseInstant(t.dueAt).plus(Duration.ofHours(hours.toLong())).toString()

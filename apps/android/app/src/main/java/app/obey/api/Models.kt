@@ -1670,7 +1670,15 @@ data class LimitAnswer(val rating: String? = null, val note: String = "")
 
 /** A person's progress, and their answers for each side: always your own, a partner's once everyone has finished. */
 @Serializable
-data class LimitPerson(val userId: String, val finishedAt: String? = null, val updatedAt: String? = null, val rated: Int = 0, val sides: LimitSides? = null)
+data class LimitPerson(
+    val userId: String,
+    val finishedAt: String? = null,
+    val updatedAt: String? = null,
+    val rated: Int = 0,
+    val sides: LimitSides? = null,
+    /** Your own answers here were filled in from your limits and you haven't finished yet. */
+    val fromProfile: Boolean = false,
+)
 
 @Serializable
 data class LimitList(val items: List<LimitItem>, val people: List<LimitPerson>)
@@ -1680,6 +1688,23 @@ data class LimitAnswerInput(val rating: String?, val note: String, val side: Str
 
 @Serializable
 data class LimitItemInput(val category: String, val title: String)
+
+/** Your own limits, apart from any dynamic: the starter list, answered both ways round. */
+@Serializable
+data class LimitProfile(val items: List<LimitItem> = emptyList(), val rated: Int = 0, val sides: LimitSides = LimitSides())
+
+@Serializable
+data class LimitChange(val itemKey: String, val side: String)
+
+@Serializable
+data class LimitChanges(val changes: List<LimitChange>)
+
+/** A dynamic where answers you just changed in your limits read differently. */
+@Serializable
+data class LimitProfileMatch(val relationshipId: String, val name: String, val differ: Int, val finished: Boolean = false)
+
+@Serializable
+data class LimitProfileApply(val changes: List<LimitChange>, val relationshipIds: List<String>)
 
 /** AI access for a dynamic: who has allowed it, the apps its members connected, and their calls in the last 30 days. */
 @Serializable

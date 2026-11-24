@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSetAvatar, useUpdateMe, useUpdateRelationship } from "../api/hooks";
+import { useLimitProfile, useSetAvatar, useUpdateMe, useUpdateRelationship } from "../api/hooks";
+import { LIMIT_STARTERS } from "@obey/contracts";
 import { errorMessage } from "../api/client";
 import type { WeekStart } from "../api/types";
 import { getSession, signOut } from "../auth/session";
@@ -48,6 +49,12 @@ function ValueRow({ label, value, to, hash }: { label: string; value?: ReactNode
       </span>
     </Link>
   );
+}
+
+/** Your own limits, which fill in each new dynamic's list. */
+function LimitsRow() {
+  const profile = useLimitProfile();
+  return <ValueRow label="Your limits" value={profile.data ? `${profile.data.rated} of ${LIMIT_STARTERS.length}` : undefined} to="/settings/limits" />;
 }
 
 const PROOF_DAYS_SHORT: Record<number, string> = { 1: "1 day", 7: "7 days", 30: "30 days" };
@@ -150,6 +157,7 @@ function SettingsList() {
         <Rows>
           <ValueRow label="Name, photo, email" value={me.user.displayName} to="/settings/you" />
           <ValueRow label="Week starts on" value={me.user.weekStart === "mon" ? "Monday" : "Sunday"} to="/settings/you" />
+          <LimitsRow />
         </Rows>
 
         <Eyebrow>Notifications</Eyebrow>
@@ -307,6 +315,9 @@ function YouSection() {
           ]}
         />
       </div>
+      <Rows>
+        <LimitsRow />
+      </Rows>
       <div className="mt-4">
         <SignOutRow />
         <DeleteAccount />

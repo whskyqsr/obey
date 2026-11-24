@@ -348,6 +348,7 @@ fun LimitsScreen(onEdit: () -> Unit, vm: LimitsViewModel = hiltViewModel()) {
     val edit = { key: String? -> openAt = key; onEdit() }
     val status = when {
         mine == null -> null
+        mine.fromProfile -> "Filled in from your limits. Change anything ${partner?.let { "for ${it.displayName}" } ?: "here"}, then finish."
         both -> "You've both finished. Answers you didn't share stay private."
         partner == null -> if (mine.finishedAt != null) "You've rated ${mine.rated} of $total." else "You've rated ${mine.rated} of $total so far."
         mine.finishedAt != null -> "You've finished. ${partner.displayName} has rated ${theirs?.rated ?: 0} of $total; you'll see each other's once they finish."
@@ -378,7 +379,11 @@ fun LimitsScreen(onEdit: () -> Unit, vm: LimitsViewModel = hiltViewModel()) {
                 is Load.Ready -> {
                     if (mine == null) return@Column
                     status?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    if (mine.finishedAt == null) Button(onClick = { edit(null) }, colors = inkButtonColors()) { Text(if (mine.rated > 0) "Carry on" else "Start") }
+                    if (mine.finishedAt == null) {
+                        Button(onClick = { edit(if (mine.fromProfile) byCategory(s.value.items).firstOrNull()?.second?.firstOrNull()?.key else null) }, colors = inkButtonColors()) {
+                            Text(if (mine.fromProfile) "Review and finish" else if (mine.rated > 0) "Carry on" else "Start")
+                        }
+                    }
                     if (both) {
                         PillRow {
                             Verdict.entries.forEach { v ->
@@ -497,50 +502,20 @@ fun LimitsEditScreen(onClose: () -> Unit, vm: LimitsViewModel = hiltViewModel())
                         Box(Modifier.fillMaxWidth(index.coerceAtMost(items.size).toFloat() / items.size.coerceAtLeast(1)).height(3.dp).background(c.onSurface))
                     }
                     if (item != null) {
-                        Text(item.title, style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 40.dp))
-                        listOf(usual, otherSide(usual)).forEach { side ->
-                            val a = answers[side][item.key]
-                            val said = limitSentence(if (side == "dom") item.sentences.dom else item.sentences.sub, partner?.displayName)
-                            Row(Modifier.padding(top = 28.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                                    Text(said, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f, fill = false))
-                                    if (side != usual) Text("Optional", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant, modifier = Modifier.padding(start = 8.dp))
-                                }
-                                Text(
-                                    if (a?.note.isNullOrEmpty()) "Add a note" else "Change the note",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = c.primary,
-                                    modifier = Modifier.clickable { noting = item to side }.padding(vertical = 4.dp),
-                                )
-                            }
-                            Row(Modifier.padding(top = 12.dp).fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Rating.entries.forEach { r ->
-                                    val on = a?.rating == r.key
-                                    Column(
-                                        Modifier.weight(1f).height(64.dp).clip(RoundedCornerShape(12.dp))
-                                            .background(if (on) c.surfaceContainer else c.surfaceContainerLowest)
-                                            .border(1.dp, if (on) c.onSurface else c.outlineVariant, RoundedCornerShape(12.dp))
-                                            .selectable(selected = on, role = Role.RadioButton) {
-                                                vm.answer(item, side, if (on) null else r.key, a?.note.orEmpty())
-                                                if (!on && answers[otherSide(side)][item.key]?.rating != null) go(index + 1)
-                                            },
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center,
-                                    ) {
-                                        RatingMark(r.key, 13.dp)
-                                        Text(r.label, style = MaterialTheme.typography.bodySmall, maxLines = 1, softWrap = false, modifier = Modifier.padding(top = 8.dp))
-                                    }
-                                }
-                            }
-                            a?.note?.takeIf { it.isNotEmpty() }?.let {
-                                Text("“$it”", style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 28.sp, fontStyle = FontStyle.Italic), color = c.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))
-                            }
-                        }
-                        Row(Modifier.padding(top = 20.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Spacer(Modifier.weight(1f))
-                            if (index > 0) TextButton(onClick = { go(index - 1) }) { Text("Previous", color = c.onSurfaceVariant) }
-                            TextButton(onClick = { go(index + 1) }) { Text(if (rated(item.key)) "Next" else "Skip", color = c.onSurfaceVariant) }
-                        }
+                        ItemStep(
+                            item = item,
+                            answers = answers,
+                            sides = listOf(usual, otherSide(usual)),
+                            optional = otherSide(usual),
+                            partnerName = partner?.displayName,
+                            onRate = { side, rating ->
+                                vm.answer(item, side, rating, answers[side][item.key]?.note.orEmpty())
+                                if (rating != null && answers[otherSide(side)][item.key]?.rating != null) go(index + 1)
+                            },
+                            onNote = { side -> noting = item to side },
+                            onPrevious = if (index > 0) ({ go(index - 1) }) else null,
+                            onNext = { go(index + 1) },
+                        )
                     } else {
                         Text(if (mine.finishedAt != null) "All saved" else "That's all of them", style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 40.dp))
                         Text("You've rated ${mine.rated} of ${items.size}.", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
@@ -611,6 +586,64 @@ fun LimitsEditScreen(onClose: () -> Unit, vm: LimitsViewModel = hiltViewModel())
             },
             dismissButton = { TextButton(onClick = { adding = false }) { Text("Cancel") } },
         )
+    }
+}
+
+/** One item: its name, then a sentence for each side with the five answers under it, and Previous and Next. */
+@Composable
+internal fun ItemStep(
+    item: LimitItem,
+    answers: LimitSides,
+    sides: List<String>,
+    optional: String?,
+    partnerName: String?,
+    onRate: (side: String, rating: String?) -> Unit,
+    onNote: (side: String) -> Unit,
+    onPrevious: (() -> Unit)?,
+    onNext: () -> Unit,
+) {
+    val c = MaterialTheme.colorScheme
+    val rated = answers.dom[item.key]?.rating != null || answers.sub[item.key]?.rating != null
+    Text(item.title, style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 40.dp))
+    sides.forEach { side ->
+        val a = answers[side][item.key]
+        val said = limitSentence(if (side == "dom") item.sentences.dom else item.sentences.sub, partnerName)
+        Row(Modifier.padding(top = 28.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                Text(said, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f, fill = false))
+                if (side == optional) Text("Optional", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant, modifier = Modifier.padding(start = 8.dp))
+            }
+            Text(
+                if (a?.note.isNullOrEmpty()) "Add a note" else "Change the note",
+                style = MaterialTheme.typography.labelLarge,
+                color = c.primary,
+                modifier = Modifier.clickable { onNote(side) }.padding(vertical = 4.dp),
+            )
+        }
+        Row(Modifier.padding(top = 12.dp).fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Rating.entries.forEach { r ->
+                val on = a?.rating == r.key
+                Column(
+                    Modifier.weight(1f).height(64.dp).clip(RoundedCornerShape(12.dp))
+                        .background(if (on) c.surfaceContainer else c.surfaceContainerLowest)
+                        .border(1.dp, if (on) c.onSurface else c.outlineVariant, RoundedCornerShape(12.dp))
+                        .selectable(selected = on, role = Role.RadioButton) { onRate(side, if (on) null else r.key) },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    RatingMark(r.key, 13.dp)
+                    Text(r.label, style = MaterialTheme.typography.bodySmall, maxLines = 1, softWrap = false, modifier = Modifier.padding(top = 8.dp))
+                }
+            }
+        }
+        a?.note?.takeIf { it.isNotEmpty() }?.let {
+            Text("“$it”", style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 28.sp, fontStyle = FontStyle.Italic), color = c.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))
+        }
+    }
+    Row(Modifier.padding(top = 20.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Spacer(Modifier.weight(1f))
+        onPrevious?.let { TextButton(onClick = it) { Text("Previous", color = c.onSurfaceVariant) } }
+        TextButton(onClick = onNext) { Text(if (rated) "Next" else "Skip", color = c.onSurfaceVariant) }
     }
 }
 

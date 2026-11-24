@@ -30,7 +30,6 @@ import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import app.obey.ui.common.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -256,7 +255,7 @@ fun ProofTermsDialog(onDismiss: () -> Unit, onAgree: () -> Unit) {
                 }
                 listOf(Triple("I'm 18 or older", adult) { v: Boolean -> adult = v }, Triple("I'll follow these rules", rules) { v: Boolean -> rules = v }).forEach { (label, on, set) ->
                     Row(Modifier.fillMaxWidth().clickable { set(!on) }, verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(on, { set(it) }, colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = c.onSurface, checkmarkColor = c.surface))
+                        app.obey.ui.common.DiamondCheckbox(on, { set(it) })
                         Text(label, style = MaterialTheme.typography.bodyLarge)
                     }
                     androidx.compose.material3.HorizontalDivider(color = c.outlineVariant)
