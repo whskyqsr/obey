@@ -1,4 +1,5 @@
 import { ReviewCard } from "./ReviewCard";
+import { planTone } from "../lib/planColors";
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import {
@@ -24,19 +25,11 @@ import { Clash } from "./CurfewStrip";
 import { useNoteAfter } from "./DecisionNote";
 import { EventDialog, eventOn, eventWhen } from "./EventDialog";
 import { MOOD_LABELS } from "./Mood";
-import { MoodRow, RedemptionRow, SceneCheckRow } from "./NeedsYou";
+import { MoodRow, RedemptionCard, SceneCheckRow } from "./NeedsYou";
 import { MissActions, MissCard, RowGroup, TaskRow } from "./TaskRow";
-import { Button, Dialog, Icon, IconButton, Section, TextField, cx, useSnackbar } from "./ui";
+import { Button, Dialog, Icon, IconButton, TextField, cx, useSnackbar } from "./ui";
 
 type Tone = "primary" | "secondary" | "tertiary" | "error" | "neutral";
-const TONE: Record<Tone, string> = {
-  // Letters: the icon carries the tone on its own, with no filled circle behind it.
-  primary: "text-primary",
-  secondary: "text-on-surface-variant",
-  tertiary: "text-on-surface-variant",
-  error: "text-error",
-  neutral: "text-on-surface-variant",
-};
 
 /** One row of the list: a kind of thing waiting, how many, and what they are once opened. A link row opens a page instead. */
 /** [cards]: for a Dominant, one card per item instead of [body]'s rows (the mockup's sentence cards). */
@@ -249,13 +242,7 @@ export function TodayInbox() {
       title: `${plural(list.length, "reward")} to give`,
       sub: names(list.map((e) => e.note)),
       count: list.length,
-      body: (
-        <RowGroup>
-          {list.map((e) => (
-            <RedemptionRow key={e.id} e={e} />
-          ))}
-        </RowGroup>
-      ),
+      cards: list.map((e) => <RedemptionCard key={e.id} e={e} />),
     });
   }
   // Updates: nothing to decide, so each kind clears in one tap.
@@ -371,82 +358,50 @@ export function TodayInbox() {
       if (!next.delete(key)) next.add(key);
       return next;
     });
-  if (isDom)
-    // A Dominant's decisions sit at the top of Today as cards, each with its own buttons; the greeting already says how many.
-    return (
-      <section aria-label={`Needs you · ${total}`} className="flex flex-col gap-3 px-4 pb-6 md:px-6">
-        {groups.map((g) =>
-          g.cards ? (
-            <Fragment key={g.key}>
-              {g.cards.map((c, i) => (
-                <div key={i} className="rounded-lg border border-outline-variant bg-surface-container-lowest p-4">
-                  {c}
-                </div>
-              ))}
-              {g.action && <div className="-mt-1 flex justify-end">{g.action}</div>}
-            </Fragment>
-          ) : g.body && !g.to ? (
-            <div
-              key={g.key}
-              className="rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-1 [&>*+*]:border-t [&>*+*]:border-outline-variant"
-            >
-              {g.body}
-              {g.action && <div className="flex justify-end py-3">{g.action}</div>}
-            </div>
-          ) : (
-            <div key={g.key} className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2">
-              <GroupRow g={g} open={false} onToggle={() => toggle(g.key)} />
-            </div>
-          ),
-        )}
-      </section>
-    );
+  // Mockups 03 and 11: whatever waits on this person sits on Today as sentence cards, each with its own buttons. The greeting
+  // already says how many, so there's no count or heading.
   return (
-    <Section title={`For you · ${total}`}>
-      <div className="flex flex-col divide-y divide-outline-variant border-y border-outline-variant">
-        {groups.map((g) => (
-          <GroupRow key={g.key} g={g} open={isOpen(g.key)} onToggle={() => toggle(g.key)} />
-        ))}
-      </div>
-    </Section>
+    <section aria-label={`${isDom ? "Needs you" : "For you"} · ${total}`} className={cx("flex flex-col gap-3 px-4 md:px-6", isDom ? "pb-6" : "pt-2 pb-2")}>
+      {groups.map((g) =>
+        g.cards ? (
+          <Fragment key={g.key}>
+            {g.cards.map((c, i) => (
+              <div key={i} className="rounded-lg border border-outline-variant bg-surface-container-lowest p-4">
+                {c}
+              </div>
+            ))}
+            {g.action && <div className="-mt-1 flex justify-end">{g.action}</div>}
+          </Fragment>
+        ) : (
+          <GroupCard key={g.key} g={g} open={isOpen(g.key)} onToggle={() => toggle(g.key)} />
+        ),
+      )}
+    </section>
   );
 }
 
-function GroupRow({ g, open, onToggle }: { g: Group; open: boolean; onToggle(): void }) {
-  const head = (
-    <>
-      <span className={cx("flex size-8 shrink-0 items-center justify-center", TONE[g.tone])}>
-        <Icon name={g.icon} size={22} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-title-medium text-on-surface">{g.title}</div>
-        {!(open && g.body) && g.sub && <div className="truncate text-body-medium text-on-surface-variant">{g.sub}</div>}
-      </div>
-    </>
-  );
-  if (g.to)
-    return (
-      <Link to={g.to} className="state-layer flex min-h-16 items-center gap-3 py-2 pr-2">
-        {head}
-        <Icon name="chevron_right" className="text-on-surface-variant" />
-      </Link>
-    );
+/** A kind of thing waiting, as one card: what it is, a line under it, and a quiet link to open it or show the items. */
+function GroupCard({ g, open, onToggle }: { g: Group; open: boolean; onToggle(): void }) {
+  const link = "state-layer -mr-2 shrink-0 rounded-md px-2 py-1 text-body-medium text-primary";
   return (
-    <div>
-      <div className="flex min-h-16 items-center">
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={onToggle}
-          className="state-layer flex min-w-0 flex-1 items-center gap-3 self-stretch py-2 pr-2 text-left"
-        >
-          {head}
-          {!open && <span className="rounded-full bg-primary px-2 py-0.5 text-label-medium text-on-primary tabular-nums">{g.count}</span>}
-          <Icon name={open ? "expand_less" : "expand_more"} className="text-on-surface-variant" />
-        </button>
+    <div className="rounded-lg border border-outline-variant bg-surface-container-lowest p-4">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-body-large text-on-surface">{g.title}</div>
+          {g.sub && !(open && g.body) && <div className="mt-0.5 text-body-medium text-on-surface-variant">{g.sub}</div>}
+        </div>
+        {g.to ? (
+          <Link to={g.to} className={link}>
+            Open
+          </Link>
+        ) : g.body ? (
+          <button type="button" aria-expanded={open} onClick={onToggle} className={link}>
+            {open ? "Hide" : g.count > 1 ? `Show ${g.count}` : "Show"}
+          </button>
+        ) : null}
       </div>
       {open && g.body && (
-        <div className="flex flex-col gap-0 pb-3 md:pl-11 [&>*+*]:border-t [&>*+*]:border-outline-variant">
+        <div className="mt-2 flex flex-col [&>*+*]:border-t [&>*+*]:border-outline-variant">
           {g.body}
           {g.action && <div className="flex justify-end pt-3">{g.action}</div>}
         </div>
@@ -701,11 +656,12 @@ function usePlanClashes() {
 }
 
 function PlanClashes({ clashing }: { clashing: CalendarEvent[] }) {
+  const { rel } = useRel();
   const [open, setOpen] = useState<CalendarEvent | null>(null);
   return (
     <div className="flex flex-col gap-3">
       {clashing.map((e) => (
-        <div key={e.id} className="flex items-center gap-3 border-l-2 border-primary py-1 pl-4">
+        <div key={e.id} className={cx("flex items-center gap-3 border-l-2 py-1 pl-4", planTone(e, rel).rule)}>
           <div className="min-w-0 flex-1">
             <div className="truncate text-body-large text-on-surface">{e.title}</div>
             <div className="text-body-medium text-on-surface-variant">

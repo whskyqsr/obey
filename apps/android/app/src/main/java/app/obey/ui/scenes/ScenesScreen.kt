@@ -152,7 +152,7 @@ fun ScenesScreen(onOpenSettings: () -> Unit, onOpen: (String) -> Unit, onAfterca
                         .border(1.dp, c.outlineVariant, MaterialTheme.shapes.medium).padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Eyebrow("Your aftercare plan")
+                    Eyebrow("Your aftercare")
                     PlanText(mine, "Not written yet.")
                     if (!session.readOnly) {
                         Text(
@@ -166,7 +166,7 @@ fun ScenesScreen(onOpenSettings: () -> Unit, onOpen: (String) -> Unit, onAfterca
             }
             if (others.isNotEmpty()) item {
                 Text(
-                    others.joinToString(" · ") { "${session.nameOf(it.userId)}'s aftercare plan" } + " ›",
+                    others.joinToString(" · ") { "${session.nameOf(it.userId)}'s aftercare" } + " ›",
                     style = MaterialTheme.typography.bodyLarge,
                     color = c.onSurfaceVariant,
                     modifier = Modifier.padding(top = 16.dp).clickable(onClick = onAftercare),

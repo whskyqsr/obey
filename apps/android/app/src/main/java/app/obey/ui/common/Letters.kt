@@ -37,9 +37,29 @@ fun Eyebrow(text: String, modifier: Modifier = Modifier, color: Color = Material
     Text(text.uppercase(), style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.5.sp), color = color, modifier = modifier)
 }
 
-/** The ink button: the one filled button in Letters. */
+/** The ink button: the one filled button in Letters. Disabled, it fades like the web's instead of turning grey. */
 @Composable
-fun inkButtonColors() = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface, contentColor = MaterialTheme.colorScheme.surface)
+fun inkButtonColors() = ButtonDefaults.buttonColors(
+    containerColor = MaterialTheme.colorScheme.onSurface,
+    contentColor = MaterialTheme.colorScheme.surface,
+    disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+    disabledContentColor = MaterialTheme.colorScheme.surface,
+)
+
+/**
+ * The filled button in ink with small corners, as on the web. Use it in place of Material's, whose default fill is the
+ * oxblood accent and whose shape is a pill.
+ */
+@Composable
+fun Button(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    shape: androidx.compose.ui.graphics.Shape = MaterialTheme.shapes.small,
+    colors: androidx.compose.material3.ButtonColors = inkButtonColors(),
+    contentPadding: androidx.compose.foundation.layout.PaddingValues = ButtonDefaults.ContentPadding,
+    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
+) = androidx.compose.material3.Button(onClick = onClick, modifier = modifier, enabled = enabled, shape = shape, colors = colors, contentPadding = contentPadding, content = content)
 
 /** A read-only pill on a hairline, such as each aftercare given on a scene. */
 @Composable
@@ -161,3 +181,23 @@ fun AccentBox(modifier: Modifier = Modifier, content: @Composable ColumnScope.()
 /** A rule down the left edge, the way plans and status lines carry their tone. */
 fun Modifier.sideRule(color: Color): Modifier =
     drawBehind { drawRect(color, size = androidx.compose.ui.geometry.Size(2.dp.toPx(), size.height)) }.padding(start = 16.dp)
+
+/** The Letters switch: an ink track when on, as on the web. Use it in place of Material's, whose track is the oxblood accent. */
+@Composable
+fun Switch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    val c = MaterialTheme.colorScheme
+    androidx.compose.material3.Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        modifier = modifier,
+        enabled = enabled,
+        colors = androidx.compose.material3.SwitchDefaults.colors(
+            checkedTrackColor = c.onSurface,
+            checkedThumbColor = c.surface,
+            checkedBorderColor = c.onSurface,
+            uncheckedThumbColor = c.outlineVariant,
+            uncheckedTrackColor = c.surfaceContainerLowest,
+            uncheckedBorderColor = c.outline,
+        ),
+    )
+}

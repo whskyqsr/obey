@@ -8,7 +8,8 @@ import { useNeedsYou } from "../lib/today";
 import { DynamicSwitcher } from "./DynamicSwitcher";
 import { InviteSheet } from "../pages/Dynamic";
 import { SafeCallBanner, SafeWordSheet } from "./SafeCall";
-import { Dialog, Icon, cx } from "./ui";
+import { SwapDialog, swapPartner } from "./RoleSwap";
+import { Chip, Dialog, Icon, cx } from "./ui";
 
 export interface Dest {
   to: string;
@@ -119,48 +120,83 @@ function Tab({ d, active, badge }: { d: Dest; active: boolean; badge?: number })
   );
 }
 
-/** What the + button can start. Each one opens where it's made, with its form already open where the page has one. */
+/** What the + button can start (mockup 17). Each one opens where it's made, with its form already open where the page has one. */
 function useNewItems() {
   const { isDom, features, solo, rel } = useRel();
   const items: { label: string; icon: string; go: { to: string; params?: Record<string, string>; search?: Record<string, string> } }[] = [];
   if (rel.endedAt) return items;
-  if (isDom) items.push({ label: "Task", icon: "add_task", go: { to: "/tasks/$taskId", params: { taskId: "new" } } });
+  if (isDom) items.push({ label: "Task", icon: "check_box", go: { to: "/tasks/$taskId", params: { taskId: "new" } } });
   items.push({ label: "Plan", icon: "event", go: { to: "/calendar", search: { new: "1" } } });
-  if (features.journal) items.push({ label: "Journal entry", icon: "auto_stories", go: { to: "/journal/$noteId", params: { noteId: "new" } } });
-  items.push({ label: "Note", icon: "sticky_note_2", go: { to: "/notes/$noteId", params: { noteId: "new" } } });
+  items.push({ label: "Note", icon: "edit_square", go: { to: "/notes/$noteId", params: { noteId: "new" } } });
+  if (features.journal) items.push({ label: "Journal entry", icon: "menu_book", go: { to: "/journal/$noteId", params: { noteId: "new" } } });
+  if (features.scenes && !solo) items.push({ label: "Log a scene", icon: "bedtime", go: { to: "/scenes", search: { new: "1" } } });
   if (features.rules)
-    items.push({ label: isDom ? "Broken rule" : "Own up to a rule", icon: "gavel", go: { to: "/rule-log", search: { new: "1" } } });
-  if (features.consequences && isDom) items.push({ label: "Consequence", icon: "bolt", go: { to: "/consequences" } });
-  if (features.scenes && !solo) items.push({ label: "Scene", icon: "auto_awesome", go: { to: "/scenes", search: { new: "1" } } });
-  if (isDom) items.push({ label: "From a kit", icon: "widgets", go: { to: "/kits" } });
+    items.push({ label: isDom ? "Log a broken rule" : "Own up to a rule", icon: "receipt_long", go: { to: "/rule-log", search: { new: "1" } } });
+  if (features.consequences && isDom) items.push({ label: "Assign a consequence", icon: "bolt", go: { to: "/consequences" } });
+  if (isDom) items.push({ label: "Start from a kit", icon: "stacks", go: { to: "/kits" } });
   return items;
 }
 
 function NewSheet({ open, onClose }: { open: boolean; onClose(): void }) {
   const items = useNewItems();
   const navigate = useNavigate();
+  const { rel, me, self } = useRel();
+  const [extra, setExtra] = useState<"swap" | "invite" | null>(null);
+  const canSwap = !rel.endedAt && !rel.roleSwap && self?.role !== "switch" && !!swapPartner(rel, me.user.id);
+  const canInvite = !rel.endedAt;
   return (
-    <Dialog open={open} onClose={onClose} title="New">
-      <ul className="-mx-2 flex flex-col">
-        {items.map((it) => (
-          <li key={it.label}>
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                void navigate(it.go as never);
-              }}
-              className="state-layer flex w-full items-center gap-4 rounded-md px-2 py-3 text-left"
-            >
-              <Icon name={it.icon} className="text-on-surface" />
-              <span className="min-w-0 flex-1">
-                <span className="block font-serif text-[20px] leading-6 text-on-surface">{it.label}</span>
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </Dialog>
+    <>
+      <Dialog open={open} onClose={onClose}>
+        <div className="eyebrow">New</div>
+        <ul className="mt-2 flex flex-col">
+          {items.map((it) => (
+            <li key={it.label} className="border-b border-outline-variant last:border-b-0">
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  void navigate(it.go as never);
+                }}
+                className="state-layer -mx-2 flex w-[calc(100%+16px)] items-center gap-4 rounded-md px-2 py-3.5 text-left outline-none"
+              >
+                <Icon name={it.icon} size={22} className="text-on-surface-variant" />
+                <span className="min-w-0 flex-1 font-serif text-[22px] leading-7 text-on-surface">{it.label}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        {(canSwap || canInvite) && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {canSwap && (
+              <Chip
+                plain
+                icon="swap_horiz"
+                onClick={() => {
+                  onClose();
+                  setExtra("swap");
+                }}
+              >
+                Ask to swap roles
+              </Chip>
+            )}
+            {canInvite && (
+              <Chip
+                plain
+                icon="person_add"
+                onClick={() => {
+                  onClose();
+                  setExtra("invite");
+                }}
+              >
+                Invite
+              </Chip>
+            )}
+          </div>
+        )}
+      </Dialog>
+      <SwapDialog open={extra === "swap"} onClose={() => setExtra(null)} />
+      <InviteSheet open={extra === "invite"} onClose={() => setExtra(null)} />
+    </>
   );
 }
 

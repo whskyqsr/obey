@@ -46,7 +46,7 @@ private fun PointsContent(m: WidgetModel) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Glyph(R.drawable.ic_widget_reward, c.onPrimaryContainer, 22.dp)
             Spacer(GlanceModifier.width(8.dp))
-            Label(if (m.names && m.pointsName != null) "${m.pointsName}'s points" else "Points", 15.sp, c.onPrimaryContainer, FontWeight.Medium)
+            Label(m.pointsName?.takeIf { m.names } ?: "Points", 15.sp, c.onPrimaryContainer, FontWeight.Medium)
         }
         Spacer(GlanceModifier.height(6.dp))
         val balance = m.balance

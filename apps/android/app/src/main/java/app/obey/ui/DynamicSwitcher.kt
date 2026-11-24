@@ -60,6 +60,10 @@ class SwitcherActions(
 /** "with Sam", or the dynamic's own name. */
 private fun Relationship.heading(myId: String) = if (name != null || members.size < 2) title(myId) else "with ${title(myId)}"
 
+/** The phone header: "with Sam" whenever there's one other person, whatever the dynamic is called (as on the web). */
+private fun Relationship.chipLabel(myId: String): String =
+    members.filter { it.userId != myId }.singleOrNull()?.let { "with ${it.displayName}" } ?: heading(myId)
+
 private fun Relationship.subtitle(myId: String): String =
     when {
         ended -> "Ended"
@@ -184,7 +188,7 @@ fun DynamicSwitcherCompact(a: SwitcherActions) {
 }
 
 /**
- * The phone's switcher at the start of Today, Week and Us: the partner's picture and the dynamic's name in the serif,
+ * The phone's switcher at the start of Today, Week and Us: the partner's picture and "with Sam" (mockups 01, 03),
  * opening the list below it when there's more than one dynamic.
  */
 @Composable
@@ -200,8 +204,8 @@ fun DynamicSwitcherChip(a: SwitcherActions) {
         ) {
             DynamicMark(rel, a, 28.dp)
             Text(
-                rel.heading(a.session.userId),
-                style = MaterialTheme.typography.titleLarge.copy(fontSize = 19.sp),
+                rel.chipLabel(a.session.userId),
+                style = MaterialTheme.typography.bodyLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.widthIn(max = 180.dp),

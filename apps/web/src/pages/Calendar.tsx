@@ -7,10 +7,11 @@ import { useMediaQuery } from "../lib/useMediaQuery";
 import { OccurrenceCard, isOverdue } from "../components/OccurrenceCard";
 import { Button, Diamond, Dialog, type DiamondState, ErrorBox, Fab, IconButton, Loading, PageHeader, SegmentedButtons, cx } from "../components/ui";
 import { useOpenOnNew } from "../lib/newParam";
+import { PlanKey, WeekColumns } from "../components/WeekColumns";
 import { addDays, addMonths, daysBetween, fmtDate, fmtMonth, fmtTime, localDateOf, monthGrid, startOfWeek, today } from "../lib/dates";
 import { storage } from "../lib/storage";
 import { useRel } from "../lib/relationship";
-import { planPeople } from "../lib/planColors";
+import { planLegend, planTone } from "../lib/planColors";
 import type { WeekStart } from "../api/types";
 
 type View = "week" | "month";
@@ -81,20 +82,22 @@ export function CalendarPage() {
       <PageHeader
         hero
         title={heading}
+        // Phones keep the icons in the header row; desktop puts All tasks with the rest so it doesn't sit on a row of its own.
         tools={
-          <>
-            <IconButton icon="checklist" label="All tasks" onClick={() => void navigate({ to: "/tasks" })} />
-            {!desk && (
+          desk ? undefined : (
+            <>
+              <IconButton icon="checklist" label="All tasks" onClick={() => void navigate({ to: "/tasks" })} />
               <IconButton
                 icon={view === "month" ? "view_week" : "calendar_month"}
                 label={view === "month" ? "Show the week" : "Show the month"}
                 onClick={() => setView(view === "month" ? "week" : "month")}
               />
-            )}
-          </>
+            </>
+          )
         }
         actions={
           <>
+            {desk && <IconButton icon="checklist" label="All tasks" onClick={() => void navigate({ to: "/tasks" })} className="mr-1" />}
             {view === "week" && heading !== range && <span className="mr-1 text-body-large text-on-surface-variant">{range}</span>}
             <IconButton icon="chevron_left" label={view === "month" ? "Previous month" : "Previous week"} onClick={() => step(-1)} />
             <IconButton icon="chevron_right" label={view === "month" ? "Next month" : "Next week"} onClick={() => step(1)} />
@@ -202,32 +205,14 @@ export function CalendarPage() {
           </section>
         </div>
       ) : desk ? (
-        // Letters desktop: a column per day, its plans first, then its tasks in time order.
-        <div className="mx-6 grid grid-cols-7 border-y border-outline-variant">
-          {days.map((d, i) => {
-            const items = byDay.get(d) ?? [];
-            const dayEvents = eventsOn(d).sort((a, b) => Number(inTopStrip(b)) - Number(inTopStrip(a)) || a.startsAt.localeCompare(b.startsAt));
-            return (
-              <div
-                key={d}
-                className={cx(
-                  "flex min-h-[420px] min-w-0 flex-col gap-1 px-3 pt-3 pb-6",
-                  i > 0 && "border-l border-outline-variant",
-                  d === t && "bg-surface-container-lowest",
-                )}
-              >
-                <span className={cx("text-label-medium", d === t ? "text-primary" : "text-on-surface-variant")}>{fmtDate(d, { weekday: "short" })}</span>
-                <span className="mb-2 font-serif text-[30px] leading-8 text-on-surface">{Number(d.slice(8))}</span>
-                {dayEvents.map((e) => (
-                  <EventItem key={e.id} e={e} onOpen={() => setPlan(e)} />
-                ))}
-                {items.map((o) => (
-                  <ColumnItem key={o.id} o={o} clash={clashing.has(o.id)} onOpen={() => setDetailId(o.id)} />
-                ))}
-              </div>
-            );
-          })}
-        </div>
+        <WeekColumns
+          days={days}
+          occurrences={(occ.data ?? []).filter((o) => o.status !== "cancelled")}
+          events={events.data ?? []}
+          clashing={clashing}
+          onOpenTask={(o) => setDetailId(o.id)}
+          onOpenEvent={setPlan}
+        />
       ) : (
         // Letters: one hairline row per day, a diamond for each task, and a word on how it went. Tap a day to open it.
         <div className="mx-4 border-t border-outline-variant md:mx-6">
@@ -278,6 +263,7 @@ export function CalendarPage() {
           })}
         </div>
       )}
+      {!(desk && view === "week") && (events.data?.length ?? 0) > 0 && <PlanKey items={planLegend(rel, me.user.id)} className="mx-4 mt-4 md:mx-6" />}
       <Dialog
         open={!!detail}
         onClose={() => setDetailId(null)}
@@ -307,27 +293,15 @@ export function CalendarPage() {
   );
 }
 
-/** A plan: an accent rule down its side and whose it is, so it never reads as a task. */
+/** A plan: a rule down its side in its person's colour, so it never reads as a task. */
 function EventItem({ e, onOpen, large }: { e: CalendarEvent; onOpen(): void; large?: boolean }) {
-  const { rel, me } = useRel();
-  const whose =
-    e.withPartner || planPeople(rel).length < 2
-      ? null
-      : e.authorId === me.user.id
-        ? "Your plan"
-        : `${rel.members.find((m) => m.userId === e.authorId)?.displayName ?? "Their"}'s plan`;
+  const { rel } = useRel();
   return (
     <button type="button" onClick={onOpen} className={cx("state-layer flex w-full text-left", large ? "border-b border-outline-variant py-3" : "py-1")}>
-      <span className={cx("min-w-0 flex-1 border-l-2 border-primary", large ? "pl-4" : "pl-2")}>
+      <span className={cx("min-w-0 flex-1 border-l-2", planTone(e, rel).rule, large ? "pl-4" : "pl-2")}>
         <span className={cx("line-clamp-2 block break-words text-on-surface", large ? "text-body-large" : "text-body-small")}>{e.title}</span>
         <span className={cx("block text-on-surface-variant", large ? "text-body-medium" : "text-label-small")}>
-          {[
-            e.allDay ? "All day" : `${fmtTime(e.startsAt)}–${fmtTime(e.endsAt)}`,
-            whose,
-            e.conflictIds.length > 0 ? `overlaps ${e.conflictIds.length === 1 ? "a task" : `${e.conflictIds.length} tasks`}` : null,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
+          {e.allDay ? "All day" : `${fmtTime(e.startsAt)}–${fmtTime(e.endsAt)}`}
         </span>
       </span>
     </button>

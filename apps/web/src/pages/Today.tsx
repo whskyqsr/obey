@@ -140,9 +140,9 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
                   }
                   action={
                     myOpenToday.length > 1 ? (
-                      <Button variant="text" icon="more_time" onClick={() => setDaySheet(true)}>
-                        More time
-                      </Button>
+                      <button type="button" onClick={() => setDaySheet(true)} className="state-layer -mr-2 rounded-md px-2 py-1 text-body-medium text-primary">
+                        More time for today
+                      </button>
                     ) : isDom && !solo && todays.length > 0 ? (
                       <span className="text-body-small text-on-surface-variant tabular-nums">
                         {doneToday} of {todays.length}

@@ -34,7 +34,7 @@ import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Flag
-import androidx.compose.material3.Button
+import app.obey.ui.common.Button
 import androidx.compose.material3.IconButton
 import androidx.lifecycle.SavedStateHandle
 import androidx.navigation.toRoute
@@ -267,7 +267,7 @@ private fun StatsBody(s: DynamicStats, before: String, name: String?, weekStart:
         }
         Text(
             listOfNotNull(
-                name?.let { "$it's tasks" },
+                name,
                 t.rate?.let { "${pct(it)} done" },
                 trend(t.rate, s.previous.rate, before),
                 if (t.excused > 0) "${t.excused} excused" else null,

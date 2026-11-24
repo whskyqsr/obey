@@ -36,7 +36,7 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import app.obey.ui.common.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import app.obey.ui.common.TonalButton
 import androidx.compose.material3.Icon
@@ -259,7 +259,7 @@ private fun YourSide(to: String, busy: Boolean, onShare: (SceneSideInput) -> Uni
 /** A side as the mockup shows it: an eyebrow with the mood, then the words in the serif. */
 @Composable
 private fun SideView(side: SceneSide, session: Session) {
-    val who = if (side.userId == session.userId) "Your side" else "${session.nameOf(side.userId)}'s side"
+    val who = if (side.userId == session.userId) "You" else session.nameOf(side.userId)
     val rows = listOf(null to side.worked, "Next time" to side.change, "Still needs" to side.need).filter { it.second.isNotBlank() }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Eyebrow("$who · ${feeling(side.mood)}")

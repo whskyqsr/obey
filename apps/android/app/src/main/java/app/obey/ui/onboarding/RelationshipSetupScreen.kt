@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
+import app.obey.ui.common.Button
 import androidx.compose.material3.MaterialTheme
 import app.obey.ui.common.LettersField
 import androidx.compose.material3.Scaffold

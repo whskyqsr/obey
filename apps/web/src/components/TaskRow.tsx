@@ -94,7 +94,7 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
     <div
       data-row
       className={cx(
-        "state-layer flex min-h-16 items-center gap-2 py-1 pr-1 pl-0 has-[a[data-card-link]:focus-visible]:outline-2 has-[a[data-card-link]:focus-visible]:-outline-offset-2 has-[a[data-card-link]:focus-visible]:outline-primary",
+        "group/row state-layer flex min-h-16 items-center gap-2 py-1 pr-1 pl-0 has-[a[data-card-link]:focus-visible]:outline-2 has-[a[data-card-link]:focus-visible]:-outline-offset-2 has-[a[data-card-link]:focus-visible]:outline-primary",
         current && "bg-surface-container-lowest",
       )}
     >
@@ -163,13 +163,13 @@ export function TaskRow({ o, showDate, actions }: { o: Occurrence; showDate?: bo
         {mine && readyToSend(o) && <IconButton icon="send" label={`Send “${o.title}”`} className="text-primary" onClick={() => setCompleting(true)} />}
         {checkable && <CheckInButton o={o} className="max-md:hidden" />}
         {/* A Dominant moves anyone's deadline as easily as a sub asks for more time on their own. */}
-        {/* Phones keep rows to a title and a time; the task page and wider screens carry the rest. */}
+        {/* Phones keep rows to a title and a time; wider screens show it on hover or focus (and R), so rows stay quiet. */}
         {!actions && o.status === "pending" && (mine || isDom) && (
           <IconButton
             icon="more_time"
             label={mine ? "More time" : "Reschedule"}
             data-action="more"
-            className="max-md:hidden"
+            className="max-md:hidden md:opacity-0 md:group-hover/row:opacity-100 md:focus-visible:opacity-100"
             onClick={() => setRescheduling(true)}
           />
         )}

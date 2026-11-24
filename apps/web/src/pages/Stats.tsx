@@ -152,7 +152,7 @@ function Body({ s, before, name }: { s: DynamicStats; before: string; name: stri
         </div>
         <p className="text-body-medium text-on-surface-variant">
           {[
-            name ? `${name}'s tasks` : null,
+            name ?? null,
             t.rate === null ? null : `${pct(t.rate)} done`,
             trend(t.rate, s.previous.rate, before),
             t.excused ? `${t.excused} excused` : null,

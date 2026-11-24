@@ -60,7 +60,7 @@ export function ScenesPage() {
       <div className="flex max-w-3xl flex-col gap-6 px-4 pb-28 md:px-6">
         {mine && (
           <section className="rounded-lg border border-outline-variant bg-surface-container-lowest p-6">
-            <h2 className="eyebrow">Your aftercare plan</h2>
+            <h2 className="eyebrow">Your aftercare</h2>
             <PlanText plan={mine} empty="Not written yet." />
             {!readOnly && (
               <button type="button" onClick={() => setEditingPlan(mine)} className="mt-2 text-left text-body-large text-primary">
@@ -72,7 +72,7 @@ export function ScenesPage() {
         )}
         {others.some((p) => p.needs.length || p.note) && (
           <Link to="/aftercare" className="-mt-2 text-body-large text-on-surface-variant">
-            {others.map((p) => `${memberName(p.userId)}'s aftercare plan`).join(" · ")} ›
+            {others.map((p) => `${memberName(p.userId)}'s aftercare`).join(" · ")} ›
           </Link>
         )}
         {scenes.isLoading && <Loading />}
@@ -374,7 +374,7 @@ function YourSide({ s }: { s: Scene }) {
 /** A side as the mockup shows it: an eyebrow with the mood, then the words in the serif. */
 function SideView({ side }: { side: SceneSide }) {
   const { me, memberName } = useRel();
-  const who = side.userId === me.user.id ? "Your side" : `${memberName(side.userId)}'s side`;
+  const who = side.userId === me.user.id ? "You" : memberName(side.userId);
   const rows: [string | null, string][] = [
     [null, side.worked],
     ["Next time", side.change],
@@ -503,7 +503,7 @@ export function AftercarePage() {
           const isMe = p.userId === me.user.id;
           return (
             <section key={p.userId} className="border-b border-outline-variant pb-6">
-              <h2 className="eyebrow">{isMe ? "Your aftercare plan" : `${memberName(p.userId)}'s aftercare plan`}</h2>
+              <h2 className="eyebrow">{isMe ? "You" : memberName(p.userId)}</h2>
               <PlanText plan={p} empty={isMe ? "You haven't written yours yet." : "Not written yet."} />
               {p.updatedAt && <p className="mt-2 text-body-medium text-on-surface-variant">Updated {fmtDateTime(p.updatedAt)}</p>}
               {isMe && !readOnly && (

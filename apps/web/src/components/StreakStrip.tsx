@@ -33,14 +33,14 @@ export function Strip({ s, className, compact }: { s: TaskStreak; className?: st
             key={i}
             className={cx(
               "size-2 rounded-full",
-              r === "completed" && "bg-primary",
+              r === "completed" && "bg-on-surface",
               r === "missed" && "bg-error",
               r === "excused" && "border-[1.5px] border-outline",
             )}
           />
         ))}
       </span>
-      <span className={cx("text-label-medium tabular-nums", s.streak ? "text-primary" : "text-on-surface-variant")}>{s.streak} in a row</span>
+      <span className={cx("text-label-medium tabular-nums", "text-on-surface-variant")}>{s.streak} in a row</span>
     </span>
   );
 }

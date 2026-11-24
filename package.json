@@ -9,7 +9,9 @@
   },
   "pnpm": {
     "overrides": {
-      "@esbuild-kit/core-utils>esbuild": "^0.25.12"
+      "@esbuild-kit/core-utils>esbuild": "^0.25.12",
+      "@firebase/firestore>@grpc/grpc-js": "^1.14.7",
+      "rimraf>glob": "^14.0.2"
     }
   }
 }

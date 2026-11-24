@@ -24,7 +24,7 @@ import androidx.compose.material.icons.outlined.EventBusy
 import androidx.compose.material.icons.outlined.HourglassTop
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import app.obey.ui.common.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,7 +38,7 @@ import app.obey.ui.common.LettersField
 import app.obey.ui.common.PillSegment
 import app.obey.ui.common.PillRow
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
+import app.obey.ui.common.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -221,45 +221,45 @@ class PlanViewModel @Inject constructor(
     }
 }
 
-/** A plan in a day's list: an accent rule down its side, its title, and when and whose. [tone] is kept for callers. */
+/** A plan in a day's list: a rule down its side in its person's colour, its title, and when. */
 @Composable
-fun PlanRow(e: CalendarEvent, day: LocalDate, who: String?, @Suppress("UNUSED_PARAMETER") tone: PlanTone, onOpen: () -> Unit) {
-    PlanLine(e.title, listOfNotNull(e.dayLabel(day), who?.let { "$it's plan" }, if (e.conflictIds.isNotEmpty()) "overlaps ${if (e.conflictIds.size == 1) "a task" else "${e.conflictIds.size} tasks"}" else null).joinToString(" · "), e.conflictIds.isNotEmpty(), onOpen)
+fun PlanRow(e: CalendarEvent, day: LocalDate, tone: PlanTone, onOpen: () -> Unit) {
+    PlanLine(e.title, e.dayLabel(day), tone.dot, onOpen)
 }
 
 /** An all-day or multi-day plan above a day's tasks, ruled the same way as [PlanRow]. */
 @Composable
-fun PlanChip(e: CalendarEvent, day: LocalDate, @Suppress("UNUSED_PARAMETER") tone: PlanTone, onOpen: () -> Unit, modifier: Modifier = Modifier) {
+fun PlanChip(e: CalendarEvent, day: LocalDate, tone: PlanTone, onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val span = if (e.allDay && e.firstDay() == e.lastDay()) "All day" else "${formatDate(e.firstDay())} – ${formatDate(e.lastDay())}"
     Box(modifier) {
-        PlanLine(e.title, listOfNotNull(span, if (e.conflictIds.isNotEmpty()) "overlaps a task" else null).joinToString(" · "), e.conflictIds.isNotEmpty(), onOpen)
+        PlanLine(e.title, span, tone.dot, onOpen)
     }
 }
 
 @Composable
-private fun PlanLine(title: String, sub: String, clash: Boolean, onOpen: () -> Unit) {
+private fun PlanLine(title: String, sub: String, rule: androidx.compose.ui.graphics.Color, onOpen: () -> Unit) {
     val c = MaterialTheme.colorScheme
     Column(
         Modifier
             .fillMaxWidth()
             .clickable(onClick = onOpen)
             .padding(horizontal = 16.dp, vertical = 10.dp)
-            .drawBehind { drawRect(c.primary, size = androidx.compose.ui.geometry.Size(2.dp.toPx(), size.height)) }
+            .drawBehind { drawRect(rule, size = androidx.compose.ui.geometry.Size(2.dp.toPx(), size.height)) }
             .padding(start = 16.dp),
     ) {
         Text(title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Text(sub, style = MaterialTheme.typography.bodyMedium, color = if (clash) c.error else c.onSurfaceVariant)
+        Text(sub, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
     }
 }
 
 /** Today's heads-up for a plan that runs into tasks: the plan's accent rule, and a way into the plan to move them. */
 @Composable
-fun PlanHeadsUp(e: CalendarEvent, @Suppress("UNUSED_PARAMETER") tone: PlanTone, onOpen: () -> Unit) {
+fun PlanHeadsUp(e: CalendarEvent, tone: PlanTone, onOpen: () -> Unit) {
     val c = MaterialTheme.colorScheme
     Row(
         Modifier
             .fillMaxWidth()
-            .drawBehind { drawRect(c.primary, size = androidx.compose.ui.geometry.Size(2.dp.toPx(), size.height)) }
+            .drawBehind { drawRect(tone.dot, size = androidx.compose.ui.geometry.Size(2.dp.toPx(), size.height)) }
             .padding(start = 16.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
