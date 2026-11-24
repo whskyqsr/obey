@@ -123,7 +123,9 @@ function Night({ night, request }: { night: CurfewNight; request?: CurfewRequest
               <IconButton
                 icon="check"
                 label="Leave it missed"
-                onClick={() => confirm.mutate(night.occurrenceId, { onSuccess: () => noteAfter("Left as missed", target("leaving curfew missed")), onError: fail })}
+                onClick={() =>
+                  confirm.mutate(night.occurrenceId, { onSuccess: () => noteAfter("Left as missed", target("leaving curfew missed")), onError: fail })
+                }
               />
             </div>
           )
@@ -193,7 +195,15 @@ function Night({ night, request }: { night: CurfewNight; request?: CurfewRequest
         body={`Since ${fmtTime(night.arrivedAt)} · ${mine ? "stay" : "in"} until ${until}${note}`}
       />
     );
-  if (!mine) return <Strip tone="neutral" icon="bedtime" title={started ? `Curfew started at ${due}` : `Curfew at ${due}`} body={`${who} isn't home yet · in until ${until}`} />;
+  if (!mine)
+    return (
+      <Strip
+        tone="neutral"
+        icon="bedtime"
+        title={started ? `Curfew started at ${due}` : `Curfew at ${due}`}
+        body={`${who} isn't home yet · in until ${until}`}
+      />
+    );
   const more = canAsk && (
     <Button variant="tonal" icon="more_time" onClick={() => setAsking(true)}>
       More time
@@ -215,7 +225,9 @@ function Night({ night, request }: { night: CurfewNight; request?: CurfewRequest
                 icon="home"
                 busy={home.isPending}
                 onClick={() =>
-                  night.reportHome ? setTelling(true) : home.mutate({ occurrenceId: night.occurrenceId }, { onSuccess: () => snack("You're home for curfew"), onError: fail })
+                  night.reportHome
+                    ? setTelling(true)
+                    : home.mutate({ occurrenceId: night.occurrenceId }, { onSuccess: () => snack("You're home for curfew"), onError: fail })
                 }
               >
                 I'm home
@@ -255,7 +267,6 @@ function TellHomeSheet({ night, onClose }: { night: CurfewNight; onClose(): void
     <Dialog
       open
       onClose={onClose}
-      icon="home"
       title={`Tell ${who} you're home`}
       actions={
         <>
@@ -374,7 +385,6 @@ function MoreTimeSheet({ night, onClose }: { night: CurfewNight; onClose(): void
     <Dialog
       open
       onClose={onClose}
-      icon="more_time"
       title="More time tonight"
       actions={
         <>
@@ -481,7 +491,6 @@ function ChangeSheet({ request, onClose }: { request: CurfewRequest; onClose(): 
     <Dialog
       open
       onClose={onClose}
-      icon="bedtime"
       title={`Home by, ${nightLabel(request.fromDueAt)}`}
       actions={
         <>
@@ -561,7 +570,9 @@ export function Clash({ clash }: { clash: CurfewClash }) {
           </Button>
           <Button
             variant="text"
-            onClick={() => dismiss.mutate({ id: clash.eventId, occurrenceIds: [clash.occurrenceId] }, { onSuccess: () => snack("Curfew stays that night"), onError: fail })}
+            onClick={() =>
+              dismiss.mutate({ id: clash.eventId, occurrenceIds: [clash.occurrenceId] }, { onSuccess: () => snack("Curfew stays that night"), onError: fail })
+            }
           >
             Leave it
           </Button>
@@ -588,7 +599,6 @@ function PlanEndSheet({ clash, onClose }: { clash: CurfewClash; onClose(): void 
     <Dialog
       open
       onClose={onClose}
-      icon="event"
       title={`When does ${clash.eventTitle} end?`}
       actions={
         <>
@@ -619,7 +629,9 @@ function PlanEndSheet({ clash, onClose }: { clash: CurfewClash; onClose(): void 
     >
       <div className="flex flex-col gap-4">
         <TimeChoices options={options} value={endsAt} onChange={setEndsAt} after={clash.eventStartsAt} before={clash.eventEndsAt} />
-        {endsAt && <Summary icon="event" title={`${day}, ${fmtTime(clash.eventStartsAt)} – ${fmtTime(endsAt)}`} body={`Was until ${fmtTime(clash.eventEndsAt)}`} />}
+        {endsAt && (
+          <Summary icon="event" title={`${day}, ${fmtTime(clash.eventStartsAt)} – ${fmtTime(endsAt)}`} body={`Was until ${fmtTime(clash.eventEndsAt)}`} />
+        )}
         <TextArea
           label={`Note to ${partners.map((p) => p.displayName).join(" and ") || "them"} (optional)`}
           value={note}

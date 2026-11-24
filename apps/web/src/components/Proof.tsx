@@ -30,7 +30,6 @@ export function ProofTermsDialog({ open, onClose, onAccepted }: { open: boolean;
     <Dialog
       open={open}
       onClose={onClose}
-      icon="add_a_photo"
       title="Before your first photo"
       actions={
         <>
@@ -49,7 +48,10 @@ export function ProofTermsDialog({ open, onClose, onAccepted }: { open: boolean;
     >
       <div className="flex flex-col gap-3">
         <p>Proof photos are seen only by the people in this dynamic. You can delete yours at any time, and either of you can report a photo.</p>
-        <p>Never share anything showing someone under 18, anyone who hasn't agreed to be in it, or anything illegal. Breaking these rules gets an account removed.</p>
+        <p>
+          Never share anything showing someone under 18, anyone who hasn't agreed to be in it, or anything illegal. Breaking these rules gets an account
+          removed.
+        </p>
         <div className="flex flex-col gap-1 text-on-surface">
           <Checkbox checked={adult} onChange={setAdult} label="I'm 18 or older" />
           <Checkbox checked={rules} onChange={setRules} label="I'll follow these rules" />

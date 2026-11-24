@@ -379,7 +379,6 @@ function AgreeDialog({ v, current, onClose, onDone }: { v: AgreementVersion; cur
     <Dialog
       open
       onClose={onClose}
-      icon="handshake"
       title={`Agree to version ${v.number}?`}
       actions={
         <>
@@ -426,7 +425,6 @@ function AskChangesDialog({ v, current, onClose, onDone }: { v: AgreementVersion
     <Dialog
       open
       onClose={onClose}
-      icon="rate_review"
       title="Ask for changes"
       actions={
         <>

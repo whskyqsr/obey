@@ -724,7 +724,6 @@ private fun LeaveDialog(
     var block by remember { mutableStateOf(listOfNotNull(target?.userId)) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(if (target != null) Icons.Outlined.Block else Icons.AutoMirrored.Outlined.Logout, null) },
         title = {
             Text(
                 when {

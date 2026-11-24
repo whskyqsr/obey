@@ -574,7 +574,6 @@ private fun NoteHistoryDialog(vm: NoteEditorViewModel, onClose: () -> Unit) {
     val revisions by vm.revisions.collectAsStateWithLifecycle()
     AlertDialog(
         onDismissRequest = onClose,
-        icon = { Icon(Icons.Outlined.History, null) },
         title = { Text("Edit history") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {

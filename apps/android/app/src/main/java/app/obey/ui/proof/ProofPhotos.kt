@@ -237,7 +237,6 @@ fun ProofTermsDialog(onDismiss: () -> Unit, onAgree: () -> Unit) {
     var rules by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Outlined.AddAPhoto, null) },
         title = { Text("Before your first photo") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

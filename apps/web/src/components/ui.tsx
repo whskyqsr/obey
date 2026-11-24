@@ -570,7 +570,6 @@ export function Dialog({
   open,
   onClose,
   title,
-  icon,
   children,
   actions,
   sheetOnMobile = true,
@@ -578,7 +577,6 @@ export function Dialog({
   open: boolean;
   onClose(): void;
   title?: ReactNode;
-  icon?: string;
   children: ReactNode;
   actions?: ReactNode;
   /** On small screens render as a modal bottom sheet. */
@@ -617,8 +615,7 @@ export function Dialog({
       >
         {sheetOnMobile && <div className="mx-auto mt-3 h-1 w-8 rounded-full bg-outline-variant md:hidden" />}
         <div className="overflow-y-auto px-6 pt-6 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {icon && <Icon name={icon} className="mb-4 block text-center text-on-surface-variant" />}
-          {title && <h2 className={cx("mb-4 text-headline-small", icon && "text-center")}>{title}</h2>}
+          {title && <h2 className="mb-4 text-headline-small">{title}</h2>}
           <div className="text-body-medium text-on-surface-variant">{children}</div>
         </div>
         {actions && <div className="flex flex-wrap justify-end gap-2 px-6 pt-2 pb-6">{actions}</div>}

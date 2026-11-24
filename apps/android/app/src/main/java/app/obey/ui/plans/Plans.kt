@@ -252,27 +252,26 @@ private fun PlanLine(title: String, sub: String, clash: Boolean, onOpen: () -> U
     }
 }
 
-/** Today's heads-up for a plan that runs into tasks, with a way into the plan to move them. */
+/** Today's heads-up for a plan that runs into tasks: the plan's accent rule, and a way into the plan to move them. */
 @Composable
-fun PlanHeadsUp(e: CalendarEvent, tone: PlanTone, onOpen: () -> Unit) {
-    Surface(
-        color = tone.container,
-        contentColor = tone.onContainer,
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.fillMaxWidth(),
+fun PlanHeadsUp(e: CalendarEvent, @Suppress("UNUSED_PARAMETER") tone: PlanTone, onOpen: () -> Unit) {
+    val c = MaterialTheme.colorScheme
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .drawBehind { drawRect(c.primary, size = androidx.compose.ui.geometry.Size(2.dp.toPx(), size.height)) }
+            .padding(start = 16.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(Modifier.padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.EventBusy, null)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(e.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(
-                    "${e.whenLabel()} · overlaps ${if (e.conflictIds.size == 1) "a task" else "${e.conflictIds.size} tasks"}",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            TextButton(onClick = onOpen) { Text("Sort it out") }
+        Column(Modifier.weight(1f)) {
+            Text(e.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                "${e.whenLabel()} · overlaps ${if (e.conflictIds.size == 1) "a task" else "${e.conflictIds.size} tasks"}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = c.onSurfaceVariant,
+            )
         }
+        TextButton(onClick = onOpen) { Text("Sort it out", color = c.primary) }
     }
 }
 

@@ -195,7 +195,6 @@ function RevealDialog({ open, onClose }: { open: boolean; onClose(): void }) {
     <Dialog
       open={open}
       onClose={onClose}
-      icon="visibility"
       title="Show photos unblurred?"
       actions={
         <>

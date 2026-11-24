@@ -597,7 +597,6 @@ function LeaveDialog({ target, onClose }: { target: Member | null; onClose(): vo
     <Dialog
       open
       onClose={onClose}
-      icon={target ? "block" : "logout"}
       title={target ? (ended ? `Block ${target.displayName}?` : `Block ${target.displayName} and end this dynamic?`) : "Leave this dynamic?"}
       actions={
         <>

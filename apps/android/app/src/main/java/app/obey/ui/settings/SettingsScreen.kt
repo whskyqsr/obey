@@ -295,7 +295,6 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, onOpenFeatures
             .distinct()
         AlertDialog(
             onDismissRequest = { if (!busy) dialog = null },
-            icon = { Icon(Icons.Outlined.DeleteForever, null) },
             title = { Text("Delete your account?") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

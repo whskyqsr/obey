@@ -92,7 +92,6 @@ export function SceneCheckRow({ x: { scene, check } }: { x: SceneCheckFor }) {
         <Dialog
           open
           onClose={() => setReplying(false)}
-          icon="chat"
           title={`${who} is feeling ${feeling}`}
           actions={
             <Button variant="text" onClick={() => setReplying(false)}>
@@ -145,7 +144,6 @@ export function RedeemedDialog({ e, onClose }: { e: LedgerEntry; onClose(): void
     <Dialog
       open
       onClose={onClose}
-      icon="redeem"
       title={`Redeem “${e.note}”`}
       actions={
         <>

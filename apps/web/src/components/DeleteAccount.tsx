@@ -14,7 +14,9 @@ export function DeleteAccount() {
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   // Everyone sharing a dynamic that hasn't ended: it ends for them too.
-  const partners = [...new Set(me.relationships.filter((r) => !r.endedAt).flatMap((r) => r.members.filter((m) => m.userId !== me.user.id).map((m) => m.displayName)))];
+  const partners = [
+    ...new Set(me.relationships.filter((r) => !r.endedAt).flatMap((r) => r.members.filter((m) => m.userId !== me.user.id).map((m) => m.displayName))),
+  ];
 
   async function remove() {
     setBusy(true);
@@ -36,7 +38,6 @@ export function DeleteAccount() {
       <Dialog
         open={open}
         onClose={() => !busy && setOpen(false)}
-        icon="delete_forever"
         title="Delete your account?"
         actions={
           <>
@@ -51,7 +52,10 @@ export function DeleteAccount() {
       >
         <div className="flex flex-col gap-3 text-body-medium">
           {partners.length > 0 && (
-            <p>Your dynamic with {partners.join(" and ")} ends for both of you. They keep a read-only copy of the tasks and notes you shared, shown as from a deleted account.</p>
+            <p>
+              Your dynamic with {partners.join(" and ")} ends for both of you. They keep a read-only copy of the tasks and notes you shared, shown as from a
+              deleted account.
+            </p>
           )}
           <p>Your profile, photo, private notes, journal and proof photos are deleted, and so is your sign-in. This can't be undone.</p>
           <TextField label='Type "delete" to confirm' value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" />

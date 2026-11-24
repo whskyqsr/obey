@@ -190,7 +190,6 @@ function PinDialog({ open, onClose, onSave }: { open: boolean; onClose(): void; 
     <Dialog
       open={open}
       onClose={onClose}
-      icon="lock"
       title="Choose a PIN"
       actions={
         <>

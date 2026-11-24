@@ -110,7 +110,6 @@ fun RedeemedDialog(e: LedgerEntry, name: String, busy: Boolean, onDismiss: () ->
     var note by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Outlined.Redeem, null) },
         title = { Text("Redeem “${e.note}”") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -161,7 +160,6 @@ fun TellHomeDialog(who: String, busy: Boolean, onDismiss: () -> Unit, onSend: (S
     var note by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Outlined.Home, null) },
         title = { Text("Tell $who you're home") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {

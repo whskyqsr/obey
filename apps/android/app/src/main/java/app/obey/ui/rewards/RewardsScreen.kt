@@ -313,7 +313,6 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
         val ledger = (state as? Load.Ready)?.value?.ledger.orEmpty()
         AlertDialog(
             onDismissRequest = { history = false },
-            icon = { Icon(Icons.Outlined.History, null) },
             title = { Text("History") },
             text = {
                 androidx.compose.foundation.lazy.LazyColumn {
@@ -405,7 +404,6 @@ private fun LetOffDialog(
     var picked by remember { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Outlined.Redeem, null) },
         title = { Text(reward.title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
