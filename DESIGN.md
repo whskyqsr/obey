@@ -48,7 +48,7 @@ Once Jake decides how something looks or behaves, apply it everywhere the same s
 - Form fields are label-above Letters fields with one hairline (2026-11-23).
 - Deleting an item returns to its list, never back through history to wherever it was opened from (Notes, 2026-11-23).
 - The overflow menu is a horizontal ⋯, as in every mockup (2026-11-24).
-- Plans are marked with an accent rule and say whose they are by name alone ("Kitten", or "You"), never "Kitten's plan", and not a colour per person (mockup 13, 2026-11-24). The desktop week is a column per day with its plans and tasks in the order they happen, with no space for gaps in time. A timed plan holds the tasks that fall during it, and all-day or multi-day plans shade the days they cover with their name once. Plans don't say how many tasks they overlap; a task that runs into a plan is marked in oxblood until someone moves it or keeps it (2026-11-24).
+- Plans are marked with an accent rule and say whose they are by name alone ("Kitten", or "You"), never "Kitten's plan", and not a colour per person (mockup 13, 2026-11-24). The desktop week is a column per day with its plans and tasks in the order they happen, with no space for gaps in time. A timed plan holds the tasks that fall during it, and all-day or multi-day plans are their name over a line that spans the days they cover. Plans don't say how many tasks they overlap; a task that runs into a plan is marked in oxblood until someone moves it or keeps it (2026-11-24).
 
 Pixel perfection isn't the goal. Once the big gaps in `design/STATUS.md` are closed, there will be a consistency pass across every screen: same headers, same row styles, same buttons and same spacing for the same jobs.
 

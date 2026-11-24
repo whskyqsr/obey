@@ -5,7 +5,7 @@ import { planPeople } from "../lib/planColors";
 import { isOverdue } from "./OccurrenceCard";
 import { Diamond, type DiamondState, cx } from "./ui";
 
-/** All-day plans, and plans of a day or more, shade the days they cover instead of sitting in a day's list. */
+/** All-day plans, and plans of a day or more, run across the days they cover instead of sitting in a day's list. */
 export const coversDays = (e: CalendarEvent) => e.allDay || new Date(e.endsAt).getTime() - new Date(e.startsAt).getTime() >= 86_400_000;
 
 /** Each day-covering plan's first and last visible day, packed into as few label rows as fit. */
@@ -50,7 +50,7 @@ type Entry = { at: number; kind: "task"; o: Occurrence } | { at: number; kind: "
 /**
  * The desktop week: a column per day with its plans and tasks in the order they happen, without spacing out the gaps
  * between them. A timed plan holds the tasks that fall during it, so you can see what it runs into. A plan that covers
- * whole days shades them, with its name once over the first. A task that runs into a plan is marked until someone
+ * whole days is its name over a line that runs across those days. A task that runs into a plan is marked until someone
  * sorts it out (moves it, or keeps it as it is).
  */
 export function WeekColumns({
@@ -133,7 +133,7 @@ export function WeekColumns({
           aria-hidden
           className={cx(
             i > 0 && "border-l border-outline-variant",
-            long.some((s) => s.from <= i && s.to >= i) ? "bg-primary-container/35" : d === t && "bg-surface-container-lowest",
+            d === t && "bg-surface-container-lowest",
           )}
           style={{ gridColumn: i + 1, gridRow: "1 / -1" }}
         />
@@ -154,12 +154,16 @@ export function WeekColumns({
             type="button"
             onClick={() => onOpenEvent(s.e)}
             style={{ gridColumn: `${s.from + 1} / ${s.to + 2}`, gridRow: s.row + 2 }}
-            className={cx("state-layer mx-2 mb-1 flex min-w-0 items-baseline gap-2 py-0.5 pr-2 text-left", s.before ? "pl-2" : "border-l-2 border-primary pl-2")}
+            className={cx("state-layer mb-1 block min-w-0 pt-0.5 text-left", s.before ? "pl-0" : "pl-3", s.after ? "pr-0" : "pr-3")}
           >
-            {s.before && <span className="text-label-small text-on-surface-variant">‹</span>}
-            <span className="max-w-full shrink-0 truncate text-body-small text-on-surface">{s.e.title}</span>
-            {meta && <span className="min-w-0 truncate text-label-small text-on-surface-variant">{meta}</span>}
-            {s.after && <span className="ml-auto text-label-small text-on-surface-variant">›</span>}
+            <span className={cx("flex min-w-0 items-baseline gap-2", s.before && "pl-3", s.after && "pr-3")}>
+              {s.before && <span className="text-label-small text-on-surface-variant">‹</span>}
+              <span className="max-w-full shrink-0 truncate text-body-small text-on-surface">{s.e.title}</span>
+              {meta && <span className="min-w-0 truncate text-label-small text-on-surface-variant">{meta}</span>}
+              {s.after && <span className="ml-auto text-label-small text-on-surface-variant">›</span>}
+            </span>
+            {/* The line runs across every day the plan covers. */}
+            <span aria-hidden className="mt-1 block h-[1.5px] bg-primary" />
           </button>
         );
       })}
