@@ -219,7 +219,8 @@ export function WeekGrid({
                   const inset = b.kind === "task" && perDay[i]!.some((x) => x.b.kind === "event" && x.b.start <= b.start && x.b.end > b.start) ? 14 : 4;
                   const style = { top, height, left: `calc(${(lane / of) * 100}% + ${inset}px)`, width: `calc(${100 / of}% - ${inset + 4}px)` };
                   if (b.kind === "event") {
-                    const meta = [`${fmtTime(b.e.startsAt)}–${fmtTime(b.e.endsAt)}`, whose(b.e)].filter(Boolean).join(" · ");
+                    // The hours already show when it runs; only whose it is.
+                    const meta = whose(b.e);
                     return (
                       <button
                         key={b.key}
@@ -229,7 +230,7 @@ export function WeekGrid({
                         className="state-layer absolute z-10 flex flex-col overflow-hidden border-l-2 border-primary bg-primary-container/50 px-2 py-1 text-left"
                       >
                         <span className="truncate text-body-small text-on-surface">{b.e.title}</span>
-                        {height > 40 && <span className="truncate text-label-small text-on-surface-variant">{meta}</span>}
+                        {meta && height > 40 && <span className="truncate text-label-small text-on-surface-variant">{meta}</span>}
                       </button>
                     );
                   }
