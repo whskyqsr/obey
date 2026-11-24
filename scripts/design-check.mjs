@@ -49,7 +49,7 @@ const rules = [
     name: "Raw colour on Android (use MaterialTheme.colorScheme)",
     files: android,
     test: /\bColor\(0x/,
-    allow: ["ui/theme/", "ui/SafeCall.kt", "ui/agreement/AgreementScreen.kt"],
+    allow: ["ui/theme/", "ui/SafeCall.kt"],
   },
   {
     name: 'Capital "Submissive" in user-facing text (always lowercase)',
