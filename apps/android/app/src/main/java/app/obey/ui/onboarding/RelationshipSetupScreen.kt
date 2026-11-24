@@ -50,6 +50,7 @@ fun RelationshipSetupScreen(vm: SettingsViewModel = hiltViewModel()) {
     var joinRole by rememberSaveable { mutableStateOf(Role.Submissive) }
     var name by rememberSaveable { mutableStateOf("") }
     var code by rememberSaveable { mutableStateOf("") }
+    val invite = rememberInviteRole(code, vm::previewInvite)
     val colors = MaterialTheme.colorScheme
 
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
@@ -58,7 +59,7 @@ fun RelationshipSetupScreen(vm: SettingsViewModel = hiltViewModel()) {
                 actions = {
                     Button(
                         onClick = { if (joining) vm.join(code, joinRole) else vm.createRelationship(name, role) },
-                        enabled = !busy && (!joining || code.length >= 4),
+                        enabled = !busy && (!joining || (code.length >= 4 && invite != InviteRoleState.Invalid)),
                         colors = app.obey.ui.common.inkButtonColors(),
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                     ) { Text("Continue") }
@@ -95,12 +96,7 @@ fun RelationshipSetupScreen(vm: SettingsViewModel = hiltViewModel()) {
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     )
-                    if (joining) {
-                        Text("Your role, if the invite leaves it to you", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))
-                        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Role.entries.forEach { r -> app.obey.ui.common.LettersChip(r.label, joinRole == r, { joinRole = r }) }
-                        }
-                    }
+                    if (joining) InviteRole(invite, joinRole) { joinRole = it }
                 }
             }
         }

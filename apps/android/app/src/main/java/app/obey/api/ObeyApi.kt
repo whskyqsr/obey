@@ -81,6 +81,9 @@ interface ObeyApi {
     @POST("relationships/{id}/invites")
     suspend fun createInvite(@Path("id") relationshipId: String, @Body body: CreateInviteInput): Invite
 
+    @GET("invites/{code}")
+    suspend fun invitePreview(@Path("code") code: String): InvitePreview
+
     @POST("relationships/join")
     suspend fun joinRelationship(@Body body: JoinRelationshipInput): Relationship
 

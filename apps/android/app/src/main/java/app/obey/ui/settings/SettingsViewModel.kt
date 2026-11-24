@@ -199,6 +199,9 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /** The invite a typed code points at, or null when it can't be used. */
+    suspend fun previewInvite(code: String): app.obey.api.InvitePreview? = runCatching { api.invitePreview(parseInviteCode(code)) }.getOrNull()
+
     fun join(code: String, role: Role) = action {
         val rel = api.joinRelationship(JoinRelationshipInput(parseInviteCode(code), role))
         settings.setWelcome(rel.id)

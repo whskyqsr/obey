@@ -556,7 +556,7 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
         "join" -> AlertDialog(
             onDismissRequest = { dialog = null },
             title = { Text("Join with a link or code") },
-            text = { JoinRelationshipForm(busy) { code, role -> vm.join(code, role); dialog = null } },
+            text = { JoinRelationshipForm(busy, vm::previewInvite) { code, role -> vm.join(code, role); dialog = null } },
             confirmButton = {},
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
         )

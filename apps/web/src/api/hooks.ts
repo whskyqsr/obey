@@ -311,8 +311,8 @@ export function useCreateInvite(rel: string) {
   return useMutation({ mutationFn: (role?: Role | null) => api<Invite>(`/relationships/${rel}/invites`, { method: "POST", body: role === undefined ? {} : { role } }) });
 }
 
-export function useInvitePreview(code: string) {
-  return useQuery({ queryKey: ["invite", code], queryFn: () => api<InvitePreview>(`/invites/${encodeURIComponent(code)}`) });
+export function useInvitePreview(code: string, enabled = true) {
+  return useQuery({ queryKey: ["invite", code], queryFn: () => api<InvitePreview>(`/invites/${encodeURIComponent(code)}`), enabled, retry: false });
 }
 
 // ---- tasks
