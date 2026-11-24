@@ -372,7 +372,14 @@ function Questions({ s, mine, onSent }: { s: MonthSummary; mine?: MonthReview; o
                     </div>
                   </div>
                 ) : (
-                  <TextArea aria-label={q} autoFocus rows={3} value={draft[key]} maxLength={2000} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })} />
+                  <TextArea
+                    aria-label={q}
+                    autoFocus
+                    rows={3}
+                    value={draft[key]}
+                    maxLength={2000}
+                    onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
+                  />
                 )}
               </div>
             )}
