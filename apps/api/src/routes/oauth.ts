@@ -95,7 +95,7 @@ export const oauthRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     };
   });
 
-  app.post("/oauth/register", own, async (req, reply) => {
+  app.post("/oauth/register", { config: { ownAuth: true, rateLimit: { max: 20, timeWindow: "1 hour" } } }, async (req, reply) => {
     const parsed = register.safeParse(req.body ?? {});
     if (!parsed.success) return oauthError(reply, "invalid_client_metadata", parsed.error.issues[0]?.message);
     const id = `fc_${randomBytes(16).toString("base64url")}`;
@@ -117,7 +117,7 @@ export const oauthRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   };
 
   // A bad client or redirect is shown, never redirected to; anything else goes on to the connect page.
-  app.get("/oauth/authorize", own, async (req, reply) => {
+  app.get("/oauth/authorize", { config: { ownAuth: true, rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (req, reply) => {
     const q = req.query as Record<string, string>;
     const client = q.client_id && q.redirect_uri ? await clientFor(q.client_id, q.redirect_uri) : null;
     if (!client) return reply.status(400).type("text/plain").send("This app isn't registered with Fealty, or its return address doesn't match.");
@@ -165,7 +165,7 @@ export const oauthRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     return { redirect: back.toString() };
   });
 
-  app.post("/oauth/token", own, async (req, reply) => {
+  app.post("/oauth/token", { config: { ownAuth: true, rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (req, reply) => {
     const parsed = tokenRequest.safeParse(req.body ?? {});
     if (!parsed.success) return oauthError(reply, "invalid_request");
     const body = parsed.data;
