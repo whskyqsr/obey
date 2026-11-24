@@ -623,7 +623,7 @@ fun TodayScreen(
                     }
                     if (restOfToday.isEmpty()) {
                         item(key = "e-today") {
-                            EmptyBox("Nothing else due today", if (d.overdue.isEmpty()) "Enjoy it, or ask for more." else null)
+                            EmptyBox("Nothing else due today")
                         }
                     } else {
                         items(restOfToday, key = { "t-" + it.id }) { o -> row(o)() }

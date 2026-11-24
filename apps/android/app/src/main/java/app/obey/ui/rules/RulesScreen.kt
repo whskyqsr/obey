@@ -155,7 +155,7 @@ fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, on
             is Load.Failed -> ErrorBox(s.message, vm::refresh)
             is Load.Ready -> {
                 if (s.value.isEmpty()) {
-                    EmptyBox("No rules yet", if (canManage) "Rules are numbered in the order you add them." else null, icon = Icons.Outlined.Gavel)
+                    EmptyBox("No rules yet", icon = Icons.Outlined.Gavel)
                 } else {
                     // Numbers always follow the list order; a Dominant drags the handle to change it.
                     ReorderableList(

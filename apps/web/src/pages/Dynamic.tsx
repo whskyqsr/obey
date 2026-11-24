@@ -191,7 +191,9 @@ export function DynamicPage() {
 
   return (
     <div className="flex flex-col pb-10">
-      <TopBar back={back} onInvite={ended ? undefined : () => setSheet("invite")} />
+      <div className="mx-auto w-full max-w-2xl">
+        <TopBar back={back} onInvite={ended ? undefined : () => setSheet("invite")} />
+      </div>
       <div className="mx-auto w-full max-w-2xl px-4 md:px-6">
         <DynamicHero
           className="pt-2 pb-2"
@@ -409,7 +411,7 @@ export function PeoplePage() {
   const others = rel.members.filter((m) => m.userId !== me.user.id);
   return (
     <div className="flex flex-col pb-10">
-      <SubHeader title="People" back="Your dynamic" onBack={back} />
+      <div className="mx-auto w-full max-w-2xl"><SubHeader title="People" back="Your dynamic" onBack={back} /></div>
       <div className="mx-auto w-full max-w-2xl px-4 md:px-6">
         <Group>
           {rel.members.map((m) => (
@@ -707,7 +709,7 @@ export function HowItWorksPage() {
   };
   return (
     <div className="flex flex-col pb-10">
-      <SubHeader title="How it works" back="Your dynamic" onBack={back} />
+      <div className="mx-auto w-full max-w-2xl"><SubHeader title="How it works" back="Your dynamic" onBack={back} /></div>
       <div className="mx-auto w-full max-w-2xl px-4 md:px-6">
         {!isDom && <p className="-mt-2 text-body-medium text-on-surface-variant">{rel.endedAt ? "This dynamic has ended, so nothing here can change." : "Only a Dominant changes these."}</p>}
         <Group>

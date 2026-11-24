@@ -198,7 +198,7 @@ export function NotesPage({ kind, selected }: { kind: "note" | "journal"; select
     <Empty
       icon={copy.icon}
       title={q || tag ? "Nothing matches" : copy.empty}
-      body={q || tag ? undefined : canWrite ? "Start one with the + above." : undefined}
+      
     />
   );
 

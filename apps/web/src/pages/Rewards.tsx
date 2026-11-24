@@ -82,13 +82,6 @@ export function RewardsPage() {
               <Empty
                 icon="redeem"
                 title="No rewards yet"
-                body={
-                  solo
-                    ? "Add treats to spend your points on."
-                    : isDom
-                      ? "Add treats your sub can spend points on."
-                      : "Your Dominant hasn't added any rewards yet."
-                }
               />
             )}
             {/* A menu, not cards: each reward and its price, with a dotted leader between, dimmed until it's affordable. */}

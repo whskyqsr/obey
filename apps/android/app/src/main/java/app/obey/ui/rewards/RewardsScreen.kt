@@ -169,7 +169,7 @@ fun RewardsScreen(onOpenSettings: () -> Unit, consequences: Boolean = false, vm:
                 }
 
                 if (features.points) item(key = "h-rewards") { SectionHeader(if (canManage && !solo) "Your menu" else "Spend") }
-                if (features.points && d.rewards.isEmpty()) item(key = "e-rewards") { EmptyBox("No rewards yet", if (canManage) "Add things worth earning." else null, icon = Icons.Outlined.Redeem) }
+                if (features.points && d.rewards.isEmpty()) item(key = "e-rewards") { EmptyBox("No rewards yet", icon = Icons.Outlined.Redeem) }
                 items(if (features.points) d.rewards else emptyList(), key = { "r-" + it.id }) { r ->
                     val myBalance = vm.balanceOf(session?.userId.orEmpty())
                     // A menu, not cards: the title, a dotted leader, the price; dimmed until it's affordable.

@@ -95,7 +95,7 @@ export function AiAccessPage() {
 
   return (
     <div className="flex flex-col pb-10">
-      <SubHeader title="AI access" back="Your dynamic" onBack={back} />
+      <div className="mx-auto w-full max-w-2xl"><SubHeader title="AI access" back="Your dynamic" onBack={back} /></div>
       <div className="mx-auto w-full max-w-2xl px-4 md:px-6">
         <Group>
           <div className="py-1.5">
