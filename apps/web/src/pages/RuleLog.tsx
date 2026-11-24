@@ -63,7 +63,7 @@ export function RuleLogPage() {
   };
   const filters = features.rules && features.protocols;
 
-  if (!features.rules && !features.protocols) return <Empty icon="gavel" title="Rules and protocols are off" body="Turn one of them on in Your dynamic to keep a log." />;
+  if (!features.rules && !features.protocols) return <Empty icon="gavel" title="Rules and protocols are off" body="Turn one of them on in Settings, under Features." />;
 
   return (
     <>

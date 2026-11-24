@@ -158,7 +158,7 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
                     <Empty
                       icon="spa"
                       title="Nothing due today"
-                      body={rel.endedAt ? "This dynamic has ended." : isDom ? "Add one with the button below." : "Enjoy it while it lasts."}
+                      body={rel.endedAt ? "This dynamic has ended." : undefined}
                     />
                   )}
                 </Section>

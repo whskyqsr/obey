@@ -178,7 +178,7 @@ fun TaskListScreen(
             is Load.Ready -> LazyColumn(Modifier.padding(padding).fillMaxSize()) {
                 val (drafts, tasks) = s.value.partition { it.draft }
                 if (drafts.isNotEmpty()) item(key = "kit-review") { KitReview(drafts, vm.session, onOpen, onSend = vm::sendDrafts, onDrop = vm::dropDraft) }
-                if (tasks.isEmpty() && drafts.isEmpty()) item { EmptyBox("No tasks yet", "Create one with the + button.", icon = Icons.Outlined.Checklist) }
+                if (tasks.isEmpty() && drafts.isEmpty()) item { EmptyBox("No tasks yet", if (vm.session?.canManage == true) null else "Nothing has been set for you yet.", icon = Icons.Outlined.Checklist) }
                 val me = vm.session?.userId
                 val others = vm.session?.partners.orEmpty()
                 val shown = tasks.filter {

@@ -44,7 +44,7 @@ export function ProtocolsPage() {
         {list.isLoading && <Loading />}
         {list.error && <ErrorBox error={list.error} onRetry={() => list.refetch()} />}
         {list.data && !list.data.length && (
-          <Empty icon="fact_check" title="No protocols yet" body={isDom ? "Spell out exactly what's expected, and when and how it's done." : undefined} />
+          <Empty icon="fact_check" title="No protocols yet" />
         )}
         <SortableList items={protocols} enabled={isDom} onReorder={(next) => reorder.mutate(next, { onError: (e) => snack(errorMessage(e)) })}>
           {(p, _i, handle) => {

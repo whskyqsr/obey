@@ -178,8 +178,8 @@ fun NotesScreen(
                             item {
                                 when {
                                     q.isNotEmpty() -> EmptyBox("Nothing matches", icon = Icons.Outlined.SearchOff)
-                                    journal -> EmptyBox("No entries yet", "Write about your day, and how you felt.", icon = Icons.Outlined.AutoStories)
-                                    else -> EmptyBox("No notes yet", "Plans, ideas, anything worth keeping. Notes support headings, lists and checklists.", icon = Icons.Outlined.StickyNote2)
+                                    journal -> EmptyBox("No entries yet", icon = Icons.Outlined.AutoStories)
+                                    else -> EmptyBox("No notes yet", icon = Icons.Outlined.StickyNote2)
                                 }
                             }
                         }

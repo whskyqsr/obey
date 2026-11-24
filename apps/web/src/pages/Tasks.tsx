@@ -62,7 +62,7 @@ export function TasksPage() {
           <Empty
             icon="checklist"
             title={q || filter ? "No matches" : "No tasks yet"}
-            body={isDom ? "Start one with the + above." : "Nothing has been set for you yet."}
+            body={q || filter || isDom ? undefined : "Nothing has been set for you yet."}
           />
         </div>
       )}

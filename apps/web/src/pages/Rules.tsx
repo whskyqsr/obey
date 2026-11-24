@@ -67,7 +67,7 @@ export function RulesPage() {
       <ol className="flex flex-col border-t border-outline-variant mx-4 md:mx-6">
         {list.isLoading && <Loading />}
         {list.error && <ErrorBox error={list.error} onRetry={() => list.refetch()} />}
-        {list.data && !list.data.length && <Empty icon="gavel" title="No rules yet" body={isDom ? "Write the first one." : undefined} />}
+        {list.data && !list.data.length && <Empty icon="gavel" title="No rules yet" />}
         {/* Reordering works on the whole list, so it's off while a category filter is on. */}
         <SortableList items={shown} enabled={isDom && !category} onReorder={(next) => reorder.mutate(next, { onError: (e) => snack(errorMessage(e)) })}>
           {(r, _i, handle) => (

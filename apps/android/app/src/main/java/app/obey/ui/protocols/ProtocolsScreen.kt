@@ -149,7 +149,7 @@ fun ProtocolsScreen(onOpen: (String) -> Unit, onNew: () -> Unit, onOpenSettings:
             is Load.Ready -> {
                 val rules = if (showRules) s.value.rules else emptyList()
                 if (s.value.protocols.isEmpty()) {
-                    EmptyBox("No protocols yet", if (canManage) "Spell out exactly what's expected, and when and how it's done." else null, icon = Icons.Outlined.FactCheck)
+                    EmptyBox("No protocols yet", icon = Icons.Outlined.FactCheck)
                 } else {
                     ReorderableList(
                         items = s.value.protocols,
