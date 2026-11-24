@@ -4,10 +4,20 @@ PKG = "me.fealty"
 def adb(*a, **k): return subprocess.run(["adb", *a], capture_output=True, **k)
 def dump():
     for _ in range(3):
+        if _ : anr()
         adb("shell", "uiautomator", "dump", "/sdcard/u.xml"); r = adb("shell", "cat", "/sdcard/u.xml")
         try: return ET.fromstring(r.stdout.decode("utf8", "ignore"))
         except Exception: time.sleep(1)
     return ET.fromstring("<x/>")
+def anr():
+    # The emulator's launcher sometimes stalls on a cold boot; wave its "isn't responding" dialog away.
+    for _ in range(3):
+        r = adb("shell", "uiautomator", "dump", "/sdcard/a.xml"); x = adb("shell", "cat", "/sdcard/a.xml").stdout.decode("utf8", "ignore")
+        if "isn't responding" not in x: return
+        m = re.search(r'text="Wait"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', x)
+        if m: a, b, c, d = map(int, m.groups()); adb("shell", "input", "tap", str((a + c) // 2), str((b + d) // 2))
+        else: adb("shell", "input", "keyevent", "4")
+        time.sleep(2)
 def center(n):
     x1, y1, x2, y2 = map(int, re.findall(r"\d+", n.get("bounds"))); return (x1 + x2) // 2, (y1 + y2) // 2
 def find(label, desc=False, exact=True):
@@ -30,11 +40,15 @@ def scroll(): adb("shell", "input", "swipe", "540", "1700", "540", "500", "400")
 def signin(uid):
     adb("shell", "pm", "clear", PKG); adb("shell", "pm", "grant", PKG, "android.permission.POST_NOTIFICATIONS")
     adb("shell", "monkey", "-p", PKG, "-c", "android.intent.category.LAUNCHER", "1"); time.sleep(8)
-    shot("signin")
+    anr(); shot("signin")
     for _ in range(4):
         if find("Dev user id (UUID)", exact=False) or find("Use dev user"): break
         scroll()
-    edits = [n for n in dump().iter("node") if n.get("class") == "android.widget.EditText"]
+    edits = []
+    for _ in range(5):
+        anr(); edits = [n for n in dump().iter("node") if n.get("class") == "android.widget.EditText"]
+        if edits: break
+        time.sleep(3)
     x, y = center(edits[-1]); adb("shell", "input", "tap", str(x), str(y)); time.sleep(1)
     adb("shell", "input", "text", uid); time.sleep(1)
     for attempt in range(4):
