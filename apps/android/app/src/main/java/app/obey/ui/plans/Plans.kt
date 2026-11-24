@@ -28,16 +28,15 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import app.obey.ui.common.ChoiceChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import app.obey.ui.common.LettersField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import app.obey.ui.common.PillSegment
+import app.obey.ui.common.PillRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -410,16 +409,14 @@ fun PlanDialog(event: CalendarEvent?, day: LocalDate, onDismiss: () -> Unit, onC
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    SegmentedButton(
+                PillRow(Modifier.fillMaxWidth()) {
+                    PillSegment(
                         selected = !draft.withPartner,
                         onClick = { draft = draft.copy(withPartner = false) },
-                        shape = SegmentedButtonDefaults.itemShape(0, 2),
                     ) { Text("Just me") }
-                    SegmentedButton(
+                    PillSegment(
                         selected = draft.withPartner,
                         onClick = { draft = draft.copy(withPartner = true) },
-                        shape = SegmentedButtonDefaults.itemShape(1, 2),
                     ) { Text(partner?.let { "Me and $it" } ?: "Both of us", maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 }
                 Text(
@@ -630,7 +627,7 @@ private fun Clashes(items: List<Occurrence>, plan: ClashPlan, form: ClashForm, s
                 val all = listOf(ClashChoice.Keep to "Keep all") +
                     if (allMovable) listOf(ClashChoice.Move to "Move all after", ClashChoice.Cancel to if (isDom) "Call off all" else "Ask off all") else emptyList()
                 all.forEach { (c, label) ->
-                    FilterChip(
+                    ChoiceChip(
                         selected = allAre(c),
                         onClick = { setAll(c) },
                         label = { Text(label) },
@@ -654,9 +651,9 @@ private fun Clashes(items: List<Occurrence>, plan: ClashPlan, form: ClashForm, s
                     if (canAct(o)) {
                         val labels = listOf(ClashChoice.Keep to "Keep") +
                             if (canMove(o)) listOf(ClashChoice.Move to "Move", ClashChoice.Cancel to if (isDom) "Call off" else "Ask off") else emptyList()
-                        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        PillRow(Modifier.fillMaxWidth()) {
                             labels.forEachIndexed { i, (c, label) ->
-                                SegmentedButton(selected = choiceOf(o) == c, onClick = { choices[o.id] = c }, shape = SegmentedButtonDefaults.itemShape(i, labels.size)) { Text(label, maxLines = 1) }
+                                PillSegment(selected = choiceOf(o) == c, onClick = { choices[o.id] = c }) { Text(label, maxLines = 1) }
                             }
                         }
                         if (choiceOf(o) == ClashChoice.Move) {
@@ -749,10 +746,10 @@ private fun CurfewWarning(
                     )
                 }
             }
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            PillRow(Modifier.fillMaxWidth()) {
                 val n = if (canAsk) 2 else 1
-                SegmentedButton(selected = false, onClick = onEndAtCurfew, shape = SegmentedButtonDefaults.itemShape(0, n)) { Text("End at ${formatTime(night.dueAt)}", maxLines = 1) }
-                if (canAsk) SegmentedButton(selected = asking, onClick = { onAsking(!asking) }, shape = SegmentedButtonDefaults.itemShape(1, n)) {
+                PillSegment(selected = false, onClick = onEndAtCurfew) { Text("End at ${formatTime(night.dueAt)}", maxLines = 1) }
+                if (canAsk) PillSegment(selected = asking, onClick = { onAsking(!asking) }) {
                     Text("Ask until ${formatTime(end.toString())}", maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }

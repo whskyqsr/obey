@@ -14,9 +14,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import app.obey.ui.common.PillSegment
+import app.obey.ui.common.PillRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -84,9 +83,9 @@ fun AppLockSetting(vm: AppLockViewModel = hiltViewModel()) {
             }
             if (on) {
                 Text("Lock again when you've been away", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                PillRow(Modifier.fillMaxWidth()) {
                     AFTER.forEachIndexed { i, (seconds, label) ->
-                        SegmentedButton(selected = after == seconds, onClick = { vm.setAfter(seconds) }, shape = SegmentedButtonDefaults.itemShape(i, AFTER.size)) { Text(label) }
+                        PillSegment(selected = after == seconds, onClick = { vm.setAfter(seconds) }) { Text(label) }
                     }
                 }
             }

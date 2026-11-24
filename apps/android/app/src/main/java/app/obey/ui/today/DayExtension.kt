@@ -18,7 +18,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import app.obey.ui.common.ChoiceChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import app.obey.ui.common.LettersField
@@ -69,7 +69,7 @@ fun DayRescheduleSheet(
             Text("More time for today", style = MaterialTheme.typography.titleLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 DELAYS.forEach { h ->
-                    FilterChip(selected = hours == h, onClick = { hours = h }, label = { Text("+$h hours") })
+                    ChoiceChip(selected = hours == h, onClick = { hours = h }, label = { Text("+$h hours") })
                 }
             }
             tasks.forEach { t ->

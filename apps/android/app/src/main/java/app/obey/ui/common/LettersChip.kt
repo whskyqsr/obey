@@ -42,3 +42,42 @@ fun LettersChip(label: String, selected: Boolean, onClick: () -> Unit, modifier:
         Text(label, style = MaterialTheme.typography.labelLarge, color = if (selected) c.onSurface else c.onSurfaceVariant)
     }
 }
+
+/**
+ * [LettersChip] with a composable label and optional leading icon, in place of Material's FilterChip (which brings a
+ * filled, tinted container the redesign doesn't use).
+ */
+@Composable
+fun ChoiceChip(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    leadingIcon: (@Composable () -> Unit)? = null,
+) {
+    val c = MaterialTheme.colorScheme
+    Row(
+        modifier
+            .clip(CircleShape)
+            .border(1.dp, if (selected) c.onSurface else c.outlineVariant, CircleShape)
+            .background(if (selected) c.surfaceContainerLowest else Color.Transparent)
+            .toggleable(value = selected, enabled = enabled, role = Role.Checkbox, onValueChange = { onClick() })
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        val color = when {
+            !enabled -> c.onSurfaceVariant.copy(alpha = 0.4f)
+            selected -> c.onSurface
+            else -> c.onSurfaceVariant
+        }
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.material3.LocalContentColor provides color,
+            androidx.compose.material3.LocalTextStyle provides MaterialTheme.typography.labelLarge.copy(color = color),
+        ) {
+            leadingIcon?.invoke()
+            label()
+        }
+    }
+}

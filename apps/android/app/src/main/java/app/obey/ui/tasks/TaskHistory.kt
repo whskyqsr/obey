@@ -12,7 +12,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import app.obey.ui.common.ChoiceChip
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -113,7 +113,7 @@ private fun EditHistoryDialog(entry: HistoryEntry, onDismiss: () -> Unit, onSave
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(OccurrenceStatus.Completed to "Done", OccurrenceStatus.Missed to "Missed", OccurrenceStatus.Excused to "Excused")
-                        .forEach { (s, label) -> FilterChip(selected = status == s, onClick = { status = s }, label = { Text(label) }) }
+                        .forEach { (s, label) -> ChoiceChip(selected = status == s, onClick = { status = s }, label = { Text(label) }) }
                 }
                 if (status == OccurrenceStatus.Completed) {
                     Text("Done at", style = MaterialTheme.typography.labelLarge)

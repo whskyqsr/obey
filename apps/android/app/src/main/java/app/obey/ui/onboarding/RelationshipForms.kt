@@ -8,9 +8,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import app.obey.ui.common.LettersField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import app.obey.ui.common.PillSegment
+import app.obey.ui.common.PillRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,12 +31,11 @@ val Role.label: String
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RolePicker(role: Role, onChange: (Role) -> Unit, modifier: Modifier = Modifier) {
-    SingleChoiceSegmentedButtonRow(modifier.fillMaxWidth()) {
+    PillRow(modifier.fillMaxWidth()) {
         Role.entries.forEachIndexed { i, r ->
-            SegmentedButton(
+            PillSegment(
                 selected = role == r,
                 onClick = { onChange(r) },
-                shape = SegmentedButtonDefaults.itemShape(i, Role.entries.size),
             ) { Text(r.label) }
         }
     }

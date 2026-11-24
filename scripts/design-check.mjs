@@ -32,6 +32,12 @@ const rules = [
     ],
   },
   {
+    name: "Material chip, segmented or tonal button on Android (use ChoiceChip, PillRow, TonalButton)",
+    files: android,
+    test: /\b(FilterChip|AssistChip|InputChip|SuggestionChip|SegmentedButton|SingleChoiceSegmentedButtonRow|FilledTonalButton|FilledTonalIconButton)\(/,
+    allow: [],
+  },
+  {
     name: "Card on web (use hairlines)",
     files: web,
     test: /<Card\b/,

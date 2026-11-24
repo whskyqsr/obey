@@ -1,6 +1,10 @@
 package app.obey.ui.common
 
 import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -103,4 +107,39 @@ fun TonalIconButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled:
         border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant),
         content = content,
     )
+}
+
+/** The ink pill toggle ([PillToggle]) for choices with their own labels: an outlined pill holding [PillSegment]s. */
+@Composable
+fun PillRow(modifier: Modifier = Modifier, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+    androidx.compose.foundation.layout.Row(
+        modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape).padding(4.dp).selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        content = content,
+    )
+}
+
+/** One choice in a [PillRow]: filled in ink when chosen. */
+@Composable
+fun androidx.compose.foundation.layout.RowScope.PillSegment(selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, label: @Composable () -> Unit) {
+    val c = MaterialTheme.colorScheme
+    val color = when {
+        selected -> c.surface
+        !enabled -> c.onSurfaceVariant.copy(alpha = 0.4f)
+        else -> c.onSurfaceVariant
+    }
+    androidx.compose.foundation.layout.Box(
+        modifier
+            .weight(1f)
+            .clip(CircleShape)
+            .background(if (selected) c.onSurface else Color.Transparent)
+            .selectable(selected = selected, enabled = enabled, role = androidx.compose.ui.semantics.Role.Tab, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        contentAlignment = androidx.compose.ui.Alignment.Center,
+    ) {
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.material3.LocalContentColor provides color,
+            androidx.compose.material3.LocalTextStyle provides MaterialTheme.typography.labelLarge.copy(color = color, fontSize = 15.sp),
+        ) { label() }
+    }
 }

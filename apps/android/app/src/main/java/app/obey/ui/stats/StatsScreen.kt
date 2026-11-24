@@ -42,13 +42,11 @@ import app.obey.api.MonthSummary
 import app.obey.ui.StatsRoute
 import java.time.YearMonth
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import app.obey.ui.common.PillSegment
+import app.obey.ui.common.PillRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.LargeTopAppBar

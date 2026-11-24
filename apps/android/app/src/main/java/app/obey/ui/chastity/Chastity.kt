@@ -32,7 +32,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import app.obey.ui.common.TonalButton
-import androidx.compose.material3.FilterChip
+import app.obey.ui.common.ChoiceChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -317,7 +317,7 @@ private fun AskToAnswer(e: ChastityEvent, l: ChastityLock, wearer: String, busy:
         e.note?.let { Text("“$it”", style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic) }
         if (changing) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(10, 15, 20, 30, 45).forEach { m -> FilterChip(selected = minutes == m, onClick = { minutes = m }, label = { Text("$m min") }) }
+                listOf(10, 15, 20, 30, 45).forEach { m -> ChoiceChip(selected = minutes == m, onClick = { minutes = m }, label = { Text("$m min") }) }
             }
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -451,7 +451,7 @@ private fun TimeDialog(sign: Int, onDismiss: () -> Unit, onSave: (Int, String) -
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(60, 360, 1440, 4320).forEach { m -> FilterChip(selected = minutes == m, onClick = { minutes = m }, label = { Text(fmtMinutes(m)) }) }
+                    listOf(60, 360, 1440, 4320).forEach { m -> ChoiceChip(selected = minutes == m, onClick = { minutes = m }, label = { Text(fmtMinutes(m)) }) }
                 }
                 LettersField(note, { note = it.take(500) }, label = { Text("Why (optional)") }, singleLine = true)
             }
@@ -472,7 +472,7 @@ private fun PhotoAskDialog(wearer: String, onDismiss: () -> Unit, onAsk: (Int) -
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Within", style = MaterialTheme.typography.titleSmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(30, 60, 180).forEach { m -> FilterChip(selected = minutes == m, onClick = { minutes = m }, label = { Text(fmtMinutes(m)) }) }
+                    listOf(30, 60, 180).forEach { m -> ChoiceChip(selected = minutes == m, onClick = { minutes = m }, label = { Text(fmtMinutes(m)) }) }
                 }
                 Text("$wearer gets a task with photo proof, and you approve it. Missing it counts like any missed task.", style = MaterialTheme.typography.bodySmall)
             }
@@ -495,7 +495,7 @@ private fun AskDialog(kind: String, l: ChastityLock, keyholder: String, onDismis
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (isBreak) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(10, 20, 30).forEach { m -> FilterChip(selected = minutes == m, onClick = { minutes = m }, label = { Text("$m minutes") }) }
+                        listOf(10, 20, 30).forEach { m -> ChoiceChip(selected = minutes == m, onClick = { minutes = m }, label = { Text("$m minutes") }) }
                     }
                     Text(
                         "The lock's clock keeps running. When the break is over, you relock${if (l.keyMode == "keybox") " and seal a new code" else ""}.",
@@ -547,17 +547,17 @@ fun StartLockDialog(wearers: List<Member>, busy: Boolean, onDismiss: () -> Unit,
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (wearers.size > 1) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        wearers.forEach { w -> FilterChip(selected = w.userId == wearerId, onClick = { wearerId = w.userId }, label = { Text(w.displayName) }) }
+                        wearers.forEach { w -> ChoiceChip(selected = w.userId == wearerId, onClick = { wearerId = w.userId }, label = { Text(w.displayName) }) }
                     }
                 }
                 Text("For how long", style = MaterialTheme.typography.titleSmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = timed, onClick = { timed = true }, label = { Text("Set time") })
-                    FilterChip(selected = !timed, onClick = { timed = false }, label = { Text("Until I release") })
+                    ChoiceChip(selected = timed, onClick = { timed = true }, label = { Text("Set time") })
+                    ChoiceChip(selected = !timed, onClick = { timed = false }, label = { Text("Until I release") })
                 }
                 if (timed) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(1440, 3 * 1440, 7 * 1440, 14 * 1440).forEach { m -> FilterChip(selected = minutes == m, onClick = { minutes = m }, label = { Text(fmtMinutes(m)) }) }
+                        listOf(1440, 3 * 1440, 7 * 1440, 14 * 1440).forEach { m -> ChoiceChip(selected = minutes == m, onClick = { minutes = m }, label = { Text(fmtMinutes(m)) }) }
                     }
                     Text(
                         "Unlocks about ${fmtLockTime(Instant.now().plusSeconds(minutes * 60L).toString())}, counted from when $name locks up.",
@@ -567,8 +567,8 @@ fun StartLockDialog(wearers: List<Member>, busy: Boolean, onDismiss: () -> Unit,
                 }
                 Text("Who has the key?", style = MaterialTheme.typography.titleSmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = !keybox, onClick = { keybox = false }, label = { Text("I keep it") })
-                    FilterChip(selected = keybox, onClick = { keybox = true }, label = { Text("Keybox") })
+                    ChoiceChip(selected = !keybox, onClick = { keybox = false }, label = { Text("I keep it") })
+                    ChoiceChip(selected = keybox, onClick = { keybox = true }, label = { Text("Keybox") })
                 }
                 Text(
                     if (keybox) "$name scrambles the keybox code without looking and seals a photo of it. You can see it any time; $name sees it when released."
@@ -611,8 +611,8 @@ fun LockTimeField(label: String, value: Int?, onChange: (Int?) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = MaterialTheme.typography.titleSmall)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = value == null, onClick = { onChange(null) }, label = { Text("None") })
-            LOCK_TIME_CHOICES.forEach { m -> FilterChip(selected = value == m, onClick = { onChange(m) }, label = { Text(fmtMinutes(m)) }) }
+            ChoiceChip(selected = value == null, onClick = { onChange(null) }, label = { Text("None") })
+            LOCK_TIME_CHOICES.forEach { m -> ChoiceChip(selected = value == m, onClick = { onChange(m) }, label = { Text(fmtMinutes(m)) }) }
         }
     }
 }

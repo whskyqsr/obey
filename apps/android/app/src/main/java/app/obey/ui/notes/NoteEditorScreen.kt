@@ -57,7 +57,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import app.obey.ui.common.ChoiceChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -225,7 +225,7 @@ fun NoteEditorScreen(onDone: () -> Unit, vm: NoteEditorViewModel = hiltViewModel
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            FilterChip(
+                            ChoiceChip(
                                 selected = draft.visibility == NoteVisibility.Private,
                                 onClick = {
                                     vm.update {
@@ -236,7 +236,7 @@ fun NoteEditorScreen(onDone: () -> Unit, vm: NoteEditorViewModel = hiltViewModel
                             )
                             val sub = vm.subName
                             if (sub != null && draft.kind == NoteKind.Note && draft.visibility == NoteVisibility.Shared) {
-                                FilterChip(
+                                ChoiceChip(
                                     selected = draft.subCanEdit,
                                     onClick = { vm.update { it.copy(subCanEdit = !it.subCanEdit) } },
                                     label = { Text("$sub can edit") },
@@ -246,7 +246,7 @@ fun NoteEditorScreen(onDone: () -> Unit, vm: NoteEditorViewModel = hiltViewModel
                         if (draft.kind == NoteKind.Journal) {
                             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 moods.forEach { (n, label) ->
-                                    FilterChip(
+                                    ChoiceChip(
                                         selected = draft.mood == n,
                                         onClick = { vm.update { it.copy(mood = if (it.mood == n) null else n) } },
                                         label = { Text(label) },

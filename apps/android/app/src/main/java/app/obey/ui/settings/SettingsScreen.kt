@@ -35,7 +35,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import app.obey.ui.common.TonalButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,9 +44,8 @@ import androidx.compose.material3.OutlinedButton
 import app.obey.ui.common.LettersField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import app.obey.ui.common.PillSegment
+import app.obey.ui.common.PillRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
@@ -186,13 +184,12 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, onOpenFeatures
                         ListItem(headlineContent = { Text("Email") }, trailingContent = { Text(user.email ?: "None", color = MaterialTheme.colorScheme.onSurfaceVariant) })
                         Hairline()
                         SectionHeader("Week starts on")
-                        SingleChoiceSegmentedButtonRow(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
+                        PillRow(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
                             listOf(false to "Sunday", true to "Monday").forEachIndexed { i, (monday, label) ->
-                                SegmentedButton(
+                                PillSegment(
                                     selected = (session.weekStart == java.time.DayOfWeek.MONDAY) == monday,
                                     onClick = { vm.setWeekStart(monday) },
                                     enabled = !busy,
-                                    shape = SegmentedButtonDefaults.itemShape(i, 2),
                                 ) { Text(label) }
                             }
                         }

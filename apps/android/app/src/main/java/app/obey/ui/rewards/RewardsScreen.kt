@@ -39,7 +39,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import app.obey.ui.common.TonalButton
-import androidx.compose.material3.FilterChip
+import app.obey.ui.common.ChoiceChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -482,7 +482,7 @@ private fun AdjustDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    members.forEach { (id, name) -> FilterChip(selected = user == id, onClick = { user = id }, label = { Text(name) }) }
+                    members.forEach { (id, name) -> ChoiceChip(selected = user == id, onClick = { user = id }, label = { Text(name) }) }
                 }
                 NumberField("Points (negative to deduct)", delta, Modifier.fillMaxWidth()) { delta = it }
                 LettersField(note, { note = it.take(500) }, label = { Text("Why") }, singleLine = true)

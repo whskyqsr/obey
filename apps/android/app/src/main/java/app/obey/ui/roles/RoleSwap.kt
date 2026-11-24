@@ -21,7 +21,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import app.obey.ui.common.ChoiceChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -262,8 +262,8 @@ fun SwapSheet(session: Session, onDismiss: () -> Unit, vm: RoleSwapViewModel = h
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("For how long", style = MaterialTheme.typography.titleSmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = timed, onClick = { timed = true }, label = { Text("Until a set time") })
-                    FilterChip(selected = !timed, onClick = { timed = false }, label = { Text("Until we swap back") })
+                    ChoiceChip(selected = timed, onClick = { timed = true }, label = { Text("Until a set time") })
+                    ChoiceChip(selected = !timed, onClick = { timed = false }, label = { Text("Until we swap back") })
                 }
             }
             if (timed) {

@@ -21,9 +21,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import app.obey.ui.common.LettersField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import app.obey.ui.common.PillSegment
+import app.obey.ui.common.PillRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -93,16 +92,14 @@ fun RescheduleSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                SegmentedButton(
+            PillRow(Modifier.fillMaxWidth()) {
+                PillSegment(
                     selected = scope == RescheduleScope.This,
                     onClick = { scope = RescheduleScope.This },
-                    shape = SegmentedButtonDefaults.itemShape(0, 2),
                 ) { Text("This one") }
-                SegmentedButton(
+                PillSegment(
                     selected = scope == RescheduleScope.Following,
                     onClick = { scope = RescheduleScope.Following },
-                    shape = SegmentedButtonDefaults.itemShape(1, 2),
                 ) { Text("This & following") }
             }
 

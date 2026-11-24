@@ -207,7 +207,7 @@ fun TaskListScreen(
                             add("paused" to "Paused")
                         }
                         chips.forEach { (key, label) ->
-                            androidx.compose.material3.FilterChip(selected = filter == key, onClick = { filter = if (filter == key) null else key }, label = { Text(label) })
+                            app.obey.ui.common.ChoiceChip(selected = filter == key, onClick = { filter = if (filter == key) null else key }, label = { Text(label) })
                         }
                     }
                 }
