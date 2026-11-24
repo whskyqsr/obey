@@ -20,6 +20,7 @@ import type {
   LimitItem,
   LimitList,
   LimitRating,
+  LimitSide,
   AdminReport,
   OccurrenceComment,
   NoteComment,
@@ -1242,9 +1243,9 @@ export function useAnswerLimit(rel: string, userId: string) {
   const qc = useQueryClient();
   const key = ["rel", rel, "limit-list"];
   return useMutation({
-    mutationFn: ({ itemKey, ...body }: { itemKey: string; rating: LimitRating | null; note: string }) =>
+    mutationFn: ({ itemKey, ...body }: { itemKey: string; side: LimitSide; rating: LimitRating | null; note: string }) =>
       api<LimitAnswer>(`/relationships/${rel}/limit-list/answers/${encodeURIComponent(itemKey)}`, { method: "PUT", body }),
-    onMutate: ({ itemKey, rating, note }) => {
+    onMutate: ({ itemKey, side, rating, note }) => {
       qc.setQueryData<LimitList>(
         key,
         (list) =>
@@ -1252,10 +1253,11 @@ export function useAnswerLimit(rel: string, userId: string) {
             ...list,
             people: list.people.map((p) => {
               if (p.userId !== userId) return p;
-              const answers = { ...(p.answers ?? {}) };
-              if (rating || note) answers[itemKey] = { rating, note };
-              else delete answers[itemKey];
-              return { ...p, answers, rated: Object.values(answers).filter((a) => a.rating).length };
+              const sides = { dom: { ...p.sides?.dom }, sub: { ...p.sides?.sub } };
+              if (rating || note) sides[side][itemKey] = { rating, note };
+              else delete sides[side][itemKey];
+              const rated = new Set([...Object.entries(sides.dom), ...Object.entries(sides.sub)].filter(([, a]) => a.rating).map(([k]) => k)).size;
+              return { ...p, sides, rated };
             }),
           },
       );

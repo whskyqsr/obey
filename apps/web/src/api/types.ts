@@ -102,6 +102,7 @@ export type MonthFocus = c.MonthFocus;
 export type MonthReview = c.MonthReview;
 export type PastMonth = c.PastMonth;
 export type LimitRating = c.LimitRating;
+export type LimitSide = c.LimitSide;
 export type LimitItem = c.LimitItem;
 export type LimitAnswer = c.LimitAnswer;
 export type LimitPerson = c.LimitPerson;

@@ -392,7 +392,7 @@ export function SegmentedButtons<T extends string>({
             aria-checked={on}
             onClick={() => onChange(o.value)}
             className={cx(
-              "state-layer flex min-w-12 flex-1 items-center justify-center gap-1.5 rounded-full px-3.5 text-label-large",
+              "state-layer flex min-w-12 flex-1 items-center justify-center gap-1.5 rounded-full px-3.5 text-label-large whitespace-nowrap",
               on ? "bg-on-surface text-surface" : "text-on-surface-variant",
             )}
           >
