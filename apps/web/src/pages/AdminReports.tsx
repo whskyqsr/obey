@@ -5,7 +5,7 @@ import { errorMessage } from "../api/client";
 import type { AdminReport } from "../api/types";
 import { fmtDateTime } from "../lib/dates";
 import { useBack } from "../lib/useBack";
-import { SubHeader, Button, Icon, SegmentedButtons, Spinner, cx, useSnackbar } from "../components/ui";
+import { BackLink, Button, Chip, ErrorBox, Spinner, cx, useSnackbar } from "../components/ui";
 
 const REASON: Record<AdminReport["reason"], string> = {
   minor: "Shows someone under 18",
@@ -14,50 +14,57 @@ const REASON: Record<AdminReport["reason"], string> = {
   other: "Something else",
 };
 
-/** The reported photo, hidden until the reviewer chooses to look. */
+/** The reported photo, blurred until the reviewer chooses to look. */
 function ReportedPhoto({ id }: { id: string }) {
   const [show, setShow] = useState(false);
   const url = useAdminPhotoUrl(id, show).data;
-  if (!show) {
-    return (
-      <Button variant="outlined" icon="visibility" className="self-start" onClick={() => setShow(true)}>
-        View photo
-      </Button>
-    );
-  }
-  return url ? <img src={url} alt="Reported photo" className="max-h-80 rounded-md object-contain" /> : <Spinner />;
+  return (
+    <div className="flex flex-col gap-2">
+      {show && url ? (
+        <img src={url} alt="Reported photo" className="max-h-80 rounded-sm object-contain" />
+      ) : show ? (
+        <Spinner />
+      ) : (
+        <div aria-hidden className="h-24 w-32 rounded-sm bg-outline-variant blur-[2px]" />
+      )}
+      {!show && (
+        <Button variant="outlined" className="self-start" onClick={() => setShow(true)}>
+          View photo
+        </Button>
+      )}
+    </div>
+  );
 }
 
-function ReportCard({ r }: { r: AdminReport }) {
+function ReportRow({ r }: { r: AdminReport }) {
   const snack = useSnackbar();
   const resolve = useResolveReport();
   const act = (removePhoto: boolean) =>
     resolve.mutate({ id: r.id, removePhoto }, { onSuccess: () => snack(removePhoto ? "Photo removed, report closed" : "Report closed"), onError: (e) => snack(errorMessage(e)) });
   const serious = r.reason === "minor" || r.reason === "illegal";
   return (
-    <div className="flex flex-col gap-3 rounded-lg bg-surface-container-low p-4">
-      <div className="flex items-center gap-2">
-        <Icon name="flag" className={serious ? "text-error" : "text-on-surface-variant"} />
-        <span className={cx("flex-1 text-title-medium", serious ? "text-error" : "text-on-surface")}>{REASON[r.reason]}</span>
-        <span className="text-body-small text-on-surface-variant">{fmtDateTime(r.createdAt)}</span>
-      </div>
-      <div className="text-body-medium text-on-surface-variant">
-        <span className="text-on-surface">{r.reporter.displayName}</span> ({r.reporter.email ?? "no email"}) reported{" "}
-        <span className="text-on-surface">{r.subject.displayName}</span> ({r.subject.email ?? "no email"})
-      </div>
-      {r.details && <p className="rounded-sm bg-surface-container px-3 py-2 whitespace-pre-wrap">{r.details}</p>}
+    <div className="flex flex-col gap-4 border-b border-outline-variant py-5 md:flex-row md:items-start">
       {r.photoId && <ReportedPhoto id={r.photoId} />}
-      {r.photoDeleted && <div className="text-body-small text-on-surface-variant">The photo has been deleted.</div>}
-      {r.resolvedAt ? (
-        <div className="text-body-small text-on-surface-variant">Closed {fmtDateTime(r.resolvedAt)}</div>
-      ) : (
-        <div className="flex flex-wrap gap-2">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className={cx("text-body-large", serious ? "text-error" : "text-on-surface")}>{REASON[r.reason]}</div>
+        <div className="text-body-medium text-on-surface-variant">
+          {fmtDateTime(r.createdAt)}
+          {r.details ? ` · “${r.details}”` : ""}
+        </div>
+        <div className="text-body-small text-on-surface-variant">
+          {r.reporter.displayName} ({r.reporter.email ?? "no email"}) reported {r.subject.displayName} ({r.subject.email ?? "no email"})
+        </div>
+        {r.photoDeleted && <div className="text-body-small text-on-surface-variant">The photo has been deleted.</div>}
+        {r.resolvedAt && <div className="text-body-small text-on-surface-variant">Closed {fmtDateTime(r.resolvedAt)}</div>}
+      </div>
+      {!r.resolvedAt && (
+        <div className="flex flex-wrap items-center gap-2">
           {r.photoId && (
-            <Button variant="danger" icon="delete" busy={resolve.isPending} onClick={() => act(true)}>
+            <Button busy={resolve.isPending} onClick={() => act(true)}>
               Remove photo and close
             </Button>
           )}
-          <Button variant="tonal" busy={resolve.isPending} onClick={() => act(false)}>
+          <Button variant="plain" busy={resolve.isPending} onClick={() => act(false)}>
             Close, no action
           </Button>
         </div>
@@ -66,29 +73,35 @@ function ReportCard({ r }: { r: AdminReport }) {
   );
 }
 
-/** The Fealty team's queue of reports. Only people on the API's admin list ever reach it. */
+/** The Fealty team's queue of reports (desktop mockup 17). Only people on the API's admin list ever reach it. */
 export function AdminReportsPage() {
   const navigate = useNavigate();
   const back = useBack(() => navigate({ to: "/settings" }));
-  const [all, setAll] = useState<"open" | "all">("open");
-  const reports = useAdminReports(all === "all");
+  const [all, setAll] = useState(false);
+  const reports = useAdminReports(all);
   return (
-    <div className="flex flex-col pb-10">
-      <SubHeader title="Reports" back="Settings" onBack={back} />
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-3 px-4 md:px-6">
-        <SegmentedButtons<"open" | "all">
-          value={all}
-          onChange={setAll}
-          options={[
-            { value: "open", label: "Open" },
-            { value: "all", label: "All" },
-          ]}
-        />
+    <div className="flex max-w-5xl flex-col pb-10">
+      <header className="px-4 pt-3 pb-4 md:px-6 md:pt-6">
+        <div className="-mx-2 flex min-h-10 items-center px-2">
+          <BackLink label="Settings" onClick={back} />
+        </div>
+        <div className="eyebrow mt-2">Fealty team</div>
+        <h1 className="text-display-small text-on-surface md:text-display-medium">Reports</h1>
+      </header>
+      <div className="flex flex-col px-4 md:px-6">
+        <div className="flex gap-2 pb-2">
+          <Chip selected={!all} onClick={() => setAll(false)}>
+            Open
+          </Chip>
+          <Chip selected={all} onClick={() => setAll(true)}>
+            All
+          </Chip>
+        </div>
         {reports.isLoading && <Spinner />}
-        {reports.error && <div className="text-error">{errorMessage(reports.error)}</div>}
-        {reports.data?.length === 0 && <div className="py-10 text-center text-body-large text-on-surface-variant">Nothing to review.</div>}
+        {reports.error && <ErrorBox error={reports.error} onRetry={() => reports.refetch()} />}
+        {reports.data?.length === 0 && <div className="py-10 text-body-large text-on-surface-variant">Nothing to review.</div>}
         {reports.data?.map((r) => (
-          <ReportCard key={r.id} r={r} />
+          <ReportRow key={r.id} r={r} />
         ))}
       </div>
     </div>

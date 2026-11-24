@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { useChastity, useChastityAsk, useDecideChastityAsk, useEndLock, useKeyboxUrl, useLockTime, useLockUp, usePhotoAsk, useStartLock } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { ChastityEvent, ChastityLock, Member } from "../api/types";
 import { useReadOnly, useRel } from "../lib/relationship";
 import { shrinkPhoto } from "./Proof";
-import { Button, Chip, Dialog, Icon, Spinner, Switch, TextField, cx, useSnackbar } from "./ui";
+import { Button, Chip, Diamond, Dialog, Spinner, Switch, TextField, cx, useSnackbar } from "./ui";
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -53,63 +54,54 @@ function useNow() {
   return now;
 }
 
-function Ring({ frac, icon }: { frac: number | null; icon: string }) {
-  const r = 32;
-  const c = 2 * Math.PI * r;
-  return (
-    <div className="relative size-[72px] shrink-0">
-      <svg viewBox="0 0 72 72" className="absolute inset-0 -rotate-90">
-        <circle cx="36" cy="36" r={r} fill="none" stroke="var(--md-outline-variant)" strokeWidth="6" />
-        {frac !== null && (
-          <circle cx="36" cy="36" r={r} fill="none" stroke="var(--md-primary)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${c * frac} ${c}`} />
-        )}
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center text-primary">
-        <Icon name={icon} filled />
-      </div>
-    </div>
-  );
+/** "3d 4h", "5h 20m", "12m": the big serif clock. */
+export function fmtClock(ms: number) {
+  const m = Math.max(0, Math.round(ms / MIN));
+  const d = Math.floor(m / 1440);
+  const h = Math.floor((m % 1440) / 60);
+  if (d) return `${d}d ${h}h`;
+  if (h) return `${h}h ${m % 60}m`;
+  return `${m % 60}m`;
 }
 
-/** What a lock card says: time left (or locked for, when open-ended or hidden), and the end. */
-function lockLines(l: ChastityLock, now: number) {
+/** "Thu 1:00 AM" */
+export const fmtWhen = (iso: string) => `${new Date(iso).toLocaleDateString(undefined, { weekday: "short" })} ${clock(iso)}`;
+
+/** The big clock and the line under it: time left, or time locked so far when there's no end the viewer can see. */
+function lockLines(l: ChastityLock, now: number, wearerName: string) {
   const started = l.startedAt ? new Date(l.startedAt).getTime() : now;
-  const day = Math.floor((now - started) / DAY) + 1;
   if (l.status === "break" && l.breakEndsAt) {
     const left = new Date(l.breakEndsAt).getTime() - now;
-    return {
-      big: left > 0 ? `Break: ${fmtSpan(left)} left` : "Break is over",
-      small: left > 0 ? `Relock by ${clock(l.breakEndsAt)}` : `It was due back at ${clock(l.breakEndsAt)}`,
-      frac: null,
-      icon: "shower",
-    };
+    return left > 0
+      ? { big: fmtClock(left), small: `hygiene break · relock by ${clock(l.breakEndsAt)}` }
+      : { big: "Relock", small: `the break ended at ${clock(l.breakEndsAt)}` };
   }
   if (l.endsAt) {
-    const end = new Date(l.endsAt).getTime();
-    const total = Math.max(end - started, MIN);
-    return {
-      big: `${fmtSpan(end - now)} left`,
-      small: `Until ${fmtLockTime(l.endsAt)} · day ${day} of ${Math.max(day, Math.ceil(total / DAY))}`,
-      frac: Math.min(1, Math.max(0, (now - started) / total)),
-      icon: "lock",
-    };
+    return { big: fmtClock(new Date(l.endsAt).getTime() - now), small: `until ${fmtWhen(l.endsAt)}${l.hideTime ? ` · hidden from ${wearerName}` : ""}` };
   }
-  return { big: `Locked ${fmtSpan(now - started)}`, small: l.timeHidden ? "The time left is hidden" : "Until released", frac: null, icon: "lock" };
+  return { big: fmtClock(now - started), small: l.timeHidden ? "locked so far · the time left is hidden" : "locked so far · until released" };
 }
 
-function LockSummary({ l, who }: { l: ChastityLock; who: string }) {
+function LockClock({ l, page }: { l: ChastityLock; page: boolean }) {
   const now = useNow();
-  const t = lockLines(l, now);
+  const { memberName } = useRel();
+  const t = lockLines(l, now, memberName(l.wearerId));
   return (
-    <div className="flex items-center gap-4">
-      <Ring frac={t.frac} icon={t.icon} />
-      <div className="min-w-0 flex-1">
-        <div className="text-body-medium text-on-surface-variant">{who}</div>
-        <div className="text-title-large text-on-surface">{t.big}</div>
-        <div className="text-body-medium text-on-surface-variant">{t.small}</div>
-      </div>
+    <div className={page ? "py-2 text-center" : ""}>
+      <div className={cx("font-serif leading-none text-on-surface", page ? "text-[88px] tracking-[-0.02em]" : "text-[44px]")}>{t.big}</div>
+      <div className={cx("text-body-medium text-on-surface-variant", page ? "mt-3" : "mt-1")}>{t.small}</div>
     </div>
   );
+}
+
+/** What the page header says about a lock, from the side of whoever is looking. */
+export function lockHeading(l: ChastityLock, meId: string, memberName: (id: string) => string) {
+  if (l.wearerId === meId) {
+    return { eyebrow: l.startedAt ? `Locked since ${fmtWhen(l.startedAt)}${l.keyMode === "keybox" ? " · keybox" : ""}` : undefined };
+  }
+  const state = l.status === "break" ? "is on a hygiene break" : l.status === "pending" ? "has been asked to lock" : "is locked";
+  const key = l.keyholderId === meId ? (l.keyMode === "keybox" ? " · you hold the keybox code" : " · you hold the key") : "";
+  return { subtitle: `${memberName(l.wearerId)} ${state}${key}.` };
 }
 
 /** Takes or shows a photo of the keybox code; the code itself never goes through the app as text. */
@@ -145,22 +137,22 @@ function KeyboxPicker({ photo, onPhoto }: { photo: Blob | null; onPhoto(b: Blob 
       />
       {url ? (
         <div className="flex items-center gap-3">
-          <img src={url} alt="" className="size-16 rounded-md object-cover blur-md" />
-          <div className="flex-1 text-body-medium">Photo taken. It stays hidden from you.</div>
-          <Button variant="text" onClick={() => input.current?.click()}>
+          <img src={url} alt="" className="size-16 rounded-sm object-cover blur-md" />
+          <div className="flex-1 text-body-medium text-on-surface-variant">Sealed. It stays hidden from you.</div>
+          <Button variant="outlined" onClick={() => input.current?.click()}>
             Retake
           </Button>
         </div>
       ) : (
-        <Button variant="tonal" icon="add_a_photo" busy={busy} onClick={() => input.current?.click()}>
-          Photograph the keybox code
+        <Button icon="photo_camera" busy={busy} onClick={() => input.current?.click()} className="self-start">
+          Take the photo
         </Button>
       )}
     </div>
   );
 }
 
-/** The wearer locking up, or relocking after a break. */
+/** The wearer locking up, or relocking after a break: the keybox steps, then "I'm locked". */
 function LockUp({ l, relock }: { l: ChastityLock; relock?: boolean }) {
   const { rel, memberName } = useRel();
   const lockUp = useLockUp(rel.id);
@@ -168,37 +160,49 @@ function LockUp({ l, relock }: { l: ChastityLock; relock?: boolean }) {
   const snack = useSnackbar();
   const [photo, setPhoto] = useState<Blob | null>(null);
   const keybox = l.keyMode === "keybox";
+  const kh = memberName(l.keyholderId);
   return (
     <div className="flex flex-col gap-3">
       {keybox && (
         <>
-          <p className="text-body-medium">
-            Scramble the keybox to a new code without looking, then photograph it. You won't see the code until you're released. {memberName(l.keyholderId)} can
-            see it any time, and a Red safe call shows it to you at once.
-          </p>
-          <KeyboxPicker photo={photo} onPhoto={setPhoto} />
+          <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-5">
+            <div className="eyebrow">Step 1</div>
+            <p className="mt-2 text-body-large text-on-surface">Scramble the keybox code without looking.</p>
+          </div>
+          <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-5">
+            <div className="eyebrow">Step 2</div>
+            <p className="mt-2 text-body-large text-on-surface">
+              Photograph the code. It's sealed straight away: only {kh} can see it, until the lock ends or you call red.
+            </p>
+            <div className="mt-4">
+              <KeyboxPicker photo={photo} onPhoto={setPhoto} />
+            </div>
+          </div>
         </>
       )}
-      <div className="flex flex-wrap gap-2">
+      <Button
+        className="mt-3 h-12 w-full"
+        disabled={keybox && !photo}
+        busy={lockUp.isPending}
+        onClick={() =>
+          lockUp.mutate(
+            { lockId: l.id, photo: photo ?? undefined },
+            { onSuccess: () => snack(relock ? "Relocked" : "You're locked"), onError: (e) => snack(errorMessage(e)) },
+          )
+        }
+      >
+        {relock ? "I've relocked" : "I'm locked"}
+      </Button>
+      {!relock && (
         <Button
-          icon="lock"
-          disabled={keybox && !photo}
-          busy={lockUp.isPending}
-          onClick={() =>
-            lockUp.mutate(
-              { lockId: l.id, photo: photo ?? undefined },
-              { onSuccess: () => snack(relock ? "Relocked" : "You're locked"), onError: (e) => snack(errorMessage(e)) },
-            )
-          }
+          variant="plain"
+          className="h-12 w-full"
+          busy={decline.isPending}
+          onClick={() => decline.mutate(l.id, { onError: (e) => snack(errorMessage(e)) })}
         >
-          {relock ? "I've relocked" : "I'm locked"}
+          Not now
         </Button>
-        {!relock && (
-          <Button variant="text" busy={decline.isPending} onClick={() => decline.mutate(l.id, { onError: (e) => snack(errorMessage(e)) })}>
-            Not now
-          </Button>
-        )}
-      </div>
+      )}
     </div>
   );
 }
@@ -410,14 +414,19 @@ function AskToAnswer({ e, l }: { e: ChastityEvent; l: ChastityLock }) {
   const answer = (approve: boolean, m?: number) =>
     decide.mutate({ askId: e.id, approve, minutes: m }, { onSuccess: () => setChanging(false), onError: (err) => snack(errorMessage(err)) });
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-primary bg-surface-container-lowest px-5 py-4 text-on-surface">
-      <div className="text-title-medium">{e.kind === "break" ? `${name} asked for a hygiene break` : `${name} asked to be released`}</div>
-      <p className="text-body-medium">
-        {e.kind === "break"
-          ? `${e.minutes} minutes, then they relock${l.keyMode === "keybox" ? " and seal a new code" : ""}. The lock's clock keeps running.`
-          : "Releasing ends the lock now."}
+    <div className="flex flex-col gap-3 rounded-md border border-outline-variant bg-surface-container-lowest p-5 text-on-surface">
+      <p className="text-body-large">
+        {e.kind === "break" ? (
+          <>
+            {name} asks for a <b className="font-semibold">hygiene break</b>, {e.minutes} minutes.
+          </>
+        ) : (
+          <>
+            {name} asks to be <b className="font-semibold">released</b>.
+          </>
+        )}
       </p>
-      {e.note && <p className="text-body-medium italic opacity-85">“{e.note}”</p>}
+      {e.note && <p className="text-body-medium text-on-surface-variant italic">“{e.note}”</p>}
       {changing && (
         <div className="flex flex-wrap gap-2">
           {[10, 15, 20, 30, 45].map((m) => (
@@ -427,11 +436,11 @@ function AskToAnswer({ e, l }: { e: ChastityEvent; l: ChastityLock }) {
           ))}
         </div>
       )}
-      <div className="mt-1 flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
         {e.kind === "break" ? (
           <>
             <Button busy={decide.isPending} onClick={() => answer(true, changing ? minutes : e.minutes!)}>
-              Allow {changing ? minutes : e.minutes} min
+              {changing ? `Allow ${minutes} min` : "Allow"}
             </Button>
             {!changing && (
               <Button variant="outlined" onClick={() => setChanging(true)}>
@@ -444,8 +453,8 @@ function AskToAnswer({ e, l }: { e: ChastityEvent; l: ChastityLock }) {
             Release
           </Button>
         )}
-        <Button variant="text" className="text-on-surface-variant" onClick={() => answer(false)}>
-          {e.kind === "break" ? "Decline" : "Not yet"}
+        <Button variant="outlined" onClick={() => answer(false)}>
+          Not now
         </Button>
       </div>
     </div>
@@ -461,18 +470,24 @@ export function LockCard({ l, events, page = false }: { l: ChastityLock; events:
   const keyholder = l.keyholderId === me.user.id;
   const asks = events.filter((e) => e.lockId === l.id && e.status === "pending" && (e.kind === "break" || e.kind === "release_ask"));
   const asked = (kind: string) => asks.some((e) => e.kind === kind);
+  const kh = memberName(l.keyholderId);
 
   if (l.status === "pending") {
-    if (wearer && !readOnly)
+    if (wearer && !readOnly) {
+      const length = l.minutes ? `For ${fmtMinutes(l.minutes)}` : l.timeHidden ? "For a time" : "Until released";
       return (
-        <div className="flex flex-col gap-2 rounded-md border border-primary bg-surface-container-lowest px-5 py-4 text-on-surface">
-          <div className="text-title-medium">
-            {memberName(l.keyholderId)} wants you locked{l.minutes ? ` for ${fmtMinutes(l.minutes)}` : l.timeHidden ? "" : " until they release you"}
+        <div className="flex flex-col gap-4">
+          <div>
+            <h2 className={cx("font-serif text-on-surface", page ? "text-headline-large" : "text-headline-medium")}>{kh} asked you to lock.</h2>
+            <p className="mt-2 text-body-large text-on-surface-variant">
+              {length}
+              {l.keyMode === "keybox" ? ", keybox" : `, ${kh} keeps the key`}.{l.timeHidden ? " The time left will be hidden from you." : ""}
+            </p>
           </div>
-          {l.keyMode === "keyholder" && <p className="text-body-medium">{memberName(l.keyholderId)} keeps the key. Tap when you're locked.</p>}
           <LockUp l={l} />
         </div>
       );
+    }
     return (
       <Waiting
         l={l}
@@ -482,64 +497,68 @@ export function LockCard({ l, events, page = false }: { l: ChastityLock; events:
     );
   }
 
+  const keyboxSealed = wearer && l.hasKeybox && !l.canSeeKeybox;
+  const buttons = !readOnly && (
+    <div className={cx("flex gap-2", page && wearer ? "flex-col" : "flex-wrap")}>
+      {wearer && l.status === "active" && (
+        <>
+          <Button variant="outlined" className={cx(page && "h-12")} disabled={asked("break")} onClick={() => setDialog("ask-break")}>
+            {asked("break") ? "Hygiene break asked" : "Ask for a hygiene break"}
+          </Button>
+          <Button variant="outlined" className={cx(page && "h-12")} disabled={asked("release_ask")} onClick={() => setDialog("ask-release")}>
+            {asked("release_ask") ? "Release asked" : "Ask to be released"}
+          </Button>
+        </>
+      )}
+      {keyholder && l.endsAt && (
+        <>
+          <Button variant="outlined" onClick={() => setDialog("add")}>
+            Add time
+          </Button>
+          <Button variant="outlined" onClick={() => setDialog("remove")}>
+            Take off time
+          </Button>
+        </>
+      )}
+      {keyholder && l.status === "active" && (
+        <Button variant="outlined" onClick={() => setDialog("photo")}>
+          Ask for a photo
+        </Button>
+      )}
+      {l.canSeeKeybox && (
+        <Button variant="outlined" onClick={() => setDialog("keybox")}>
+          Show keybox code
+        </Button>
+      )}
+      {keyholder && (
+        <div className="basis-full">
+          <Button onClick={() => setDialog("release")}>Release</Button>
+        </div>
+      )}
+    </div>
+  );
+
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-5">
+      {!page && (
+        <div className="text-body-medium text-on-surface-variant">
+          {wearer ? (l.status === "break" ? "You're on a hygiene break" : "You're locked") : `${memberName(l.wearerId)} is ${l.status === "break" ? "on a hygiene break" : "locked"}`}
+        </div>
+      )}
+      <LockClock l={l} page={page} />
       {keyholder && !readOnly && asks.map((e) => <AskToAnswer key={e.id} e={e} l={l} />)}
-      <div className={cx("flex flex-col gap-4 rounded-xl p-4", page ? "bg-surface-container-low" : "bg-surface-container-low")}>
-        <LockSummary
-          l={l}
-          who={
-            wearer
-              ? l.status === "break"
-                ? "You're on a hygiene break"
-                : "You're locked"
-              : `${memberName(l.wearerId)} is ${l.status === "break" ? "on a hygiene break" : "locked"}`
-          }
-        />
-        {wearer && l.status === "break" && !readOnly && <LockUp l={l} relock />}
-        {!readOnly && (
-          <div className="flex flex-wrap gap-2">
-            {wearer && l.status === "active" && (
-              <>
-                <Button variant="tonal" disabled={asked("release_ask")} onClick={() => setDialog("ask-release")}>
-                  {asked("release_ask") ? "Release asked" : "Ask for release"}
-                </Button>
-                <Button variant="outlined" icon="shower" disabled={asked("break")} onClick={() => setDialog("ask-break")}>
-                  {asked("break") ? "Break asked" : "Hygiene break"}
-                </Button>
-              </>
-            )}
-            {keyholder && (
-              <>
-                {l.endsAt && (
-                  <>
-                    <Button variant="tonal" icon="more_time" onClick={() => setDialog("add")}>
-                      Add time
-                    </Button>
-                    <Button variant="outlined" onClick={() => setDialog("remove")}>
-                      Take off time
-                    </Button>
-                  </>
-                )}
-                {l.status === "active" && (
-                  <Button variant="text" icon="photo_camera" onClick={() => setDialog("photo")}>
-                    Ask for a photo
-                  </Button>
-                )}
-                <Button variant="text" onClick={() => setDialog("release")}>
-                  Release
-                </Button>
-              </>
-            )}
-            {l.canSeeKeybox && (
-              <Button variant="text" icon="key" onClick={() => setDialog("keybox")}>
-                Show keybox code
-              </Button>
-            )}
+      {keyboxSealed && (
+        <div className="flex items-center gap-4 rounded-md border border-outline-variant bg-surface-container-lowest p-4">
+          <div aria-hidden className="size-16 shrink-0 rounded-sm bg-outline-variant blur-[3px]" />
+          <div>
+            <div className="text-body-large text-on-surface">Keybox code is sealed.</div>
+            <div className="text-body-medium text-on-surface-variant">Only {kh} can see it until the lock ends.</div>
           </div>
-        )}
-        {wearer && asks.length > 0 && <p className="text-body-small text-on-surface-variant">Waiting for {memberName(l.keyholderId)} to answer.</p>}
-      </div>
+        </div>
+      )}
+      {wearer && l.status === "break" && !readOnly && <LockUp l={l} relock />}
+      {buttons}
+      {wearer && asks.length > 0 && <p className="-mt-2 text-body-small text-on-surface-variant">Waiting for {kh} to answer.</p>}
       {dialog === "add" && <TimeDialog l={l} sign={1} onClose={() => setDialog(null)} />}
       {dialog === "remove" && <TimeDialog l={l} sign={-1} onClose={() => setDialog(null)} />}
       {dialog === "photo" && <PhotoAskDialog l={l} onClose={() => setDialog(null)} />}
@@ -556,17 +575,16 @@ function Waiting({ l, text, canTakeBack }: { l: ChastityLock; text: string; canT
   const end = useEndLock(rel.id);
   const snack = useSnackbar();
   return (
-    <div className="flex items-center gap-3 rounded-xl bg-surface-container-low px-4 py-3">
-      <Icon name="lock_clock" className="shrink-0 text-primary" />
+    <div className="flex items-center gap-3 border-y border-outline-variant py-3">
       <div className="min-w-0 flex-1">
-        <div className="text-title-small text-on-surface">{text}</div>
+        <div className="text-body-large text-on-surface">{text}</div>
         <div className="text-body-small text-on-surface-variant">
           {l.minutes ? `For ${fmtMinutes(l.minutes)}` : "Until released"}
           {l.keyMode === "keybox" ? " · keybox" : ""}
         </div>
       </div>
       {canTakeBack && (
-        <Button variant="text" busy={end.isPending} onClick={() => end.mutate(l.id, { onError: (e) => snack(errorMessage(e)) })}>
+        <Button variant="outlined" busy={end.isPending} onClick={() => end.mutate(l.id, { onError: (e) => snack(errorMessage(e)) })}>
           Take back
         </Button>
       )}
@@ -574,18 +592,43 @@ function Waiting({ l, text, canTakeBack }: { l: ChastityLock; text: string; canT
   );
 }
 
-/** On Today, for the wearer and the keyholder: the lock, asks to answer, and locking up. */
+/** On Today: a line per lock that opens the Chastity page, with any ask to answer, an ask to lock up, or a relock. */
 export function ChastityToday() {
-  const { rel, me, features } = useRel();
+  const { rel, me, features, memberName } = useRel();
+  const readOnly = useReadOnly();
   const view = useChastity(rel.id, features.chastity);
+  const now = useNow();
+  const navigate = useNavigate();
   if (!features.chastity || !view.data) return null;
   const mine = view.data.open.filter((l) => l.wearerId === me.user.id || l.keyholderId === me.user.id);
   if (!mine.length) return null;
   return (
-    <div className="flex flex-col gap-3 px-4 pb-4 md:px-6">
-      {mine.map((l) => (
-        <LockCard key={l.id} l={l} events={view.data.events} />
-      ))}
+    <div className="flex flex-col gap-4 px-4 pb-6 md:px-6">
+      {mine.map((l) => {
+        const wearer = l.wearerId === me.user.id;
+        if (l.status === "pending") return <LockCard key={l.id} l={l} events={view.data.events} />;
+        const t = lockLines(l, now, memberName(l.wearerId));
+        const asks = view.data.events.filter((e) => e.lockId === l.id && e.status === "pending" && (e.kind === "break" || e.kind === "release_ask"));
+        return (
+          <div key={l.id} className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => void navigate({ to: "/chastity" })}
+              className="state-layer flex items-baseline gap-3 border-y border-outline-variant py-3 text-left"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block text-body-large text-on-surface">
+                  {wearer ? (l.status === "break" ? "You're on a hygiene break" : "You're locked") : `${memberName(l.wearerId)} is ${l.status === "break" ? "on a hygiene break" : "locked"}`}
+                </span>
+                <span className="block text-body-medium text-on-surface-variant">{t.small}</span>
+              </span>
+              <span className="font-serif text-[28px] leading-none text-on-surface">{t.big}</span>
+            </button>
+            {!wearer && !readOnly && asks.map((e) => <AskToAnswer key={e.id} e={e} l={l} />)}
+            {wearer && l.status === "break" && !readOnly && <LockUp l={l} relock />}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -599,45 +642,30 @@ function toLocalInput(d: Date) {
 
 /** The keyholder asking to lock someone. */
 export function StartLockDialog({ wearers, onClose }: { wearers: Member[]; onClose(): void }) {
-  const { rel, me } = useRel();
+  const { rel } = useRel();
   const start = useStartLock(rel.id);
   const snack = useSnackbar();
   const [wearerId, setWearerId] = useState(wearers[0]!.userId);
-  const [timed, setTimed] = useState(true);
-  const [length, setLength] = useState<number | "custom">(3 * 1440);
+  const [length, setLength] = useState<number | "custom" | "open">(3 * 1440);
   const [custom, setCustom] = useState(() => toLocalInput(new Date(Date.now() + 3 * DAY)));
   const [hide, setHide] = useState(false);
   const [keybox, setKeybox] = useState(false);
   const name = wearers.find((w) => w.userId === wearerId)!.displayName;
-  const minutes = !timed ? null : length === "custom" ? Math.round((new Date(custom).getTime() - Date.now()) / MIN) : length;
+  const timed = length !== "open";
+  const minutes = length === "open" ? null : length === "custom" ? Math.round((new Date(custom).getTime() - Date.now()) / MIN) : length;
   const valid = minutes === null || (minutes >= 15 && minutes <= 90 * 1440);
-  const ends = minutes ? new Date(Date.now() + minutes * MIN) : null;
+  const keyRow = (on: boolean, title: string, body: string | null, pick: () => void) => (
+    <button type="button" onClick={pick} className="state-layer flex w-full items-center gap-4 border-b border-outline-variant py-3 text-left">
+      <Diamond state={on ? "done" : "open"} size={16} className="shrink-0" />
+      <span className="min-w-0 flex-1">
+        <span className="block text-body-large text-on-surface">{title}</span>
+        {body && <span className="block text-body-medium text-on-surface-variant">{body}</span>}
+      </span>
+    </button>
+  );
   return (
-    <Dialog
-      open
-      onClose={onClose}
-      title={`Lock ${name}`}
-      actions={
-        <>
-          <Button variant="text" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            disabled={!valid}
-            busy={start.isPending}
-            onClick={() =>
-              start.mutate(
-                { wearerId, minutes, hideTime: hide, keyMode: keybox ? "keybox" : "keyholder" },
-                { onSuccess: () => (onClose(), snack(`Asked ${name} to lock up`)), onError: (e) => snack(errorMessage(e)) },
-              )
-            }
-          >
-            Ask {name} to lock up
-          </Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-4">
+    <Dialog open onClose={onClose} title={`Lock ${name}`}>
+      <div className="flex flex-col gap-4 pb-4">
         {wearers.length > 1 && (
           <div className="flex flex-wrap gap-2">
             {wearers.map((w) => (
@@ -648,96 +676,76 @@ export function StartLockDialog({ wearers, onClose }: { wearers: Member[]; onClo
           </div>
         )}
         <div>
-          <div className="mb-2 text-title-small text-on-surface">For how long</div>
+          <div className="mb-2 text-body-medium text-on-surface-variant">For how long</div>
           <div className="flex flex-wrap gap-2">
-            <Chip selected={timed} onClick={() => setTimed(true)}>
+            {LENGTHS.map((m) => (
+              <Chip key={m} selected={length === m} onClick={() => setLength(m)}>
+                {fmtMinutes(m)}
+              </Chip>
+            ))}
+            <Chip selected={length === "custom"} onClick={() => setLength("custom")}>
               Set time
             </Chip>
-            <Chip selected={!timed} onClick={() => setTimed(false)}>
+            <Chip selected={length === "open"} onClick={() => setLength("open")}>
               Until I release
             </Chip>
           </div>
         </div>
+        {length === "custom" && (
+          <TextField
+            type="datetime-local"
+            label="Unlocks"
+            value={custom}
+            onChange={(e) => setCustom(e.target.value)}
+            error={valid ? undefined : "Pick a time from 15 minutes to 90 days away"}
+          />
+        )}
         {timed && (
-          <>
-            <div className="flex flex-wrap gap-2">
-              {LENGTHS.map((m) => (
-                <Chip key={m} selected={length === m} onClick={() => setLength(m)}>
-                  {fmtMinutes(m)}
-                </Chip>
-              ))}
-              <Chip selected={length === "custom"} onClick={() => setLength("custom")}>
-                Custom
-              </Chip>
-            </div>
-            {length === "custom" ? (
-              <TextField
-                type="datetime-local"
-                label="Unlocks"
-                value={custom}
-                onChange={(e) => setCustom(e.target.value)}
-                error={valid ? undefined : "Pick a time from 15 minutes to 90 days away"}
-              />
-            ) : (
-              ends && (
-                <p className="text-body-medium text-on-surface-variant">
-                  Unlocks about {fmtLockTime(ends.toISOString())}, counted from when {name} locks up.
-                </p>
-              )
-            )}
-          </>
+          <div className="border-b border-outline-variant pb-3">
+            <Switch checked={hide} onChange={setHide} label={`Hide the time left from ${name}`} />
+          </div>
         )}
         <div>
-          <div className="mb-2 text-title-small text-on-surface">Who has the key?</div>
-          <div className="flex flex-wrap gap-2">
-            <Chip selected={!keybox} onClick={() => setKeybox(false)}>
-              I keep it
-            </Chip>
-            <Chip selected={keybox} onClick={() => setKeybox(true)}>
-              Keybox
-            </Chip>
-          </div>
-          <p className="mt-2 text-body-small">
-            {keybox
-              ? `${name} scrambles the keybox code without looking and seals a photo of it. You can see it any time; ${name} sees it when released.`
-              : `You keep the physical key.`}
-          </p>
+          <div className="text-body-medium text-on-surface-variant">Who has the key?</div>
+          {keyRow(!keybox, "I keep it", null, () => setKeybox(false))}
+          {keyRow(keybox, "Keybox", `${name} scrambles the code without looking and photographs it. Only you see the photo.`, () => setKeybox(true))}
         </div>
-        {timed && <Switch checked={hide} onChange={setHide} label={`Hide the time left from ${name}`} help={`${name} sees only that they're locked`} />}
-        <p className="text-body-small">
-          You can add or take off time later, and consequences and rewards can too. A Red safe call always shows {name} the keybox code.
-        </p>
+        <p className="text-body-medium text-on-surface-variant">{name} taps “I'm locked” to start the clock. Asks lapse after 7 days.</p>
+        <Button
+          className="h-12 w-full"
+          disabled={!valid}
+          busy={start.isPending}
+          onClick={() =>
+            start.mutate(
+              { wearerId, minutes, hideTime: timed && hide, keyMode: keybox ? "keybox" : "keyholder" },
+              { onSuccess: () => (onClose(), snack(`Asked ${name} to lock`)), onError: (e) => snack(errorMessage(e)) },
+            )
+          }
+        >
+          Ask {name} to lock
+        </Button>
       </div>
     </Dialog>
   );
 }
 
-export const eventIcon: Record<ChastityEvent["kind"], string> = {
-  started: "lock",
-  time: "more_time",
-  release_ask: "lock_open",
-  break: "shower",
-  photo_ask: "photo_camera",
-  relocked: "lock",
-  ended: "lock_open",
-};
-
-/** One line of a lock's history. */
-export function eventText(e: ChastityEvent, wearerName: string): { title: string; pill?: string; neg?: boolean } {
+/** One line of a lock's history: what happened, and any reason given. */
+export function eventText(e: ChastityEvent, wearerName: string): { title: string; note?: string } {
   switch (e.kind) {
     case "started":
       return { title: e.minutes ? `Locked for ${fmtMinutes(e.minutes)}` : "Locked" };
     case "time":
-      return {
-        title: e.note ?? (e.minutes === null ? "Time changed" : e.minutes > 0 ? "Time added" : "Time taken off"),
-        pill: e.minutes === null ? undefined : `${e.minutes > 0 ? "+" : "−"}${fmtMinutes(e.minutes)}`,
-        neg: (e.minutes ?? 0) > 0,
-      };
+      if (e.minutes === null) return { title: "Time changed", note: e.note ?? undefined };
+      return { title: `${e.minutes > 0 ? "+" : "−"}${fmtMinutes(e.minutes)}`, note: e.note ?? undefined };
     case "release_ask":
-      return { title: `${wearerName} asked to be released${e.status === "declined" ? ": not yet" : e.status === "approved" ? ": released" : ""}` };
+      return {
+        title: `${wearerName} asked to be released${e.status === "declined" ? ": not yet" : e.status === "approved" ? ": released" : ""}`,
+        note: e.note ?? undefined,
+      };
     case "break":
       return {
         title: `Hygiene break, ${e.minutes} min${e.status === "pending" ? " (asked)" : e.status === "declined" ? ": declined" : e.status === "overdue" ? ": not relocked in time" : ""}`,
+        note: e.note ?? undefined,
       };
     case "photo_ask":
       return { title: "Photo asked for" };
