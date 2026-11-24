@@ -969,12 +969,34 @@ export const limitPerson = z.object({
   answers: z.record(z.string(), limitAnswer).nullable(),
   /** Their answers for each side, by item key; shown on the same terms as answers. */
   sides: z.object({ dom: z.record(z.string(), limitAnswer), sub: z.record(z.string(), limitAnswer) }).nullable(),
+  /** Your own answers here were filled in from your limits and you haven't finished yet (always false for a partner). */
+  fromProfile: z.boolean().default(false),
 });
 export type LimitPerson = z.infer<typeof limitPerson>;
 export const limitList = z.object({ items: z.array(limitItem), people: z.array(limitPerson) });
 export type LimitList = z.infer<typeof limitList>;
 /** Without a side, the answer is for the person's usual side (older apps). */
 export const limitAnswerInput = z.object({ rating: limitRating.nullable(), note: z.string().trim().max(500).default(""), side: limitSide.optional() });
+/** Your own limits, apart from any dynamic: starter items only, by side, with "{name}" read as "your partner". */
+export const limitProfile = z.object({
+  /** The starter list, which is what your limits cover. */
+  items: z.array(limitItem),
+  rated: z.number().int(),
+  sides: z.object({ dom: z.record(z.string(), limitAnswer), sub: z.record(z.string(), limitAnswer) }),
+});
+export type LimitProfile = z.infer<typeof limitProfile>;
+export const limitProfileAnswerInput = z.object({ rating: limitRating.nullable(), note: z.string().trim().max(500).default(""), side: limitSide });
+export const limitProfileChanges = z.array(z.object({ itemKey: z.string().max(80), side: limitSide })).max(200);
+/** Dynamics where some of the answers you just changed in your limits read differently. */
+export const limitProfileMatch = z.object({
+  relationshipId: id,
+  /** The partner's name, or the dynamic's when there's no partner yet. */
+  name: z.string(),
+  differ: z.number().int(),
+  finished: z.boolean(),
+});
+export type LimitProfileMatch = z.infer<typeof limitProfileMatch>;
+export const limitProfileApplyInput = z.object({ changes: limitProfileChanges, relationshipIds: z.array(id).max(50) });
 export const limitItemInput = z.object({ category: z.string().trim().min(1).max(60).default(OWN_CATEGORY), title: z.string().trim().min(1).max(80) });
 
 /** A rule or protocol someone broke, logged by a Dominant or owned up to by the person themselves. */

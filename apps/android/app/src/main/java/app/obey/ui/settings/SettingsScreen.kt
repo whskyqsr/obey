@@ -86,11 +86,13 @@ import app.obey.ui.tasks.Stepper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, onOpenFeatures: () -> Unit = onOpenDynamic, vm: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, onOpenLimits: () -> Unit = {}, onOpenFeatures: () -> Unit = onOpenDynamic, vm: SettingsViewModel = hiltViewModel()) {
     val sessionState by vm.session.collectAsStateWithLifecycle()
     val devUserId by vm.devUserId.collectAsStateWithLifecycle()
     val appIcon by vm.appIcon.collectAsStateWithLifecycle()
     val authState by vm.authState.collectAsStateWithLifecycle()
+    val limits by vm.limits.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { vm.loadLimits() }
     val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         uri?.let(vm::setAvatar)
     }
@@ -138,6 +140,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, onOpenFeatures
                         SectionHeader("You")
                         ValueRow("Name, photo, email", user.displayName) { page = "you" }
                         ValueRow("Week starts on", if (session.weekStart == java.time.DayOfWeek.MONDAY) "Monday" else "Sunday") { page = "you" }
+                        ValueRow("Your limits", limits?.let { "${it.rated} of ${it.items.size}" }, onClick = onOpenLimits)
 
                         SectionHeader("Notifications")
                         val (heard, total) = notifyCount(user.mutedNotifications, session.relationship?.features?.points == true)

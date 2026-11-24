@@ -1,12 +1,23 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { LIMIT_CATEGORIES, OWN_CATEGORY, limitSentence } from "@obey/contracts";
+import { LIMIT_CATEGORIES, LIMIT_STARTERS, OWN_CATEGORY, limitSentence } from "@obey/contracts";
 import { errorMessage } from "../api/client";
-import { useAddLimitItem, useAnswerLimit, useFinishLimits, useLimitList, useRemoveLimitItem } from "../api/hooks";
-import type { LimitAnswer, LimitItem, LimitRating, LimitSide } from "../api/types";
+import {
+  useAddLimitItem,
+  useAnswerLimit,
+  useAnswerLimitProfile,
+  useApplyLimitProfile,
+  useFinishLimits,
+  useLimitList,
+  useLimitProfile,
+  useLimitProfileMatches,
+  useRemoveLimitItem,
+} from "../api/hooks";
+import type { LimitAnswer, LimitItem, LimitProfileMatch, LimitRating, LimitSide } from "../api/types";
 import {
   BackLink,
   Button,
+  Checkbox,
   Dialog,
   Diamond,
   ErrorBox,
@@ -76,6 +87,9 @@ async function saveImage(rows: LimitRow[], names: string[], snack: (m: string) =
   }
 }
 
+/** The first item in category order, where a review starts. */
+const items0 = (list: { items: LimitItem[] }) => byCategory(list.items)[0]?.[1][0]?.key;
+
 /** The item the fill-in page opens on, when the list sends someone to change one answer. */
 let openAt: string | undefined;
 
@@ -126,7 +140,9 @@ export function LimitsPage() {
 
   const status = !mine
     ? undefined
-    : both
+    : mine.fromProfile
+      ? `Filled in from your limits. Change anything ${partner ? `for ${partner.displayName}` : "here"}, then finish.`
+      : both
       ? "You've both finished. Answers you didn't share stay private."
       : !partner
         ? mine.finishedAt
@@ -151,7 +167,9 @@ export function LimitsPage() {
         <div className="flex max-w-3xl flex-col gap-6 px-4 pb-12 md:px-6">
           {!mine.finishedAt && (
             <div>
-              <Button onClick={() => edit()}>{mine.rated ? "Carry on" : "Start"}</Button>
+              <Button onClick={() => edit(mine.fromProfile ? items0(data) : undefined)}>
+                {mine.fromProfile ? "Review and finish" : mine.rated ? "Carry on" : "Start"}
+              </Button>
             </div>
           )}
           {both && (
@@ -301,59 +319,20 @@ export function LimitsEditPage() {
 
       {item ? (
         <>
-          <h1 className="mt-12 font-serif text-[56px] leading-[60px] break-words text-on-surface">{item.title}</h1>
-          {sides.map((side) => {
-            const a = answers[side][item.key];
-            const text = limitSentence(item.sentences[side], partner?.displayName);
-            return (
-              <section key={side} className="mt-7">
-                <div className="flex items-baseline gap-4">
-                  <h2 className="min-w-0 flex-1 text-body-large text-on-surface">
-                    {text}
-                    {side !== usual && <span className="ml-2 text-body-medium text-on-surface-variant">Optional</span>}
-                  </h2>
-                  <button type="button" onClick={() => setNoting({ item, side })} className="text-label-large text-primary">
-                    {a?.note ? "Change the note" : "Add a note"}
-                  </button>
-                </div>
-                <div role="radiogroup" aria-label={text} className="mt-3 grid grid-cols-5 gap-1.5">
-                  {RATINGS.map((r) => {
-                    const on = a?.rating === r.value;
-                    return (
-                      <button
-                        key={r.value}
-                        type="button"
-                        role="radio"
-                        aria-checked={on}
-                        onClick={() => {
-                          set(item, side, on ? null : r.value);
-                          if (!on && answers[otherSide(side)][item.key]?.rating) go(index + 1);
-                        }}
-                        className={cx(
-                          "state-layer flex h-16 flex-col items-center justify-center gap-2 rounded-lg border px-1 text-body-small whitespace-nowrap text-on-surface",
-                          on ? "border-on-surface bg-surface-container" : "border-outline-variant bg-surface-container-lowest",
-                        )}
-                      >
-                        <RatingMark rating={r.value} size={13} />
-                        {r.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                {a?.note && <p className="mt-3 font-serif text-[20px] leading-7 text-on-surface-variant italic">“{a.note}”</p>}
-              </section>
-            );
-          })}
-          <div className="mt-7 flex items-center justify-end gap-4">
-            {index > 0 && (
-              <button type="button" onClick={() => go(index - 1)} className="text-label-large text-on-surface-variant">
-                Previous
-              </button>
-            )}
-            <button type="button" onClick={() => go(index + 1)} className="text-label-large text-on-surface-variant">
-              {rated(item.key) ? "Next" : "Skip"}
-            </button>
-          </div>
+          <ItemStep
+            item={item}
+            answers={answers}
+            sides={sides}
+            optional={otherSide(usual)}
+            partnerName={partner?.displayName}
+            onRate={(side, rating) => {
+              set(item, side, rating);
+              if (rating && answers[otherSide(side)][item.key]?.rating) go(index + 1);
+            }}
+            onNote={(side) => setNoting({ item, side })}
+            onPrevious={index > 0 ? () => go(index - 1) : undefined}
+            onNext={() => go(index + 1)}
+          />
         </>
       ) : (
         <>
@@ -400,6 +379,272 @@ export function LimitsEditPage() {
         />
       )}
     </div>
+  );
+}
+
+type Answers = Record<LimitSide, Record<string, LimitAnswer>>;
+
+/** One item: its name, then a sentence for each side with the five answers under it, and Previous and Next. */
+function ItemStep({
+  item,
+  answers,
+  sides,
+  optional,
+  partnerName,
+  onRate,
+  onNote,
+  onPrevious,
+  onNext,
+}: {
+  item: LimitItem;
+  answers: Answers;
+  sides: readonly LimitSide[];
+  /** The side marked "Optional", if any. */
+  optional?: LimitSide;
+  partnerName?: string;
+  onRate(side: LimitSide, rating: LimitRating | null): void;
+  onNote(side: LimitSide): void;
+  onPrevious?: () => void;
+  onNext(): void;
+}) {
+  const rated = !!(answers.dom[item.key]?.rating || answers.sub[item.key]?.rating);
+  return (
+    <>
+      <h1 className="mt-12 font-serif text-[56px] leading-[60px] break-words text-on-surface">{item.title}</h1>
+      {sides.map((side) => {
+        const a = answers[side][item.key];
+        const text = limitSentence(item.sentences[side], partnerName);
+        return (
+          <section key={side} className="mt-7">
+            <div className="flex items-baseline gap-4">
+              <h2 className="min-w-0 flex-1 text-body-large text-on-surface">
+                {text}
+                {side === optional && <span className="ml-2 text-body-medium text-on-surface-variant">Optional</span>}
+              </h2>
+              <button type="button" onClick={() => onNote(side)} className="text-label-large text-primary">
+                {a?.note ? "Change the note" : "Add a note"}
+              </button>
+            </div>
+            <div role="radiogroup" aria-label={text} className="mt-3 grid grid-cols-5 gap-1.5">
+              {RATINGS.map((r) => {
+                const on = a?.rating === r.value;
+                return (
+                  <button
+                    key={r.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    onClick={() => onRate(side, on ? null : r.value)}
+                    className={cx(
+                      "state-layer flex h-16 flex-col items-center justify-center gap-2 rounded-lg border px-1 text-body-small whitespace-nowrap text-on-surface",
+                      on ? "border-on-surface bg-surface-container" : "border-outline-variant bg-surface-container-lowest",
+                    )}
+                  >
+                    <RatingMark rating={r.value} size={13} />
+                    {r.label}
+                  </button>
+                );
+              })}
+            </div>
+            {a?.note && <p className="mt-3 font-serif text-[20px] leading-7 text-on-surface-variant italic">“{a.note}”</p>}
+          </section>
+        );
+      })}
+      <div className="mt-7 flex items-center justify-end gap-4">
+        {onPrevious && (
+          <button type="button" onClick={onPrevious} className="text-label-large text-on-surface-variant">
+            Previous
+          </button>
+        )}
+        <button type="button" onClick={onNext} className="text-label-large text-on-surface-variant">
+          {rated ? "Next" : "Skip"}
+        </button>
+      </div>
+    </>
+  );
+}
+
+const PROFILE_ITEMS: LimitItem[] = byCategory(LIMIT_STARTERS.map((s) => ({ ...s, custom: false, createdBy: null }))).flatMap(([, xs]) => xs);
+
+/**
+ * Your own limits (limits-sides/5-your-limits), from Settings: the same steps as in a dynamic, said about "your partner",
+ * with your current role's side first and neither marked optional. They fill in each new dynamic's list as a draft; when
+ * you change them, Fealty asks which dynamics to update too and never copies on its own.
+ */
+export function LimitsProfilePage() {
+  const { rel, me, partners, solo } = useRel();
+  const profile = useLimitProfile();
+  const answer = useAnswerLimitProfile();
+  const matches = useLimitProfileMatches();
+  const snack = useSnackbar();
+  const navigate = useNavigate();
+  const back = useBack(() => navigate({ to: "/settings" }));
+  const [at, setAt] = useState<number | null>(null);
+  const [noting, setNoting] = useState<{ item: LimitItem; side: LimitSide } | null>(null);
+  const [changed, setChanged] = useState<Map<string, { itemKey: string; side: LimitSide }>>(new Map());
+  const [asking, setAsking] = useState<LimitProfileMatch[] | null>(null);
+  const self = rel.members.find((m) => m.userId === me.user.id);
+  const usual = usualSide(self?.role ?? "dominant", solo ? undefined : partners[0]?.role);
+  const sides = [usual, otherSide(usual)] as const;
+
+  if (profile.isLoading) return <Loading />;
+  if (profile.error || !profile.data) return <ErrorBox error={profile.error} onRetry={() => profile.refetch()} />;
+  const answers = profile.data.sides;
+  const items = PROFILE_ITEMS;
+  const rated = (key: string) => !!(answers.dom[key]?.rating || answers.sub[key]?.rating);
+  const first = () => {
+    const unrated = items.findIndex((i) => !rated(i.key));
+    return unrated >= 0 ? unrated : items.length;
+  };
+  const index = at ?? first();
+  const item = items[index];
+  const set = (i: LimitItem, side: LimitSide, rating: LimitRating | null, note = answers[side][i.key]?.note ?? "") => {
+    setChanged((m) => new Map(m).set(`${i.key}:${side}`, { itemKey: i.key, side }));
+    answer.mutate({ itemKey: i.key, side, rating, note }, { onError: (e) => snack(errorMessage(e)) });
+  };
+  const go = (n: number) => {
+    setAt(Math.max(0, Math.min(items.length, n)));
+    window.scrollTo({ top: 0 });
+  };
+  /** Leaving: if anything changed, ask which dynamics to bring along. */
+  const leave = () => {
+    if (!changed.size) return back();
+    matches.mutate([...changed.values()], {
+      onSuccess: (found) => (found.length ? setAsking(found) : back()),
+      onError: (e) => snack(errorMessage(e)),
+    });
+  };
+  const inCategory = item ? items.filter((i) => i.category === item.category) : [];
+  const step = item ? inCategory.indexOf(item) + 1 : 0;
+
+  return (
+    <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-4 pt-3 pb-8 md:px-6 md:pt-6">
+      <div className="-mx-2">
+        <BackLink label="Settings" onClick={leave} />
+      </div>
+      <div className="eyebrow mt-1">
+        {item ? `Your limits · ${item.category} · ${step} of ${inCategory.length}` : `Your limits · ${profile.data.rated} of ${items.length} rated`}
+      </div>
+      <div className="mt-3 h-[3px] bg-outline-variant" aria-hidden>
+        <div className="h-full bg-on-surface transition-[width]" style={{ width: `${(Math.min(index, items.length) / Math.max(1, items.length)) * 100}%` }} />
+      </div>
+
+      {item ? (
+        <ItemStep
+          item={item}
+          answers={answers}
+          sides={sides}
+          onRate={(side, rating) => {
+            set(item, side, rating);
+            if (rating && answers[otherSide(side)][item.key]?.rating) go(index + 1);
+          }}
+          onNote={(side) => setNoting({ item, side })}
+          onPrevious={index > 0 ? () => go(index - 1) : undefined}
+          onNext={() => go(index + 1)}
+        />
+      ) : (
+        <>
+          <h1 className="mt-12 font-serif text-[56px] leading-[60px] text-on-surface">All saved</h1>
+          <p className="mt-3 text-body-large text-on-surface-variant">
+            You've rated {profile.data.rated} of {items.length}.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Button busy={matches.isPending} onClick={leave}>
+              Done
+            </Button>
+            <Button variant="text" onClick={() => go(0)}>
+              Start again from the top
+            </Button>
+          </div>
+        </>
+      )}
+
+      {noting && (
+        <NoteDialog
+          title={limitSentence(noting.item.sentences[noting.side], null)}
+          answer={answers[noting.side][noting.item.key]}
+          onClose={() => setNoting(null)}
+          onSave={(note) => set(noting.item, noting.side, answers[noting.side][noting.item.key]?.rating ?? null, note)}
+        />
+      )}
+      {asking && (
+        <UpdateDynamicsDialog
+          matches={asking}
+          changes={[...changed.values()]}
+          onClose={() => {
+            setAsking(null);
+            setChanged(new Map());
+            back();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** After changing your limits: which dynamics to bring the changes to. Ones you've finished start unticked, since your partner would see the change. */
+function UpdateDynamicsDialog({ matches, changes, onClose }: { matches: LimitProfileMatch[]; changes: { itemKey: string; side: LimitSide }[]; onClose(): void }) {
+  const apply = useApplyLimitProfile();
+  const snack = useSnackbar();
+  const [picked, setPicked] = useState(() => new Set(matches.filter((m) => !m.finished).map((m) => m.relationshipId)));
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title="Update your limits with them too?"
+      actions={
+        <>
+          <Button variant="outlined" onClick={onClose}>
+            Not now
+          </Button>
+          <Button
+            busy={apply.isPending}
+            disabled={!picked.size}
+            onClick={() =>
+              apply.mutate(
+                { changes, relationshipIds: [...picked] },
+                {
+                  onSuccess: () => {
+                    snack(picked.size === 1 ? "Updated" : `Updated ${picked.size}`);
+                    onClose();
+                  },
+                  onError: (e) => snack(errorMessage(e)),
+                },
+              )
+            }
+          >
+            Update
+          </Button>
+        </>
+      }
+    >
+      <p>
+        You changed {changes.length} {changes.length === 1 ? "answer" : "answers"}.
+      </p>
+      <div className="mt-4 divide-y divide-outline-variant border-b border-outline-variant">
+        {[...matches].sort((a, b) => Number(a.finished) - Number(b.finished)).map((m) => (
+          <div key={m.relationshipId} className="flex min-h-14 items-center gap-3 py-2">
+            <div className="min-w-0 flex-1">
+              <Checkbox
+                checked={picked.has(m.relationshipId)}
+                onChange={(on) =>
+                  setPicked((p) => {
+                    const next = new Set(p);
+                    if (on) next.add(m.relationshipId);
+                    else next.delete(m.relationshipId);
+                    return next;
+                  })
+                }
+                label={<span className="text-on-surface">{m.name}</span>}
+              />
+            </div>
+            <span className="shrink-0 text-body-small text-on-surface-variant">
+              {m.differ} differ{m.finished ? " · finished" : ""}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Dialog>
   );
 }
 

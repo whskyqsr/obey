@@ -630,6 +630,18 @@ interface ObeyApi {
     @DELETE("relationships/{id}/limit-list/items/{key}")
     suspend fun removeLimitItem(@Path("id") relationshipId: String, @Path("key") key: String)
 
+    @GET("me/limit-profile")
+    suspend fun limitProfile(): LimitProfile
+
+    @PUT("me/limit-profile/answers/{key}")
+    suspend fun answerLimitProfile(@Path("key") key: String, @Body body: LimitAnswerInput): LimitAnswer
+
+    @POST("me/limit-profile/matches")
+    suspend fun limitProfileMatches(@Body body: LimitChanges): List<LimitProfileMatch>
+
+    @POST("me/limit-profile/apply")
+    suspend fun applyLimitProfile(@Body body: LimitProfileApply)
+
     @PUT("relationships/{id}/limit-list/finished")
     suspend fun finishLimits(@Path("id") relationshipId: String, @Body body: Map<String, String> = emptyMap())
 }

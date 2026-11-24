@@ -6,16 +6,21 @@ import {
   type LimitSide,
   type Role,
   allFeatures,
+  type LimitProfile,
+  type LimitProfileMatch,
   limitAnswerInput,
   limitItemInput,
+  limitProfileAnswerInput,
+  limitProfileApplyInput,
+  limitProfileChanges,
 } from "@obey/contracts";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { Deps } from "../app.js";
-import { limitFinished, limitItems, limitRatings, memberships, relationships } from "../db/schema.js";
+import { limitFinished, limitItems, limitPrefilled, limitProfile, limitRatings, memberships, relationships, users } from "../db/schema.js";
 import { HttpError, forbidden, notFound } from "../errors.js";
-import { requireMember } from "../services/access.js";
+import { requestScope, requireMember } from "../services/access.js";
 
 const STARTER_KEYS = new Set(LIMIT_STARTERS.map((s) => s.key));
 
@@ -51,9 +56,157 @@ export const limitListRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   const sidesFor = (people: { userId: string; role: Role }[], userId: string) =>
     usualSides(people.find((p) => p.userId === userId)!.role, people.find((p) => p.userId !== userId)?.role);
 
+  /**
+   * The first time you open a dynamic's list with nothing answered there yet, your own limits fill it in as a draft: nothing
+   * is shared until you finish, and changes there stay with that dynamic. Says whether this list was ever filled in that way.
+   */
+  async function prefill(relationshipId: string, userId: string) {
+    const [done] = await db
+      .select({ at: limitPrefilled.filledAt })
+      .from(limitPrefilled)
+      .where(and(eq(limitPrefilled.relationshipId, relationshipId), eq(limitPrefilled.userId, userId)));
+    if (done) return true;
+    if (requestScope.getStore()?.ai) return false;
+    const [rel] = await db.select({ endedAt: relationships.endedAt }).from(relationships).where(eq(relationships.id, relationshipId));
+    if (rel?.endedAt) return false;
+    const [answered, finished, profile] = await Promise.all([
+      db
+        .select({ k: limitRatings.itemKey })
+        .from(limitRatings)
+        .where(and(eq(limitRatings.relationshipId, relationshipId), eq(limitRatings.userId, userId)))
+        .limit(1),
+      db
+        .select({ at: limitFinished.finishedAt })
+        .from(limitFinished)
+        .where(and(eq(limitFinished.relationshipId, relationshipId), eq(limitFinished.userId, userId))),
+      db.select().from(limitProfile).where(eq(limitProfile.userId, userId)),
+    ]);
+    const rows = profile.filter((r) => STARTER_KEYS.has(r.itemKey) && (r.rating || r.note));
+    if (answered.length || finished.length || !rows.length) return false;
+    const now = deps.now();
+    await db.transaction(async (tx) => {
+      const [claimed] = await tx.insert(limitPrefilled).values({ relationshipId, userId, filledAt: now }).onConflictDoNothing().returning();
+      if (!claimed) return;
+      await tx
+        .insert(limitRatings)
+        .values(rows.map((r) => ({ relationshipId, userId, itemKey: r.itemKey, side: r.side, rating: r.rating, note: r.note, updatedAt: now })))
+        .onConflictDoNothing();
+    });
+    return true;
+  }
+
+  const profileOf = async (userId: string) =>
+    (await db.select().from(limitProfile).where(eq(limitProfile.userId, userId))).filter((r) => STARTER_KEYS.has(r.itemKey) && (r.rating || r.note));
+
+  /** Your own limits, apart from any dynamic. */
+  app.get("/me/limit-profile", async (req): Promise<LimitProfile> => {
+    const rows = await profileOf(req.user.id);
+    const side = (x: LimitSide): Record<string, LimitAnswer> =>
+      Object.fromEntries(rows.filter((r) => r.side === x).map((r) => [r.itemKey, { rating: r.rating, note: r.note }]));
+    return {
+      items: LIMIT_STARTERS.map((s) => ({ ...s, custom: false, createdBy: null })),
+      rated: new Set(rows.filter((r) => r.rating).map((r) => r.itemKey)).size,
+      sides: { dom: side("dom"), sub: side("sub") },
+    };
+  });
+
+  app.put<{ Params: { key: string } }>("/me/limit-profile/answers/:key", async (req) => {
+    if (!STARTER_KEYS.has(req.params.key)) throw notFound();
+    const body = limitProfileAnswerInput.parse(req.body);
+    const row = and(eq(limitProfile.userId, req.user.id), eq(limitProfile.itemKey, req.params.key), eq(limitProfile.side, body.side));
+    if (!body.rating && !body.note) await db.delete(limitProfile).where(row);
+    else
+      await db
+        .insert(limitProfile)
+        .values({ userId: req.user.id, itemKey: req.params.key, side: body.side, rating: body.rating, note: body.note, updatedAt: deps.now() })
+        .onConflictDoUpdate({
+          target: [limitProfile.userId, limitProfile.itemKey, limitProfile.side],
+          set: { rating: body.rating, note: body.note, updatedAt: deps.now() },
+        });
+    return { rating: body.rating, note: body.note };
+  });
+
+  /** Your live dynamics with limits on whose lists you've started, and how many of the given answers read differently there from your limits. */
+  async function differences(userId: string, changes: { itemKey: string; side: LimitSide }[], only?: string[]) {
+    const keys = changes.filter((c) => STARTER_KEYS.has(c.itemKey));
+    const mine = await db
+      .select({ relationshipId: relationships.id, name: relationships.name, features: relationships.features })
+      .from(memberships)
+      .innerJoin(relationships, eq(relationships.id, memberships.relationshipId))
+      .where(and(eq(memberships.userId, userId), isNull(relationships.endedAt)));
+    const live = mine.filter((r) => allFeatures(r.features).limits && (!only || only.includes(r.relationshipId)));
+    if (!keys.length || !live.length) return [];
+    const relIds = live.map((r) => r.relationshipId);
+    const [profile, ratings, prefilled, finished, partners] = await Promise.all([
+      profileOf(userId),
+      db.select().from(limitRatings).where(and(inArray(limitRatings.relationshipId, relIds), eq(limitRatings.userId, userId))),
+      db.select().from(limitPrefilled).where(and(inArray(limitPrefilled.relationshipId, relIds), eq(limitPrefilled.userId, userId))),
+      db.select().from(limitFinished).where(and(inArray(limitFinished.relationshipId, relIds), eq(limitFinished.userId, userId))),
+      db
+        .select({ relationshipId: memberships.relationshipId, name: users.displayName })
+        .from(memberships)
+        .innerJoin(users, eq(users.id, memberships.userId))
+        .where(and(inArray(memberships.relationshipId, relIds), ne(memberships.userId, userId))),
+    ]);
+    const same = (a?: { rating: string | null; note: string }, b?: { rating: string | null; note: string }) =>
+      (a?.rating ?? null) === (b?.rating ?? null) && (a?.note ?? "") === (b?.note ?? "");
+    return live.flatMap((r) => {
+      const here = ratings.filter((x) => x.relationshipId === r.relationshipId);
+      // A list you haven't started yet fills itself in from your limits when you open it.
+      const started = here.length > 0 || prefilled.some((x) => x.relationshipId === r.relationshipId) || finished.some((x) => x.relationshipId === r.relationshipId);
+      if (!started) return [];
+      const differ = keys.filter((c) =>
+        !same(
+          profile.find((p) => p.itemKey === c.itemKey && p.side === c.side),
+          here.find((x) => x.itemKey === c.itemKey && x.side === c.side),
+        ),
+      );
+      if (!differ.length) return [];
+      const name = partners.filter((p) => p.relationshipId === r.relationshipId).map((p) => p.name).join(" and ") || r.name || "Just you";
+      return [{ relationshipId: r.relationshipId, name, differ, finished: finished.some((x) => x.relationshipId === r.relationshipId) }];
+    });
+  }
+
+  /** Where the answers you just changed in your limits differ: Fealty asks before copying them anywhere, never syncs on its own. */
+  app.post("/me/limit-profile/matches", async (req): Promise<LimitProfileMatch[]> => {
+    const changes = limitProfileChanges.parse((req.body as { changes?: unknown } | undefined)?.changes);
+    return (await differences(req.user.id, changes)).map(({ differ, ...r }) => ({ ...r, differ: differ.length }));
+  });
+
+  /** Copies the given answers from your limits into the dynamics you picked. */
+  app.post("/me/limit-profile/apply", async (req) => {
+    const body = limitProfileApplyInput.parse(req.body);
+    const targets = await differences(req.user.id, body.changes, body.relationshipIds);
+    const profile = await profileOf(req.user.id);
+    const now = deps.now();
+    for (const t of targets) {
+      await requireLimits(t.relationshipId, req.user.id);
+      for (const c of t.differ) {
+        const p = profile.find((x) => x.itemKey === c.itemKey && x.side === c.side);
+        const row = and(
+          eq(limitRatings.relationshipId, t.relationshipId),
+          eq(limitRatings.userId, req.user.id),
+          eq(limitRatings.itemKey, c.itemKey),
+          eq(limitRatings.side, c.side),
+        );
+        if (!p) await db.delete(limitRatings).where(row);
+        else
+          await db
+            .insert(limitRatings)
+            .values({ relationshipId: t.relationshipId, userId: req.user.id, itemKey: c.itemKey, side: c.side, rating: p.rating, note: p.note, updatedAt: now })
+            .onConflictDoUpdate({
+              target: [limitRatings.relationshipId, limitRatings.userId, limitRatings.itemKey, limitRatings.side],
+              set: { rating: p.rating, note: p.note, updatedAt: now },
+            });
+      }
+    }
+    return { updated: targets.map((t) => t.relationshipId) };
+  });
+
   app.get<{ Params: { id: string } }>("/relationships/:id/limit-list", async (req): Promise<LimitList> => {
     await requireLimits(req.params.id, req.user.id);
     const relId = req.params.id;
+    const prefilled = await prefill(relId, req.user.id);
     const [people, custom, ratings, finished] = await Promise.all([
       members(relId),
       db.select().from(limitItems).where(eq(limitItems.relationshipId, relId)).orderBy(asc(limitItems.createdAt)),
@@ -93,6 +246,7 @@ export const limitListRoutes = (deps: Deps) => async (app: FastifyInstance) => {
           rated: new Set(mine.filter((r) => r.rating).map((r) => r.itemKey)).size,
           answers: shown ? sides[sidesFor(people, p.userId)[0]!] : null,
           sides: shown ? sides : null,
+          fromProfile: p.userId === req.user.id && prefilled && !finished.some((f) => f.userId === p.userId),
         };
       }),
     };

@@ -185,6 +185,37 @@ export const limitRatings = pgTable(
   (t) => [primaryKey({ columns: [t.relationshipId, t.userId, t.itemKey, t.side] })],
 );
 
+/** Someone's own limits, kept apart from any dynamic: starter items only, by side as in limit_ratings. They pre-fill a dynamic's list as a draft. */
+export const limitProfile = pgTable(
+  "limit_profile",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    itemKey: text("item_key").notNull(),
+    side: text("side", { enum: ["dom", "sub"] }).notNull(),
+    rating: text("rating", { enum: ["love", "like", "curious", "soft", "hard"] }),
+    note: text("note").notNull().default(""),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.itemKey, t.side] })],
+);
+
+/** When someone's limits list in a dynamic was filled in from their own limits, so it only happens once there. */
+export const limitPrefilled = pgTable(
+  "limit_prefilled",
+  {
+    relationshipId: uuid("relationship_id")
+      .notNull()
+      .references(() => relationships.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    filledAt: timestamp("filled_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.relationshipId, t.userId] })],
+);
+
 /** When someone said they'd finished their limits list; partners' answers show once everyone has. */
 export const limitFinished = pgTable(
   "limit_finished",

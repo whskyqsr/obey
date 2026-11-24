@@ -89,6 +89,60 @@ describe("limits list", () => {
     });
   });
 
+  it("fills a new list in from your own limits as a draft, and asks before copying later changes", async () => {
+    const { sub, relId, subId } = await ctx.pair();
+    const url = `/relationships/${relId}/limit-list`;
+    expect((await sub.get("/me/limit-profile")).body).toMatchObject({ rated: 0, sides: { dom: {}, sub: {} } });
+    expect((await sub.get("/me/limit-profile")).body.items.length).toBe(LIMIT_STARTERS.length);
+    expect((await sub.put("/me/limit-profile/answers/canes", { rating: "hard", side: "sub" })).status).toBe(200);
+    expect((await sub.put("/me/limit-profile/answers/kneeling", { rating: "love", note: "On a cushion", side: "sub" })).status).toBe(200);
+    expect((await sub.put("/me/limit-profile/answers/kneeling", { rating: "like" })).status).toBe(400);
+    expect((await sub.put("/me/limit-profile/answers/not-an-item", { rating: "like", side: "dom" })).status).toBe(404);
+    expect((await sub.get("/me/limit-profile")).body.rated).toBe(2);
+
+    // Opening the list fills it in once, unfinished.
+    let me = (await sub.get(url)).body.people.find((p: { userId: string }) => p.userId === subId);
+    expect(me).toMatchObject({ fromProfile: true, finishedAt: null, rated: 2 });
+    expect(me.sides.sub.kneeling).toEqual({ rating: "love", note: "On a cushion" });
+    await sub.put(`${url}/answers/canes`, { rating: "soft", side: "sub" });
+
+    // A second dynamic, opened after a change to the profile.
+    const dom2 = ctx.as(crypto.randomUUID(), "Sam");
+    const rel2 = (await dom2.post("/relationships", { role: "dominant" })).body;
+    const invite = (await dom2.post(`/relationships/${rel2.id}/invites`)).body;
+    await sub.post("/relationships/join", { code: invite.code, role: "submissive" });
+    await sub.put("/me/limit-profile/answers/gags", { rating: "curious", side: "sub" });
+    expect((await sub.get(`/relationships/${rel2.id}/limit-list`)).body.people.find((p: { userId: string }) => p.userId === subId).rated).toBe(3);
+    await sub.put(`/relationships/${rel2.id}/limit-list/finished`, {});
+
+    // Change two answers in the profile; only lists where they differ are offered.
+    await sub.put("/me/limit-profile/answers/kneeling", { rating: null, side: "sub" });
+    await sub.put("/me/limit-profile/answers/gags", { rating: "curious", side: "sub" });
+    const changes = [
+      { itemKey: "kneeling", side: "sub" },
+      { itemKey: "gags", side: "sub" },
+    ];
+    const matches = (await sub.post("/me/limit-profile/matches", { changes })).body;
+    expect(matches).toEqual(
+      expect.arrayContaining([
+        { relationshipId: relId, name: "Dom", differ: 2, finished: false },
+        { relationshipId: rel2.id, name: "Sam", differ: 1, finished: true },
+      ]),
+    );
+    expect(matches.length).toBe(2);
+
+    await sub.post("/me/limit-profile/apply", { changes, relationshipIds: [relId] });
+    me = (await sub.get(url)).body.people.find((p: { userId: string }) => p.userId === subId);
+    expect(me.sides.sub).toEqual({ canes: { rating: "soft", note: "" }, gags: { rating: "curious", note: "" } });
+    const other = (await sub.get(`/relationships/${rel2.id}/limit-list`)).body.people.find((p: { userId: string }) => p.userId === subId);
+    expect(other.sides.sub.kneeling).toEqual({ rating: "love", note: "On a cushion" });
+    expect(other.fromProfile).toBe(false);
+
+    // Clearing everything in a list doesn't fill it in again.
+    for (const k of ["canes", "gags"]) await sub.put(`${url}/answers/${k}`, { rating: null, side: "sub" });
+    expect((await sub.get(url)).body.people.find((p: { userId: string }) => p.userId === subId).rated).toBe(0);
+  });
+
   it("is closed while the dynamic has it switched off", async () => {
     const { dom, sub, relId } = await ctx.pair();
     const url = `/relationships/${relId}/limit-list`;

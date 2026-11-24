@@ -19,7 +19,7 @@ import { RuleLogPage } from "./pages/RuleLog";
 import { StatsPage } from "./pages/Stats";
 import { MonthReviewPage } from "./pages/MonthReview";
 import { AgreementPage } from "./pages/Agreement";
-import { LimitsEditPage, LimitsPage } from "./pages/Limits";
+import { LimitsEditPage, LimitsPage, LimitsProfilePage } from "./pages/Limits";
 import { AftercarePage, ScenePage, ScenesPage } from "./pages/Scenes";
 import { ChastityPage } from "./pages/Chastity";
 import { PlacesPage } from "./pages/Places";
@@ -297,6 +297,7 @@ const routeTree = rootRoute.addChildren([
   page("/aftercare", gated("scenes", AftercarePage)),
   page("/chastity", gated("chastity", ChastityPage)),
   page("/settings", () => <SettingsPage />),
+  page("/settings/limits", LimitsProfilePage),
   settingsSectionRoute,
   page("/dynamic", DynamicPage),
   page("/dynamic/people", PeoplePage),

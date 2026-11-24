@@ -19,6 +19,8 @@ import type {
   LimitAnswer,
   LimitItem,
   LimitList,
+  LimitProfile,
+  LimitProfileMatch,
   LimitRating,
   LimitSide,
   AdminReport,
@@ -1263,6 +1265,49 @@ export function useAnswerLimit(rel: string, userId: string) {
       );
     },
     onError: () => void qc.invalidateQueries({ queryKey: key }),
+  });
+}
+
+/** Your own limits, apart from any dynamic. */
+export function useLimitProfile() {
+  return useQuery({ queryKey: ["me", "limit-profile"], queryFn: () => api<LimitProfile>("/me/limit-profile") });
+}
+
+export function useAnswerLimitProfile() {
+  const qc = useQueryClient();
+  const key = ["me", "limit-profile"];
+  return useMutation({
+    mutationFn: ({ itemKey, ...body }: { itemKey: string; side: LimitSide; rating: LimitRating | null; note: string }) =>
+      api<LimitAnswer>(`/me/limit-profile/answers/${encodeURIComponent(itemKey)}`, { method: "PUT", body }),
+    onMutate: ({ itemKey, side, rating, note }) => {
+      qc.setQueryData<LimitProfile>(key, (p) => {
+        if (!p) return p;
+        const sides = { dom: { ...p.sides.dom }, sub: { ...p.sides.sub } };
+        if (rating || note) sides[side][itemKey] = { rating, note };
+        else delete sides[side][itemKey];
+        const rated = new Set([...Object.entries(sides.dom), ...Object.entries(sides.sub)].filter(([, a]) => a.rating).map(([k]) => k)).size;
+        return { ...p, sides, rated };
+      });
+    },
+    onError: () => void qc.invalidateQueries({ queryKey: key }),
+  });
+}
+
+type LimitChange = { itemKey: string; side: LimitSide };
+/** Your dynamics where answers you just changed in your limits read differently. */
+export function useLimitProfileMatches() {
+  return useMutation({
+    mutationFn: (changes: LimitChange[]) => api<LimitProfileMatch[]>("/me/limit-profile/matches", { method: "POST", body: { changes } }),
+  });
+}
+
+export function useApplyLimitProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { changes: LimitChange[]; relationshipIds: string[] }) => api("/me/limit-profile/apply", { method: "POST", body }),
+    onSuccess: (_, { relationshipIds }) => {
+      for (const id of relationshipIds) void qc.invalidateQueries({ queryKey: ["rel", id, "limit-list"] });
+    },
   });
 }
 
