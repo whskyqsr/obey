@@ -39,7 +39,7 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.LinkOff
-import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Redeem
 import androidx.compose.material.icons.outlined.Report
 import androidx.compose.material.icons.outlined.Share
@@ -539,7 +539,7 @@ fun KitScreen(kitId: String, onBack: () -> Unit, onAdded: (ApplyKitResult) -> Un
                 actions = {
                     if (kit != null) {
                         Box {
-                            IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "More options") }
+                            IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreHoriz, "More options") }
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                                 DropdownMenuItem(text = { Text("Edit") }, leadingIcon = { Icon(Icons.Outlined.Edit, null) }, onClick = { menu = false; dialog = "edit" })
                                 DropdownMenuItem(

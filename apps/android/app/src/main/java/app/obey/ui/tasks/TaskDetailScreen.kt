@@ -22,7 +22,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -209,7 +209,7 @@ fun TaskDetailScreen(
                 actions = {
                     IconButton(onClick = { onHistory(vm.taskId) }) { Icon(Icons.Outlined.History, "History") }
                     if (canManage) Box {
-                        IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "More options") }
+                        IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreHoriz, "More options") }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             DropdownMenuItem(
                                 text = { Text("Edit") },

@@ -27,7 +27,7 @@ Last full sweep: 2026-11-24, web at 390px and 1440px, local seed data.
 | Consequences | 29, 63, 64 | Matched (#111) | Matched | |
 | Rules | 06, 69 | Close (#108) | Close | Missing the "Agreed by both… version" line and the footer: broken this month · See the log · Propose a change. |
 | Protocols tab | 65 | Matched (#108) | Matched | |
-| Protocol page | 66 | Not matched | Not matched | The header should be "‹ Protocols" with a pencil and ⋯, not a trash can and an Edit button. The body should be serif. The "Broken this month" section is missing. |
+| Protocol page | 66 | Matched | Matched | "‹ Protocols", pencil and ⋯ (Delete), serif title and body, "Spells out rule iii" line, and Broken this month from the rule log. Editing is Cancel / Save with the Letters editor. |
 | Rule log | 67, 68 | Matched (#112) | Matched | |
 | Notes | 28, 70, 72, desktop 20 | Matched (#110, fixes in #114) | Matched | |
 | Journal | 07, 71, desktop 15 | Close (#109) | Not matched | Partner replies aren't quoted under entries. Desktop should show the entry with an "Earlier" list beside it and a "Write tonight's entry" button. |

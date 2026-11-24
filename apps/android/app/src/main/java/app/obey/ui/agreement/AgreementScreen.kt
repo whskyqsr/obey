@@ -38,7 +38,7 @@ import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.HourglassTop
 import androidx.compose.material.icons.outlined.Key
-import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PublishedWithChanges
 import androidx.compose.material.icons.outlined.RemoveCircleOutline
@@ -1020,7 +1020,7 @@ private fun SectionEditor(
                     },
                 )
                 Box {
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "Section options") }
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreHoriz, "Section options") }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         DropdownMenuItem(text = { Text("Move up") }, onClick = { menu = false; onMove(-1) }, enabled = canMoveUp)
                         DropdownMenuItem(text = { Text("Move down") }, onClick = { menu = false; onMove(1) }, enabled = canMoveDown)

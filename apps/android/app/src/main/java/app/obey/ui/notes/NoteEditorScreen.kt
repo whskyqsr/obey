@@ -49,7 +49,6 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.EditNote
-import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.filled.PushPin
@@ -163,7 +162,7 @@ fun NoteEditorScreen(onDone: () -> Unit, vm: NoteEditorViewModel = hiltViewModel
                             ) { Text("Save") }
                         }
                         if (vm.isAuthor) Box {
-                            IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "More") }
+                            IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreHoriz, "More") }
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                                 DropdownMenuItem(
                                     text = { Text("Delete") },

@@ -14,7 +14,7 @@ import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.TaskAlt
@@ -189,7 +189,7 @@ fun OccurrenceRow(
                 }
             } else if (listOf(actions.onCompleteWithNote, actions.onReschedule, actions.onEditTask, actions.onComments).any { it != null }) {
                 Box {
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "More") }
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreHoriz, "More") }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         if (occurrence.status == OccurrenceStatus.Pending) {
                             if (occurrence.isOpen() && !occurrence.isRitual && !occurrence.isCounted && !occurrence.isPlaced) actions.onCompleteWithNote?.let {

@@ -149,7 +149,7 @@ export function OverflowMenu({
   }, [open]);
   return (
     <div ref={ref} className="relative">
-      <IconButton icon="more_vert" label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)} />
+      <IconButton icon="more_horiz" label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)} />
       {open && (
         <div
           role="menu"
