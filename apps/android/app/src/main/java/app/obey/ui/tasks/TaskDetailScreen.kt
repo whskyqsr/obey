@@ -155,6 +155,12 @@ class TaskDetailViewModel @Inject constructor(
         refresh()
     }
 
+    fun excuse(o: Occurrence) = action {
+        api.editOccurrence(o.id, app.obey.api.EditOccurrenceInput(status = OccurrenceStatus.Excused))
+        say("Excused")
+        refresh()
+    }
+
     fun reschedule(o: Occurrence, input: RescheduleInput) = action {
         val r = api.reschedule(o.id, input)
         say(if (r.applied) "Moved to ${formatDue(r.occurrence.dueAt)}" else "Extension requested; waiting for approval")
@@ -265,7 +271,8 @@ fun TaskDetailScreen(
                         val mine = o.assigneeId == session?.userId
                         OccurrenceRow(
                             o,
-                            if (mine) null else session?.nameOf(o.assigneeId),
+                            // The page already says whose task it is.
+                            null,
                             if (canManage && o.status == OccurrenceStatus.Submitted) {
                                 OccurrenceActions(onApprove = { vm.review(o, true) }, onReject = { sendingBack = o }, onComments = { commenting = o })
                             } else {
@@ -273,6 +280,8 @@ fun TaskDetailScreen(
                                     onComplete = if (mine) ({ if (o.isRitual) running = o else if (o.needsDoneDialog) noting = o else vm.complete(o) }) else null,
                                     onCompleteWithNote = if (mine) ({ noting = o }) else null,
                                     onReschedule = { rescheduling = o },
+                                    // A Dominant settles a miss here too: excuse it, or move it, which reopens it.
+                                    onExcuseInMenu = if (canManage && !mine && o.status == OccurrenceStatus.Missed) ({ vm.excuse(o) }) else null,
                                     onComments = { commenting = o },
                                     onCount = if (mine && o.canCount(true, canManage)) ({ if (o.readyToSend) noting = o else vm.count(o, by = 1) { noting = it } }) else null,
                                     onCountHold = if (o.canCount(mine, canManage)) ({ counting = o }) else null,

@@ -71,7 +71,7 @@ function TaskView({ task, onClose }: { task: Task; onClose?: () => void }) {
   const s = stats.data;
   const eyebrow = [
     `${task.summary}${task.dueTime ? ` by ${fmtClock(task.dueTime)}` : ", all day"}`,
-    !onClose && task.assigneeId !== me.user.id ? memberName(task.assigneeId) : null,
+    task.assigneeId !== me.user.id ? memberName(task.assigneeId) : null,
     features.points && task.points !== 0 ? `${task.points > 0 ? "+" : ""}${task.points}` : null,
     task.assignedConsequenceId ? "consequence" : null,
     task.approvalRequired ? "approved by you" : null,

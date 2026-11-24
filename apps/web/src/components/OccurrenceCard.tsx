@@ -1,7 +1,7 @@
 import { Suspense, lazy, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import type { Occurrence, OccurrenceStatus } from "@obey/contracts";
-import { useCompleteOccurrence, useReviewOccurrence } from "../api/hooks";
+import { useCompleteOccurrence, useEditOccurrence, useReviewOccurrence } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { fmtDate, fmtDateTime, fmtRelative, fmtTime, localDateOf, today } from "../lib/dates";
 import { useReadOnly, useRel } from "../lib/relationship";
@@ -13,7 +13,7 @@ import { RescheduleSheet } from "./RescheduleSheet";
 import { CountRing, CountSheet, canCount, countLine, isCounted, readyToSend, useCountTap } from "./Count";
 import { CheckInButton, PlaceRing, canCheckIn, isPlaced, placeLine, usePlaceLookup } from "./Location";
 import { StreakStrip } from "./StreakStrip";
-import { Badge, Button, Dialog, Icon, Spinner, TextArea, cx, useSnackbar } from "./ui";
+import { Badge, Button, Dialog, Diamond, type DiamondState, Icon, Spinner, TextArea, cx, useSnackbar } from "./ui";
 import { importPage } from "../lib/staleBuild";
 
 const MarkdownEditor = lazy(importPage(() => import("./MarkdownEditor").then((m) => ({ default: m.MarkdownEditor }))));
@@ -43,6 +43,14 @@ export function opensLabel(o: Occurrence) {
   return localDateOf(at) === today() ? `opens ${fmtTime(o.opensAt)}` : `opens ${fmtDateTime(o.opensAt)}`;
 }
 
+/** How a due date reads as a diamond. */
+export function diamondOf(o: Occurrence): DiamondState {
+  if (o.status === "completed") return "done";
+  if (o.status === "missed" || isOverdue(o)) return "owed";
+  if (o.status === "submitted") return "waiting";
+  return o.status === "pending" ? "open" : "off";
+}
+
 export function isOverdue(o: Occurrence, now = Date.now()) {
   return o.status === "pending" && new Date(o.dueAt).getTime() < now;
 }
@@ -54,6 +62,7 @@ export function OccurrenceCard({ o, showDate, linkTask = true, plain }: { o: Occ
   const readOnly = useReadOnly();
   const snack = useSnackbar();
   const review = useReviewOccurrence(rel.id);
+  const edit = useEditOccurrence(rel.id);
   const [completing, setCompleting] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
   const [sendingBack, setSendingBack] = useState(false);
@@ -116,14 +125,17 @@ export function OccurrenceCard({ o, showDate, linkTask = true, plain }: { o: Occ
         </div>
       </div>
       {plain && (
-        <p className={cx("text-body-large", overdue ? "text-error" : "text-on-surface")}>
-          {allDay ? `${fmtDate(localDateOf(due))}, all day` : fmtDateTime(o.dueAt)}
-          <span className={overdue ? "" : "text-on-surface-variant"}>
-            {o.status === "pending" ? ` · ${fmtRelative(o.dueAt)}` : ` · ${overdue ? "Overdue" : o.leftAt ? "Left early" : status.label.toLowerCase()}`}
-            {!mine && ` · ${memberName(o.assigneeId)}`}
-            {o.rescheduled && " · moved"}
-          </span>
-        </p>
+        // The task's own page: a diamond and when it's due. The page already names the task and whose it is.
+        <div className="flex items-center gap-3">
+          <Diamond state={diamondOf(o)} />
+          <p className="text-body-large text-on-surface">
+            {allDay ? `${fmtDate(localDateOf(due))}, all day` : fmtDateTime(o.dueAt)}
+            <span className={overdue || o.status === "missed" ? "text-error" : "text-on-surface-variant"}>
+              {o.status === "pending" ? ` · ${fmtRelative(o.dueAt)}` : ` · ${overdue ? "Overdue" : o.leftAt ? "Left early" : status.label.toLowerCase()}`}
+              {o.rescheduled && " · moved"}
+            </span>
+          </p>
+        </div>
       )}
       {counted && (
         <div className="relative z-10 flex flex-col gap-2">
@@ -229,7 +241,27 @@ export function OccurrenceCard({ o, showDate, linkTask = true, plain }: { o: Occ
           )}
         </div>
       )}
-      {!(o.status === "pending" || (isDom && o.status === "submitted")) && !commenting && o.commentCount === 0 && !readOnly && (
+      {/* A Dominant settles a miss from here too: excuse it, or move it, which reopens it. */}
+      {o.status === "missed" && isDom && !mine && !readOnly && (
+        <div className="relative z-10 flex flex-wrap items-center gap-2">
+          <Button
+            variant="outlined"
+            busy={edit.isPending}
+            onClick={() => edit.mutate({ id: o.id, change: { status: "excused" } }, { onSuccess: () => snack("Excused"), onError: (e) => snack(errorMessage(e)) })}
+          >
+            Excuse
+          </Button>
+          <Button variant="outlined" disabled={edit.isPending} onClick={() => setRescheduling(true)}>
+            Reschedule
+          </Button>
+          {!commenting && o.commentCount === 0 && (
+            <Button variant="text" onClick={() => setCommenting(true)}>
+              Add a word
+            </Button>
+          )}
+        </div>
+      )}
+      {!(o.status === "pending" || (isDom && o.status === "submitted") || (o.status === "missed" && isDom && !mine && !readOnly)) && !commenting && o.commentCount === 0 && !readOnly && (
         <Button variant="text" className="relative z-10 self-start" onClick={() => setCommenting(true)}>
           Add a word
         </Button>

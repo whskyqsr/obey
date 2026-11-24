@@ -87,7 +87,8 @@ fun RescheduleSheet(
     var scope by rememberSaveable { mutableStateOf(RescheduleScope.This) }
     var reason by rememberSaveable { mutableStateOf("") }
     var picking by remember { mutableStateOf(false) }
-    val current = parseInstant(occurrence.dueAt).local()
+    // A missed or overdue task gets its time from now, so the new deadline is never already past.
+    val current = maxOf(parseInstant(occurrence.dueAt), Instant.now()).local()
 
     val isDom = session?.canManage == true
     val policy = session?.relationship?.reschedulePolicy

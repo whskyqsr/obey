@@ -47,6 +47,8 @@ Once Jake decides how something looks or behaves, apply it everywhere the same s
 - Create buttons read "+ New" (from Rules/Protocols, 2026-11-23).
 - No explainers under names or settings (2026-11-23).
 - Write for people who already know their dynamic: everyone who sees a screen is a partner who knows whose plans, tasks and notes are whose, so don't spell out what they already know (2026-11-24).
+- Name a person once per page. If the header says whose task or item it is, rows and status lines below don't name them again ("missed", not "Kitten missed") (task page, 2026-11-24).
+- Status lines lead with the diamond for their state, as in the mockups (task page, 2026-11-24).
 - Form fields are label-above Letters fields with one hairline (2026-11-23).
 - Deleting an item returns to its list, never back through history to wherever it was opened from (Notes, 2026-11-23).
 - The overflow menu is a horizontal ⋯, as in every mockup (2026-11-24).

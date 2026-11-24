@@ -12,11 +12,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -123,7 +121,7 @@ fun CommentsSheet(occurrence: Occurrence, onDismiss: () -> Unit, onChanged: () -
             val list = comments
             when {
                 list == null -> Text("Loading…", color = colors.onSurfaceVariant)
-                list.isEmpty() -> Text("No comments yet. Ask a question or say why it was late.", color = colors.onSurfaceVariant)
+                list.isEmpty() -> {}
                 else -> LazyColumn(Modifier.heightIn(max = 420.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(list, key = { it.id }) { c ->
                         CommentRow(c, author = if (c.authorId == me) "You" else session?.nameOf(c.authorId) ?: "Someone", onDelete = { vm.delete(c, onChanged) }.takeIf { c.authorId == me && !readOnly }, busy = busy)
@@ -152,7 +150,7 @@ private fun CommentRow(c: Comment, author: String, onDelete: (() -> Unit)?, busy
 
 @Composable
 private fun CommentComposer(text: String, onText: (String) -> Unit, enabled: Boolean, onSend: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         LettersField(
             value = text,
             onValueChange = { if (it.length <= 2000) onText(it) },
@@ -160,9 +158,8 @@ private fun CommentComposer(text: String, onText: (String) -> Unit, enabled: Boo
             modifier = Modifier.weight(1f),
             maxLines = 5,
         )
-        FilledIconButton(onClick = onSend, enabled = text.isNotBlank() && enabled) {
-            Icon(Icons.AutoMirrored.Outlined.Send, "Send comment")
-        }
+        // A word in the accent, like every other text action: no filled circle.
+        androidx.compose.material3.TextButton(onClick = onSend, enabled = text.isNotBlank() && enabled) { Text("Send") }
     }
 }
 

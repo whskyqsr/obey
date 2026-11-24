@@ -59,6 +59,8 @@ data class OccurrenceActions(
     val onConfirmMiss: (() -> Unit)? = null,
     /** Keep the miss but drop the consequence it handed out (only when one is still to be done). */
     val onDropConsequence: (() -> Unit)? = null,
+    /** A Dominant excusing a miss from the ⋯ menu; with it, Reschedule shows for the miss too. */
+    val onExcuseInMenu: (() -> Unit)? = null,
     /** Opens the comments on this due date. */
     val onComments: (() -> Unit)? = null,
     /** A count task: a tap adds one; holding opens the dialog to change the count. */
@@ -180,12 +182,20 @@ fun OccurrenceRow(
                     actions.onReject?.let { IconButton(onClick = it) { Icon(Icons.AutoMirrored.Outlined.Undo, "Send back") } }
                     actions.onApprove?.let { IconButton(onClick = it) { Icon(Icons.Outlined.TaskAlt, "Approve") } }
                 }
-            } else if (listOf(actions.onCompleteWithNote, actions.onReschedule, actions.onEditTask, actions.onComments).any { it != null }) {
+            } else if (listOf(actions.onCompleteWithNote, actions.onReschedule, actions.onEditTask, actions.onComments, actions.onExcuseInMenu).any { it != null }) {
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreHoriz, "More") }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        if (occurrence.status == OccurrenceStatus.Pending) {
-                            if (occurrence.isOpen() && !occurrence.isRitual && !occurrence.isCounted && !occurrence.isPlaced) actions.onCompleteWithNote?.let {
+                        val missed = occurrence.status == OccurrenceStatus.Missed && actions.onExcuseInMenu != null
+                        if (missed) actions.onExcuseInMenu?.let {
+                            DropdownMenuItem(
+                                text = { Text("Excuse") },
+                                leadingIcon = { Icon(Icons.Outlined.RemoveCircleOutline, null) },
+                                onClick = { menu = false; it() },
+                            )
+                        }
+                        if (occurrence.status == OccurrenceStatus.Pending || missed) {
+                            if (occurrence.status == OccurrenceStatus.Pending && occurrence.isOpen() && !occurrence.isRitual && !occurrence.isCounted && !occurrence.isPlaced) actions.onCompleteWithNote?.let {
                                 DropdownMenuItem(
                                     text = { Text("Done, with a note") },
                                     leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Notes, null) },
