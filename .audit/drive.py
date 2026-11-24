@@ -71,42 +71,22 @@ def run(who, uid):
     for _ in range(3):
         if find("Today"): break
         time.sleep(3)
-    shot(f"{who}-today"); scroll(); shot(f"{who}-today-2"); scroll(); shot(f"{who}-today-3")
-    tap("Today")
-    if tap("New", desc=True): shot(f"{who}-plus")
-    if tap("Plan", wait=3):
-        shot(f"{who}-plan-editor-empty")
-        adb("shell", "input", "text", "dinner%swith%sfriends"); time.sleep(1.5)
-        shot(f"{who}-plan-editor")
-    home()
-    tap("Week"); shot(f"{who}-week")
-    for d in range(7):
-        if tap(str(__import__("datetime").date.today().day + d - 1), wait=1.5): pass
-    shot(f"{who}-week-open")
-    if tap("Off work", exact=False, wait=3): shot(f"{who}-plan-open")
     if who == "sub":
-        home(); tap("Week")
-        for _ in range(3):
-            if find("Dinner with Jess", exact=False): break
+        tap("Today")
+        if tap("New", desc=True) and tap("Plan", wait=3):
+            adb("shell", "input", "text", "the%sgym"); time.sleep(1)
+            if tap("Repeats", wait=2): shot("sub-repeat-dialog"); tap("Done", wait=1.5)
+            tap("Pause tasks during it", wait=1)
+            shot("sub-plan-editor-repeat")
+            tap("Save and ask", exact=False, wait=4)
+            shot("sub-after-save")
+    else:
+        tap("Today")
+        for i in range(6):
+            if find("asks to pause tasks", exact=False): break
             scroll()
-        if tap("Dinner with Jess", exact=False, wait=3): shot("sub-clash")
-    home(); tap("Week")
-    if tap("Show the month", desc=True): shot(f"{who}-month")
-    home(); tap("Us"); shot(f"{who}-us")
-    tap("Us")
-    if not find("Chastity"): scroll()
-    if tap("Chastity", wait=3):
-        shot(f"{who}-chastity"); scroll(); shot(f"{who}-chastity-2")
-        if who == "dom" and tap("Lock", exact=False, wait=2): shot("dom-lock-sheet")
-    home(); tap("Us")
-    if tap("Settings", desc=True, wait=3):
-        shot(f"{who}-settings")
-        if tap("Privacy", wait=3): shot(f"{who}-privacy"); scroll(); shot(f"{who}-privacy-2")
-    if who == "sub":
-        home()
-        if tap("Safe word", desc=True, wait=3):
-            shot("sub-safecall")
-            if tap("Red", wait=3): shot("sub-safered"); tap("I'm okay now", wait=2)
+        shot("dom-today-pauseask")
+        if tap("asks to pause tasks", exact=False, wait=2): shot("dom-pauseask-open")
 import traceback
 for who, uid in [("sub", "22222222-2222-4222-8222-222222222222"), ("dom", "11111111-1111-4111-8111-111111111111")]:
     try: run(who, uid)
