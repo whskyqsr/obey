@@ -59,7 +59,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedCard
 import app.obey.ui.common.LettersField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -394,6 +393,7 @@ fun KitsScreen(
                         item(key = "mine") { SectionLabel("Yours") }
                         items(own, key = { it.id }) { k -> KitCard(Icons.Outlined.Widgets, k.title, k.description, k.items, k.shareCode != null) { onOpenKit(k.id) } }
                     }
+                    item(key = "add") { AddByCodeRow(onOpenShared) }
                 }
             }
         }
@@ -405,6 +405,41 @@ fun KitsScreen(
         }
     }
     if (adding) AddByCodeDialog(onDismiss = { adding = false }, onOpen = { adding = false; onOpenShared(it) })
+}
+
+/** Under the lists (mockup 84): paste a shared kit's link or code and open it. */
+@Composable
+private fun AddByCodeRow(onOpen: (String) -> Unit) {
+    var text by rememberSaveable { mutableStateOf("") }
+    val code = shareCodeFrom(text)
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        color = colors.surfaceContainerLowest,
+        border = androidx.compose.foundation.BorderStroke(1.dp, colors.outlineVariant),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp).fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Link, null, tint = colors.onSurfaceVariant)
+            Spacer(Modifier.width(12.dp))
+            androidx.compose.foundation.text.BasicTextField(
+                value = text,
+                onValueChange = { text = it.take(200) },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.onSurface),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(colors.onSurface),
+                modifier = Modifier.weight(1f),
+                decorationBox = { inner ->
+                    Box {
+                        if (text.isEmpty()) Text("Add from a link or code", style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant)
+                        inner()
+                    }
+                },
+            )
+            Spacer(Modifier.width(8.dp))
+            OutlinedButton(enabled = code != null, onClick = { code?.let(onOpen) }) { Text("Add") }
+        }
+    }
 }
 
 @Composable
@@ -618,7 +653,13 @@ private fun ShareSheet(kit: Kit, busy: Boolean, onShare: (Boolean) -> Unit, onDi
                 }
             } else {
                 val link = kitLink(code)
-                OutlinedCard(onClick = { clipboard.setText(AnnotatedString(link)) }, modifier = Modifier.fillMaxWidth()) {
+                Surface(
+                    onClick = { clipboard.setText(AnnotatedString(link)) },
+                    color = colors.surfaceContainerLowest,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, colors.outlineVariant),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
                     Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(link.removePrefix("https://"), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                         Icon(Icons.Outlined.ContentCopy, "Copy link", tint = colors.primary)
@@ -866,7 +907,12 @@ fun SharedKitScreen(code: String, onBack: () -> Unit, onAdded: (ApplyKitResult) 
 @Composable
 fun KitPrompt(onBrowse: () -> Unit, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
-    OutlinedCard(modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth()) {
+    Surface(
+        color = colors.surfaceContainerLowest,
+        border = androidx.compose.foundation.BorderStroke(1.dp, colors.outlineVariant),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
+    ) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.Widgets, null, tint = colors.primary)
             Spacer(Modifier.width(16.dp))
