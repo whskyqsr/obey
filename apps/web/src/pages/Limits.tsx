@@ -203,9 +203,14 @@ function Rows({ rows, names, onOpen }: { rows: LimitRow[]; names: string[]; onOp
     <div className="flex flex-col gap-6">
       {[...groups.entries()].map(([category, items]) => (
         <section key={category}>
-          <div className="flex items-baseline text-body-medium text-on-surface-variant">
+          <div className="flex items-baseline gap-3 text-body-medium text-on-surface-variant">
             <h2 className="min-w-0 flex-1">{category}</h2>
-            <span>{names.join(" · ")}</span>
+            {/* Each name sits centred over its column of diamonds. */}
+            {names.map((n) => (
+              <span key={n} className="flex w-10 justify-center whitespace-nowrap">
+                {n}
+              </span>
+            ))}
           </div>
           <div className="divide-y divide-outline-variant border-b border-outline-variant">
             {items.map((r) => (
