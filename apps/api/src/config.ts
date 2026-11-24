@@ -27,4 +27,6 @@ export const config = {
   esriApiKey: process.env.ESRI_API_KEY,
   mailFrom: env("MAIL_FROM", "Fealty <hello@fealty.me>"),
   appUrl: env("APP_URL", "http://localhost:5173"),
+  /** This API's public address, for OAuth and MCP metadata; worked out from each request when unset. */
+  apiUrl: process.env.API_URL,
 };
