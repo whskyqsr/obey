@@ -136,21 +136,20 @@ fun RulesScreen(onOpenSettings: () -> Unit, onOpenProtocol: (String) -> Unit, on
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                navigationIcon = { MenuButton() },
-                title = {},
-                actions = {
-                    IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.AssignmentLate, "Broken rules") }
-                    if (canManage) IconButton(onClick = { editing = Editing(null) }) { Icon(Icons.Outlined.Add, "New rule") }
-                    SafeWordAction()
-                },
-            )
+            val count = (state as? Load.Ready)?.value?.size
+            app.obey.ui.common.PageHeader(
+                "Rules",
+                sub = count?.let { "$it rule${if (it == 1) "" else "s"}" },
+                tabs = onProtocols?.let { go -> { app.obey.ui.common.PillToggle(listOf("Rules", "Protocols"), 0) { go() } } },
+            ) {
+                IconButton(onClick = onOpenLog) { Icon(Icons.Outlined.AssignmentLate, "Broken rules") }
+                if (canManage) IconButton(onClick = { editing = Editing(null) }) { Icon(Icons.Outlined.Add, "New rule") }
+            }
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
       Column(Modifier.padding(padding).fillMaxSize()) {
         // Protocols are a tab inside Rules.
-        app.obey.ui.common.TitleWithToggle("Rules", listOf("Rules", "Protocols"), 0, { onProtocols?.invoke() }, showToggle = onProtocols != null)
         when (val s = state) {
             Load.Loading -> LoadingBox()
             is Load.Failed -> ErrorBox(s.message, vm::refresh)

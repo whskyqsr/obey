@@ -99,13 +99,6 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
         <div className="xl:flex xl:items-start">
           <div className="min-w-0 flex-1 xl:mx-auto xl:max-w-4xl">
             <PageHeader
-              actions={
-                wide && isDom ? (
-                  <Button variant="tonal" icon="add" onClick={newTask}>
-                    New
-                  </Button>
-                ) : undefined
-              }
               hero
               title={isDom && !solo ? `Good ${part === "night" ? "evening" : part}${name ? `, ${name}` : ""}.` : `${weekday} ${part}.`}
               subtitle={summary}
@@ -187,7 +180,7 @@ export function TodayPage({ selected, renderTask }: { selected?: string; renderT
             {wide && occ.data && <ShortcutHints dom={isDom} />}
             <DayRescheduleSheet tasks={myOpenToday} open={daySheet} onClose={() => setDaySheet(false)} />
             {/* On phones the + in the tab bar starts a task. */}
-            {isDom && <Fab icon="add" label="New task" onClick={newTask} className="max-md:hidden xl:hidden" />}
+            {isDom && <Fab icon="add" label="New task" onClick={newTask} className="max-md:hidden" />}
           </div>
           {wide && (
             <aside

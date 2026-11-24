@@ -49,7 +49,7 @@ export function RulesPage() {
       <PageHeader
         title="Rules"
         subtitle={`${rules.length} rule${rules.length === 1 ? "" : "s"}`}
-        actions={<RulesTabs current="rules" />}
+        tabs={<RulesTabs current="rules" />}
         tools={<IconButton icon="assignment_late" label="Broken rules" onClick={() => void navigate({ to: "/rule-log" })} />}
       />
       {categories.length > 0 && (

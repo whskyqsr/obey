@@ -128,16 +128,10 @@ export function IconButton({
 }
 
 /** An overflow menu (⋮). Items close it when chosen. */
-export function OverflowMenu({
-  label = "More options",
-  icon = "more_horiz",
-  items,
-}: {
-  label?: string;
-  /** The trigger's icon, when the menu isn't just "more" (Location's pause). */
-  icon?: string;
-  items: { label: string; icon: string; onClick(): void; danger?: boolean }[];
-}) {
+type MenuItem = { label: string; icon: string; onClick(): void; danger?: boolean };
+
+/** A trigger with a small menu under it, closed by a tap outside or Escape. */
+function PopMenu({ items, trigger }: { items: MenuItem[]; trigger(open: boolean, toggle: () => void): ReactNode }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -154,7 +148,7 @@ export function OverflowMenu({
   }, [open]);
   return (
     <div ref={ref} className="relative">
-      <IconButton icon={icon} label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)} />
+      {trigger(open, () => setOpen((o) => !o))}
       {open && (
         <div
           role="menu"
@@ -178,6 +172,24 @@ export function OverflowMenu({
         </div>
       )}
     </div>
+  );
+}
+
+export function OverflowMenu({
+  label = "More options",
+  icon = "more_horiz",
+  items,
+}: {
+  label?: string;
+  /** The trigger's icon, when the menu isn't just "more" (Location's pause). */
+  icon?: string;
+  items: MenuItem[];
+}) {
+  return (
+    <PopMenu
+      items={items}
+      trigger={(open, toggle) => <IconButton icon={icon} label={label} aria-haspopup="menu" aria-expanded={open} onClick={toggle} />}
+    />
   );
 }
 
@@ -221,46 +233,56 @@ export function Fab({
   onClick,
   extended = true,
   className,
+  items,
 }: {
   icon: string;
   label: string;
-  onClick(): void;
+  onClick?(): void;
   extended?: boolean;
   className?: string;
+  /** When there's more than one kind of new thing (a task or a plan), + New opens a menu of them. */
+  items?: MenuItem[];
 }) {
   const slots = useHeaderSlots();
   // Every FAB starts something new, and nothing new goes into an ended dynamic.
   if (useReadOnly()) return null;
+  const go = onClick ?? (() => {});
   if (slots.narrow?.isConnected && slots.wide?.isConnected) {
+    const narrow = (open: boolean, toggle: () => void) => (
+      <IconButton
+        icon={icon === "edit" ? "add" : icon}
+        label={label}
+        aria-haspopup={items ? "menu" : undefined}
+        aria-expanded={items ? open : undefined}
+        onClick={items ? toggle : go}
+        className={cx("md:hidden", className)}
+      />
+    );
+    const wide = (open: boolean, toggle: () => void) => (
+      <button
+        type="button"
+        onClick={items ? toggle : go}
+        aria-label={label}
+        aria-haspopup={items ? "menu" : undefined}
+        aria-expanded={items ? open : undefined}
+        className={cx("state-layer inline-flex h-10 items-center gap-2 rounded-md border border-on-surface px-4 text-label-large text-on-surface", className)}
+      >
+        <Icon name="add" size={18} />
+        {/* Every page's button reads "New", so it never changes width between tabs (Jake). */}
+        New
+      </button>
+    );
     return (
       <>
-        {createPortal(
-          <IconButton icon={icon === "edit" ? "add" : icon} label={label} onClick={onClick} className={cx("md:hidden", className)} />,
-          slots.narrow,
-        )}
-        {createPortal(
-          <button
-            type="button"
-            onClick={onClick}
-            aria-label={label}
-            className={cx(
-              "state-layer inline-flex h-10 items-center gap-2 rounded-md border border-on-surface px-4 text-label-large text-on-surface",
-              className,
-            )}
-          >
-            <Icon name="add" size={18} />
-            {/* "New rule" and "New protocol" share one header; a plain "New" keeps it from changing width between tabs. */}
-            {label.startsWith("New ") ? "New" : label}
-          </button>,
-          slots.wide,
-        )}
+        {createPortal(items ? <PopMenu items={items} trigger={narrow} /> : narrow(false, go), slots.narrow)}
+        {createPortal(items ? <PopMenu items={items} trigger={wide} /> : wide(false, go), slots.wide)}
       </>
     );
   }
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={go}
       aria-label={label}
       className={cx(
         "state-layer fixed right-4 bottom-[calc(84px+env(safe-area-inset-bottom))] in-data-nobar:bottom-[calc(16px+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-3 rounded-full bg-on-surface text-surface shadow-elev-2 md:right-8 md:bottom-8",
@@ -693,7 +715,6 @@ export const useSnackbar = () => useContext(SnackContext);
 
 // ---------- Page scaffolding
 
-/** A secondary page's header: back, then the title, with optional actions at the end. Main pages use PageHeader. */
 /** A text link back to where you came from, as in the mockups: "‹ Us". */
 export function BackLink({ label, onClick }: { label: string; onClick(): void }) {
   return (
@@ -719,7 +740,7 @@ export function SubHeader({ title, onBack, back = "Back", actions }: { title: Re
         <HeaderSlot />
       </div>
       <div className="mt-2 flex items-end gap-2">
-        <h1 className="min-w-0 flex-1 text-display-small text-on-surface md:text-display-medium">{title}</h1>
+        <h1 className="min-w-0 flex-1 text-display-small text-on-surface md:text-[52px] md:leading-[1.05]">{title}</h1>
         <HeaderSlot wide />
       </div>
     </header>
@@ -738,6 +759,7 @@ export function PageHeader({
   tools,
   hero,
   eyebrow,
+  tabs,
 }: {
   /** Today's greeting: the large serif line from the mockups. */
   hero?: boolean;
@@ -747,6 +769,8 @@ export function PageHeader({
   subtitle?: ReactNode;
   actions?: ReactNode;
   tools?: ReactNode;
+  /** The page's tabs (Rules | Protocols, Notes | Journal): under the title, left-aligned. */
+  tabs?: ReactNode;
 }) {
   const menu = useMenu();
   const navigate = useNavigate();
@@ -765,7 +789,8 @@ export function PageHeader({
     <>
       {menu?.banner}
       <header className="px-4 pt-3 pb-4 md:px-6 md:pt-6">
-        <div className={cx("-mx-2 flex min-h-10 items-center gap-1", !tools && !hand && "md:hidden")}>
+        {/* Always drawn, even empty, so every title sits at the same height whether or not the page has icons (Jake). */}
+        <div className="-mx-2 flex min-h-10 items-center gap-1">
           <div className="min-w-0 flex-1 md:hidden">
             {menu?.lead === "switcher" && <DynamicSwitcher chip />}
             {menu?.lead === "back" && <BackLink label={menu.back?.label ?? "Us"} onClick={menu.back?.go ?? (() => void navigate({ to: "/us" }))} />}
@@ -775,35 +800,37 @@ export function PageHeader({
           <HeaderSlot />
           {hand}
         </div>
-        <div className="mt-2 flex items-end gap-2 md:mt-0">
-          <div className="min-w-0 flex-1">
-            {eyebrow && <div className="eyebrow mb-1">{eyebrow}</div>}
-            <h1
-              className={
-                hero
-                  ? "mt-4 font-serif text-[52px] leading-[1.05] tracking-[-0.01em] text-on-surface"
-                  : "text-display-small text-on-surface md:text-display-medium"
-              }
-            >
-              {title}
-            </h1>
-            {subtitle && <p className={hero ? "mt-3 text-body-large text-on-surface-variant" : "mt-1 text-body-medium text-on-surface-variant"}>{subtitle}</p>}
-          </div>
+        {eyebrow && <div className="eyebrow mt-2 mb-1 md:mt-0">{eyebrow}</div>}
+        {/* The New button lines up with the title, whatever sits under it. */}
+        <div className={cx("flex gap-2", hero ? "items-end" : "items-center", !eyebrow && "mt-2 md:mt-0")}>
+          <h1
+            className={cx(
+              "min-w-0 flex-1",
+              hero ? "mt-4 font-serif text-[52px] leading-[1.05] tracking-[-0.01em] text-on-surface" : "text-display-small text-on-surface md:text-[52px] md:leading-[1.05]",
+            )}
+          >
+            {title}
+          </h1>
           {actions && <div className="flex items-center gap-1">{actions}</div>}
           <HeaderSlot wide />
         </div>
+        {subtitle && <p className={hero ? "mt-3 text-body-large text-on-surface-variant" : "mt-1 text-body-medium text-on-surface-variant"}>{subtitle}</p>}
+        {tabs && <div className="mt-4 flex">{tabs}</div>}
       </header>
     </>
   );
 }
 
-export function Section({ title, children, action }: { title: ReactNode; children: ReactNode; action?: ReactNode }) {
+/** A group on a page. A page with one group leaves out its title: the page heading already names it. */
+export function Section({ title, children, action }: { title?: ReactNode; children: ReactNode; action?: ReactNode }) {
   return (
     <section className="px-4 pb-6 md:px-6">
-      <div className="mb-2 flex items-center gap-2">
-        <h2 className="eyebrow flex-1">{title}</h2>
-        {action}
-      </div>
+      {(title || action) && (
+        <div className="mb-2 flex items-center gap-2">
+          <h2 className="eyebrow flex-1">{title}</h2>
+          {action}
+        </div>
+      )}
       {children}
     </section>
   );

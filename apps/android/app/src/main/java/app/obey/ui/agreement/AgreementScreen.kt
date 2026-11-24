@@ -363,27 +363,21 @@ private fun AgreementContent(onOpenSettings: () -> Unit, onOpenNote: (String) ->
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
-                title = {
-                    Column {
-                        Text(title)
-                        subtitle?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    }
-                },
-                navigationIcon = {
+            app.obey.ui.common.PageHeader(
+                title,
+                sub = subtitle,
+                navigation = {
                     if (version != null || shown != "main") {
                         BackLink(if (version != null) "Versions" else "Agreement") { if (version != null) { vm.closeVersion() } else { page = "main" } }
                     } else {
                         MenuButton()
                     }
                 },
-                actions = {
-                    if (version == null && shown == "main" && (a?.current != null || a?.proposal != null)) {
-                        IconButton(onClick = { page = "versions" }) { Icon(Icons.Outlined.History, "Versions") }
-                    }
-                    SafeWordAction()
-                },
-            )
+            ) {
+                if (version == null && shown == "main" && (a?.current != null || a?.proposal != null)) {
+                    IconButton(onClick = { page = "versions" }) { Icon(Icons.Outlined.History, "Versions") }
+                }
+            }
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->

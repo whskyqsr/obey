@@ -79,6 +79,8 @@ fun NotesScreen(
     onOpen: (String) -> Unit,
     onNew: () -> Unit,
     onOpenSettings: () -> Unit,
+    /** Notes | Journal: goes to the other list; null when the journal is switched off. */
+    onSwitch: (() -> Unit)? = null,
     vm: NotesViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -98,18 +100,17 @@ fun NotesScreen(
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
-                navigationIcon = { MenuButton() },
-                title = { Text(if (journal) "Journal" else "Notes") },
-                actions = {
-                    IconButton(onClick = { searching = !searching; if (!searching) query = "" }) { Icon(Icons.Outlined.Search, "Search") }
-                    if (journal) IconButton(onClick = { chart = !chart }) {
-                        Icon(Icons.AutoMirrored.Outlined.ShowChart, if (chart) "Hide the mood chart" else "Show the mood chart")
-                    }
-                    if (vm.canWrite(journal)) IconButton(onClick = onNew) { Icon(Icons.Outlined.Add, "Write") }
-                    SafeWordAction()
-                },
-            )
+            // Notes and the journal are one page with two tabs, under one header (DESIGN.md, "Page headers").
+            app.obey.ui.common.PageHeader(
+                if (journal) "Journal" else "Notes",
+                tabs = onSwitch?.let { go -> { app.obey.ui.common.PillToggle(listOf("Notes", "Journal"), if (journal) 1 else 0) { go() } } },
+            ) {
+                IconButton(onClick = { searching = !searching; if (!searching) query = "" }) { Icon(Icons.Outlined.Search, "Search") }
+                if (journal) IconButton(onClick = { chart = !chart }) {
+                    Icon(Icons.AutoMirrored.Outlined.ShowChart, if (chart) "Hide the mood chart" else "Show the mood chart")
+                }
+                if (vm.canWrite(journal)) IconButton(onClick = onNew) { Icon(Icons.Outlined.Add, if (journal) "New entry" else "New note") }
+            }
         },
         snackbarHost = { SnackbarHost(snackbar) },
         // Tonight's entry starts from a bar above the tabs, as in the mockup.
@@ -190,7 +191,7 @@ fun NotesScreen(
                                 onOpen = { onOpen(n.id) },
                             )
                         }
-                        if (journal && shown.isNotEmpty()) item(key = "top") { androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant) }
+                        if (shown.isNotEmpty()) item(key = "top") { androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant) }
                         if (journal) items(shown, key = { it.id }) { n ->
                             JournalEntryRow(
                                 n,
@@ -236,66 +237,41 @@ private fun NoteRow(note: Note, author: String?, subName: String?, onOpen: () ->
     }
 }
 
-/** Letters: a journal entry on a hairline, "MONDAY, NOV 23 · FEELING GOOD" over the first lines in the serif. */
+/** A journal entry on a hairline, like a note: "Tue, Nov 24 · good · Jake replied" over its first lines in the serif. */
 @Composable
 private fun JournalEntryRow(note: Note, author: String?, reply: Pair<app.obey.api.NoteComment, String>?, onOpen: () -> Unit) {
     val c = MaterialTheme.colorScheme
     Column(Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
-        Column(Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (note.visibility == NoteVisibility.Private) Icon(Icons.Outlined.Lock, "Private", Modifier.padding(end = 4.dp).size(14.dp), tint = c.onSurfaceVariant)
-                Text(
-                    listOfNotNull(
-                        journalDay(note.createdAt),
-                        note.mood?.let { m -> moods.firstOrNull { it.first == m }?.second?.let { "feeling ${it.lowercase()}" } },
-                        author,
-                    ).joinToString(" · ").uppercase(),
-                    style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.5.sp),
-                    color = c.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (note.title.isNotBlank() && note.title != "Untitled") Text(note.title, style = MaterialTheme.typography.titleMedium)
-            if (note.bodyMd.isNotBlank()) Text(
-                journalExcerpt(note.bodyMd),
-                style = MaterialTheme.typography.titleLarge.copy(fontSize = 23.sp, lineHeight = 31.sp),
-                maxLines = 4,
+        Column(Modifier.padding(vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                listOfNotNull(
+                    journalDay(note.createdAt),
+                    note.mood?.let { m -> moods.firstOrNull { it.first == m }?.second?.lowercase() },
+                    author,
+                    if (note.visibility == NoteVisibility.Private) "Private" else null,
+                    reply?.second?.takeIf { it.isNotBlank() }?.let { "$it replied" },
+                ).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = c.onSurfaceVariant,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (note.tags.isNotEmpty()) Text(note.tags.joinToString(" ") { "#$it" }, style = MaterialTheme.typography.labelMedium, color = c.onSurfaceVariant)
-            reply?.let { (r, name) -> ReplyQuote(r, name) }
+            Text(
+                journalExcerpt(note.bodyMd).ifBlank { note.title.ifBlank { "Untitled" } },
+                style = MaterialTheme.typography.titleLarge.copy(fontSize = 21.sp, lineHeight = 28.sp),
+                color = c.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         androidx.compose.material3.HorizontalDivider(color = c.outlineVariant)
     }
 }
 
-/** The partner's reply quoted under the entry: an accent rule, the words in serif italic, then who and when. */
-@Composable
-private fun ReplyQuote(reply: app.obey.api.NoteComment, name: String) {
-    val c = MaterialTheme.colorScheme
-    Row(Modifier.padding(start = 24.dp, top = 8.dp).height(IntrinsicSize.Min)) {
-        Box(Modifier.width(2.dp).fillMaxHeight().background(c.primary))
-        Column(Modifier.padding(start = 18.dp)) {
-            Text(
-                "\u201C${journalExcerpt(reply.body).take(220)}\u201D",
-                style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 28.sp, fontStyle = FontStyle.Italic),
-            )
-            Text(
-                listOf(name, java.time.OffsetDateTime.parse(reply.createdAt).atZoneSameInstant(java.time.ZoneId.systemDefault())
-                    .format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))).filter { it.isNotBlank() }.joinToString(" · "),
-                style = MaterialTheme.typography.bodySmall,
-                color = c.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
-            )
-        }
-    }
-}
-
-/** "Monday, Nov 23" in the reader's time zone. */
+/** "Tue, Nov 24" in the reader's time zone. */
 private fun journalDay(iso: String): String =
     java.time.OffsetDateTime.parse(iso).atZoneSameInstant(java.time.ZoneId.systemDefault())
-        .format(java.time.format.DateTimeFormatter.ofPattern("EEEE, MMM d"))
+        .format(java.time.format.DateTimeFormatter.ofPattern("EEE, MMM d"))
 
 /** The entry as plain sentences: markdown marks and checklist boxes dropped, lines joined. */
 private fun journalExcerpt(md: String): String = md.lineSequence()
