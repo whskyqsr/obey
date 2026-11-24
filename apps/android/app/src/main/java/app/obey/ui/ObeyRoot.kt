@@ -502,6 +502,7 @@ private fun ObeyNavHost(nav: NavHostController, usItems: List<UsItem>, switcher:
                 onOpenRules = { nav.navigate(RulesRoute) },
                 onOpenProtocol = { nav.navigate(ProtocolEditorRoute(protocolId = it)) },
                 onOpenScene = { nav.navigate(SceneRoute(it)) },
+                onOpenChastity = { nav.navigate(ChastityRoute) },
             )
         }
         composable<UpcomingRoute> {

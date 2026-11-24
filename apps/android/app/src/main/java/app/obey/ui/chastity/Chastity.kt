@@ -1,5 +1,13 @@
 package app.obey.ui.chastity
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.sp
+import app.obey.ui.common.Eyebrow
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -188,49 +196,69 @@ private fun rememberNow(): Long {
     return now
 }
 
-private data class Lines(val big: String, val small: String, val frac: Float?, val onBreak: Boolean)
+private data class Lines(val big: String, val small: String)
 
 private const val MIN = 60_000L
-private const val DAY = 1440 * MIN
 
-/** What a lock card says: time left (or locked for, when open-ended or hidden), and the end. */
-private fun lockLines(l: ChastityLock, now: Long): Lines {
+/** "3d 4h", "5h 20m", "12m": the big serif clock. */
+fun fmtClock(ms: Long): String {
+    val m = maxOf(0L, Math.round(ms / 60_000.0))
+    val d = m / 1440
+    val h = (m % 1440) / 60
+    return when {
+        d > 0 -> "${d}d ${h}h"
+        h > 0 -> "${h}h ${m % 60}m"
+        else -> "${m % 60}m"
+    }
+}
+
+/** "Thu 1:00 AM" */
+fun fmtWhen(iso: String) = zoned(iso).let { "${it.format(DateTimeFormatter.ofPattern("EEE"))} ${it.format(timeFmt)}" }
+
+/** The big clock and the line under it: time left, or time locked so far when there's no end the viewer can see. */
+private fun lockLines(l: ChastityLock, now: Long, wearer: String): Lines {
     val started = l.startedAt?.let { parseInstant(it).toEpochMilli() } ?: now
-    val day = (now - started) / DAY + 1
     if (l.status == "break" && l.breakEndsAt != null) {
         val left = parseInstant(l.breakEndsAt).toEpochMilli() - now
-        return if (left > 0) Lines("Break: ${fmtSpan(left / MIN)} left", "Relock by ${clock(l.breakEndsAt)}", null, true)
-        else Lines("Break is over", "It was due back at ${clock(l.breakEndsAt)}", null, true)
+        return if (left > 0) Lines(fmtClock(left), "hygiene break · relock by ${clock(l.breakEndsAt)}")
+        else Lines("Relock", "the break ended at ${clock(l.breakEndsAt)}")
     }
     if (l.endsAt != null) {
-        val end = parseInstant(l.endsAt).toEpochMilli()
-        val total = maxOf(end - started, MIN)
-        val days = maxOf(day, (total + DAY - 1) / DAY)
-        return Lines("${fmtSpan((end - now) / MIN)} left", "Until ${fmtLockTime(l.endsAt)} · day $day of $days", ((now - started).toFloat() / total).coerceIn(0f, 1f), false)
+        return Lines(fmtClock(parseInstant(l.endsAt).toEpochMilli() - now), "until ${fmtWhen(l.endsAt)}" + if (l.hideTime) " · hidden from $wearer" else "")
     }
-    return Lines("Locked ${fmtSpan((now - started) / MIN)}", if (l.timeHidden) "The time left is hidden" else "Until released", null, false)
+    return Lines(fmtClock(now - started), if (l.timeHidden) "locked so far · the time left is hidden" else "locked so far · until released")
+}
+
+/** What the page header says about a lock: an eyebrow for the wearer, a line for everyone else. */
+fun lockHeading(l: ChastityLock, me: String, nameOf: (String) -> String): Pair<String?, String?> {
+    if (l.wearerId == me) return (l.startedAt?.let { "Locked since ${fmtWhen(it)}" + if (l.keyMode == "keybox") " · keybox" else "" }) to null
+    val state = when (l.status) { "break" -> "is on a hygiene break"; "pending" -> "has been asked to lock"; else -> "is locked" }
+    val key = if (l.keyholderId == me) (if (l.keyMode == "keybox") " · you hold the keybox code" else " · you hold the key") else ""
+    return null to "${nameOf(l.wearerId)} $state$key."
+}
+
+/** The outlined button in ink, the second action beside the filled one. */
+@Composable
+fun InkOutlinedButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+    val c = MaterialTheme.colorScheme
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        shape = MaterialTheme.shapes.small,
+        colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = c.onSurface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (enabled) c.onSurface else c.outlineVariant),
+        content = content,
+    )
 }
 
 @Composable
-private fun Ring(frac: Float?, onBreak: Boolean) {
+private fun LockClock(l: ChastityLock, wearer: String, page: Boolean) {
+    val t = lockLines(l, rememberNow(), wearer)
     val c = MaterialTheme.colorScheme
-    Box(Modifier.size(72.dp), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(progress = { frac ?: 0f }, modifier = Modifier.size(72.dp), strokeWidth = 6.dp, trackColor = c.outlineVariant, gapSize = 0.dp)
-        Icon(if (onBreak) Icons.Filled.Shower else Icons.Filled.Lock, null, tint = c.primary)
-    }
-}
-
-@Composable
-private fun LockSummary(l: ChastityLock, who: String) {
-    val t = lockLines(l, rememberNow())
-    val c = MaterialTheme.colorScheme
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Ring(t.frac, t.onBreak)
-        Column(Modifier.weight(1f)) {
-            Text(who, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
-            Text(t.big, style = MaterialTheme.typography.titleLarge)
-            Text(t.small, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
-        }
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = if (page) Alignment.CenterHorizontally else Alignment.Start) {
+        Text(t.big, style = MaterialTheme.typography.displayLarge.copy(fontSize = if (page) 88.sp else 44.sp, lineHeight = if (page) 92.sp else 48.sp), color = c.onSurface)
+        Text(t.small, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
     }
 }
 
@@ -247,9 +275,9 @@ private fun KeyboxPicker(photo: Uri?, onPhoto: (Uri) -> Unit) {
         camera.launch(uri)
     }
     if (photo == null) {
-        TonalButton(onClick = { take() }, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Outlined.AddAPhoto, null)
-            Text("Photograph the keybox code", Modifier.padding(start = 8.dp))
+        Button(onClick = { take() }) {
+            Icon(Icons.Outlined.PhotoCamera, null, Modifier.size(18.dp))
+            Text("Take the photo", Modifier.padding(start = 8.dp))
         }
     } else {
         val bitmap by produceState<ImageBitmap?>(null, photo) {
@@ -257,64 +285,69 @@ private fun KeyboxPicker(photo: Uri?, onPhoto: (Uri) -> Unit) {
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             bitmap?.let { Image(it, null, Modifier.size(64.dp).blur(16.dp), contentScale = ContentScale.Crop) }
-            Text("Photo taken. It stays hidden from you.", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-            TextButton(onClick = { take() }) { Text("Retake") }
+            Text("Sealed. It stays hidden from you.", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            InkOutlinedButton(onClick = { take() }) { Text("Retake") }
         }
     }
 }
 
-/** The wearer locking up, or relocking after a break. */
+/** A bordered prompt on paper, such as an ask to answer or a keybox step. */
+@Composable
+private fun LockBox(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    val c = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(8.dp)
+    Column(
+        Modifier.fillMaxWidth().clip(shape).border(1.dp, c.outlineVariant, shape).background(c.surfaceContainerLowest).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        content = content,
+    )
+}
+
+/** The wearer locking up, or relocking after a break: the keybox steps (mockup 96), then "I'm locked". */
 @Composable
 private fun LockUp(l: ChastityLock, keyholder: String, relock: Boolean, busy: Boolean, vm: ChastityViewModel) {
     var photo by remember { mutableStateOf<Uri?>(null) }
     val keybox = l.keyMode == "keybox"
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (keybox) {
-            Text(
-                "Scramble the keybox to a new code without looking, then photograph it. You won't see the code until you're released. $keyholder can see it any time, and a Red safe call shows it to you at once.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            KeyboxPicker(photo) { photo = it }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { vm.lockUp(l, photo, relock) }, enabled = !busy && (!keybox || photo != null)) {
-                Icon(Icons.Filled.Lock, null, Modifier.size(18.dp))
-                Text(if (relock) "I've relocked" else "I'm locked", Modifier.padding(start = 8.dp))
+            LockBox {
+                Eyebrow("Step 1")
+                Text("Scramble the keybox code without looking.", style = MaterialTheme.typography.bodyLarge)
             }
-            if (!relock) TextButton(onClick = { vm.end(l) }, enabled = !busy) { Text("Not now") }
+            LockBox {
+                Eyebrow("Step 2")
+                Text("Photograph the code. It's sealed straight away: only $keyholder can see it, until the lock ends or you call red.", style = MaterialTheme.typography.bodyLarge)
+                KeyboxPicker(photo) { photo = it }
+            }
+        }
+        Button(onClick = { vm.lockUp(l, photo, relock) }, enabled = !busy && (!keybox || photo != null), modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(48.dp)) {
+            Text(if (relock) "I've relocked" else "I'm locked")
+        }
+        if (!relock) {
+            TextButton(onClick = { vm.end(l) }, enabled = !busy, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                Text("Not now", color = MaterialTheme.colorScheme.onSurface)
+            }
         }
     }
 }
 
-@Composable
-private fun LockBox(container: Boolean = false, content: @Composable () -> Unit) {
-    val c = MaterialTheme.colorScheme
-    Surface(
-        color = androidx.compose.ui.graphics.Color.Transparent,
-        contentColor = c.onSurface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (container) c.primary else c.outlineVariant),
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { content() }
-    }
-}
-
-/** A pending ask, for the keyholder to answer. */
+/** A pending ask, for the keyholder to answer (mockup 78). */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AskToAnswer(e: ChastityEvent, l: ChastityLock, wearer: String, busy: Boolean, vm: ChastityViewModel) {
     var changing by remember { mutableStateOf(false) }
     var minutes by remember { mutableStateOf(e.minutes ?: 20) }
     val isBreak = e.kind == "break"
-    LockBox(container = true) {
-        Text(if (isBreak) "$wearer asked for a hygiene break" else "$wearer asked to be released", style = MaterialTheme.typography.titleMedium)
+    LockBox {
         Text(
-            if (isBreak) "${e.minutes} minutes, then they relock${if (l.keyMode == "keybox") " and seal a new code" else ""}. The lock's clock keeps running."
-            else "Releasing ends the lock now.",
-            style = MaterialTheme.typography.bodyMedium,
+            androidx.compose.ui.text.buildAnnotatedString {
+                append(if (isBreak) "$wearer asks for a " else "$wearer asks to be ")
+                withStyle(androidx.compose.ui.text.SpanStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)) { append(if (isBreak) "hygiene break" else "released") }
+                append(if (isBreak) ", ${e.minutes} minutes." else ".")
+            },
+            style = MaterialTheme.typography.bodyLarge,
         )
-        e.note?.let { Text("“$it”", style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic) }
+        e.note?.let { Text("“$it”", style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         if (changing) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(10, 15, 20, 30, 45).forEach { m -> ChoiceChip(selected = minutes == m, onClick = { minutes = m }, label = { Text("$m min") }) }
@@ -322,23 +355,25 @@ private fun AskToAnswer(e: ChastityEvent, l: ChastityLock, wearer: String, busy:
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (isBreak) {
-                val m = if (changing) minutes else e.minutes ?: 20
-                Button(onClick = { vm.decide(e, true, m) }, enabled = !busy) { Text("Allow $m min") }
-                if (!changing) OutlinedButton(onClick = { changing = true }) { Text("Change") }
+                Button(onClick = { vm.decide(e, true, if (changing) minutes else e.minutes ?: 20) }, enabled = !busy) { Text(if (changing) "Allow $minutes min" else "Allow") }
+                if (!changing) InkOutlinedButton(onClick = { changing = true }) { Text("Change") }
             } else {
                 Button(onClick = { vm.decide(e, true) }, enabled = !busy) { Text("Release") }
             }
-            TextButton(onClick = { vm.decide(e, false) }, enabled = !busy) { Text(if (isBreak) "Decline" else "Not yet") }
+            InkOutlinedButton(onClick = { vm.decide(e, false) }, enabled = !busy) { Text("Not now") }
         }
     }
 }
 
 private enum class LockDialog { Add, Remove, Photo, Release, Keybox, AskRelease, AskBreak }
 
-/** One lock, from the side of whoever is looking: the wearer's asks, or the keyholder's controls. */
+/**
+ * One lock, from the side of whoever is looking (mockups 27, 78, 96): the big clock, any ask to answer, the sealed
+ * keybox, and the wearer's asks or the keyholder's controls in outlined buttons over an ink Release.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun LockCard(l: ChastityLock, events: List<ChastityEvent>, session: Session, busy: Boolean, vm: ChastityViewModel) {
+fun LockCard(l: ChastityLock, events: List<ChastityEvent>, session: Session, busy: Boolean, vm: ChastityViewModel, page: Boolean = true) {
     val me = session.userId
     val readOnly = session.readOnly
     val wearer = l.wearerId == me
@@ -348,77 +383,80 @@ fun LockCard(l: ChastityLock, events: List<ChastityEvent>, session: Session, bus
     val asks = events.filter { it.lockId == l.id && it.status == "pending" && (it.kind == "break" || it.kind == "release_ask") }
     fun asked(kind: String) = asks.any { it.kind == kind }
     var dialog by remember { mutableStateOf<LockDialog?>(null) }
+    val c = MaterialTheme.colorScheme
 
     if (l.status == "pending") {
         if (wearer && !readOnly) {
-            LockBox(container = true) {
-                val length = l.minutes?.let { " for ${fmtMinutes(it)}" } ?: if (l.timeHidden) "" else " until they release you"
-                Text("$keyholderName wants you locked$length", style = MaterialTheme.typography.titleMedium)
-                if (l.keyMode == "keyholder") Text("$keyholderName keeps the key. Tap when you're locked.", style = MaterialTheme.typography.bodyMedium)
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("$keyholderName asked you to lock.", style = if (page) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.headlineMedium)
+                val length = l.minutes?.let { "For ${fmtMinutes(it)}" } ?: if (l.timeHidden) "For a time" else "Until released"
+                Text(
+                    length + (if (l.keyMode == "keybox") ", keybox." else ", $keyholderName keeps the key.") + if (l.timeHidden) " The time left will be hidden from you." else "",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = c.onSurfaceVariant,
+                )
                 LockUp(l, keyholderName, relock = false, busy = busy, vm = vm)
             }
         } else {
-            LockBox {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Icon(Icons.Outlined.LockClock, null, tint = MaterialTheme.colorScheme.primary)
+            Column {
+                androidx.compose.material3.HorizontalDivider(color = c.outlineVariant)
+                Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Column(Modifier.weight(1f)) {
-                        Text(if (keyholder) "Waiting for $wearerName to lock up" else "$wearerName has been asked to lock up", style = MaterialTheme.typography.titleSmall)
+                        Text(if (keyholder) "Waiting for $wearerName to lock up" else "$wearerName has been asked to lock up", style = MaterialTheme.typography.bodyLarge)
                         Text(
                             (l.minutes?.let { "For ${fmtMinutes(it)}" } ?: "Until released") + if (l.keyMode == "keybox") " · keybox" else "",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = c.onSurfaceVariant,
                         )
                     }
-                    if (keyholder && !readOnly) TextButton(onClick = { vm.end(l) }, enabled = !busy) { Text("Take back") }
+                    if (keyholder && !readOnly) InkOutlinedButton(onClick = { vm.end(l) }, enabled = !busy) { Text("Take back") }
                 }
+                androidx.compose.material3.HorizontalDivider(color = c.outlineVariant)
             }
         }
         return
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        val onBreak = l.status == "break"
+        LockClock(l, wearerName, page)
         if (keyholder && !readOnly) asks.forEach { AskToAnswer(it, l, wearerName, busy, vm) }
-        LockBox {
-            val onBreak = l.status == "break"
-            LockSummary(l, if (wearer) (if (onBreak) "You're on a hygiene break" else "You're locked") else "$wearerName is ${if (onBreak) "on a hygiene break" else "locked"}")
-            if (wearer && onBreak && !readOnly) LockUp(l, keyholderName, relock = true, busy = busy, vm = vm)
-            if (!readOnly) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (wearer && l.status == "active") {
-                        TonalButton(onClick = { dialog = LockDialog.AskRelease }, enabled = !asked("release_ask")) {
-                            Text(if (asked("release_ask")) "Release asked" else "Ask for release")
-                        }
-                        OutlinedButton(onClick = { dialog = LockDialog.AskBreak }, enabled = !asked("break")) {
-                            Icon(Icons.Outlined.Shower, null, Modifier.size(18.dp))
-                            Text(if (asked("break")) "Break asked" else "Hygiene break", Modifier.padding(start = 8.dp))
-                        }
+        if (wearer && l.hasKeybox && !l.canSeeKeybox) {
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).border(1.dp, c.outlineVariant, RoundedCornerShape(8.dp)).background(c.surfaceContainerLowest).padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Box(Modifier.size(64.dp).clip(RoundedCornerShape(4.dp)).background(c.outlineVariant).blur(3.dp))
+                Column {
+                    Text("Keybox code is sealed.", style = MaterialTheme.typography.bodyLarge)
+                    Text("Only $keyholderName can see it until the lock ends.", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
+                }
+            }
+        }
+        if (wearer && onBreak && !readOnly) LockUp(l, keyholderName, relock = true, busy = busy, vm = vm)
+        if (!readOnly) {
+            if (wearer && l.status == "active") {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    InkOutlinedButton(onClick = { dialog = LockDialog.AskBreak }, enabled = !asked("break"), modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                        Text(if (asked("break")) "Hygiene break asked" else "Ask for a hygiene break")
                     }
-                    if (keyholder) {
-                        if (l.endsAt != null) {
-                            TonalButton(onClick = { dialog = LockDialog.Add }) {
-                                Icon(Icons.Outlined.MoreTime, null, Modifier.size(18.dp))
-                                Text("Add time", Modifier.padding(start = 8.dp))
-                            }
-                            OutlinedButton(onClick = { dialog = LockDialog.Remove }) { Text("Take off time") }
-                        }
-                        if (l.status == "active") {
-                            TextButton(onClick = { dialog = LockDialog.Photo }) {
-                                Icon(Icons.Outlined.PhotoCamera, null, Modifier.size(18.dp))
-                                Text("Ask for a photo", Modifier.padding(start = 8.dp))
-                            }
-                        }
-                        TextButton(onClick = { dialog = LockDialog.Release }) { Text("Release") }
-                    }
-                    if (l.canSeeKeybox) {
-                        TextButton(onClick = { dialog = LockDialog.Keybox }) {
-                            Icon(Icons.Outlined.Key, null, Modifier.size(18.dp))
-                            Text("Show keybox code", Modifier.padding(start = 8.dp))
-                        }
+                    InkOutlinedButton(onClick = { dialog = LockDialog.AskRelease }, enabled = !asked("release_ask"), modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                        Text(if (asked("release_ask")) "Release asked" else "Ask to be released")
                     }
                 }
             }
-            if (wearer && asks.isNotEmpty()) Text("Waiting for $keyholderName to answer.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (keyholder && l.endsAt != null) {
+                    InkOutlinedButton(onClick = { dialog = LockDialog.Add }) { Text("Add time") }
+                    InkOutlinedButton(onClick = { dialog = LockDialog.Remove }) { Text("Take off time") }
+                }
+                if (keyholder && l.status == "active") InkOutlinedButton(onClick = { dialog = LockDialog.Photo }) { Text("Ask for a photo") }
+                if (l.canSeeKeybox) InkOutlinedButton(onClick = { dialog = LockDialog.Keybox }) { Text("Show keybox code") }
+            }
+            if (keyholder) Button(onClick = { dialog = LockDialog.Release }) { Text("Release") }
         }
+        if (wearer && asks.isNotEmpty()) Text("Waiting for $keyholderName to answer.", style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
     }
 
     val close = { dialog = null }
@@ -437,6 +475,29 @@ fun LockCard(l: ChastityLock, events: List<ChastityEvent>, session: Session, bus
         LockDialog.AskRelease -> AskDialog("release", l, keyholderName, close) { m, note -> vm.ask(l, "release", m, note, keyholderName); close() }
         LockDialog.AskBreak -> AskDialog("break", l, keyholderName, close) { m, note -> vm.ask(l, "break", m, note, keyholderName); close() }
         null -> {}
+    }
+}
+
+/** On Today: a line per running lock that opens the Chastity page, with the clock on the right. */
+@Composable
+fun LockLine(l: ChastityLock, session: Session, onOpen: () -> Unit) {
+    val c = MaterialTheme.colorScheme
+    val wearerName = session.nameOf(l.wearerId)
+    val t = lockLines(l, rememberNow(), wearerName)
+    val onBreak = l.status == "break"
+    Column {
+        androidx.compose.material3.HorizontalDivider(color = c.outlineVariant)
+        Row(Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    if (l.wearerId == session.userId) (if (onBreak) "You're on a hygiene break" else "You're locked") else "$wearerName is ${if (onBreak) "on a hygiene break" else "locked"}",
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(t.small, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
+            }
+            Text(t.big, style = MaterialTheme.typography.headlineLarge.copy(fontSize = 28.sp))
+        }
+        androidx.compose.material3.HorizontalDivider(color = c.outlineVariant)
     }
 }
 
@@ -529,75 +590,67 @@ private fun KeyboxDialog(l: ChastityLock, vm: ChastityViewModel, onDismiss: () -
     )
 }
 
-/** The keyholder asking to lock someone. */
-@OptIn(ExperimentalLayoutApi::class)
+/** The keyholder asking to lock someone (mockup 79): a sheet with lengths, hiding the time, and who has the key. */
+@OptIn(ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun StartLockDialog(wearers: List<Member>, busy: Boolean, onDismiss: () -> Unit, onStart: (ChastityLockInput, String) -> Unit) {
     var wearerId by remember { mutableStateOf(wearers.first().userId) }
-    var timed by remember { mutableStateOf(true) }
-    var minutes by remember { mutableStateOf(3 * 1440) }
+    var minutes by remember { mutableStateOf<Int?>(3 * 1440) }
     var hide by remember { mutableStateOf(false) }
     var keybox by remember { mutableStateOf(false) }
     val name = wearers.first { it.userId == wearerId }.displayName
     val c = MaterialTheme.colorScheme
-    AlertDialog(
+    androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = { Text("Lock $name") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (wearers.size > 1) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        wearers.forEach { w -> ChoiceChip(selected = w.userId == wearerId, onClick = { wearerId = w.userId }, label = { Text(w.displayName) }) }
-                    }
-                }
-                Text("For how long", style = MaterialTheme.typography.titleSmall)
+        containerColor = c.surface,
+        sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Lock $name", style = MaterialTheme.typography.headlineLarge)
+            if (wearers.size > 1) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ChoiceChip(selected = timed, onClick = { timed = true }, label = { Text("Set time") })
-                    ChoiceChip(selected = !timed, onClick = { timed = false }, label = { Text("Until I release") })
+                    wearers.forEach { w -> ChoiceChip(selected = w.userId == wearerId, onClick = { wearerId = w.userId }, label = { Text(w.displayName) }) }
                 }
-                if (timed) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(1440, 3 * 1440, 7 * 1440, 14 * 1440).forEach { m -> ChoiceChip(selected = minutes == m, onClick = { minutes = m }, label = { Text(fmtMinutes(m)) }) }
-                    }
-                    Text(
-                        "Unlocks about ${fmtLockTime(Instant.now().plusSeconds(minutes * 60L).toString())}, counted from when $name locks up.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = c.onSurfaceVariant,
-                    )
-                }
-                Text("Who has the key?", style = MaterialTheme.typography.titleSmall)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ChoiceChip(selected = !keybox, onClick = { keybox = false }, label = { Text("I keep it") })
-                    ChoiceChip(selected = keybox, onClick = { keybox = true }, label = { Text("Keybox") })
-                }
-                Text(
-                    if (keybox) "$name scrambles the keybox code without looking and seals a photo of it. You can see it any time; $name sees it when released."
-                    else "You keep the physical key.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                if (timed) LabeledSwitch("Hide the time left from $name", "$name sees only that they're locked", hide) { hide = it }
-                Text(
-                    "You can add or take off time later, and consequences and rewards can too. A Red safe call always shows $name the keybox code.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
             }
-        },
-        confirmButton = {
+            Text("For how long", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(1440, 3 * 1440, 7 * 1440, 14 * 1440).forEach { m -> ChoiceChip(selected = minutes == m, onClick = { minutes = m }, label = { Text(fmtMinutes(m)) }) }
+                ChoiceChip(selected = minutes == null, onClick = { minutes = null }, label = { Text("Until I release") })
+            }
+            if (minutes != null) {
+                Column {
+                    LabeledSwitch("Hide the time left from $name", null, hide) { hide = it }
+                    androidx.compose.material3.HorizontalDivider(color = c.outlineVariant, modifier = Modifier.padding(top = 12.dp))
+                }
+            }
+            Column {
+                Text("Who has the key?", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
+                listOf(false to ("I keep it" to null), true to ("Keybox" to "$name scrambles the code without looking and photographs it. Only you see the photo.")).forEach { (k, t) ->
+                    Row(Modifier.fillMaxWidth().clickable { keybox = k }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        app.obey.ui.common.Diamond(if (keybox == k) app.obey.ui.common.DiamondState.Done else app.obey.ui.common.DiamondState.Open, size = 14.dp)
+                        Column(Modifier.weight(1f)) {
+                            Text(t.first, style = MaterialTheme.typography.bodyLarge)
+                            t.second?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant) }
+                        }
+                    }
+                    androidx.compose.material3.HorizontalDivider(color = c.outlineVariant)
+                }
+            }
+            Text("$name taps “I'm locked” to start the clock. Asks lapse after 7 days.", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
             Button(
-                onClick = { onStart(ChastityLockInput(wearerId, if (timed) minutes else null, timed && hide, if (keybox) "keybox" else "keyholder"), name) },
+                onClick = { onStart(ChastityLockInput(wearerId, minutes, minutes != null && hide, if (keybox) "keybox" else "keyholder"), name) },
                 enabled = !busy,
-            ) { Text("Ask $name to lock up") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+            ) { Text("Ask $name to lock") }
+        }
+    }
 }
 
-/** One line of a lock's history: title, and the time added or taken off when the viewer may see it. */
+/** One line of a lock's history: what happened, and any reason given. */
 fun eventText(e: ChastityEvent, wearer: String): Pair<String, String?> = when (e.kind) {
     "started" -> (e.minutes?.let { "Locked for ${fmtMinutes(it)}" } ?: "Locked") to null
-    "time" -> (e.note ?: when { e.minutes == null -> "Time changed"; e.minutes > 0 -> "Time added"; else -> "Time taken off" }) to
-        e.minutes?.let { "${if (it > 0) "+" else "−"}${fmtMinutes(it)}" }
-    "release_ask" -> "$wearer asked to be released${when (e.status) { "declined" -> ": not yet"; "approved" -> ": released"; else -> "" }}" to null
+    "time" -> (e.minutes?.let { "${if (it > 0) "+" else "−"}${fmtMinutes(it)}" } ?: "Time changed") to e.note
+    "release_ask" -> "$wearer asked to be released${when (e.status) { "declined" -> ": not yet"; "approved" -> ": released"; else -> "" }}" to e.note
     "break" -> "Hygiene break, ${e.minutes} min${when (e.status) { "pending" -> " (asked)"; "declined" -> ": declined"; "overdue" -> ": not relocked in time"; else -> "" }}" to null
     "photo_ask" -> "Photo asked for" to null
     "relocked" -> (e.note?.let { "Relocked, ${it.lowercase()}" } ?: "Relocked") to null

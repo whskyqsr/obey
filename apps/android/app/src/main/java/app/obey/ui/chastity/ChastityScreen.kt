@@ -18,6 +18,8 @@ import androidx.compose.material.icons.outlined.MoreTime
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Shower
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import app.obey.ui.common.Eyebrow
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,43 +57,27 @@ import app.obey.ui.common.SectionHeader
 import app.obey.ui.common.formatDateTime
 import app.obey.ui.common.parseInstant
 
-private val eventIcon = mapOf(
-    "started" to Icons.Outlined.Lock,
-    "time" to Icons.Outlined.MoreTime,
-    "release_ask" to Icons.Outlined.LockOpen,
-    "break" to Icons.Outlined.Shower,
-    "photo_ask" to Icons.Outlined.PhotoCamera,
-    "relocked" to Icons.Outlined.Lock,
-    "ended" to Icons.Outlined.LockOpen,
-)
-
+/** Hairline rows under a small heading, as in the mockups' HISTORY. */
 @Composable
-private fun EventRow(e: ChastityEvent, wearer: String) {
-    val (title, pill) = eventText(e, wearer)
+private fun Rows(title: String, rows: List<Pair<String, String>>) {
     val c = MaterialTheme.colorScheme
-    ListItem(
-        colors = ListItemDefaults.colors(containerColor = c.surfaceContainerLow),
-        leadingContent = { Icon(eventIcon[e.kind] ?: Icons.Outlined.Lock, null, tint = c.onSurfaceVariant) },
-        headlineContent = { Text(title) },
-        supportingContent = { Text(formatDateTime(e.createdAt)) },
-        trailingContent = pill?.let { { Text(it, style = MaterialTheme.typography.titleSmall, color = if ((e.minutes ?: 0) > 0) c.error else c.primary) } },
-    )
+    Column {
+        SectionHeader(title, horizontalPadding = 0.dp)
+        rows.forEachIndexed { i, (head, sub) ->
+            Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+                Text(head, style = MaterialTheme.typography.bodyLarge)
+                Text(sub, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
+            }
+            if (i < rows.size - 1) HorizontalDivider(color = c.outlineVariant)
+        }
+    }
 }
 
-@Composable
-private fun PastLock(l: ChastityLock, session: Session) {
+private fun pastLine(l: ChastityLock, session: Session): Pair<String, String> {
     val length = if (l.startedAt != null && l.endedAt != null) fmtSpan((parseInstant(l.endedAt).toEpochMilli() - parseInstant(l.startedAt).toEpochMilli()) / 60_000) else null
-    ListItem(
-        colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-        leadingContent = { Icon(if (l.status == "ended") Icons.Outlined.LockOpen else Icons.Outlined.Block, null) },
-        headlineContent = { Text(session.nameOf(l.wearerId) + (length?.let { ", $it" } ?: if (l.status == "declined") ", declined" else ", not started")) },
-        supportingContent = {
-            Text(
-                (if (l.startedAt != null) "${fmtLockTime(l.startedAt)} to ${l.endedAt?.let(::fmtLockTime) ?: "?"}" else formatDateTime(l.createdAt)) +
-                    when (l.endReason) { "released" -> " · released early"; "time" -> " · time's up"; else -> "" },
-            )
-        },
-    )
+    return (session.nameOf(l.wearerId) + (length?.let { ", $it" } ?: if (l.status == "declined") ", declined" else ", not started")) to
+        ((if (l.startedAt != null) "${fmtLockTime(l.startedAt)} to ${l.endedAt?.let(::fmtLockTime) ?: "?"}" else formatDateTime(l.createdAt)) +
+            when (l.endReason) { "released" -> " · released early"; "time" -> " · time's up"; else -> "" })
 }
 
 /** Locks, time added and taken off, and asks to be let out. Off unless the dynamic switches it on. */
@@ -113,60 +99,49 @@ fun ChastityScreen(onOpenSettings: () -> Unit, vm: ChastityViewModel = hiltViewM
     // Anyone else in the dynamic who isn't already locked or asked.
     val wearers = if (session.canManage) session.partners.filter { m -> open.none { it.wearerId == m.userId } } else emptyList()
 
+    val c = MaterialTheme.colorScheme
     Scaffold(
-        topBar = {
-            LargeTopAppBar(
-                title = {
-                    Column {
-                        Text("Chastity")
-                        Text("Locks, time, and asks to be let out", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                },
-                navigationIcon = { MenuButton() },
-                actions = {
-                    if (wearers.isNotEmpty()) IconButton(onClick = { starting = true }) { Icon(Icons.Outlined.Add, "Lock") }
-                    SafeWordAction()
-                },
-            )
-        },
+        topBar = { TopAppBar(navigationIcon = { MenuButton() }, title = {}, actions = { SafeWordAction() }) },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         when (val s = state) {
             Load.Loading -> LoadingBox(Modifier.padding(padding))
             is Load.Failed -> ErrorBox(s.message, vm::load, Modifier.padding(padding))
-            is Load.Ready -> if (s.value.open.isEmpty() && s.value.past.isEmpty()) {
-                EmptyBox(
-                    "Nobody is locked",
-                    if (session.canManage) "Ask to lock someone, for a set time or until you release them." else "When you're asked to lock up, it shows here and on Today.",
-                    Modifier.padding(padding),
-                    icon = Icons.Outlined.LockOpen,
-                )
-            } else {
+            is Load.Ready -> {
                 val v = s.value
+                // One lock: the header says whose it is. A wearer asked to lock gets the ask's own heading instead.
+                val only = v.open.singleOrNull()?.takeUnless { it.status == "pending" && it.wearerId == session.userId }
+                val (eyebrow, subtitle) = only?.let { lockHeading(it, session.userId, session::nameOf) } ?: (null to if (v.open.isEmpty()) "Nobody is locked." else null)
                 LazyColumn(
                     Modifier.padding(padding).fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp),
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
                 ) {
+                    item(key = "head") {
+                        Column {
+                            eyebrow?.let { Eyebrow(it, Modifier.padding(bottom = 4.dp)) }
+                            Text("Chastity", style = MaterialTheme.typography.displaySmall)
+                            subtitle?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp)) }
+                        }
+                    }
+                    if (wearers.isNotEmpty()) {
+                        item(key = "lock") {
+                            val label = if (wearers.size == 1) "Lock ${wearers.first().displayName}" else "Lock someone"
+                            if (v.open.isEmpty()) app.obey.ui.common.Button(onClick = { starting = true }) { Text(label) }
+                            else InkOutlinedButton(onClick = { starting = true }) { Text(label) }
+                        }
+                    }
                     items(v.open, key = { it.id }) { l ->
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                            if (only == null && v.open.size > 1) lockHeading(l, session.userId, session::nameOf).second?.let { Text(it, color = c.onSurfaceVariant) }
                             LockCard(l, v.events, session, busy, vm)
                             val log = v.events.filter { it.lockId == l.id }
                             if (log.isNotEmpty()) {
-                                Surface(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-                                    Column { log.forEach { EventRow(it, session.nameOf(l.wearerId)) } }
-                                }
+                                Rows("History", log.map { e -> eventText(e, session.nameOf(l.wearerId)).let { (t, note) -> t to ((note?.let { "$it · " } ?: "") + fmtWhen(e.createdAt)) } })
                             }
                         }
                     }
-                    if (v.past.isNotEmpty()) {
-                        item(key = "h-past") { SectionHeader("Past locks", horizontalPadding = 0.dp) }
-                        item(key = "past") {
-                            Surface(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-                                Column { v.past.forEach { PastLock(it, session) } }
-                            }
-                        }
-                    }
+                    if (v.past.isNotEmpty()) item(key = "past") { Rows("Past locks", v.past.map { pastLine(it, session) }) }
                 }
             }
         }
@@ -179,7 +154,7 @@ fun ChastityScreen(onOpenSettings: () -> Unit, vm: ChastityViewModel = hiltViewM
 
 /** On Today, for the wearer and the keyholder: the lock, asks to answer, and locking up. */
 @Composable
-fun ChastityTodayCard(session: Session, vm: ChastityViewModel = hiltViewModel(key = "chastity-today-${session.relationship?.id}")) {
+fun ChastityTodayCard(session: Session, onOpen: () -> Unit = {}, vm: ChastityViewModel = hiltViewModel(key = "chastity-today-${session.relationship?.id}")) {
     LifecycleResumeEffect(session.relationship?.id) {
         vm.load()
         onPauseOrDispose { }
@@ -194,7 +169,10 @@ fun ChastityTodayCard(session: Session, vm: ChastityViewModel = hiltViewModel(ke
     val v = (state as? Load.Ready)?.value ?: return
     val mine = v.open.filter { it.wearerId == session.userId || it.keyholderId == session.userId }
     if (mine.isEmpty()) return
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        mine.forEach { LockCard(it, v.events, session, busy, vm) }
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        mine.forEach { l ->
+            if (l.status == "pending") LockCard(l, v.events, session, busy, vm, page = false)
+            else LockLine(l, session, onOpen)
+        }
     }
 }
