@@ -41,7 +41,8 @@ function buildServer(deps: Deps, grant: Grant, call: Call, touched: Set<string>)
     {
       instructions:
         "Fealty is a D/s app for partners. You act as the person who connected you and can see and do only what they can in the app. " +
-        'Write "submissive" in lowercase, always. Call people by their first names. Start with list_dynamics.',
+        'Write "submissive" in lowercase and "Dominant" with a capital, always. Call people by their first names. Start with list_dynamics. ' +
+          "Answer only what was asked, briefly, as a partner would say it. Ids, feature switches and other fields are for your own use: don't recite them unless asked.",
     },
   );
 
@@ -67,7 +68,7 @@ function buildServer(deps: Deps, grant: Grant, call: Call, touched: Set<string>)
     "list_dynamics",
     {
       title: "List dynamics",
-      description: "The dynamics you can reach here: their ids, your role, your partners and which parts of the app are switched on.",
+      description: "The dynamics you can reach here, with the ids and switches other tools need. When asked about them, just say who each one is with and their role, e.g. \"One, with Felicia, your submissive.\"",
       inputSchema: {},
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -84,8 +85,8 @@ function buildServer(deps: Deps, grant: Grant, call: Call, touched: Set<string>)
           id: r.id,
           name: r.name,
           yourRole: solo ? "switch" : mine?.role,
-          solo,
-          ended: r.endedAt !== null,
+          ...(solo ? { solo } : {}),
+          ...(r.endedAt !== null ? { ended: true } : {}),
           partners: r.members.filter((m) => m.userId !== body.user.id).map((m) => ({ id: m.userId, name: m.displayName, role: m.role })),
           switchedOn: Object.entries(r.features)
             .filter(([, on]) => on)
