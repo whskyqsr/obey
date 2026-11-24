@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SentimentDissatisfied
 import androidx.compose.material.icons.filled.SentimentNeutral
@@ -87,24 +88,26 @@ private val MOOD_FILLED = listOf(
 fun moodIcon(mood: Int, filled: Boolean = false): ImageVector = (if (filled) MOOD_FILLED else MOOD_OUTLINED)[(mood - 1).coerceIn(0, 4)]
 fun moodLabel(mood: Int): String = MOOD_LABELS[(mood - 1).coerceIn(0, 4)]
 
-/** Five faces to pick how you feel. */
+/** How you feel, 1 (awful) to 5 (great), as five word pills; the chosen one has the ink border. */
 @Composable
 fun MoodPicker(value: Int?, onChange: (Int) -> Unit, modifier: Modifier = Modifier) {
-    val colors = MaterialTheme.colorScheme
-    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    val c = MaterialTheme.colorScheme
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         (1..5).forEach { m ->
             val on = value == m
-            Column(
-                Modifier
+            Text(
+                moodLabel(m),
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (on) c.onSurface else c.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                maxLines = 1,
+                modifier = Modifier
                     .weight(1f)
-                    .background(if (on) colors.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent, MaterialTheme.shapes.medium)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .border(1.dp, if (on) c.onSurface else c.outlineVariant, androidx.compose.foundation.shape.CircleShape)
                     .clickable(role = SemanticsRole.RadioButton) { onChange(m) }
-                    .padding(vertical = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Icon(moodIcon(m, on), null, Modifier.size(28.dp), tint = if (on) colors.onSecondaryContainer else colors.onSurfaceVariant)
-                Text(moodLabel(m), style = MaterialTheme.typography.labelMedium, color = if (on) colors.onSecondaryContainer else colors.onSurfaceVariant)
-            }
+                    .padding(vertical = 9.dp),
+            )
         }
     }
 }

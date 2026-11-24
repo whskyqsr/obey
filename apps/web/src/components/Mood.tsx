@@ -8,26 +8,25 @@ import { Chip, Icon, SegmentedButtons, cx } from "./ui";
 export const MOODS = ["sentiment_very_dissatisfied", "sentiment_dissatisfied", "sentiment_neutral", "sentiment_satisfied", "sentiment_very_satisfied"];
 export const MOOD_LABELS = ["Awful", "Low", "Okay", "Good", "Great"];
 
-/** Five faces to pick how you feel, 1 (awful) to 5 (great). */
+/** Five pills to pick how you feel, 1 (awful) to 5 (great). The chosen one has the ink border. */
 export function MoodPicker({ value, onChange }: { value: number | null; onChange(mood: number): void }) {
   return (
-    <div role="radiogroup" aria-label="How do you feel?" className="grid grid-cols-5 gap-1">
-      {MOODS.map((icon, i) => {
+    <div role="radiogroup" aria-label="How do you feel?" className="grid max-w-md grid-cols-5 gap-2">
+      {MOOD_LABELS.map((label, i) => {
         const on = value === i + 1;
         return (
           <button
-            key={icon}
+            key={label}
             type="button"
             role="radio"
             aria-checked={on}
             onClick={() => onChange(i + 1)}
             className={cx(
-              "state-layer flex flex-col items-center gap-1 rounded-md py-2 text-label-medium",
-              on ? "bg-secondary-container text-on-secondary-container" : "text-on-surface-variant",
+              "state-layer h-10 truncate rounded-full border px-1 text-body-large",
+              on ? "border-on-surface text-on-surface" : "border-outline-variant text-on-surface-variant",
             )}
           >
-            <Icon name={icon} filled={on} size={28} />
-            {MOOD_LABELS[i]}
+            {label}
           </button>
         );
       })}

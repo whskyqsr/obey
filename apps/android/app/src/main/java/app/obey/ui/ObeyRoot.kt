@@ -454,6 +454,7 @@ private fun ObeyNavHost(nav: NavHostController, usItems: List<UsItem>, switcher:
                 onOpenAgreement = { edit -> nav.navigate(if (edit) AgreementRoute(edit = true) else AgreementRoute(review = true)) },
                 onOpenRules = { nav.navigate(RulesRoute) },
                 onOpenProtocol = { nav.navigate(ProtocolEditorRoute(protocolId = it)) },
+                onOpenScene = { nav.navigate(SceneRoute(it)) },
             )
         }
         composable<UpcomingRoute> {

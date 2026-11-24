@@ -92,6 +92,7 @@ fun TodayScreen(
     onOpenAgreement: (edit: Boolean) -> Unit = {},
     onOpenRules: () -> Unit = {},
     onOpenProtocol: (String) -> Unit = {},
+    onOpenScene: (String) -> Unit = {},
     vm: TodayViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -553,7 +554,7 @@ fun TodayScreen(
                         }
                     }
                     if (session != null) scenes?.let { t ->
-                        item(key = "scenes") { app.obey.ui.scenes.SceneCards(t, session, busy, onAftercareDone = vm::aftercareDone, onCheck = vm::checkInOnScene) }
+                        item(key = "scenes") { app.obey.ui.scenes.SceneCards(t, session, busy, onAftercareDone = vm::aftercareDone, onOpen = onOpenScene, onCheck = vm::checkInOnScene) }
                     }
                     if (isDom) items(curfew?.requests.orEmpty(), key = { "ask-${it.id}" }) { r ->
                         CurfewAskCard(

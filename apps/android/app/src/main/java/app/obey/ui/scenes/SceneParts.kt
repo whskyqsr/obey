@@ -1,50 +1,28 @@
 package app.obey.ui.scenes
 
 import android.graphics.BitmapFactory
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.HealthAndSafety
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
-import app.obey.ui.common.LettersField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -53,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.input.ImeAction
@@ -65,13 +42,18 @@ import app.obey.api.Scene
 import app.obey.api.SceneInput
 import app.obey.data.Session
 import app.obey.ui.common.Avatar
+import app.obey.ui.common.FormScreen
+import app.obey.ui.common.LettersChip
+import app.obey.ui.common.LettersField
 import app.obey.ui.common.MoodPicker
+import app.obey.ui.common.Pill
 import app.obey.ui.common.formatDateTime
+import app.obey.ui.common.inkButtonColors
 import app.obey.ui.common.local
-import app.obey.ui.common.moodIcon
 import app.obey.ui.common.moodLabel
 import app.obey.ui.common.parseInstant
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
@@ -112,51 +94,35 @@ internal fun Person(userId: String, session: Session, avatars: AvatarLoader, siz
     Avatar(userId, m?.displayName ?: session.nameOf(userId), m?.avatarVersion, avatars::load, size = size)
 }
 
-/** "Yellow called" / "Red called", or nothing. */
-@Composable
-internal fun SafewordBadge(safeword: String) {
-    if (safeword != "yellow" && safeword != "red") return
-    val c = MaterialTheme.colorScheme
-    val red = safeword == "red"
-    Surface(color = if (red) c.errorContainer else c.tertiaryContainer, contentColor = if (red) c.onErrorContainer else c.onTertiaryContainer, shape = MaterialTheme.shapes.large) {
-        Row(Modifier.height(28.dp).padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.HealthAndSafety, null, Modifier.size(16.dp))
-            Spacer(Modifier.width(4.dp))
-            Text(if (red) "Red called" else "Yellow called", style = MaterialTheme.typography.labelLarge)
-        }
-    }
+/** "no safeword used" / "yellow called". */
+internal fun safewordLine(w: String): String = if (w == "none") "no safeword used" else "$w called"
+
+/** "feeling good". */
+internal fun feeling(mood: Int): String = "feeling ${moodLabel(mood).lowercase()}"
+
+/** "Nov 19", with the year when it isn't this one. */
+internal fun shortDay(s: Scene): String {
+    val d = parseInstant(s.occurredAt).local().toLocalDate()
+    return d.format(DateTimeFormatter.ofPattern(if (d.year == LocalDate.now().year) "MMM d" else "MMM d, yyyy"))
 }
 
-/** A read-only chip, like the web's outlined ones. */
-@Composable
-internal fun Tag(text: String, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
-    Surface(color = Color.Transparent, contentColor = color, shape = MaterialTheme.shapes.small, border = BorderStroke(1.dp, color.copy(alpha = 0.4f))) {
-        Text(text, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
-    }
-}
+/** "Thursday, Nov 19". */
+internal fun longDay(s: Scene): String = parseInstant(s.occurredAt).local().toLocalDate().format(DateTimeFormatter.ofPattern("EEEE, MMM d"))
 
-/** Aftercare or needs as a row of chips; [lead] goes first, like the safeword badge. */
+/** Capitalised, as aftercare reads in a pill. */
+internal fun cap(t: String) = t.replaceFirstChar { it.uppercase() }
+
+/** Aftercare as pills, the first reading "Aftercare: water". */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun Tags(items: List<String>, color: Color = MaterialTheme.colorScheme.onSurfaceVariant, lead: (@Composable () -> Unit)? = null) {
-    if (items.isEmpty() && lead == null) return
+internal fun AftercarePills(items: List<String>) {
+    if (items.isEmpty()) return
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        lead?.invoke()
-        items.forEach { Tag(it, color) }
+        items.forEachIndexed { i, a -> Pill(if (i == 0) "Aftercare: ${a.lowercase()}" else a.lowercase()) }
     }
 }
 
-/** A mood's face and word. */
-@Composable
-internal fun MoodMark(mood: Int, size: Dp = 18.dp) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(moodIcon(mood, filled = true), null, Modifier.size(size), tint = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.width(4.dp))
-        Text(moodLabel(mood), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-/** Aftercare to pick from: the usual ones plus anything already chosen, and "Other" for the rest. */
+/** Aftercare to pick from: the usual ones plus anything already chosen, and "+ Other" for the rest. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun AftercarePicker(value: List<String>, onChange: (List<String>) -> Unit) {
@@ -170,18 +136,9 @@ internal fun AftercarePicker(value: List<String>, onChange: (List<String>) -> Un
         adding = false
     }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            options.forEach { a ->
-                FilterChip(selected = a in value, onClick = { onChange(if (a in value) value - a else value + a) }, label = { Text(a) })
-            }
-            if (!adding && value.size < 20) {
-                FilterChip(
-                    selected = false,
-                    onClick = { adding = true },
-                    label = { Text("Other") },
-                    leadingIcon = { Icon(Icons.Outlined.Add, null, Modifier.size(FilterChipDefaults.IconSize)) },
-                )
-            }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            options.forEach { a -> LettersChip(cap(a), a in value, { onChange(if (a in value) value - a else value + a) }) }
+            if (!adding && value.size < 20) LettersChip("+ Other", false, { adding = true })
         }
         if (adding) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -201,11 +158,21 @@ internal fun AftercarePicker(value: List<String>, onChange: (List<String>) -> Un
 }
 
 private val SAFEWORDS = listOf("none" to "None", "yellow" to "Yellow", "red" to "Red")
-private val dayFmt = DateTimeFormatter.ofPattern("EEE d MMM yyyy")
+private val dayFmt = DateTimeFormatter.ofPattern("EEE, MMM d")
 private val timeFmt = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
 
-/** Logging a scene, or changing [scene]. Kept short: only when is needed. [others] are asked to add their side of a new one. */
-@OptIn(ExperimentalMaterial3Api::class)
+/** A label over a value on a hairline, tappable, as the form's "When" row. */
+@Composable
+private fun FieldRow(label: String, value: String, onClick: () -> Unit) {
+    Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(vertical = 8.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    }
+}
+
+/** Logging a scene, or changing [scene] (mockup 76). [others] are asked to add their side of a new one. */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun SceneSheet(scene: Scene?, others: List<String>, busy: Boolean, onDismiss: () -> Unit, onSave: (SceneInput) -> Unit) {
     var title by remember { mutableStateOf(scene?.title ?: "") }
@@ -226,45 +193,29 @@ internal fun SceneSheet(scene: Scene?, others: List<String>, busy: Boolean, onDi
         ),
     )
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Column(
-            Modifier.imePadding().verticalScroll(rememberScrollState()).padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Icon(Icons.Outlined.AutoAwesome, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(if (scene == null) "Log a scene" else "Edit scene", style = MaterialTheme.typography.headlineSmall)
-            LettersField(title, { title = it.take(120) }, label = { Text("Name (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("When", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { picking = "date" }, modifier = Modifier.weight(1f)) { Text(at.format(dayFmt), maxLines = 1) }
-                    OutlinedButton(onClick = { picking = "time" }) { Text(at.format(timeFmt), maxLines = 1) }
-                }
+    FormScreen(if (scene == null) "Log a scene" else "Edit scene", onCancel = onDismiss, onSave = ::save, canSave = !busy) {
+        LettersField(title, { title = it.take(120) }, label = { Text("Name (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Box(Modifier.weight(1f)) { FieldRow("When", at.format(dayFmt)) { picking = "date" } }
+            Box(Modifier.weight(1f)) { FieldRow("At", at.format(timeFmt)) { picking = "time" } }
+        }
+        LettersField(what, { what = it.take(4000) }, label = { Text("What we did (optional)") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Safeword", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SAFEWORDS.forEach { (v, label) -> LettersChip(label, safeword == v, { safeword = v }) }
             }
-            LettersField(what, { what = it.take(4000) }, label = { Text("What we did (optional)") }, minLines = 3, modifier = Modifier.fillMaxWidth())
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Safeword", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    SAFEWORDS.forEachIndexed { i, (v, label) ->
-                        SegmentedButton(selected = safeword == v, onClick = { safeword = v }, shape = SegmentedButtonDefaults.itemShape(i, SAFEWORDS.size)) { Text(label) }
-                    }
-                }
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Aftercare given", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                AftercarePicker(aftercare) { aftercare = it }
-            }
-            if (scene == null && others.isNotEmpty()) {
-                Text(
-                    "${andList(others)} ${if (others.size == 1) "is" else "are"} asked to add their side. You each see the other's once you've both written.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                TextButton(onClick = onDismiss) { Text("Cancel") }
-                Button(onClick = ::save, enabled = !busy) { Text("Save") }
-            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Aftercare given", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            AftercarePicker(aftercare) { aftercare = it }
+        }
+        if (scene == null && others.isNotEmpty()) {
+            Text(
+                "Next, each of you writes your own side. You won't see ${andList(others)}'s until you share yours. The next morning you'll each be asked how you feel.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 
@@ -305,28 +256,9 @@ internal fun SceneSheet(scene: Scene?, others: List<String>, busy: Boolean, onDi
 internal fun SceneCheckIn(busy: Boolean, onSave: (mood: Int, note: String) -> Unit) {
     var mood by remember { mutableStateOf<Int?>(null) }
     var note by remember { mutableStateOf("") }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         MoodPicker(mood, { mood = it })
-        mood?.let { m ->
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                LettersField(note, { note = it.take(500) }, label = { Text("Anything you still need? (optional)") }, modifier = Modifier.weight(1f))
-                Button(onClick = { onSave(m, note.trim()) }, enabled = !busy) { Text("Save") }
-            }
-        }
-    }
-}
-
-/** A tappable surface card, as the scene list uses. */
-@Composable
-internal fun SceneSurface(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, content: @Composable () -> Unit) {
-    Surface(
-        color = androidx.compose.ui.graphics.Color.Transparent,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shape = MaterialTheme.shapes.medium,
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        Box(Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
-        }
+        LettersField(note, { note = it.take(500) }, label = { Text("Anything you still need? (optional)") }, modifier = Modifier.fillMaxWidth())
+        Button(onClick = { mood?.let { onSave(it, note.trim()) } }, enabled = mood != null && !busy, colors = inkButtonColors(), shape = MaterialTheme.shapes.small) { Text("Send") }
     }
 }

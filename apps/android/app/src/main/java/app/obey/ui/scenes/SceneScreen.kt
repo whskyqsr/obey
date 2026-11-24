@@ -1,5 +1,22 @@
 package app.obey.ui.scenes
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.ui.text.style.TextAlign
+import app.obey.ui.common.BackLink
+import app.obey.ui.common.Eyebrow
+import app.obey.ui.common.inkButtonColors
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -108,7 +125,7 @@ class SceneViewModel @Inject constructor(private val api: ObeyApi, private val s
 }
 
 /** One scene: what happened, each person's side once they've both shared, the next-day check-ins and comments. */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun SceneScreen(onBack: () -> Unit, vm: SceneViewModel = hiltViewModel()) {
     LaunchedEffect(Unit) { vm.load() }
@@ -122,19 +139,26 @@ fun SceneScreen(onBack: () -> Unit, vm: SceneViewModel = hiltViewModel()) {
     val scene = (state as? Load.Ready)?.value
     var editing by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
+    var menu by remember { mutableStateOf(false) }
+    val scroll = rememberScrollState()
+    val formAt = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {},
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") } },
+                navigationIcon = { BackLink("Scenes", onBack) },
                 actions = {
                     if (scene != null && !session.readOnly) {
-                        if (scene.loggedBy == me) IconButton(onClick = { deleting = true }) { Icon(Icons.Outlined.DeleteOutline, "Delete") }
-                        FilledTonalButton(onClick = { editing = true }, modifier = Modifier.padding(end = 8.dp)) {
-                            Icon(Icons.Outlined.Edit, null, Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Edit")
+                        Box {
+                            IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreHoriz, "More options") }
+                            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                DropdownMenuItem(text = { Text("Edit") }, leadingIcon = { Icon(Icons.Outlined.Edit, null) }, onClick = { menu = false; editing = true })
+                                if (scene.loggedBy == me) {
+                                    DropdownMenuItem(text = { Text("Delete") }, leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null) }, onClick = { menu = false; deleting = true })
+                                }
+                            }
                         }
                     }
                 },
@@ -146,10 +170,9 @@ fun SceneScreen(onBack: () -> Unit, vm: SceneViewModel = hiltViewModel()) {
             Load.Loading -> LoadingBox(Modifier.padding(padding))
             is Load.Failed -> ErrorBox(s.message, vm::load, Modifier.padding(padding))
             is Load.Ready -> Column(
-                Modifier.padding(padding).fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                Modifier.padding(padding).fillMaxSize().imePadding().verticalScroll(scroll).padding(horizontal = 16.dp).padding(bottom = 32.dp),
             ) {
-                SceneBody(s.value, session, vm, busy)
+                SceneBody(s.value, session, vm, busy, formAt) { scope.launch { formAt.bringIntoView() } }
             }
         }
     }
@@ -168,53 +191,47 @@ fun SceneScreen(onBack: () -> Unit, vm: SceneViewModel = hiltViewModel()) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun SceneBody(s: Scene, session: Session, vm: SceneViewModel, busy: Boolean) {
+private fun SceneBody(s: Scene, session: Session, vm: SceneViewModel, busy: Boolean, formAt: BringIntoViewRequester, toForm: () -> Unit) {
     val c = MaterialTheme.colorScheme
     val me = session.userId
     val mine = s.sides.firstOrNull { it.userId == me }
-    val others = session.partners
-    val othersShared = others.filter { it.userId in s.shared }
-    val othersWaiting = others.filter { it.userId !in s.shared }
     val checkOpen = !Instant.now().isBefore(parseInstant(s.checkFrom))
 
-    Column {
-        Text(sceneName(s), style = MaterialTheme.typography.headlineMedium)
-        Text(
-            whenOf(s) + (s.loggedBy?.let { " · logged by ${if (it == me) "you" else session.nameOf(it)}" } ?: ""),
-            style = MaterialTheme.typography.bodyMedium,
-            color = c.onSurfaceVariant,
-        )
-    }
-    if (s.safeword != "none" || s.aftercare.isNotEmpty() || s.what.isNotBlank()) {
-        SceneSurface {
-            if (s.safeword != "none" || s.aftercare.isNotEmpty()) Tags(s.aftercare, lead = { SafewordBadge(s.safeword) })
-            if (s.what.isNotBlank()) Text(s.what, style = MaterialTheme.typography.bodyLarge)
-        }
-    }
-    if (mine == null && !session.readOnly) {
-        YourSide(andList(others.map { it.displayName }), busy) { vm.share(it) }
-    }
-    mine?.let { SideView(it, session, vm.avatars) }
-    s.sides.filter { it.userId != me }.forEach { SideView(it, session, vm.avatars) }
-    if (mine == null && othersShared.isNotEmpty()) {
-        Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.Lock, null, tint = c.onSurfaceVariant)
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    "${andList(othersShared.map { it.displayName })} ${if (othersShared.size == 1) "has" else "have"} written their side. You'll see it once you share yours.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = c.onSurfaceVariant,
-                )
+    Eyebrow("${longDay(s)} · ${safewordLine(s.safeword)}", Modifier.padding(top = 4.dp))
+    Text(sceneName(s), style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 6.dp))
+    if (s.aftercare.isNotEmpty()) Box(Modifier.padding(top = 20.dp)) { AftercarePills(s.aftercare) }
+    if (s.what.isNotBlank()) Text(s.what, style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant, modifier = Modifier.padding(top = 20.dp))
+    Column(Modifier.padding(top = 32.dp), verticalArrangement = Arrangement.spacedBy(32.dp)) {
+        if (mine != null) SideView(mine, session)
+        else if (!session.readOnly) Box(Modifier.bringIntoViewRequester(formAt)) { YourSide(andList(session.partners.map { it.displayName }), busy) { vm.share(it) } }
+        session.partners.forEach { m ->
+            val side = s.sides.firstOrNull { it.userId == m.userId }
+            when {
+                side != null -> SideView(side, session)
+                m.userId in s.shared -> Column(
+                    Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(c.surfaceContainer)
+                        .border(1.dp, c.outlineVariant, MaterialTheme.shapes.medium).padding(horizontal = 24.dp, vertical = 28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(Icons.Outlined.VisibilityOff, null, tint = c.onSurfaceVariant)
+                    Text("${m.displayName}'s side is hidden", style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+                    Text(
+                        "${m.displayName} has written it. You'll both see each other's once you share yours.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = c.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                    if (!session.readOnly) Button(onClick = toForm, colors = inkButtonColors(), shape = MaterialTheme.shapes.small, modifier = Modifier.padding(top = 4.dp)) { Text("Share my side") }
+                }
+                else -> Text("${m.displayName} hasn't written their side yet.", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
             }
         }
+        if (checkOpen || s.checks.isNotEmpty()) NextDay(s, session, checkOpen, busy) { mood, note -> vm.check(mood, note) }
+        SceneCommentsSection(s.id, Modifier.fillMaxWidth())
     }
-    if (mine != null && othersWaiting.isNotEmpty()) {
-        Text("Waiting for ${andList(othersWaiting.map { it.displayName })} to share their side.", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
-    }
-    if (checkOpen || s.checks.isNotEmpty()) NextDay(s, session, vm.avatars, checkOpen, busy) { mood, note -> vm.check(mood, note) }
-    SceneCommentsSection(s.id, Modifier.fillMaxWidth())
 }
 
 /** Written alone and shared once; the others' sides open up then. [to] is who it's shared with. */
@@ -224,70 +241,58 @@ private fun YourSide(to: String, busy: Boolean, onShare: (SceneSideInput) -> Uni
     var worked by rememberSaveable { mutableStateOf("") }
     var change by rememberSaveable { mutableStateOf("") }
     var need by rememberSaveable { mutableStateOf("") }
-    SceneSurface {
-        Column {
-            Text("Your side", style = MaterialTheme.typography.titleLarge)
-            Text("How do you feel about it now?", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Eyebrow("Your side")
         MoodPicker(mood, { mood = it })
         LettersField(worked, { worked = it.take(2000) }, label = { Text("What worked") }, minLines = 2, modifier = Modifier.fillMaxWidth())
         LettersField(change, { change = it.take(2000) }, label = { Text("What to change next time") }, minLines = 2, modifier = Modifier.fillMaxWidth())
         LettersField(need, { need = it.take(2000) }, label = { Text("Anything you still need (optional)") }, minLines = 2, modifier = Modifier.fillMaxWidth())
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            Button(
-                onClick = { mood?.let { onShare(SceneSideInput(it, worked.trim(), change.trim(), need.trim())) } },
-                enabled = mood != null && !busy,
-            ) { Text(if (to.isNotEmpty()) "Share with $to" else "Save") }
-        }
+        Button(
+            onClick = { mood?.let { onShare(SceneSideInput(it, worked.trim(), change.trim(), need.trim())) } },
+            enabled = mood != null && !busy,
+            colors = inkButtonColors(),
+            shape = MaterialTheme.shapes.small,
+        ) { Text(if (to.isNotEmpty()) "Share with $to" else "Save") }
     }
 }
 
-/** A shared side: the mood, and whatever was written. */
+/** A side as the mockup shows it: an eyebrow with the mood, then the words in the serif. */
 @Composable
-private fun SideView(side: SceneSide, session: Session, avatars: AvatarLoader) {
-    val c = MaterialTheme.colorScheme
-    val rows = listOf("What worked" to side.worked, "Next time" to side.change, "Still needs" to side.need).filter { it.second.isNotBlank() }
-    SceneSurface {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Person(side.userId, session, avatars, size = 28.dp)
-            Spacer(Modifier.width(8.dp))
-            Text(if (side.userId == session.userId) "You" else session.nameOf(side.userId), style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.width(12.dp))
-            MoodMark(side.mood, size = 20.dp)
-        }
+private fun SideView(side: SceneSide, session: Session) {
+    val who = if (side.userId == session.userId) "Your side" else "${session.nameOf(side.userId)}'s side"
+    val rows = listOf(null to side.worked, "Next time" to side.change, "Still needs" to side.need).filter { it.second.isNotBlank() }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Eyebrow("$who · ${feeling(side.mood)}")
         rows.forEach { (label, text) ->
             Column {
-                Text(label, style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
-                Text(text, style = MaterialTheme.typography.bodyLarge)
+                label?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                Text(text, style = MaterialTheme.typography.headlineSmall)
             }
         }
     }
 }
 
-/** The day-after check-ins, and mine to give once it opens. */
+/** The morning-after check-ins on hairlines, and mine to give once it opens. */
 @Composable
-private fun NextDay(s: Scene, session: Session, avatars: AvatarLoader, open: Boolean, busy: Boolean, onCheck: (Int, String) -> Unit) {
+private fun NextDay(s: Scene, session: Session, open: Boolean, busy: Boolean, onCheck: (Int, String) -> Unit) {
     val c = MaterialTheme.colorScheme
-    val mine = s.checks.any { it.userId == session.userId }
-    SceneSurface {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.WbSunny, null, tint = c.tertiary)
-            Spacer(Modifier.width(8.dp))
-            Text("Next day", style = MaterialTheme.typography.titleMedium)
-        }
-        s.checks.forEach { check ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Person(check.userId, session, avatars)
-                Spacer(Modifier.width(8.dp))
-                MoodMark(check.mood)
-                if (check.note.isNotBlank()) {
-                    Text(" · “${check.note}”", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant, modifier = Modifier.weight(1f, fill = false))
+    val members = session.relationship?.members.orEmpty()
+    Column {
+        Eyebrow("The morning after")
+        members.forEachIndexed { i, m ->
+            if (i > 0) HorizontalDivider(color = c.outlineVariant)
+            val check = s.checks.firstOrNull { it.userId == m.userId }
+            val isMe = m.userId == session.userId
+            Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+                when {
+                    check != null -> {
+                        Text("${if (isMe) "You" else m.displayName} · ${feeling(check.mood)}", style = MaterialTheme.typography.bodyLarge)
+                        if (check.note.isNotBlank()) Text("“${check.note}”", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
+                    }
+                    isMe && open && !session.readOnly -> SceneCheckIn(busy, onCheck)
+                    else -> Text(if (isMe) "You haven't answered yet" else "${m.displayName} hasn't answered yet", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
                 }
             }
-        }
-        if (!mine && open && !session.readOnly) {
-            Text("How are you feeling now?", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
-            SceneCheckIn(busy, onCheck)
         }
     }
 }

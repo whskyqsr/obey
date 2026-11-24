@@ -1,0 +1,78 @@
+package app.obey.ui.common
+
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+
+/** Small capitals over a section, the web's `.eyebrow`, without SectionHeader's padding. */
+@Composable
+fun Eyebrow(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
+    Text(text.uppercase(), style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.5.sp), color = color, modifier = modifier)
+}
+
+/** The ink button: the one filled button in Letters. */
+@Composable
+fun inkButtonColors() = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface, contentColor = MaterialTheme.colorScheme.surface)
+
+/** A read-only pill on a hairline, such as each aftercare given on a scene. */
+@Composable
+fun Pill(text: String, modifier: Modifier = Modifier) {
+    val c = MaterialTheme.colorScheme
+    Text(
+        text,
+        style = MaterialTheme.typography.bodyLarge,
+        color = c.onSurface,
+        modifier = modifier.border(1.dp, c.outlineVariant, CircleShape).padding(horizontal = 18.dp, vertical = 8.dp),
+    )
+}
+
+/** A full-screen form with "Cancel · title · Save" across the top (mockup 76). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FormScreen(
+    title: String,
+    onCancel: () -> Unit,
+    onSave: () -> Unit,
+    canSave: Boolean = true,
+    saveLabel: String = "Save",
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Dialog(onDismissRequest = onCancel, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Scaffold(
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = { Text(title, style = MaterialTheme.typography.titleMedium) },
+                    navigationIcon = { TextButton(onClick = onCancel) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } },
+                    actions = { TextButton(onClick = onSave, enabled = canSave) { Text(saveLabel, color = MaterialTheme.colorScheme.primary.copy(alpha = if (canSave) 1f else 0.4f)) } },
+                )
+            },
+        ) { padding ->
+            Column(
+                Modifier.padding(padding).fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+                content = content,
+            )
+        }
+    }
+}

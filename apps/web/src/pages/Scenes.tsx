@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { AFTERCARE } from "@obey/contracts";
 import {
@@ -17,134 +17,108 @@ import {
 import { errorMessage } from "../api/client";
 import { useOpenOnNew } from "../lib/newParam";
 import type { AftercarePlan, Scene, SceneSide } from "../api/types";
-import { Avatar } from "../components/Avatar";
 import { CommentThread } from "../components/Comments";
-import { MOOD_LABELS, MOODS, MoodPicker } from "../components/Mood";
-import { SubHeader, Button, Chip, Dialog, Empty, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, SegmentedButtons, TextArea, TextField, cx, useSnackbar } from "../components/ui";
-import { fmtDateTime, fromLocalInput, toLocalInput } from "../lib/dates";
+import { MOOD_LABELS, MoodPicker } from "../components/Mood";
+import { BackLink, Button, Chip, ErrorBox, Fab, Icon, Loading, OverflowMenu, PageHeader, SubHeader, TextArea, TextField, useSnackbar } from "../components/ui";
+import { fmtDate, fmtDateTime, fromLocalInput, localDateOf, toLocalInput, today } from "../lib/dates";
 import { useReadOnly, useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
 import { useConfirm } from "../lib/useConfirm";
 
 type Safeword = Scene["safeword"];
 
-/** "Fri, Oct 17, 9:00 PM", in the viewer's time. */
-const when = (s: Scene) => fmtDateTime(s.occurredAt);
-const sceneName = (s: Scene) => s.title || "Untitled scene";
+const sceneName = (s: Scene) => s.title || "Untitled";
+const feeling = (mood: number) => `feeling ${MOOD_LABELS[mood - 1]!.toLowerCase()}`;
+/** "Nov 19", with the year only when it isn't this one. */
+const shortDay = (iso: string) => {
+  const d = localDateOf(new Date(iso));
+  return fmtDate(d, d.slice(0, 4) === today().slice(0, 4) ? { month: "short", day: "numeric" } : { month: "short", day: "numeric", year: "numeric" });
+};
+const safewordLine = (w: Safeword) => (w === "none" ? "no safeword used" : `${w} called`);
 
-/** "Yellow called" / "Red called", or nothing. */
+/** "Yellow called" / "Red called", or nothing: in the accent, as text. */
 export function SafewordBadge({ safeword }: { safeword: Safeword }) {
   if (safeword === "none") return null;
-  return (
-    <span
-      className={cx(
-        "inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-label-large",
-        safeword === "red" ? "bg-error-container text-on-error-container" : "bg-tertiary-container text-on-tertiary-container",
-      )}
-    >
-      <Icon name="health_and_safety" size={16} />
-      {safeword === "red" ? "Red" : "Yellow"} called
-    </span>
-  );
+  return <span className="text-label-large text-primary">{safeword === "red" ? "Red" : "Yellow"} called</span>;
 }
 
-function Chips({ items }: { items: string[] }) {
-  if (!items.length) return null;
-  return (
-    <div className="flex flex-wrap gap-2">
-      {items.map((a) => (
-        <Chip key={a}>{a}</Chip>
-      ))}
-    </div>
-  );
-}
-
-function MoodMark({ mood, size = 18 }: { mood: number; size?: number }) {
-  return (
-    <span className="inline-flex items-center gap-1">
-      <Icon name={MOODS[mood - 1]!} filled size={size} className="text-primary" />
-      {MOOD_LABELS[mood - 1]}
-    </span>
-  );
-}
-
-function Person({ userId, size = 24 }: { userId: string; size?: number }) {
-  const { rel } = useRel();
-  const m = rel.members.find((x) => x.userId === userId);
-  return <Avatar userId={userId} name={m?.displayName ?? "?"} version={m?.avatarVersion ?? null} size={size} />;
-}
-
+/** Mockup 77: your aftercare plan at the top, then each scene on a hairline. */
 export function ScenesPage() {
-  const { rel } = useRel();
+  const { rel, me, partners, memberName } = useRel();
   const readOnly = useReadOnly();
   const scenes = useScenes(rel.id);
+  const plans = useAftercarePlans(rel.id);
   const [logging, setLogging] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<AftercarePlan | null>(null);
   useOpenOnNew(() => setLogging(true), !readOnly);
-  const navigate = useNavigate();
+  const mine = plans.data?.find((p) => p.userId === me.user.id);
+  const others = (plans.data ?? []).filter((p) => p.userId !== me.user.id);
+  const names = partners.map((p) => p.displayName).join(" and ");
   return (
     <>
-      <PageHeader
-        title="Scenes"
-        actions={
-          <Button variant="tonal" icon="volunteer_activism" onClick={() => navigate({ to: "/aftercare" })}>
-            Aftercare
-          </Button>
-        }
-      />
-      <div className="flex flex-col gap-3 px-4 pb-28 md:px-6">
+      <PageHeader title="Scenes" subtitle="Only your dynamic sees these." />
+      <div className="flex max-w-3xl flex-col gap-6 px-4 pb-28 md:px-6">
+        {mine && (
+          <section className="rounded-lg border border-outline-variant bg-surface-container-lowest p-6">
+            <h2 className="eyebrow">Your aftercare plan</h2>
+            <PlanText plan={mine} empty="Not written yet." />
+            {!readOnly && (
+              <button type="button" onClick={() => setEditingPlan(mine)} className="mt-2 text-left text-body-large text-primary">
+                {mine.updatedAt ? "Edit" : "Write yours"}
+                {names && ` · ${names} ${partners.length === 1 ? "sees" : "see"} this after each scene`}
+              </button>
+            )}
+          </section>
+        )}
+        {others.some((p) => p.needs.length || p.note) && (
+          <Link to="/aftercare" className="-mt-2 text-body-large text-on-surface-variant">
+            {others.map((p) => `${memberName(p.userId)}'s aftercare plan`).join(" · ")} ›
+          </Link>
+        )}
         {scenes.isLoading && <Loading />}
         {scenes.error && <ErrorBox error={scenes.error} onRetry={() => scenes.refetch()} />}
-        {scenes.data?.length === 0 && (
-          <Empty
-            icon="auto_awesome"
-            title="No scenes yet"
-            body="Log one afterwards: what you did, whether a safeword was called and the aftercare given. Each of you then writes how it went."
-          />
+        {scenes.data && scenes.data.length > 0 && (
+          <div className="divide-y divide-outline-variant">
+            {scenes.data.map((s) => (
+              <SceneRow key={s.id} s={s} />
+            ))}
+          </div>
         )}
-        {scenes.data?.map((s) => (
-          <SceneCard key={s.id} s={s} />
-        ))}
+        {scenes.data?.length === 0 && <p className="text-body-large text-on-surface-variant">No scenes yet.</p>}
       </div>
       {!readOnly && <Fab icon="add" label="Log a scene" onClick={() => setLogging(true)} />}
       {logging && <SceneDialog onClose={() => setLogging(false)} />}
+      {editingPlan && <PlanDialog plan={editingPlan} onClose={() => setEditingPlan(null)} />}
     </>
   );
 }
 
-function SceneCard({ s }: { s: Scene }) {
-  const { rel, me, memberName } = useRel();
+/** A plan's needs joined by middots, then its note. */
+function PlanText({ plan, empty }: { plan: AftercarePlan; empty: string }) {
+  if (!plan.needs.length && !plan.note) return <p className="mt-2 text-body-large text-on-surface-variant">{empty}</p>;
   return (
-    <Link to="/scenes/$sceneId" params={{ sceneId: s.id }} className="border border-outline-variant state-layer flex flex-col gap-2 rounded-lg p-4 text-on-surface">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-body-medium text-on-surface-variant">{when(s)}</span>
-        <SafewordBadge safeword={s.safeword} />
-      </div>
-      <div className="text-title-large">{sceneName(s)}</div>
-      <Chips items={s.aftercare} />
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-body-medium text-on-surface-variant">
-        {rel.members.map((m) => {
-          const side = s.sides.find((x) => x.userId === m.userId);
-          const shared = s.shared.includes(m.userId);
-          return (
-            <span key={m.userId} className="inline-flex items-center gap-1.5">
-              <Person userId={m.userId} />
-              {side ? (
-                <MoodMark mood={side.mood} />
-              ) : shared ? (
-                <>
-                  <Icon name="check_circle" filled size={18} className="text-primary" />
-                  Shared
-                </>
-              ) : (
-                <>
-                  <Icon name="schedule" size={18} />
-                  {m.userId === me.user.id ? "Add your side" : `${memberName(m.userId)} hasn't yet`}
-                </>
-              )}
-            </span>
-          );
-        })}
-      </div>
+    <div className="mt-2 text-body-large text-on-surface">
+      {plan.needs.length > 0 && <p>{plan.needs.map((n) => n.charAt(0).toUpperCase() + n.slice(1)).join(" · ")}</p>}
+      {plan.note && <p className="mt-1 whitespace-pre-wrap">{plan.note}</p>}
+    </div>
+  );
+}
+
+function SceneRow({ s }: { s: Scene }) {
+  const { me } = useRel();
+  const mineShared = s.shared.includes(me.user.id);
+  const all = s.shared.length >= 2 && mineShared;
+  const line = [
+    shortDay(s.occurredAt),
+    s.safeword !== "none" ? safewordLine(s.safeword) : null,
+    all ? "both sides shared" : mineShared ? "waiting on theirs" : "your side missing",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <Link to="/scenes/$sceneId" params={{ sceneId: s.id }} className="state-layer flex flex-col gap-1 py-5">
+      <span className="font-serif text-[30px] leading-9 text-on-surface">{sceneName(s)}</span>
+      <span className="text-body-large text-on-surface-variant">{line}</span>
     </Link>
   );
 }
@@ -165,13 +139,13 @@ function AftercarePicker({ value, onChange }: { value: string[]; onChange(v: str
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-2">
         {options.map((a) => (
-          <Chip key={a} selected={value.includes(a)} onClick={() => toggle(a)}>
-            {a}
+          <Chip key={a} plain selected={value.includes(a)} onClick={() => toggle(a)} className="h-10 px-5 text-body-large">
+            {a.charAt(0).toUpperCase() + a.slice(1)}
           </Chip>
         ))}
         {!adding && (
-          <Chip icon="add" onClick={() => setAdding(true)}>
-            Other
+          <Chip plain onClick={() => setAdding(true)} className="h-10 px-5 text-body-large">
+            + Other
           </Chip>
         )}
       </div>
@@ -193,6 +167,40 @@ function AftercarePicker({ value, onChange }: { value: string[]; onChange(v: str
           </Button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** A full-screen form with "Cancel · title · Save" across the top, as in mockup 76. */
+function FormSheet({
+  title,
+  onClose,
+  onSave,
+  saving,
+  canSave,
+  children,
+}: {
+  title: string;
+  onClose(): void;
+  onSave(): void;
+  saving: boolean;
+  canSave: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-surface" role="dialog" aria-modal aria-label={title}>
+      <div className="mx-auto flex w-full max-w-xl flex-col px-4 pb-10 md:px-6">
+        <div className="sticky top-0 z-10 grid h-16 grid-cols-[1fr_auto_1fr] items-center bg-surface">
+          <button type="button" onClick={onClose} className="justify-self-start text-body-large text-on-surface-variant">
+            Cancel
+          </button>
+          <h1 className="text-title-medium text-on-surface">{title}</h1>
+          <button type="button" disabled={!canSave || saving} onClick={onSave} className="justify-self-end text-body-large text-primary disabled:opacity-40">
+            Save
+          </button>
+        </div>
+        <div className="flex flex-col gap-6">{children}</div>
+      </div>
     </div>
   );
 }
@@ -231,52 +239,35 @@ function SceneDialog({ scene, onClose }: { scene?: Scene; onClose(): void }) {
       },
     );
   return (
-    <Dialog
-      open
-      onClose={onClose}
-      icon="auto_awesome"
-      title={scene ? "Edit scene" : "Log a scene"}
-      actions={
-        <>
-          <Button variant="text" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button busy={save.isPending} disabled={!at} onClick={submit}>
-            Save
-          </Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-4">
-        <TextField label="Name (optional)" value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} />
-        <TextField type="datetime-local" label="When" value={at} onChange={(e) => setAt(e.target.value)} />
-        <TextArea label="What we did (optional)" value={what} maxLength={4000} rows={3} onChange={(e) => setWhat(e.target.value)} />
-        <div className="flex flex-col gap-2">
-          <span className="text-body-medium text-on-surface-variant">Safeword</span>
-          <SegmentedButtons<Safeword>
-            value={safeword}
-            onChange={setSafeword}
-            options={[
-              { value: "none", label: "None" },
-              { value: "yellow", label: "Yellow" },
-              { value: "red", label: "Red" },
-            ]}
-          />
+    <FormSheet title={scene ? "Edit scene" : "Log a scene"} onClose={onClose} onSave={submit} saving={save.isPending} canSave={!!at}>
+      <TextField label="Name (optional)" value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} />
+      <TextField type="datetime-local" label="When" value={at} onChange={(e) => setAt(e.target.value)} />
+      <TextArea label="What we did (optional)" value={what} maxLength={4000} rows={2} onChange={(e) => setWhat(e.target.value)} />
+      <div className="flex flex-col gap-2">
+        <span className="text-body-medium text-on-surface-variant">Safeword</span>
+        <div role="radiogroup" aria-label="Safeword" className="flex flex-wrap gap-2">
+          {(["none", "yellow", "red"] as const).map((w) => (
+            <Chip key={w} plain selected={safeword === w} onClick={() => setSafeword(w)} className="h-10 px-5 text-body-large">
+              {w === "none" ? "None" : w === "yellow" ? "Yellow" : "Red"}
+            </Chip>
+          ))}
         </div>
-        <div className="flex flex-col gap-2">
-          <span className="text-body-medium text-on-surface-variant">Aftercare given</span>
-          <AftercarePicker value={aftercare} onChange={setAftercare} />
-        </div>
-        {!scene && others.length > 0 && (
-          <p className="text-body-small text-on-surface-variant">
-            {others.join(" and ")} {others.length === 1 ? "is" : "are"} asked to add their side. You each see the other's once you've both written.
-          </p>
-        )}
       </div>
-    </Dialog>
+      <div className="flex flex-col gap-2">
+        <span className="text-body-medium text-on-surface-variant">Aftercare given</span>
+        <AftercarePicker value={aftercare} onChange={setAftercare} />
+      </div>
+      {!scene && others.length > 0 && (
+        <p className="text-body-large text-on-surface-variant">
+          Next, each of you writes your own side. You won't see {others.join(" and ")}'s until you share yours. The next morning you'll each be asked how you
+          feel.
+        </p>
+      )}
+    </FormSheet>
   );
 }
 
+/** Mockup 21: the scene, your side, the others' (hidden until you share yours) and the morning after. */
 export function ScenePage({ sceneId }: { sceneId: string }) {
   const { rel, me, memberName } = useRel();
   const readOnly = useReadOnly();
@@ -292,68 +283,79 @@ export function ScenePage({ sceneId }: { sceneId: string }) {
   const s = q.data;
   const mine = s.sides.find((x) => x.userId === me.user.id);
   const others = rel.members.filter((m) => m.userId !== me.user.id);
-  const othersShared = others.filter((m) => s.shared.includes(m.userId));
-  const othersWaiting = others.filter((m) => !s.shared.includes(m.userId));
   const checkOpen = Date.now() >= Date.parse(s.checkFrom);
+  const day = fmtDate(localDateOf(new Date(s.occurredAt)), { weekday: "long", month: "short", day: "numeric" });
+  const toForm = () => document.getElementById("your-side")?.scrollIntoView({ behavior: "smooth", block: "start" });
   return (
-    <div className="flex flex-col">
-      <header className="sticky top-0 z-20 flex h-14 items-center gap-1 bg-surface px-2 md:px-4">
-        <IconButton icon="arrow_back" label="Back" onClick={back} />
-        <div className="flex-1" />
-        {!readOnly && s.loggedBy === me.user.id && (
-          <IconButton
-            icon="delete"
-            label="Delete"
-            onClick={() =>
-              confirm(
-                `Delete “${sceneName(s)}”?`,
-                () => del.mutate(s.id, { onSuccess: () => navigate({ to: "/scenes" }), onError: (e) => snack(errorMessage(e)) }),
-                "Both sides, the check-ins and comments go with it.",
-              )
-            }
+    <div className="flex max-w-3xl flex-col px-4 pt-3 pb-12 md:px-6 md:pt-6">
+      <div className="-mx-2 flex items-center">
+        <div className="min-w-0 flex-1">
+          <BackLink label="Scenes" onClick={back} />
+        </div>
+        {!readOnly && (
+          <OverflowMenu
+            items={[
+              { label: "Edit", icon: "edit", onClick: () => setEditing(true) },
+              ...(s.loggedBy === me.user.id
+                ? [
+                    {
+                      label: "Delete",
+                      icon: "delete",
+                      danger: true,
+                      onClick: () =>
+                        confirm(
+                          `Delete “${sceneName(s)}”?`,
+                          () => del.mutate(s.id, { onSuccess: () => navigate({ to: "/scenes" }), onError: (e) => snack(errorMessage(e)) }),
+                          "Both sides, the check-ins and comments go with it.",
+                        ),
+                    },
+                  ]
+                : []),
+            ]}
           />
         )}
-        {!readOnly && (
-          <Button variant="tonal" icon="edit" onClick={() => setEditing(true)}>
-            Edit
-          </Button>
-        )}
-      </header>
-      <div className="flex flex-col gap-4 px-4 pb-10 md:px-6">
-        <div>
-          <h1 className="text-headline-medium text-on-surface">{sceneName(s)}</h1>
-          <div className="text-body-medium text-on-surface-variant">
-            {when(s)}
-            {s.loggedBy && ` · logged by ${s.loggedBy === me.user.id ? "you" : memberName(s.loggedBy)}`}
-          </div>
-        </div>
-        {(s.safeword !== "none" || s.aftercare.length > 0 || s.what) && (
-          <div className="border border-outline-variant flex flex-col gap-2 rounded-lg p-4 text-on-surface">
-            <div className="flex flex-wrap gap-2">
-              <SafewordBadge safeword={s.safeword} />
-              {s.aftercare.map((a) => (
-                <Chip key={a}>{a}</Chip>
-              ))}
-            </div>
-            {s.what && <p className="text-body-large whitespace-pre-wrap">{s.what}</p>}
-          </div>
-        )}
-        {!mine && !readOnly && <YourSide s={s} />}
-        {mine && <SideView side={mine} />}
-        {s.sides
-          .filter((x) => x.userId !== me.user.id)
-          .map((x) => (
-            <SideView key={x.userId} side={x} />
+      </div>
+      <div className="eyebrow mt-3">
+        {day} · {safewordLine(s.safeword)}
+      </div>
+      <h1 className="mt-2 font-serif text-[56px] leading-[60px] break-words text-on-surface">{sceneName(s)}</h1>
+      {s.aftercare.length > 0 && (
+        <div className="mt-5 flex flex-wrap gap-2">
+          {s.aftercare.map((a, i) => (
+            <Chip key={a} className="h-10 px-5 text-body-large">
+              {i === 0 ? `Aftercare: ${a}` : a}
+            </Chip>
           ))}
-        {!mine && othersShared.length > 0 && (
-          <div className="border border-outline-variant flex items-center gap-3 rounded-lg px-4 py-3 text-body-medium text-on-surface-variant">
-            <Icon name="lock" />
-            {othersShared.map((m) => m.displayName).join(" and ")} {othersShared.length === 1 ? "has" : "have"} written their side. You'll see it once you share yours.
-          </div>
-        )}
-        {mine && othersWaiting.length > 0 && (
-          <p className="text-body-medium text-on-surface-variant">Waiting for {othersWaiting.map((m) => m.displayName).join(" and ")} to share their side.</p>
-        )}
+        </div>
+      )}
+      {s.what && <p className="mt-5 text-body-large whitespace-pre-wrap text-on-surface-variant">{s.what}</p>}
+      <div className="mt-8 flex flex-col gap-8">
+        {mine ? <SideView side={mine} /> : !readOnly && <YourSide s={s} />}
+        {others.map((m) => {
+          const side = s.sides.find((x) => x.userId === m.userId);
+          if (side) return <SideView key={m.userId} side={side} />;
+          if (s.shared.includes(m.userId))
+            return (
+              <section
+                key={m.userId}
+                className="flex flex-col items-center gap-2 rounded-lg border border-outline-variant bg-surface-container px-6 py-8 text-center"
+              >
+                <Icon name="visibility_off" className="text-on-surface-variant" />
+                <h2 className="font-serif text-[28px] leading-9 text-on-surface">{m.displayName}'s side is hidden</h2>
+                <p className="text-body-large text-on-surface-variant">{m.displayName} has written it. You'll both see each other's once you share yours.</p>
+                {!readOnly && (
+                  <Button className="mt-2" onClick={toForm}>
+                    Share my side
+                  </Button>
+                )}
+              </section>
+            );
+          return (
+            <p key={m.userId} className="text-body-large text-on-surface-variant">
+              {memberName(m.userId)} hasn't written their side yet.
+            </p>
+          );
+        })}
         {(checkOpen || s.checks.length > 0) && <NextDay s={s} />}
         <SceneComments sceneId={s.id} />
       </div>
@@ -377,21 +379,22 @@ function YourSide({ s }: { s: Scene }) {
     .map((p) => p.displayName)
     .join(" and ");
   return (
-    <section className="border border-outline-variant flex flex-col gap-3 rounded-lg p-4" aria-label="Your side">
-      <div>
-        <h2 className="text-title-large text-on-surface">Your side</h2>
-        <p className="text-body-medium text-on-surface-variant">How do you feel about it now?</p>
-      </div>
+    <section id="your-side" className="flex scroll-mt-4 flex-col gap-4" aria-label="Your side">
+      <h2 className="eyebrow">Your side</h2>
       <MoodPicker value={mood} onChange={setMood} />
       <TextArea label="What worked" value={worked} maxLength={2000} rows={2} onChange={(e) => setWorked(e.target.value)} />
       <TextArea label="What to change next time" value={change} maxLength={2000} rows={2} onChange={(e) => setChange(e.target.value)} />
       <TextArea label="Anything you still need (optional)" value={need} maxLength={2000} rows={2} onChange={(e) => setNeed(e.target.value)} />
-      <div className="flex justify-end">
+      <div>
         <Button
           busy={share.isPending}
           disabled={mood === null}
           onClick={() =>
-            mood && share.mutate({ id: s.id, body: { mood, worked: worked.trim(), change: change.trim(), need: need.trim() } }, { onError: (e) => snack(errorMessage(e)) })
+            mood &&
+            share.mutate(
+              { id: s.id, body: { mood, worked: worked.trim(), change: change.trim(), need: need.trim() } },
+              { onError: (e) => snack(errorMessage(e)) },
+            )
           }
         >
           {to ? `Share with ${to}` : "Save"}
@@ -401,58 +404,64 @@ function YourSide({ s }: { s: Scene }) {
   );
 }
 
+/** A side as the mockup shows it: an eyebrow with the mood, then the words in the serif. */
 function SideView({ side }: { side: SceneSide }) {
   const { me, memberName } = useRel();
-  const rows: [string, string][] = [
-    ["What worked", side.worked],
+  const who = side.userId === me.user.id ? "Your side" : `${memberName(side.userId)}'s side`;
+  const rows: [string | null, string][] = [
+    [null, side.worked],
     ["Next time", side.change],
     ["Still needs", side.need],
   ];
   return (
-    <section className="border border-outline-variant flex flex-col gap-2 rounded-lg p-4 text-on-surface">
-      <div className="flex items-center gap-2">
-        <Person userId={side.userId} size={28} />
-        <span className="text-title-medium">{side.userId === me.user.id ? "You" : memberName(side.userId)}</span>
-        <span className="text-body-medium text-on-surface-variant">
-          <MoodMark mood={side.mood} size={20} />
-        </span>
-      </div>
+    <section className="flex flex-col gap-3">
+      <h2 className="eyebrow">
+        {who} · {feeling(side.mood)}
+      </h2>
       {rows
         .filter(([, text]) => text)
         .map(([label, text]) => (
-          <div key={label}>
-            <div className="text-body-small text-on-surface-variant">{label}</div>
-            <div className="text-body-large whitespace-pre-wrap">{text}</div>
+          <div key={label ?? "worked"}>
+            {label && <div className="text-body-medium text-on-surface-variant">{label}</div>}
+            <p className="font-serif text-[26px] leading-9 whitespace-pre-wrap text-on-surface">{text}</p>
           </div>
         ))}
     </section>
   );
 }
 
-/** The day-after check-ins, and mine to give once it opens. */
+/** The morning-after check-ins on hairlines, and mine to give once it opens. */
 function NextDay({ s }: { s: Scene }) {
-  const { me } = useRel();
+  const { rel, me, memberName } = useRel();
   const readOnly = useReadOnly();
-  const mine = s.checks.find((c) => c.userId === me.user.id);
   return (
-    <section className="border border-outline-variant flex flex-col gap-2 rounded-lg p-4 text-on-surface">
-      <div className="flex items-center gap-2">
-        <Icon name="wb_sunny" className="text-tertiary" />
-        <span className="text-title-medium">Next day</span>
+    <section className="flex flex-col">
+      <h2 className="eyebrow">The morning after</h2>
+      <div className="mt-2 divide-y divide-outline-variant">
+        {rel.members.map((m) => {
+          const c = s.checks.find((x) => x.userId === m.userId);
+          if (c)
+            return (
+              <div key={m.userId} className="py-3">
+                <div className="text-body-large text-on-surface">
+                  {m.userId === me.user.id ? "You" : memberName(m.userId)} · {feeling(c.mood)}
+                </div>
+                {c.note && <div className="text-body-medium text-on-surface-variant">“{c.note}”</div>}
+              </div>
+            );
+          if (m.userId === me.user.id && !readOnly && Date.now() >= Date.parse(s.checkFrom))
+            return (
+              <div key={m.userId} className="py-3">
+                <CheckIn s={s} />
+              </div>
+            );
+          return (
+            <p key={m.userId} className="py-3 text-body-large text-on-surface-variant">
+              {m.userId === me.user.id ? "You haven't answered yet" : `${memberName(m.userId)} hasn't answered yet`}
+            </p>
+          );
+        })}
       </div>
-      {s.checks.map((c) => (
-        <div key={c.userId} className="flex flex-wrap items-center gap-2 text-body-medium">
-          <Person userId={c.userId} />
-          <MoodMark mood={c.mood} />
-          {c.note && <span className="text-on-surface-variant">· “{c.note}”</span>}
-        </div>
-      ))}
-      {!mine && !readOnly && Date.now() >= Date.parse(s.checkFrom) && (
-        <>
-          <p className="text-body-medium text-on-surface-variant">How are you feeling now?</p>
-          <CheckIn s={s} />
-        </>
-      )}
     </section>
   );
 }
@@ -465,21 +474,24 @@ export function CheckIn({ s, onDone }: { s: Scene; onDone?(): void }) {
   const [mood, setMood] = useState<number | null>(null);
   const [note, setNote] = useState("");
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-4">
       <MoodPicker value={mood} onChange={setMood} />
-      {mood !== null && (
-        <div className="flex items-end gap-2">
-          <TextField label="Anything you still need? (optional)" value={note} maxLength={500} className="flex-1" onChange={(e) => setNote(e.target.value)} />
-          <Button
-            busy={check.isPending}
-            onClick={() =>
-              check.mutate({ id: s.id, mood, note: note.trim() }, { onSuccess: () => (snack("Saved with the scene"), onDone?.()), onError: (e) => snack(errorMessage(e)) })
-            }
-          >
-            Save
-          </Button>
-        </div>
-      )}
+      <TextField label="Anything you still need? (optional)" value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} />
+      <div>
+        <Button
+          busy={check.isPending}
+          disabled={mood === null}
+          onClick={() =>
+            mood !== null &&
+            check.mutate(
+              { id: s.id, mood, note: note.trim() },
+              { onSuccess: () => (snack("Saved with the scene"), onDone?.()), onError: (e) => snack(errorMessage(e)) },
+            )
+          }
+        >
+          Send
+        </Button>
+      </div>
     </div>
   );
 }
@@ -493,7 +505,7 @@ export function SceneComments({ sceneId }: { sceneId: string }) {
   const list = comments.data ?? [];
   return (
     <section className="flex flex-col gap-3" aria-label="Comments">
-      <h2 className="text-title-medium text-on-surface">Comments{list.length > 0 && ` · ${list.length}`}</h2>
+      <h2 className="eyebrow">Comments{list.length > 0 && ` · ${list.length}`}</h2>
       <CommentThread
         list={list}
         open
@@ -505,7 +517,7 @@ export function SceneComments({ sceneId }: { sceneId: string }) {
   );
 }
 
-/** What each person needs afterwards; everyone edits only their own. */
+/** What each person needs afterwards, on hairlines; everyone edits only their own. */
 export function AftercarePage() {
   const { rel, me, memberName } = useRel();
   const readOnly = useReadOnly();
@@ -513,35 +525,24 @@ export function AftercarePage() {
   const navigate = useNavigate();
   const back = useBack(() => navigate({ to: "/scenes" }));
   const [editing, setEditing] = useState<AftercarePlan | null>(null);
-  const list = [...(plans.data ?? [])].sort((a, b) => Number(a.userId === me.user.id) - Number(b.userId === me.user.id));
+  const list = [...(plans.data ?? [])].sort((a, b) => Number(b.userId === me.user.id) - Number(a.userId === me.user.id));
   return (
     <div className="flex flex-col">
       <SubHeader title="Aftercare" back="Scenes" onBack={back} />
-      <div className="flex flex-col gap-3 px-4 pb-10 md:px-6">
-        <p className="text-body-medium text-on-surface-variant">What each of you needs afterwards. It's shown to the others when a scene is logged.</p>
+      <div className="flex max-w-3xl flex-col gap-8 px-4 pb-10 md:px-6">
         {plans.isLoading && <Loading />}
         {plans.error && <ErrorBox error={plans.error} onRetry={() => plans.refetch()} />}
         {list.map((p) => {
           const isMe = p.userId === me.user.id;
           return (
-            <section key={p.userId} className="border border-outline-variant flex flex-col gap-2 rounded-lg p-4 text-on-surface">
-              <div className="flex items-center gap-2">
-                <Person userId={p.userId} size={28} />
-                <span className="text-title-medium">{isMe ? `${me.user.displayName} (you)` : memberName(p.userId)}</span>
-              </div>
-              <Chips items={p.needs} />
-              {p.note && <p className="text-body-large whitespace-pre-wrap">{p.note}</p>}
-              {!p.needs.length && !p.note && <p className="text-body-medium text-on-surface-variant">{isMe ? "You haven't written yours yet." : "Not written yet."}</p>}
-              {p.updatedAt && (
-                <span className="text-body-small text-on-surface-variant">
-                  Updated {fmtDateTime(p.updatedAt)}
-                  {!isMe && ` · only ${memberName(p.userId)} edits this`}
-                </span>
-              )}
+            <section key={p.userId} className="border-b border-outline-variant pb-6">
+              <h2 className="eyebrow">{isMe ? "Your aftercare plan" : `${memberName(p.userId)}'s aftercare plan`}</h2>
+              <PlanText plan={p} empty={isMe ? "You haven't written yours yet." : "Not written yet."} />
+              {p.updatedAt && <p className="mt-2 text-body-medium text-on-surface-variant">Updated {fmtDateTime(p.updatedAt)}</p>}
               {isMe && !readOnly && (
-                <Button variant="outlined" icon="edit" className="self-start" onClick={() => setEditing(p)}>
-                  {p.updatedAt ? "Edit yours" : "Write yours"}
-                </Button>
+                <button type="button" onClick={() => setEditing(p)} className="mt-2 text-label-large text-primary">
+                  {p.updatedAt ? "Edit" : "Write yours"}
+                </button>
               )}
             </section>
           );
@@ -559,26 +560,18 @@ function PlanDialog({ plan, onClose }: { plan: AftercarePlan; onClose(): void })
   const [needs, setNeeds] = useState(plan.needs);
   const [note, setNote] = useState(plan.note);
   return (
-    <Dialog
-      open
-      onClose={onClose}
-      icon="volunteer_activism"
+    <FormSheet
       title="Your aftercare"
-      actions={
-        <>
-          <Button variant="text" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button busy={save.isPending} onClick={() => save.mutate({ needs, note: note.trim() }, { onSuccess: onClose, onError: (e) => snack(errorMessage(e)) })}>
-            Save
-          </Button>
-        </>
-      }
+      onClose={onClose}
+      saving={save.isPending}
+      canSave
+      onSave={() => save.mutate({ needs, note: note.trim() }, { onSuccess: onClose, onError: (e) => snack(errorMessage(e)) })}
     >
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <span className="text-body-medium text-on-surface-variant">What you need afterwards</span>
         <AftercarePicker value={needs} onChange={setNeeds} />
-        <TextArea label="Anything else (optional)" value={note} maxLength={1000} rows={3} onChange={(e) => setNote(e.target.value)} />
       </div>
-    </Dialog>
+      <TextArea label="Anything else (optional)" value={note} maxLength={1000} rows={3} onChange={(e) => setNote(e.target.value)} />
+    </FormSheet>
   );
 }

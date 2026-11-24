@@ -1,6 +1,15 @@
 package app.obey.ui.scenes
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import app.obey.ui.common.Eyebrow
+import app.obey.ui.common.inkButtonColors
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -49,46 +58,42 @@ fun sceneToCheck(scenes: List<Scene>, me: String, now: Instant = Instant.now()):
  * until answered (for three days). Only the latest scene of each shows.
  */
 @Composable
-fun SceneCards(data: TodayScenes, session: Session, busy: Boolean, onAftercareDone: (Scene) -> Unit, onCheck: (Scene, Int, String) -> Unit) {
+fun SceneCards(data: TodayScenes, session: Session, busy: Boolean, onAftercareDone: (Scene) -> Unit, onOpen: (String) -> Unit, onCheck: (Scene, Int, String) -> Unit) {
     val me = session.userId
     val fresh = freshScene(data.scenes)
     val theirs = data.plans.filter { it.userId != me && (it.needs.isNotEmpty() || it.note.isNotBlank()) }
     val check = sceneToCheck(data.scenes, me)
-    val everyone = if (session.relationship?.members?.size == 2) "both of you" else "everyone in your dynamic"
     if ((fresh == null || theirs.isEmpty()) && check == null) return
     val c = MaterialTheme.colorScheme
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    val box = MaterialTheme.shapes.medium
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (fresh != null && theirs.isNotEmpty()) {
-            Surface(color = androidx.compose.ui.graphics.Color.Transparent, contentColor = c.onSurface, border = androidx.compose.foundation.BorderStroke(1.dp, c.primary), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    theirs.forEach { p ->
-                        Text("Aftercare for ${session.nameOf(p.userId)}", style = MaterialTheme.typography.titleMedium)
-                        Tags(p.needs, color = c.onTertiaryContainer)
-                        if (p.note.isNotBlank()) Text(p.note, style = MaterialTheme.typography.bodyMedium)
+            Column(
+                Modifier.fillMaxWidth().clip(box).background(c.surfaceContainerLowest).border(1.dp, c.primary, box).padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                theirs.forEach { p ->
+                    val name = session.nameOf(p.userId)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Eyebrow("$name's aftercare plan", color = c.primary)
+                        Text("$name likes: " + listOf(p.needs.joinToString(", "), p.note).filter { it.isNotBlank() }.joinToString(". "), style = MaterialTheme.typography.bodyLarge)
                     }
-                    Button(
-                        onClick = { onAftercareDone(fresh) },
-                        enabled = !busy,
-                        colors = ButtonDefaults.buttonColors(containerColor = c.onTertiaryContainer, contentColor = c.tertiaryContainer),
-                        modifier = Modifier.padding(top = 4.dp),
-                    ) { Text("Done") }
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Button(onClick = { onAftercareDone(fresh) }, enabled = !busy, colors = inkButtonColors(), shape = MaterialTheme.shapes.small) { Text("Done") }
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = { onOpen(fresh.id) }) { Text("Open the scene", color = c.primary) }
                 }
             }
         }
         if (check != null) {
-            Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, c.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Column {
-                        Text("How are you feeling after ${whenWas(check)}?", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            "Saved with ${if (check.title.isNotBlank()) "“${check.title}”" else "the scene"}, for $everyone to see.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = c.onSurfaceVariant,
-                        )
-                    }
-                    // Keyed by scene, so an answer doesn't carry over to the next one.
-                    key(check.id) { SceneCheckIn(busy) { mood, note -> onCheck(check, mood, note) } }
-                }
+            Column(
+                Modifier.fillMaxWidth().clip(box).background(c.surfaceContainerLowest).border(1.dp, c.outlineVariant, box).padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text("How are you feeling after ${whenWas(check)}?", style = MaterialTheme.typography.headlineSmall)
+                // Keyed by scene, so an answer doesn't carry over to the next one.
+                key(check.id) { SceneCheckIn(busy) { mood, note -> onCheck(check, mood, note) } }
             }
         }
     }
