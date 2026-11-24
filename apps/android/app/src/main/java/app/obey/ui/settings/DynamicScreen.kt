@@ -563,12 +563,13 @@ fun DynamicScreen(onBack: () -> Unit, startInvite: Boolean = false, startFeature
     }
 }
 
-/** Name, who moves deadlines, sub notes and how long proof photos stay: mockup 87. Only a Dominant changes them. */
+/** Name, who moves deadlines, when "any time" tasks are reminded, sub notes and how long proof photos stay: mockup 87. Only a Dominant changes them. */
 @Composable
 private fun HowItWorks(s: app.obey.data.Session, rel: Relationship, busy: Boolean, vm: SettingsViewModel, onRename: () -> Unit) {
     val manage = s.canManage && !rel.ended
     val subName = rel.members.firstOrNull { it.role == Role.Submissive }?.displayName ?: "The submissive"
     var pickingProofDays by remember { mutableStateOf(false) }
+    var pickingAnytime by remember { mutableStateOf(false) }
     Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(rememberScrollState())) {
         if (!manage) {
             Text(
@@ -605,6 +606,13 @@ private fun HowItWorks(s: app.obey.data.Session, rel: Relationship, busy: Boolea
                 else Text("${rel.weeklyDelayAllowance} free delays a week", style = MaterialTheme.typography.bodyLarge)
             }
         }
+        SectionHeader("Reminders")
+        ListItem(
+            modifier = if (manage) Modifier.clickable { pickingAnytime = true } else Modifier,
+            overlineContent = { Text("Tasks with no time") },
+            headlineContent = { Text(app.obey.ui.common.formatClock(rel.anytimeReminder)) },
+        )
+        Hair()
         SectionHeader("Notes")
         ListItem(
             headlineContent = { Text("$subName can write their own notes") },
@@ -619,6 +627,9 @@ private fun HowItWorks(s: app.obey.data.Session, rel: Relationship, busy: Boolea
         )
         Hair()
         Spacer(Modifier.height(24.dp))
+    }
+    if (pickingAnytime) {
+        AnytimeReminderDialog(rel.anytimeReminder, onDismiss = { pickingAnytime = false }) { vm.setAnytimeReminder(it); pickingAnytime = false }
     }
     if (pickingProofDays) {
         ProofDaysDialog(rel.proofDays, onDismiss = { pickingProofDays = false }) { vm.setProofDays(it); pickingProofDays = false }
@@ -739,6 +750,34 @@ private fun LeaveDialog(
             ) { Text(if (target != null) "Block" else "Leave") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+/** Hourly from noon to 11 PM, plus whatever is stored if it's off the hour. Same list as on web. */
+private fun anytimeTimes(current: String): List<String> {
+    val hours = (12..23).map { "%02d:00".format(it) }
+    return if (current in hours) hours else (hours + current).sorted()
+}
+
+@Composable
+private fun AnytimeReminderDialog(current: String, onDismiss: () -> Unit, onPick: (String) -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Tasks with no time") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                anytimeTimes(current).forEach { t ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable { onPick(t) }.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = current == t, onClick = { onPick(t) })
+                        Text(app.obey.ui.common.formatClock(t))
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
 

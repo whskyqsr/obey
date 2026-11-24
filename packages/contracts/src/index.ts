@@ -141,6 +141,8 @@ export const relationship = z.object({
   subNotes: z.boolean(),
   /** Proof photos are deleted this many days after their task is settled; null keeps them. */
   proofDays: z.number().int().nullable().default(null),
+  /** When tasks with no due time are reminded about on their day, local "HH:mm". */
+  anytimeReminder: timeOfDay.default("20:00"),
   dates: z.array(dynamicDate),
   createdAt: z.string(),
   /** When a partner left or blocked; an ended dynamic is kept read-only for both. */
@@ -205,6 +207,8 @@ export const updateRelationship = z.object({
   subNotes: z.boolean().optional(),
   /** Either partner may change it: the photos are of them, or for them. */
   proofDays: z.number().int().min(1).max(365).nullable().optional(),
+  /** A Dominant's call, like the other task settings. */
+  anytimeReminder: timeOfDay.optional(),
   /** The whole list, replacing what's stored. */
   dates: z.array(dynamicDate).max(20).optional(),
 });

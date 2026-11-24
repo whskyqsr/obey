@@ -53,6 +53,22 @@ describe("grouped notifications", () => {
     expect(to(domId, mark).filter((s) => s.push.data?.type === "occurrence_missed").map((s) => s.push.body)).toEqual(["Sub missed 3 tasks"]);
   });
 
+  it("remind about untimed tasks at the time a Dominant sets for the dynamic", async () => {
+    const { dom, sub, relId, subId } = await ctx.pair();
+    expect((await dom.get("/me")).body.relationships.find((r: { id: string }) => r.id === relId).anytimeReminder).toBe("20:00");
+    expect((await sub.patch(`/relationships/${relId}`, { anytimeReminder: "18:00" })).status).toBe(403);
+    expect((await dom.patch(`/relationships/${relId}`, { anytimeReminder: "18:00" })).body.anytimeReminder).toBe("18:00");
+    await dom.post(`/relationships/${relId}/tasks`, task(subId, { title: "Water", dueTime: null }));
+
+    // 5:59 PM in New York: not yet.
+    let mark = ctx.notifier.sent.length;
+    await at("2026-10-16T21:59:00Z", () => runJobs(ctx.db, ctx.notifier, ctx.clock.now, opts).then(() => {}));
+    expect(to(subId, mark)).toEqual([]);
+    mark = ctx.notifier.sent.length;
+    await at("2026-10-16T22:00:00Z", () => runJobs(ctx.db, ctx.notifier, ctx.clock.now, opts).then(() => {}));
+    expect(to(subId, mark).map((s) => s.push.body)).toEqual(["A task is still to do today"]);
+  });
+
   it("count unseen rule changes in one notification that replaces the last", async () => {
     const { dom, sub, relId, subId } = await ctx.pair();
     await dom.post(`/relationships/${relId}/rules`, { title: "Stay hydrated" });

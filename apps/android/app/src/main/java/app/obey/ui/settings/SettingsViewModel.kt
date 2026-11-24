@@ -232,6 +232,12 @@ class SettingsViewModel @Inject constructor(
         say(if (date == null) "Date removed" else "Date saved")
     }
 
+    fun setAnytimeReminder(hhmm: String) = action {
+        val rel = sessions.requireRelationshipId()
+        sessions.onRelationshipChanged(api.updateRelationship(rel, UpdateRelationshipInput(anytimeReminder = hhmm)))
+        say("Reminded at ${app.obey.ui.common.formatClock(hhmm)}")
+    }
+
     fun setProofDays(days: Int?) = action {
         val rel = sessions.requireRelationshipId()
         sessions.onRelationshipChanged(api.setProofDays(rel, app.obey.api.ProofDaysInput(days)))
