@@ -15,7 +15,7 @@ Last full sweep: 2026-11-24, web at 390px and 1440px, local seed data.
 |---|---|---|---|---|
 | Today, submissive | 01, 02, 10, 11, 41 | Close | Not matched | Phone: the partner's quoted word only shows when there is one. Desktop: the right panel ("At a glance" and a points box) isn't the mockup's plain partner column. |
 | Today, Dominant | 03, 12, desktop 13 | Close | Not matched | Desktop right panel should be the partner, their last journal entry, this week's numbers and what's coming up, all without boxes. |
-| Task page | 15, 57 | Not matched | Not matched | Stat boxes and an "Up next" card instead of a hairline page. The "This week" diamond row and inline comments are missing. The header should be "‹ Today" with history and ⋯. |
+| Task page, history | 15, 57 | Close (#114) | Close (#114) | Back link reads "Back" because the page opens from several places; mockup says "‹ Today". Comments open from "Add a word" instead of always showing. Android has no "This week" diamond row yet. |
 | New task / editor | 04, 52–55, desktop 14 | Not matched | Not matched | The sentence builder isn't built. It's still the old form with a toolbar editor. |
 | + menu | 17 | Not compared | — | |
 | Week | 09, desktop 16 | Matched (#106) | Close (#114) | Desktop shows the date range beside the arrows. The mockup puts it as a small line above the title. |

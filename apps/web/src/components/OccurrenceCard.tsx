@@ -48,7 +48,8 @@ export function isOverdue(o: Occurrence, now = Date.now()) {
 }
 
 /** One due date of a task. Its title opens the task, except on the task's own page. */
-export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence; showDate?: boolean; linkTask?: boolean }) {
+/** `plain` is for the task's own page, which already names the task: no title row, just when it's due and what to do. */
+export function OccurrenceCard({ o, showDate, linkTask = true, plain }: { o: Occurrence; showDate?: boolean; linkTask?: boolean; plain?: boolean }) {
   const { rel, me, isDom, memberName, features } = useRel();
   const readOnly = useReadOnly();
   const snack = useSnackbar();
@@ -77,20 +78,25 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
   return (
     <div
       className={cx(
-        "flex flex-col gap-3 rounded-md p-4",
-        // The title link stretches over the whole card, so the card is the hover and focus target.
+        // Letters: no box; a due date reads as a row on the page, and overdue shows in the accent, not a fill.
+        "relative flex flex-col gap-3 py-3",
+        // The title link stretches over the whole row, so the row is the hover and focus target.
         linkTask && "state-layer has-[a[data-card-link]:focus-visible]:outline-2 has-[a[data-card-link]:focus-visible]:outline-primary",
-        overdue ? "bg-error-container/60" : "bg-surface-container-low",
-        done && "opacity-70",
       )}
     >
-      <div className="flex items-start gap-3">
+      <div className={cx("flex items-start gap-3", plain && "hidden")}>
         <TitleWrap linkTask={linkTask} taskId={o.seriesId}>
-          <div className={cx("text-title-medium text-on-surface", done && "line-through")}>{o.title}</div>
+          <div className={cx("text-title-medium", done ? "text-on-surface-variant" : "text-on-surface")}>{o.title}</div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-body-medium text-on-surface-variant">
             <span>
               {/* All-day tasks are due at 23:59:59 local; show "All day" rather than 11:59 PM. */}
-              {allDay ? (showDate || !isToday ? `${fmtDate(localDateOf(due))}, all day` : "All day") : showDate || !isToday ? fmtDateTime(o.dueAt) : fmtTime(o.dueAt)}
+              {allDay
+                ? showDate || !isToday
+                  ? `${fmtDate(localDateOf(due))}, all day`
+                  : "All day"
+                : showDate || !isToday
+                  ? fmtDateTime(o.dueAt)
+                  : fmtTime(o.dueAt)}
             </span>
             {o.status === "pending" && <span className={overdue ? "text-error" : ""}>· {fmtRelative(o.dueAt)}</span>}
             {!mine && <span>· {memberName(o.assigneeId)}</span>}
@@ -104,11 +110,23 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
               {o.points > 0 ? `+${o.points}` : o.points} pts{counted && o.countPer === "count" ? " each" : ""}
             </Badge>
           )}
-          {(o.status !== "pending" || overdue) && <Badge tone={overdue ? "error" : status.tone}>{overdue ? "Overdue" : o.leftAt ? "Left early" : status.label}</Badge>}
+          {(o.status !== "pending" || overdue) && (
+            <Badge tone={overdue ? "error" : status.tone}>{overdue ? "Overdue" : o.leftAt ? "Left early" : status.label}</Badge>
+          )}
         </div>
       </div>
+      {plain && (
+        <p className={cx("text-body-large", overdue ? "text-error" : "text-on-surface")}>
+          {allDay ? `${fmtDate(localDateOf(due))}, all day` : fmtDateTime(o.dueAt)}
+          <span className={overdue ? "" : "text-on-surface-variant"}>
+            {o.status === "pending" ? ` · ${fmtRelative(o.dueAt)}` : ` · ${overdue ? "Overdue" : o.leftAt ? "Left early" : status.label.toLowerCase()}`}
+            {!mine && ` · ${memberName(o.assigneeId)}`}
+            {o.rescheduled && " · moved"}
+          </span>
+        </p>
+      )}
       {counted && (
-        <div className="border border-outline-variant relative z-10 flex flex-col gap-2 rounded-sm px-3 py-2">
+        <div className="relative z-10 flex flex-col gap-2">
           <div className="flex items-center gap-3">
             <CountRing
               o={o}
@@ -120,13 +138,9 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
           </div>
           {countable && (
             <div className="flex flex-wrap gap-2">
-              {mine && readyToSend(o) && (
-                <Button icon="send" onClick={() => setCompleting(true)}>
-                  Send
-                </Button>
-              )}
+              {mine && readyToSend(o) && <Button onClick={() => setCompleting(true)}>Send</Button>}
               {mine && (
-                <Button variant="tonal" icon="add" onClick={() => countTap(o, () => setCompleting(true))}>
+                <Button variant="outlined" onClick={() => countTap(o, () => setCompleting(true))}>
                   One more
                 </Button>
               )}
@@ -138,7 +152,7 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
         </div>
       )}
       {placed && (
-        <div className="border border-outline-variant relative z-10 flex flex-wrap items-center gap-3 rounded-sm px-3 py-2">
+        <div className="relative z-10 flex flex-wrap items-center gap-3">
           <PlaceRing o={o} />
           <span className="min-w-0 flex-1 text-body-medium text-on-surface">
             {placeLine(o, placeOf(o.placeId)) ?? placeOf(o.placeId)?.name}
@@ -151,13 +165,17 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
       )}
       {counting && <CountSheet o={o} open onClose={() => setCounting(false)} />}
       {isRitual(o) && (
-        <div className="border border-outline-variant flex flex-col gap-2 rounded-sm px-3 py-2">
+        <div className="flex flex-col gap-2">
           <div className="text-label-large text-on-surface-variant">{stepProgress(o)}</div>
           <StepList o={o} />
         </div>
       )}
       {o.journalNoteId && (
-        <Link to="/journal/$noteId" params={{ noteId: o.journalNoteId }} className="relative z-10 flex items-center gap-1.5 self-start text-label-large text-primary">
+        <Link
+          to="/journal/$noteId"
+          params={{ noteId: o.journalNoteId }}
+          className="relative z-10 flex items-center gap-1.5 self-start text-label-large text-primary"
+        >
           <Icon name="auto_stories" size={18} /> Read the journal entry
         </Link>
       )}
@@ -166,7 +184,7 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
           <Icon name={MOODS[o.mood - 1]!} size={18} /> Felt {MOOD_LABELS[o.mood - 1]!.toLowerCase()}
         </p>
       )}
-      {o.noteMd && <p className="border border-outline-variant rounded-sm px-3 py-2 text-body-medium whitespace-pre-wrap text-on-surface-variant">{o.noteMd}</p>}
+      {o.noteMd && <p className="border-l-2 border-primary pl-3 font-serif text-[17px] whitespace-pre-wrap text-on-surface italic">“{o.noteMd}”</p>}
       {o.photoCount > 0 && (
         <div className="relative z-10">
           <ProofPhotos o={o} canAdd={mine && (o.status === "pending" || o.status === "submitted")} />
@@ -180,12 +198,12 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
       {(o.status === "pending" || (isDom && o.status === "submitted")) && (
         <div className="relative z-10 flex flex-wrap items-center gap-2">
           {o.status === "pending" && mine && isOpen(o) && !isRitual(o) && !counted && !placed && (
-            <Button variant="filled" icon="check" onClick={() => setCompleting(true)}>
+            <Button variant="filled" onClick={() => setCompleting(true)}>
               Done
             </Button>
           )}
           {o.status === "pending" && mine && isOpen(o) && isRitual(o) && (
-            <Button variant="filled" icon="play_arrow" onClick={() => setRunning(true)}>
+            <Button variant="filled" onClick={() => setRunning(true)}>
               {o.stepsDone.length ? "Continue" : "Start"}
             </Button>
           )}
@@ -193,32 +211,31 @@ export function OccurrenceCard({ o, showDate, linkTask = true }: { o: Occurrence
           {o.status === "submitted" && isDom && (
             <>
               <Button
-                icon="thumb_up"
                 busy={review.isPending}
                 onClick={() => review.mutate({ id: o.id, approve: true }, { onSuccess: () => snack("Approved"), onError: (e) => snack(errorMessage(e)) })}
               >
                 Approve
               </Button>
-              <Button variant="outlined" icon="undo" disabled={review.isPending} onClick={() => setSendingBack(true)}>
+              <Button variant="outlined" disabled={review.isPending} onClick={() => setSendingBack(true)}>
                 Send back
               </Button>
             </>
           )}
           {o.status === "pending" && (
-            <Button variant={mine ? "outlined" : "tonal"} icon="more_time" onClick={() => setRescheduling(true)}>
+            <Button variant="outlined" onClick={() => setRescheduling(true)}>
               {mine ? "More time" : "Reschedule"}
             </Button>
           )}
           {!commenting && o.commentCount === 0 && !readOnly && (
-            <Button variant="text" icon="add_comment" onClick={() => setCommenting(true)}>
-              Comment
+            <Button variant="text" onClick={() => setCommenting(true)}>
+              Add a word
             </Button>
           )}
         </div>
       )}
       {!(o.status === "pending" || (isDom && o.status === "submitted")) && !commenting && o.commentCount === 0 && !readOnly && (
-        <Button variant="text" icon="add_comment" className="relative z-10 self-start" onClick={() => setCommenting(true)}>
-          Comment
+        <Button variant="text" className="relative z-10 self-start" onClick={() => setCommenting(true)}>
+          Add a word
         </Button>
       )}
       <SendBackDialog o={o} open={sendingBack} onClose={() => setSendingBack(false)} />

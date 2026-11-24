@@ -203,19 +203,20 @@ fun TaskDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") } },
+                // Letters: the title is set large in the page itself, under its eyebrow.
+                title = {},
+                navigationIcon = { app.obey.ui.common.BackLink("Back", onBack) },
                 actions = {
-                    if (canManage) IconButton(onClick = { onEdit(vm.taskId) }) { Icon(Icons.Outlined.Edit, "Edit") }
-                    Box {
+                    IconButton(onClick = { onHistory(vm.taskId) }) { Icon(Icons.Outlined.History, "History") }
+                    if (canManage) Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "More options") }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             DropdownMenuItem(
-                                text = { Text("History") },
-                                leadingIcon = { Icon(Icons.Outlined.History, null) },
-                                onClick = { menu = false; onHistory(vm.taskId) },
+                                text = { Text("Edit") },
+                                leadingIcon = { Icon(Icons.Outlined.Edit, null) },
+                                onClick = { menu = false; onEdit(vm.taskId) },
                             )
-                            if (canManage) {
+                            run {
                                 DropdownMenuItem(
                                     text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
                                     leadingIcon = { Icon(Icons.Outlined.Delete, null, tint = MaterialTheme.colorScheme.error) },
@@ -235,54 +236,29 @@ fun TaskDetailScreen(
             is Load.Ready -> Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                 val (task, stats, current) = s.value
                 Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(rememberScrollState())) {
-                    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            listOfNotNull(task.summary + (task.dueTime?.let { " at ${formatClock(it)}" } ?: ", all day"), session?.nameOf(task.assigneeId)).joinToString(" · "),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        val tags = listOfNotNull(
-                            if (task.assignedConsequenceId != null) "Consequence" else null,
-                            if (!task.active) "Paused" else null,
-                            if (features.points && task.points != 0) "${signed(task.points)} pts" else null,
-                            if (task.approvalRequired) "Needs approval" else null,
-                            if (task.proofRequired) "Proof required" else null,
-                        )
-                        if (tags.isNotEmpty()) {
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                tags.forEach { SuggestionChip(onClick = {}, enabled = false, label = { Text(it) }) }
-                            }
-                        }
-                    }
-
-                    stats?.let { st ->
-                        Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            StatCard("Done", st.rate?.let { "${Math.round(it * 100)}%" } ?: "–", "${st.done} of ${st.done + st.missed}", Modifier.weight(1f))
-                            StatCard("Streak", st.streak.toString(), "Best ${st.bestStreak}", Modifier.weight(1f))
-                            StatCard(
-                                "Last done",
-                                st.lastDoneAt?.let { formatDate(parseInstant(it).local().toLocalDate()) } ?: "Never",
-                                if (st.missed > 0) "${st.missed} missed" else "None missed",
-                                Modifier.weight(1f),
-                            )
-                        }
-                    }
-
-                    // Named by what's in it: today's, overdue ones, or the next one coming up.
-                    val days = current.map { parseInstant(it.dueAt).local().toLocalDate() }
-                    SectionHeader(
-                        when {
-                            LocalDate.now() in days -> "Today"
-                            days.any { it.isBefore(LocalDate.now()) } -> "Overdue"
-                            else -> "Up next"
-                        },
+                    val eyebrow = listOfNotNull(
+                        task.summary + (task.dueTime?.let { " by ${formatClock(it)}" } ?: ", all day"),
+                        if (task.assigneeId != session?.userId) session?.nameOf(task.assigneeId) else null,
+                        if (features.points && task.points != 0) signed(task.points) else null,
+                        if (task.assignedConsequenceId != null) "consequence" else null,
+                        if (task.approvalRequired) "approved by you" else null,
+                        if (task.proofRequired) "with a photo" else null,
+                        if (!task.active) "paused" else null,
                     )
+                    Text(
+                        eyebrow.joinToString(" · ").uppercase(),
+                        style = MaterialTheme.typography.labelMedium,
+                        letterSpacing = androidx.compose.ui.unit.TextUnit(1.4f, androidx.compose.ui.unit.TextUnitType.Sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                    Text(task.title, style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
                     if (current.isEmpty()) {
                         Text(
                             "Nothing due in the next week.",
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 16.dp),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         )
                     }
                     current.forEach { o ->
@@ -309,6 +285,19 @@ fun TaskDetailScreen(
                                 Icon(Icons.Outlined.AutoStories, null)
                                 Text("  Read the journal entry")
                             }
+                        }
+                    }
+
+                    stats?.let { st ->
+                        Row(Modifier.padding(16.dp).padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            StatCard("done", st.rate?.let { "${Math.round(it * 100)}%" } ?: "–", "${st.done} of ${st.done + st.missed}", Modifier.weight(1f))
+                            StatCard("streak", st.streak.toString(), "best ${st.bestStreak}", Modifier.weight(1f))
+                            StatCard(
+                                "missed",
+                                st.missed.toString(),
+                                st.lastDoneAt?.let { "last done ${formatDate(parseInstant(it).local().toLocalDate())}" } ?: "never done yet",
+                                Modifier.weight(1f),
+                            )
                         }
                     }
 
@@ -343,12 +332,10 @@ fun TaskDetailScreen(
 
 @Composable
 private fun StatCard(label: String, value: String, sub: String, modifier: Modifier = Modifier) {
-    Card(modifier, colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.Transparent), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-        Column(Modifier.padding(12.dp)) {
-            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(value, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-        }
+    Column(modifier) {
+        Text(value, style = MaterialTheme.typography.headlineLarge, maxLines = 1)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -405,8 +392,8 @@ fun TaskHistoryScreen(onBack: () -> Unit, vm: TaskHistoryViewModel = hiltViewMod
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text((state as? Load.Ready)?.value?.first.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") } },
+                title = {},
+                navigationIcon = { app.obey.ui.common.BackLink((state as? Load.Ready)?.value?.first.orEmpty().ifEmpty { "Back" }, onBack) },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -417,6 +404,7 @@ fun TaskHistoryScreen(onBack: () -> Unit, vm: TaskHistoryViewModel = hiltViewMod
             is Load.Ready -> Column(
                 Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
             ) {
+                Text("History", style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(bottom = 8.dp))
                 TaskHistorySection(s.value.second, if (vm.canManage) vm::edit else null)
                 Spacer(Modifier.height(32.dp))
             }

@@ -27,7 +27,6 @@ const rules = [
     allow: [
       "ui/stats/MonthReviewScreen.kt",
       "ui/tasks/RecurrencePicker.kt",
-      "ui/tasks/TaskDetailScreen.kt",
       "ui/location/LocationScreens.kt",
       "ui/chastity/Chastity.kt",
       "ui/today/DayExtension.kt",

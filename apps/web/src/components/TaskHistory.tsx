@@ -4,7 +4,7 @@ import { errorMessage } from "../api/client";
 import type { HistoryEntry } from "../api/types";
 import { fmtDate, fmtDateTime } from "../lib/dates";
 import { useRel } from "../lib/relationship";
-import { Badge, Button, Dialog, ErrorBox, Loading, SegmentedButtons, TextArea, TextField, useSnackbar } from "./ui";
+import { Button, cx, Dialog, ErrorBox, Loading, SegmentedButtons, TextArea, TextField, useSnackbar } from "./ui";
 
 type Fixable = "completed" | "missed" | "excused";
 
@@ -31,13 +31,12 @@ export function TaskHistory({ taskId }: { taskId: string }) {
   const entries = history.data?.pages.flat() ?? [];
 
   return (
-    <section className="px-4 pb-10 md:px-6">
-      <h2 className="mb-2 text-title-medium text-on-surface-variant">History</h2>
+    <section>
       {history.isLoading && <Loading />}
       {history.error && <ErrorBox error={history.error} onRetry={() => history.refetch()} />}
-      {history.data && entries.length === 0 && <p className="text-body-medium text-on-surface-variant">Nothing yet. Finished and missed occurrences show up here.</p>}
+      {history.data && entries.length === 0 && <p className="text-body-large text-on-surface-variant">Nothing yet.</p>}
       {entries.length > 0 && (
-        <ul className="border border-outline-variant overflow-hidden rounded-lg">
+        <ul className="flex flex-col divide-y divide-outline-variant">
           {entries.map((h) => {
             const s = LABEL[h.status];
             return (
@@ -46,22 +45,27 @@ export function TaskHistory({ taskId }: { taskId: string }) {
                   type="button"
                   disabled={!isDom || h.status === "cancelled"}
                   onClick={() => setEditing(h)}
-                  className="state-layer flex w-full items-center gap-3 px-4 py-3 text-left disabled:cursor-default"
+                  className="state-layer flex w-full items-center gap-3 py-4 text-left disabled:cursor-default"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="text-body-large text-on-surface">{fmtDate(h.originalDate, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</div>
-                    <div className="truncate text-body-small text-on-surface-variant">
-                      {h.completedAt ? `Done ${fmtDateTime(h.completedAt)}` : `Due ${fmtDateTime(h.dueAt)}`}
+                    <div className="text-body-large text-on-surface">
+                      {fmtDate(h.originalDate, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                    </div>
+                    <div className={cx("truncate text-body-medium", h.status === "missed" ? "text-error" : "text-on-surface-variant")}>
+                      {s.label}
+                      {h.completedAt ? ` · ${fmtDateTime(h.completedAt)}` : h.status === "pending" ? ` · due ${fmtDateTime(h.dueAt)}` : ""}
                       {h.syncedAt && ` · offline, synced ${fmtDateTime(h.syncedAt)}`}
                       {h.editedBy && ` · edited by ${h.editedBy === me.user.id ? "you" : memberName(h.editedBy)}`}
                     </div>
                   </div>
-                  {features.points && h.pointsDelta !== 0 && (
-                    <span className={h.pointsDelta > 0 ? "text-label-large text-primary" : "text-label-large text-error"}>
-                      {h.pointsDelta > 0 ? `+${h.pointsDelta}` : h.pointsDelta}
-                    </span>
+                  {h.noteMd ? (
+                    <span className="max-w-[45%] truncate font-serif text-[16px] text-on-surface-variant italic">“{h.noteMd}”</span>
+                  ) : (
+                    features.points &&
+                    h.pointsDelta !== 0 && (
+                      <span className="text-body-large text-on-surface-variant tabular-nums">{h.pointsDelta > 0 ? `+${h.pointsDelta}` : h.pointsDelta}</span>
+                    )
                   )}
-                  <Badge tone={s.tone}>{s.label}</Badge>
                 </button>
               </li>
             );
@@ -69,7 +73,7 @@ export function TaskHistory({ taskId }: { taskId: string }) {
         </ul>
       )}
       {history.hasNextPage && (
-        <Button variant="text" className="mt-2" busy={history.isFetchingNextPage} onClick={() => history.fetchNextPage()}>
+        <Button variant="text" className="mt-2 -ml-3" busy={history.isFetchingNextPage} onClick={() => history.fetchNextPage()}>
           Show older
         </Button>
       )}
@@ -79,7 +83,7 @@ export function TaskHistory({ taskId }: { taskId: string }) {
 }
 
 function EditEntry({ entry, onClose }: { entry: HistoryEntry; onClose(): void }) {
-  const { rel, features } = useRel();
+  const { rel } = useRel();
   const snack = useSnackbar();
   const edit = useEditOccurrence(rel.id);
   const [status, setStatus] = useState<Fixable>(entry.status === "submitted" ? "completed" : (entry.status as Fixable));
@@ -110,8 +114,7 @@ function EditEntry({ entry, onClose }: { entry: HistoryEntry; onClose(): void })
     <Dialog
       open
       onClose={onClose}
-      icon="history"
-      title={fmtDate(entry.originalDate, { weekday: "long", month: "long", day: "numeric" })}
+      title={`Change ${fmtDate(entry.originalDate, { weekday: "short", month: "short", day: "numeric" })}`}
       actions={
         <>
           <Button variant="text" onClick={onClose}>
@@ -136,9 +139,6 @@ function EditEntry({ entry, onClose }: { entry: HistoryEntry; onClose(): void })
         />
         {status === "completed" && <TextField label="Done at" type="datetime-local" value={doneAt} onChange={(e) => setDoneAt(e.target.value)} />}
         <TextArea label="Note" value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
-        {features.points && (
-          <p className="text-body-small text-on-surface-variant">Points follow the status: done earns the task's points, missed costs its penalty, excused is neither.</p>
-        )}
       </div>
     </Dialog>
   );

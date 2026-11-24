@@ -110,7 +110,7 @@ describe("app smoke test (dev auth, mocked API)", () => {
     await visit("/calendar", "Week");
     await visit("/us", "Your dynamic");
     await visit("/tasks", /Every 2 weeks on Mon, Thu at 9:00\s?PM/);
-    await visit("/tasks/t1", "Streak");
+    await visit("/tasks/t1", "streak");
     await visit("/tasks/t1", /, all day$/);
     await visit("/tasks/t1/edit", "Edit task");
     await visit("/tasks/t1/history", "History");
