@@ -310,10 +310,12 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
     val homeTab = if (!onSection) null else prev?.let { p -> tabs.firstOrNull { t -> p.hierarchy.any(t.matches) } } ?: UsTab
     fun marked(t: TopLevel) = selected(t) || (onSection && t === homeTab)
     // Tapping the marked tab from a page under it goes back to that tab (Week from All tasks), not to the saved page.
-    fun tab(t: TopLevel) = when {
-        t === UsTab && onSection -> backToUs()
-        onSection && t === homeTab -> { if (!nav.popBackStack(t.route, inclusive = false)) go(t.route) }
-        else -> go(t.route)
+    fun tab(t: TopLevel) {
+        when {
+            t === UsTab && onSection -> backToUs()
+            onSection && t === homeTab -> if (!nav.popBackStack(t.route, inclusive = false)) go(t.route)
+            else -> go(t.route)
+        }
     }
     val activeCall by safeVm.active.collectAsStateWithLifecycle()
     var safeOpen by remember { mutableStateOf(false) }
