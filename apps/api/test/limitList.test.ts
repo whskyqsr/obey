@@ -1,4 +1,5 @@
 import { LIMIT_STARTERS } from "@obey/contracts";
+import { usualSides } from "../src/routes/limitList.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { setup } from "./helpers.js";
 
@@ -18,11 +19,22 @@ describe("limits list", () => {
     expect(list.people.map((p: { answers: unknown }) => p.answers)).toEqual(expect.arrayContaining([{}, null]));
 
     expect((await sub.put(`${url}/answers/kneeling`, { rating: "love" })).status).toBe(200);
-    expect((await sub.put(`${url}/answers/gags`, { rating: "soft", note: "Only soft ones" })).status).toBe(200);
+    expect(
+      (
+        await sub.put(`${url}/answers/gags`, {
+          rating: "soft",
+          note: "Only soft ones",
+        })
+      ).status,
+    ).toBe(200);
     expect((await sub.put(`${url}/answers/not-an-item`, { rating: "love" })).status).toBe(404);
     expect((await sub.put(`${url}/answers/kneeling`, { rating: "meh" })).status).toBe(400);
     const own = (await dom.post(`${url}/items`, { title: "Silent dinners" })).body;
-    expect(own).toMatchObject({ custom: true, category: "Your own", createdBy: domId });
+    expect(own).toMatchObject({
+      custom: true,
+      category: "Your own",
+      createdBy: domId,
+    });
     await dom.put(`${url}/answers/${own.key}`, { rating: "like" });
     await dom.put(`${url}/answers/kneeling`, { rating: "love" });
     expect((await sub.del(`${url}/items/${own.key}`)).status).toBe(403);
@@ -35,7 +47,10 @@ describe("limits list", () => {
 
     await sub.put(`${url}/finished`, {});
     seen = (await dom.get(url)).body.people.find((p: { userId: string }) => p.userId === subId);
-    expect(seen.answers).toEqual({ kneeling: { rating: "love", note: "" }, gags: { rating: "soft", note: "Only soft ones" } });
+    expect(seen.answers).toEqual({
+      kneeling: { rating: "love", note: "" },
+      gags: { rating: "soft", note: "Only soft ones" },
+    });
 
     // Clearing an answer skips it; removing an item takes its answers with it.
     await sub.put(`${url}/answers/kneeling`, { rating: null });
@@ -46,6 +61,34 @@ describe("limits list", () => {
     expect(after.people.find((p: { userId: string }) => p.userId === subId).rated).toBe(1);
   });
 
+  it("takes answers for both sides, and puts one without a side on the person's usual side", async () => {
+    const { dom, sub, relId, subId, domId } = await ctx.pair();
+    const url = `/relationships/${relId}/limit-list`;
+    await sub.put(`${url}/answers/canes`, { rating: "curious" });
+    await sub.put(`${url}/answers/canes`, {
+      rating: "hard",
+      side: "dom",
+      note: "Not on Sir",
+    });
+    await dom.put(`${url}/answers/canes`, { rating: "love", side: "dom" });
+    await dom.put(`${url}/answers/kneeling`, { rating: "like", side: "sub" });
+    expect((await dom.put(`${url}/answers/canes`, { rating: "love", side: "both" })).status).toBe(400);
+    const mine = (await sub.get(url)).body.people.find((p: { userId: string }) => p.userId === subId);
+    expect(mine.sides).toEqual({
+      dom: { canes: { rating: "hard", note: "Not on Sir" } },
+      sub: { canes: { rating: "curious", note: "" } },
+    });
+    expect(mine.answers).toEqual({ canes: { rating: "curious", note: "" } });
+    expect(mine.rated).toBe(1);
+    const theirs = (await sub.get(url)).body.people.find((p: { userId: string }) => p.userId === domId);
+    expect(theirs).toMatchObject({ rated: 2, answers: null, sides: null });
+    const item = (await sub.get(url)).body.items.find((i: { key: string }) => i.key === "canes");
+    expect(item.sentences).toEqual({
+      sub: "{name} canes you",
+      dom: "You cane {name}",
+    });
+  });
+
   it("is closed while the dynamic has it switched off", async () => {
     const { dom, sub, relId } = await ctx.pair();
     const url = `/relationships/${relId}/limit-list`;
@@ -54,5 +97,15 @@ describe("limits list", () => {
     expect((await sub.put(`${url}/answers/kneeling`, { rating: "love" })).status).toBe(403);
     await dom.patch(`/relationships/${relId}`, { features: { limits: true } });
     expect((await sub.get(url)).status).toBe(200);
+  });
+});
+
+describe("usual side", () => {
+  it("follows the role, and for a switch the opposite of their partner's", () => {
+    expect(usualSides("dominant", "submissive")).toEqual(["dom"]);
+    expect(usualSides("submissive", undefined)).toEqual(["sub"]);
+    expect(usualSides("switch", "dominant")).toEqual(["sub"]);
+    expect(usualSides("switch", "submissive")).toEqual(["dom"]);
+    expect(usualSides("switch", "switch")).toEqual(["dom", "sub"]);
   });
 });

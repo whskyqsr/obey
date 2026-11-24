@@ -809,56 +809,139 @@ export const limitInput = z.object({
 export const limit = limitInput.extend({ id, relationshipId: id, ownerId: id, createdAt: z.string(), updatedAt: z.string() });
 export type Limit = z.infer<typeof limit>;
 
-/** The limits list: each person rates each item for themselves, in their own role. Skipping leaves no rating. */
+/**
+ * The limits list: each person rates each item both ways round, once with themselves in charge ("dom" side) and once
+ * with their partner in charge ("sub" side). Skipping leaves no rating.
+ */
 export const limitRating = z.enum(["love", "like", "curious", "soft", "hard"]);
 export type LimitRating = z.infer<typeof limitRating>;
+export const limitSide = z.enum(["dom", "sub"]);
+export type LimitSide = z.infer<typeof limitSide>;
 export const LIMIT_CATEGORIES = ["Service & protocol", "Restraint", "Impact & sensation", "Words & mind", "Body & care", "Out in the world"] as const;
 /** Where items the two of them add go when they don't pick a category. */
 export const OWN_CATEGORY = "Your own";
 
-/** The starter list, kept non-graphic. Keys are stable, so changing a title keeps everyone's answers. */
-export const LIMIT_STARTERS: { key: string; category: (typeof LIMIT_CATEGORIES)[number]; title: string }[] = (
+/**
+ * The starter list, kept non-graphic. Keys are stable, so changing a title keeps everyone's answers. Each item has two
+ * sentences, said to the person answering: with their partner in charge ("sub") and with them in charge ("dom").
+ * "{name}" is the partner's name.
+ */
+const STARTERS: readonly (readonly [(typeof LIMIT_CATEGORIES)[number], readonly (readonly [title: string, sub: string, dom: string])[]])[] = [
   [
+    "Service & protocol",
     [
-      "Service & protocol",
-      [
-        "Kneeling",
-        "Titles (Sir, Miss)",
-        "Serving drinks and meals",
-        "Asking permission",
-        "Waiting in position",
-        "Writing lines",
-        "Chores as service",
-        "Daily check-ins",
-        "Public protocol (discreet)",
-        "Bathroom permission",
-      ],
+      ["Kneeling", "You kneel", "{name} kneels"],
+      ["Titles (Sir, Miss)", "You call {name} Sir or Miss", "{name} calls you Sir or Miss"],
+      ["Serving drinks and meals", "You serve {name} drinks and meals", "{name} serves you drinks and meals"],
+      ["Asking permission", "You ask {name} for permission", "{name} asks you for permission"],
+      ["Waiting in position", "You wait in position", "{name} waits in position"],
+      ["Writing lines", "You write lines", "{name} writes lines"],
+      ["Chores as service", "You do chores as service", "{name} does chores as service"],
+      ["Daily check-ins", "You check in daily", "{name} checks in daily"],
+      ["Public protocol (discreet)", "You keep protocol in public", "{name} keeps protocol in public"],
+      ["Bathroom permission", "You ask to use the bathroom", "{name} asks to use the bathroom"],
     ],
+  ],
+  [
+    "Restraint",
     [
-      "Restraint",
-      ["Wrist and ankle cuffs", "Rope", "Handcuffs", "Blindfolds", "Gags", "Spreader bars", "Collar and leash", "Being wrapped up", "Being left alone tied", "Suspension"],
+      ["Wrist and ankle cuffs", "{name} cuffs you", "You cuff {name}"],
+      ["Rope", "{name} ties you with rope", "You tie {name} with rope"],
+      ["Handcuffs", "{name} handcuffs you", "You handcuff {name}"],
+      ["Blindfolds", "{name} blindfolds you", "You blindfold {name}"],
+      ["Gags", "{name} gags you", "You gag {name}"],
+      ["Spreader bars", "{name} puts you in a spreader bar", "You put {name} in a spreader bar"],
+      ["Collar and leash", "You wear a collar and leash", "{name} wears a collar and leash"],
+      ["Being wrapped up", "{name} wraps you up", "You wrap {name} up"],
+      ["Being left alone tied", "{name} leaves you tied up alone", "You leave {name} tied up alone"],
+      ["Suspension", "{name} suspends you", "You suspend {name}"],
     ],
-    ["Impact & sensation", ["Spanking (hand)", "Paddles", "Belts", "Floggers", "Canes", "Wax", "Ice", "Tickling", "Biting", "Marks that show"]],
-    ["Words & mind", ["Praise", "Pet names", "Teasing", "Begging", "Orgasm control", "Role-play", "Being ignored", "Degradation", "Humiliation", "Name-calling in public"]],
+  ],
+  [
+    "Impact & sensation",
     [
-      "Body & care",
-      ["Aftercare cuddles", "Massage", "Hair pulling", "Breath play", "Chastity", "Grooming rules", "Food and water rules", "Exercise rules", "Bedtime rules", "Outfit rules"],
+      ["Spanking (hand)", "{name} spanks you", "You spank {name}"],
+      ["Paddles", "{name} paddles you", "You paddle {name}"],
+      ["Belts", "{name} uses a belt on you", "You use a belt on {name}"],
+      ["Floggers", "{name} flogs you", "You flog {name}"],
+      ["Canes", "{name} canes you", "You cane {name}"],
+      ["Wax", "{name} drips wax on you", "You drip wax on {name}"],
+      ["Ice", "{name} uses ice on you", "You use ice on {name}"],
+      ["Tickling", "{name} tickles you", "You tickle {name}"],
+      ["Biting", "{name} bites you", "You bite {name}"],
+      ["Marks that show", "{name} leaves marks on you that show", "You leave marks on {name} that show"],
     ],
+  ],
+  [
+    "Words & mind",
     [
-      "Out in the world",
-      ["Wearing a day collar", "Remote control toys", "Texted orders while out", "Discreet tasks in public", "Photos of you", "Videos of you", "Others knowing", "Others watching"],
+      ["Praise", "{name} praises you", "You praise {name}"],
+      ["Pet names", "{name} calls you pet names", "You call {name} pet names"],
+      ["Teasing", "{name} teases you", "You tease {name}"],
+      ["Begging", "You beg {name}", "{name} begs you"],
+      ["Orgasm control", "{name} controls your orgasms", "You control {name}'s orgasms"],
+      ["Role-play", "Role-play with {name} in charge", "Role-play with you in charge"],
+      ["Being ignored", "{name} ignores you", "You ignore {name}"],
+      ["Degradation", "{name} degrades you", "You degrade {name}"],
+      ["Humiliation", "{name} humiliates you", "You humiliate {name}"],
+      ["Name-calling in public", "{name} calls you names in public", "You call {name} names in public"],
     ],
-  ] as const
-).flatMap(([category, titles]) =>
-  titles.map((title) => ({
+  ],
+  [
+    "Body & care",
+    [
+      ["Aftercare cuddles", "{name} cuddles you after", "You cuddle {name} after"],
+      ["Massage", "{name} massages you", "You massage {name}"],
+      ["Hair pulling", "{name} pulls your hair", "You pull {name}'s hair"],
+      ["Breath play", "{name} controls your breathing", "You control {name}'s breathing"],
+      ["Chastity", "You wear chastity", "{name} wears chastity"],
+      ["Grooming rules", "{name} sets your grooming rules", "You set {name}'s grooming rules"],
+      ["Food and water rules", "{name} sets your food and water rules", "You set {name}'s food and water rules"],
+      ["Exercise rules", "{name} sets your exercise rules", "You set {name}'s exercise rules"],
+      ["Bedtime rules", "{name} sets your bedtime", "You set {name}'s bedtime"],
+      ["Outfit rules", "{name} picks your outfits", "You pick {name}'s outfits"],
+    ],
+  ],
+  [
+    "Out in the world",
+    [
+      ["Wearing a day collar", "You wear a day collar", "{name} wears a day collar"],
+      ["Remote control toys", "{name} controls your toy remotely", "You control {name}'s toy remotely"],
+      ["Texted orders while out", "{name} texts you orders while out", "You text {name} orders while out"],
+      ["Discreet tasks in public", "You do discreet tasks in public", "{name} does discreet tasks in public"],
+      ["Photos of you", "{name} takes photos of you", "You take photos of {name}"],
+      ["Videos of you", "{name} takes videos of you", "You take videos of {name}"],
+      ["Others knowing", "Others know you serve {name}", "Others know {name} serves you"],
+      ["Others watching", "Others watch, with {name} in charge", "Others watch, with you in charge"],
+    ],
+  ],
+];
+/** Items the two of them add can't be phrased for them, so their sentences say who's in charge. */
+export const LIMIT_OWN_SENTENCES = {
+  sub: "With {name} in charge",
+  dom: "With you in charge",
+} as const;
+export const LIMIT_STARTERS: {
+  key: string;
+  category: (typeof LIMIT_CATEGORIES)[number];
+  title: string;
+  sentences: { sub: string; dom: string };
+}[] = STARTERS.flatMap(([category, items]) =>
+  items.map(([title, sub, dom]) => ({
     key: title
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, ""),
     category,
     title,
+    sentences: { sub, dom },
   })),
 );
+/** A sentence with the partner's name filled in, capitalised at the start ("your partner" when there isn't one yet). */
+export function limitSentence(template: string, partnerName: string | null | undefined) {
+  const s = template.replaceAll("{name}", partnerName || "your partner");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 export const limitItem = z.object({
   key: z.string(),
@@ -867,23 +950,31 @@ export const limitItem = z.object({
   /** Added by one of them rather than from the starter list; the person who added it can remove it. */
   custom: z.boolean(),
   createdBy: id.nullable(),
+  /** What each side means, said to the person answering; "{name}" is their partner. */
+  sentences: z.object({ sub: z.string(), dom: z.string() }),
 });
 export type LimitItem = z.infer<typeof limitItem>;
-export const limitAnswer = z.object({ rating: limitRating.nullable(), note: z.string() });
+export const limitAnswer = z.object({
+  rating: limitRating.nullable(),
+  note: z.string(),
+});
 export type LimitAnswer = z.infer<typeof limitAnswer>;
 export const limitPerson = z.object({
   userId: id,
   finishedAt: z.string().nullable(),
   updatedAt: z.string().nullable(),
-  /** How many items they've rated. */
+  /** How many items they've rated, either way round. */
   rated: z.number().int(),
-  /** Their answers by item key: always your own; a partner's only once everyone has finished. */
+  /** Their answers with them on their usual side, by item key (kept for older apps): always your own; a partner's only once everyone has finished. */
   answers: z.record(z.string(), limitAnswer).nullable(),
+  /** Their answers for each side, by item key; shown on the same terms as answers. */
+  sides: z.object({ dom: z.record(z.string(), limitAnswer), sub: z.record(z.string(), limitAnswer) }).nullable(),
 });
 export type LimitPerson = z.infer<typeof limitPerson>;
 export const limitList = z.object({ items: z.array(limitItem), people: z.array(limitPerson) });
 export type LimitList = z.infer<typeof limitList>;
-export const limitAnswerInput = z.object({ rating: limitRating.nullable(), note: z.string().trim().max(500).default("") });
+/** Without a side, the answer is for the person's usual side (older apps). */
+export const limitAnswerInput = z.object({ rating: limitRating.nullable(), note: z.string().trim().max(500).default(""), side: limitSide.optional() });
 export const limitItemInput = z.object({ category: z.string().trim().min(1).max(60).default(OWN_CATEGORY), title: z.string().trim().min(1).max(80) });
 
 /** A rule or protocol someone broke, logged by a Dominant or owned up to by the person themselves. */
