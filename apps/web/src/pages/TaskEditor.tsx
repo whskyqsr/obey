@@ -842,7 +842,7 @@ function Preview({ form, who, sched, reward }: { form: Form; who: string; sched:
   const first = sched.dates[0];
   const sub = [
     form.quick ? "Once" : form.picker.kind === "once" ? "Once" : sched.summary,
-    form.approvalRequired ? `${memberName(dom).replace(/^You$/, "You")} approve${memberName(dom) === "You" ? "" : "s"} it` : null,
+    form.approvalRequired ? `${memberName(dom)} approve${memberName(dom) === "You" ? "" : "s"} it` : null,
     features.points && form.points ? `${form.points > 0 ? "+" : "−"}${Math.abs(Math.trunc(form.points))}` : null,
     reward ? `Reward: ${reward}` : null,
   ]
