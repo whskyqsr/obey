@@ -36,7 +36,8 @@ def shot(name):
     with open(f"{OUT}/{name}.png", "wb") as f: f.write(adb("exec-out", "screencap", "-p").stdout)
     print("shot", name)
 def home():
-    adb("shell", "am", "start", "-n", f"{PKG}/app.obey.MainActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"); time.sleep(3); anr()
+    adb("shell", "am", "force-stop", PKG); time.sleep(1)
+    adb("shell", "monkey", "-p", PKG, "-c", "android.intent.category.LAUNCHER", "1"); time.sleep(6); anr()
     if not find("Today"): adb("shell", "monkey", "-p", PKG, "-c", "android.intent.category.LAUNCHER", "1"); time.sleep(4)
     tap("Today", wait=1.5)
 def back(): adb("shell", "input", "keyevent", "4"); time.sleep(1.5)
