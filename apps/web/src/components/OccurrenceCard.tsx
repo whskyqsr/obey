@@ -1,7 +1,7 @@
 import { Suspense, lazy, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import type { Occurrence, OccurrenceStatus } from "@obey/contracts";
-import { useCompleteOccurrence, useReviewOccurrence } from "../api/hooks";
+import { useCompleteOccurrence, useEditOccurrence, useReviewOccurrence } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import { fmtDate, fmtDateTime, fmtRelative, fmtTime, localDateOf, today } from "../lib/dates";
 import { useReadOnly, useRel } from "../lib/relationship";
@@ -54,6 +54,7 @@ export function OccurrenceCard({ o, showDate, linkTask = true, plain }: { o: Occ
   const readOnly = useReadOnly();
   const snack = useSnackbar();
   const review = useReviewOccurrence(rel.id);
+  const edit = useEditOccurrence(rel.id);
   const [completing, setCompleting] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
   const [sendingBack, setSendingBack] = useState(false);
@@ -229,7 +230,27 @@ export function OccurrenceCard({ o, showDate, linkTask = true, plain }: { o: Occ
           )}
         </div>
       )}
-      {!(o.status === "pending" || (isDom && o.status === "submitted")) && !commenting && o.commentCount === 0 && !readOnly && (
+      {/* A Dominant settles a miss from here too: excuse it, or move it, which reopens it. */}
+      {o.status === "missed" && isDom && !mine && !readOnly && (
+        <div className="relative z-10 flex flex-wrap items-center gap-2">
+          <Button
+            variant="outlined"
+            busy={edit.isPending}
+            onClick={() => edit.mutate({ id: o.id, change: { status: "excused" } }, { onSuccess: () => snack("Excused"), onError: (e) => snack(errorMessage(e)) })}
+          >
+            Excuse
+          </Button>
+          <Button variant="outlined" disabled={edit.isPending} onClick={() => setRescheduling(true)}>
+            Reschedule
+          </Button>
+          {!commenting && o.commentCount === 0 && (
+            <Button variant="text" onClick={() => setCommenting(true)}>
+              Add a word
+            </Button>
+          )}
+        </div>
+      )}
+      {!(o.status === "pending" || (isDom && o.status === "submitted") || (o.status === "missed" && isDom && !mine && !readOnly)) && !commenting && o.commentCount === 0 && !readOnly && (
         <Button variant="text" className="relative z-10 self-start" onClick={() => setCommenting(true)}>
           Add a word
         </Button>

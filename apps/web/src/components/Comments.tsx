@@ -69,7 +69,10 @@ export function CommentThread<C extends AnyComment>({
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && text.trim()) send();
               }}
             />
-            <IconButton icon="send" label="Send comment" variant="filled" disabled={!text.trim() || adding} onClick={send} />
+            {/* A word in the accent, like every other text action: no filled circle. */}
+            <Button variant="text" disabled={!text.trim() || adding} busy={adding} onClick={send}>
+              Send
+            </Button>
           </div>
         ) : (
           <Button variant="text" icon="add_comment" className="self-start" onClick={onOpen}>

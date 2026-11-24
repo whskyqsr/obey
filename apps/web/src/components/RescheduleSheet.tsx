@@ -58,7 +58,7 @@ export function RescheduleSheet({
   useEffect(() => {
     if (open) {
       setChoice(after ? "after" : "tomorrow");
-      setCustom(toLocalInput(new Date(new Date(occurrence.dueAt).getTime() + 86_400_000).toISOString()));
+      setCustom(toLocalInput(new Date(Math.max(new Date(occurrence.dueAt).getTime(), Date.now()) + 86_400_000).toISOString()));
       setScope("this");
       setReason("");
     }
@@ -77,7 +77,8 @@ export function RescheduleSheet({
         ? custom
           ? new Date(custom).toISOString()
           : null
-        : new Date(new Date(occurrence.dueAt).getTime() + (quick?.minutes ?? 0) * 60_000).toISOString();
+        : // A missed or overdue task gets its time from now, so the new deadline is never already past.
+          new Date(Math.max(new Date(occurrence.dueAt).getTime(), Date.now()) + (quick?.minutes ?? 0) * 60_000).toISOString();
 
   function submit() {
     if (!newDue) return;
