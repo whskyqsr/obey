@@ -206,14 +206,14 @@ private val UsTab = TopLevel(UsRoute, "Us", Icons.Outlined.FavoriteBorder) { it.
 
 /** Everything the tabs don't cover, in the order Us lists it (the same as the web). Protocols are a tab inside Rules. */
 private fun sections(f: Features) = listOfNotNull(
-    if (f.points) TopLevel(RewardsRoute, "Rewards", Icons.Outlined.Redeem, "Points and what they buy") { it.hasRoute<RewardsRoute>() } else null,
-    if (f.consequences) TopLevel(ConsequencesRoute, "Consequences", Icons.Outlined.Bolt, "What's owed, and the list") { it.hasRoute<ConsequencesRoute>() } else null,
     when {
         f.rules -> TopLevel(RulesRoute, "Rules", Icons.Outlined.Gavel, if (f.protocols) "Rules and protocols" else null) { it.hasRoute<RulesRoute>() || it.hasRoute<ProtocolsRoute>() }
         // With rules off, Protocols take Rules' place.
         f.protocols -> TopLevel(ProtocolsRoute, "Protocols", Icons.Outlined.FactCheck, "How things are done") { it.hasRoute<ProtocolsRoute>() }
         else -> null
     },
+    if (f.points) TopLevel(RewardsRoute, "Rewards", Icons.Outlined.Redeem, "Points and what they buy") { it.hasRoute<RewardsRoute>() } else null,
+    if (f.consequences) TopLevel(ConsequencesRoute, "Consequences", Icons.Outlined.Bolt, "What's owed, and the list") { it.hasRoute<ConsequencesRoute>() } else null,
     TopLevel(NotesRoute, "Notes", Icons.Outlined.StickyNote2, "Shared and private notes") { it.hasRoute<NotesRoute>() },
     if (f.journal) TopLevel(JournalRoute, "Journal", Icons.Outlined.AutoStories, "Entries and replies") { it.hasRoute<JournalRoute>() } else null,
     if (f.limits) TopLevel(LimitsRoute, "Limits", Icons.Outlined.Tune, "Yes, no and maybe") { it.hasRoute<LimitsRoute>() } else null,
@@ -304,8 +304,19 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
     fun backToUs() {
         if (!nav.popBackStack<UsRoute>(inclusive = false)) nav.navigate(UsRoute) { popUpTo(nav.graph.findStartDestination().id); launchSingleTop = true }
     }
-    fun tab(t: TopLevel) = if (t === UsTab && onSection) backToUs() else go(t.route)
     fun selected(t: TopLevel) = destination?.hierarchy?.any(t.matches) == true
+    // On a page under Us, the tab it was reached from stays marked: Week for All tasks opened from Week.
+    val prev = remember(entry) { nav.previousBackStackEntry?.destination }
+    val homeTab = if (!onSection) null else prev?.let { p -> tabs.firstOrNull { t -> p.hierarchy.any(t.matches) } } ?: UsTab
+    fun marked(t: TopLevel) = selected(t) || (onSection && t === homeTab)
+    // Tapping the marked tab from a page under it goes back to that tab (Week from All tasks), not to the saved page.
+    fun tab(t: TopLevel) {
+        when {
+            t === UsTab && onSection -> backToUs()
+            onSection && t === homeTab -> if (!nav.popBackStack(t.route, inclusive = false)) go(t.route)
+            else -> go(t.route)
+        }
+    }
     val activeCall by safeVm.active.collectAsStateWithLifecycle()
     var safeOpen by remember { mutableStateOf(false) }
     val openSafe = remember { { safeOpen = true } }
@@ -342,7 +353,9 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
 
     // Phones: the switcher leads Today, Week and Us; the pages Us lists lead back to it. Tablets have the rail.
     val chipLead: @Composable () -> Unit = { DynamicSwitcherChip(switcher) }
-    val backLead: @Composable () -> Unit = { app.obey.ui.common.BackLink("Us") { backToUs() } }
+    // Pages under Us go back to wherever they were opened from (All tasks from Week says "‹ Week"), else to Us.
+    val prevLabel = prev?.let { p -> (tabs + sections).firstOrNull { t -> p.hierarchy.any(t.matches) }?.label }
+    val backLead: @Composable () -> Unit = { app.obey.ui.common.BackLink(prevLabel ?: "Us") { if (prevLabel != null) nav.popBackStack() else backToUs() } }
     val lead: (@Composable () -> Unit)? = if (wide) null else if (onTab) chipLead else if (onSection) backLead else null
     val host: @Composable () -> Unit = {
         SafeCallFrame(safeVm, activeCall) {
@@ -362,7 +375,7 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
                 ) {
                     tabs.forEach { t ->
                         NavigationRailItem(
-                            selected = selected(t) || (t === UsTab && onSection),
+                            selected = marked(t),
                             onClick = { tab(t) },
                             icon = { Icon(t.icon, null) },
                             label = { Text(t.label) },
@@ -374,7 +387,7 @@ private fun MainScaffold(session: Session, settingsVm: SettingsViewModel = hiltV
         } else {
             Scaffold(
                 bottomBar = {
-                    if (showBar) TabBar(tabs, { t -> selected(t) || (t === UsTab && onSection) }, { tab(it) }, if (newItems.isNotEmpty()) ({ newOpen = true }) else null)
+                    if (showBar) TabBar(tabs, { t -> marked(t) }, { tab(it) }, if (newItems.isNotEmpty()) ({ newOpen = true }) else null)
                 },
             ) { padding ->
                 // Only the bar's space is reserved here; each screen's own Scaffold handles the top insets.

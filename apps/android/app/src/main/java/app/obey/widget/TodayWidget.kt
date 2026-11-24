@@ -30,7 +30,6 @@ import androidx.glance.layout.padding
 import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
-import androidx.glance.text.TextDecoration
 import androidx.glance.text.TextStyle
 import app.obey.R
 import app.obey.api.CompleteOccurrenceInput
@@ -188,7 +187,6 @@ private fun TaskRow(o: Occurrence, tick: Boolean) {
             style = TextStyle(
                 color = if (o.settled || missed) c.onSurfaceVariant else c.onSurface,
                 fontSize = 15.sp,
-                textDecoration = if (o.status == OccurrenceStatus.Completed) TextDecoration.LineThrough else TextDecoration.None,
             ),
             maxLines = 1,
         )

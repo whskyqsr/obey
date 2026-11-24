@@ -15,7 +15,6 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.MoreHoriz
-import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.DropdownMenu
@@ -32,7 +31,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextDecoration
 import app.obey.api.Occurrence
 import app.obey.api.OccurrenceStatus
 import app.obey.api.TaskStreak
@@ -130,17 +128,13 @@ fun OccurrenceRow(
                     }
                 },
             ) {
-                // A ritual still starts with play; everything else is the diamond.
-                if (occurrence.status == OccurrenceStatus.Pending && occurrence.isRitual) {
-                    Icon(Icons.Outlined.PlayCircle, null, tint = if (canComplete) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline)
-                } else {
-                    Diamond(occurrence.diamondState())
-                }
+                // Rituals too: the diamond is the checkbox, and tapping it starts the steps.
+                Diamond(occurrence.diamondState())
             }
             }
         },
         headlineContent = {
-            Text(occurrence.title, color = if (clash) MaterialTheme.colorScheme.error else androidx.compose.ui.graphics.Color.Unspecified, textDecoration = if (done && !occurrence.isCounted) TextDecoration.LineThrough else null)
+            Text(occurrence.title, color = if (clash) MaterialTheme.colorScheme.error else if (done && !occurrence.isCounted) MaterialTheme.colorScheme.onSurfaceVariant else androidx.compose.ui.graphics.Color.Unspecified)
         },
         supportingContent = if (supporting.isEmpty() && occurrence.mood == null && occurrence.commentCount == 0) null else ({
             Column {

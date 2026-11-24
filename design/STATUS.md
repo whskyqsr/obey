@@ -23,7 +23,7 @@ Last full sweep: 2026-11-24, web at 390px and 1440px, local seed data.
 | Month | 13 | Close | Close | Serif dates, one diamond per day, an accent bar for plans, the chosen day filled in ink, and the day as hairline rows (beside the month on desktop). Plans everywhere now use an accent rule and the owner's name ("Kitten") instead of a colour per person; the colour key is gone. The phone header keeps the week/month icon instead of the mockup's "‹ Week" link. |
 | Plan editor, clashes | 14, 58 | Not compared | Not compared | |
 | Us | 08 | Close | Close | The Safe call button only shows for submissives and switches (correct). On desktop the "Your dynamic" button stretches the full width. |
-| All tasks | 56 | Close | Close | The right column shows an hourglass icon where the mockup has words ("14 day streak", "paused"). The "From a kit" filter is missing. |
+| All tasks | 56 | Close | Close | The right column is a diamond to mark today's task done, or words ("done today", "waiting"); the mockup shows streaks there. The "From a kit" filter is missing. "‹ Week" or "‹ Us" depending on where it was opened. |
 | Rewards | 05, 59–62, desktop 18 | Matched (#111) | Matched (#111) | |
 | Consequences | 29, 63, 64 | Matched (#111) | Matched | |
 | Rules | 06, 69 | Close (#108) | Close | Missing the "Agreed by both… version" line and the footer: broken this month · See the log · Propose a change. |

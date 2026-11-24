@@ -117,8 +117,8 @@ export function RitualDialog({ o, open, onClose }: { o: Occurrence; open: boolea
                     aria-pressed={on}
                     className={cx("state-layer flex w-full items-center gap-3 rounded-md px-2 py-2 text-left", s === current && "bg-surface-container")}
                   >
-                    <Icon name={on ? "check_circle" : "radio_button_unchecked"} filled={on} className={on ? "text-primary" : "text-outline"} />
-                    <span className={cx("flex-1 text-body-large", on ? "text-on-surface-variant line-through" : "text-on-surface")}>
+                    <Diamond state={on ? "done" : "open"} className="mx-1" />
+                    <span className={cx("flex-1 text-body-large", on ? "text-on-surface-variant" : "text-on-surface")}>
                       {i + 1}. {s.title}
                     </span>
                   </button>
@@ -150,8 +150,8 @@ export function StepList({ o }: { o: Occurrence }) {
         const on = o.stepsDone.includes(s.id);
         return (
           <li key={s.id} className="flex items-center gap-2 text-body-medium">
-            <Icon name={on ? "check_circle" : "radio_button_unchecked"} filled={on} size={18} className={on ? "text-primary" : "text-outline"} />
-            <span className={on ? "text-on-surface-variant line-through" : "text-on-surface"}>
+            <Diamond state={on ? "done" : "open"} size={12} className="mx-0.5" />
+            <span className={on ? "text-on-surface-variant" : "text-on-surface"}>
               {i + 1}. {s.title}
             </span>
           </li>
