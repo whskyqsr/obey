@@ -3,29 +3,21 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEvents, useOccurrences } from "../api/hooks";
 import type { CalendarEvent, Occurrence } from "../api/types";
 import { EventDialog, eventOn } from "../components/EventDialog";
-import { MonthWeeks, inTopStrip } from "../components/WeekGrid";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { OccurrenceCard, isOverdue } from "../components/OccurrenceCard";
-import { Button, Diamond, Dialog, type DiamondState, ErrorBox, Fab, Icon, IconButton, Loading, PageHeader, SegmentedButtons, cx } from "../components/ui";
+import { Button, Diamond, Dialog, type DiamondState, ErrorBox, Fab, IconButton, Loading, PageHeader, SegmentedButtons, cx } from "../components/ui";
 import { useOpenOnNew } from "../lib/newParam";
 import { addDays, addMonths, daysBetween, fmtDate, fmtMonth, fmtTime, localDateOf, monthGrid, startOfWeek, today } from "../lib/dates";
 import { storage } from "../lib/storage";
 import { useRel } from "../lib/relationship";
-import { planLegend, planTone } from "../lib/planColors";
+import { planPeople } from "../lib/planColors";
 import type { WeekStart } from "../api/types";
 
 type View = "week" | "month";
+/** All-day and multi-day plans head their days, like any calendar. */
+const inTopStrip = (e: CalendarEvent) => e.allDay || new Date(e.endsAt).getTime() - new Date(e.startsAt).getTime() >= 86_400_000;
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const weekdayLabels = (ws: WeekStart) => (ws === "mon" ? WEEKDAY_LABELS : ["Sun", ...WEEKDAY_LABELS.slice(0, 6)]);
-
-function dotClass(o: Occurrence) {
-  if (o.status === "completed") return "bg-primary";
-  if (o.status === "missed" || isOverdue(o)) return "bg-error";
-  if (o.status === "submitted") return "bg-tertiary";
-  if (o.status === "excused" || o.status === "cancelled") return "bg-outline";
-  // Still to do: an open ring, so it reads differently from done at dot size.
-  return "border-[1.5px] border-on-surface-variant";
-}
 
 export function CalendarPage() {
   const { rel, isDom, me } = useRel();
@@ -73,18 +65,16 @@ export function CalendarPage() {
   const shownWeek = startOfWeek(anchor, weekStart);
   const weekName =
     shownWeek === thisWeek ? "This week" : shownWeek === addDays(thisWeek, 7) ? "Next week" : shownWeek === addDays(thisWeek, -7) ? "Last week" : range;
-  const heading = view === "month" ? fmtMonth(anchor) : weekName;
+  const heading = view === "month" ? (anchor.slice(0, 4) === t.slice(0, 4) ? fmtDate(anchor, { month: "long" }) : fmtMonth(anchor)) : weekName;
   const away = view === "month" ? anchor.slice(0, 7) !== t.slice(0, 7) : shownWeek !== thisWeek;
   // Phone week rows start closed; tap a day to open it.
   const [openDay, setOpenDay] = useState("");
-  const hasEvents = (events.data ?? []).length > 0;
   const month = anchor.slice(0, 7);
   const selectedItems = byDay.get(selected) ?? [];
   const [detailId, setDetailId] = useState<string | null>(null);
   const detail = occ.data?.find((o) => o.id === detailId);
   // Like a new calendar event: on the picked day in month view, else today if it's on screen, else the week's first day.
   const newTaskDay = view === "month" ? selected : days.includes(t) ? t : from;
-  const legend = planLegend(rel, me.user.id);
 
   return (
     <>
@@ -142,112 +132,74 @@ export function CalendarPage() {
           )}
         </div>
       )}
-      {legend.length > 0 && hasEvents && (
-        <div className="-mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 px-6 pb-3 text-label-medium text-on-surface-variant md:px-8">
-          {legend.map((l) => (
-            <span key={l.label} className="flex items-center gap-1.5">
-              <span className={cx("size-2.5 rounded-full", l.tone.dot)} />
-              {l.label}
-            </span>
-          ))}
-        </div>
-      )}
       {occ.error && <ErrorBox error={occ.error} onRetry={() => occ.refetch()} />}
 
       {view === "month" ? (
-        <div className="px-2 md:px-6">
-          <div className="grid grid-cols-7 text-center text-label-medium text-on-surface-variant">
-            {weekdayLabels(weekStart).map((d) => (
-              <div key={d} className="py-2">
-                {d}
-              </div>
-            ))}
-          </div>
-          {desk ? (
-            <MonthWeeks
-              days={days}
-              month={month}
-              selected={selected}
-              occurrences={(occ.data ?? []).filter((o) => o.status !== "cancelled")}
-              events={events.data ?? []}
-              onSelect={setSelected}
-              onOpenEvent={setPlan}
-            />
-          ) : (
-            <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg bg-outline-variant">
+        // Letters month (mockup 13): serif dates with a diamond for the day's tasks and an accent bar for plans, then the
+        // chosen day as hairline rows. Desktop puts the day beside the month.
+        <div className="px-4 md:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-12">
+          <div>
+            <div className="grid grid-cols-7 text-center text-label-medium text-on-surface-variant">
+              {weekdayLabels(weekStart).map((d, i) => (
+                <div key={i} className="py-2" aria-label={d}>
+                  {d[0]}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-y-1">
               {days.map((d) => {
+                if (!d.startsWith(month)) return <span key={d} aria-hidden />;
                 const items = byDay.get(d) ?? [];
-                const dayEvents = eventsOn(d);
-                const inMonth = d.startsWith(month);
+                const plans = eventsOn(d).length > 0;
+                const on = selected === d;
+                const state = monthState(items);
                 return (
                   <button
                     key={d}
                     type="button"
                     onClick={() => setSelected(d)}
+                    aria-pressed={on}
+                    aria-label={fmtDate(d, { weekday: "long", month: "long", day: "numeric" })}
                     className={cx(
-                      "state-layer flex min-h-16 flex-col items-stretch gap-1 p-1 text-left md:min-h-24 md:p-1.5",
-                      selected === d ? "bg-secondary-container" : inMonth ? "bg-surface-container-low" : "bg-surface",
+                      "state-layer mx-auto flex h-[52px] w-full max-w-[52px] flex-col items-center justify-start rounded-md pt-1 lg:h-[72px] lg:max-w-[72px] lg:pt-2",
+                      on && "bg-on-surface",
                     )}
                   >
                     <span
                       className={cx(
-                        "mx-auto flex size-7 items-center justify-center rounded-full text-label-large md:mx-0",
-                        d === t ? "bg-primary text-on-primary" : inMonth ? "text-on-surface" : "text-on-surface-variant/60",
+                        "font-serif text-[22px] leading-7 lg:text-[30px] lg:leading-9",
+                        on ? "text-surface" : d === t ? "text-primary" : "text-on-surface",
                       )}
                     >
                       {Number(d.slice(8))}
                     </span>
-                    {/* compact: a bar for plans and dots for tasks; wide: titles */}
-                    {dayEvents.length > 0 && (
-                      <span className="mx-1 flex gap-0.5 md:hidden">
-                        {[...new Set(dayEvents.map((e) => planTone(e, rel).dot))].slice(0, 3).map((dot) => (
-                          <span key={dot} className={cx("h-1 flex-1 rounded-full", dot)} />
-                        ))}
-                      </span>
-                    )}
-                    <span className="flex flex-wrap justify-center gap-0.5 md:hidden">
-                      {items.slice(0, 4).map((o) => (
-                        <span key={o.id} className={cx("size-1.5 rounded-full", dotClass(o))} />
-                      ))}
-                    </span>
-                    <span className="hidden flex-col gap-0.5 md:flex">
-                      {dayEvents.slice(0, 2).map((e) => (
-                        <span key={e.id} className={cx("truncate rounded-xs px-1 text-label-small", planTone(e, rel).bg, planTone(e, rel).text)}>
-                          {e.title}
-                        </span>
-                      ))}
-                      {items.slice(0, 3 - Math.min(dayEvents.length, 2)).map((o) => (
-                        <span key={o.id} className="flex items-center gap-1 truncate text-label-small text-on-surface-variant">
-                          <span className={cx("size-1.5 shrink-0 rounded-full", dotClass(o))} />
-                          <span className="truncate">{o.title}</span>
-                        </span>
-                      ))}
-                      {items.length + Math.min(dayEvents.length, 2) > 3 && (
-                        <span className="text-label-small text-primary">+{items.length + Math.min(dayEvents.length, 2) - 3} more</span>
-                      )}
+                    <span className="flex h-2 items-center gap-1.5">
+                      {state && !on && <Diamond state={state} size={6} />}
+                      {state && on && <span className="size-[6px] rotate-45 bg-surface" />}
+                      {plans && <span className={cx("h-[3px] w-3 rounded-full", on ? "bg-surface" : "bg-primary")} />}
                     </span>
                   </button>
                 );
               })}
             </div>
-          )}
-          <div className="mt-6 px-2 md:px-0">
-            <h3 className="mb-2 text-title-medium text-on-surface-variant">{fmtDate(selected, { weekday: "long", month: "long", day: "numeric" })}</h3>
+          </div>
+          <section className="mt-6 border-t border-outline-variant pt-5 lg:mt-0 lg:border-t-0 lg:pt-2">
+            <h2 className="eyebrow mb-2">{fmtDate(selected, { weekday: "long", month: "short", day: "numeric" })}</h2>
             {occ.isLoading ? (
               <Loading />
             ) : selectedItems.length || eventsOn(selected).length ? (
-              <div className="grid gap-2 lg:grid-cols-2">
+              <div className="flex flex-col">
                 {eventsOn(selected).map((e) => (
                   <EventItem key={e.id} e={e} onOpen={() => setPlan(e)} large />
                 ))}
                 {selectedItems.map((o) => (
-                  <OccurrenceCard key={o.id} o={o} />
+                  <DayRow key={o.id} o={o} clash={clashing.has(o.id)} onOpen={() => setDetailId(o.id)} />
                 ))}
               </div>
             ) : (
-              <p className="text-body-medium text-on-surface-variant">Nothing scheduled.</p>
+              <p className="py-3 text-body-medium text-on-surface-variant">Nothing that day.</p>
             )}
-          </div>
+          </section>
         </div>
       ) : desk ? (
         // Letters desktop: a column per day, its plans first, then its tasks in time order.
@@ -355,24 +307,54 @@ export function CalendarPage() {
   );
 }
 
-/** A plan in the week or day list: tinted in its person's colour, so it never reads as a task. */
+/** A plan: an accent rule down its side and whose it is, so it never reads as a task. */
 function EventItem({ e, onOpen, large }: { e: CalendarEvent; onOpen(): void; large?: boolean }) {
-  const { rel } = useRel();
-  const tone = planTone(e, rel);
+  const { rel, me } = useRel();
+  const whose =
+    e.withPartner || planPeople(rel).length < 2
+      ? null
+      : e.authorId === me.user.id
+        ? "Your plan"
+        : `${rel.members.find((m) => m.userId === e.authorId)?.displayName ?? "Their"}'s plan`;
+  return (
+    <button type="button" onClick={onOpen} className={cx("state-layer flex w-full text-left", large ? "border-b border-outline-variant py-3" : "py-1")}>
+      <span className={cx("min-w-0 flex-1 border-l-2 border-primary", large ? "pl-4" : "pl-2")}>
+        <span className={cx("line-clamp-2 block break-words text-on-surface", large ? "text-body-large" : "text-body-small")}>{e.title}</span>
+        <span className={cx("block text-on-surface-variant", large ? "text-body-medium" : "text-label-small")}>
+          {[
+            e.allDay ? "All day" : `${fmtTime(e.startsAt)}–${fmtTime(e.endsAt)}`,
+            whose,
+            e.conflictIds.length > 0 ? `overlaps ${e.conflictIds.length === 1 ? "a task" : `${e.conflictIds.length} tasks`}` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+/** One diamond for a day in the month: owed if anything was missed, filled once all is done, open while some are to do. */
+function monthState(items: Occurrence[]): DiamondState | null {
+  if (!items.length) return null;
+  const states = items.map(dayState);
+  if (states.includes("owed")) return "owed";
+  if (states.every((s) => s === "done" || s === "off")) return "done";
+  if (states.includes("waiting")) return "waiting";
+  return "open";
+}
+
+/** A task in the chosen day's list: diamond, name, time. */
+function DayRow({ o, clash, onOpen }: { o: Occurrence; clash?: boolean; onOpen(): void }) {
   return (
     <button
       type="button"
       onClick={onOpen}
-      className={cx("state-layer flex w-full items-start gap-2 rounded-sm text-left", tone.bg, tone.text, large ? "rounded-md p-4" : "px-2 py-1.5")}
+      className="state-layer flex w-full items-center gap-4 border-b border-outline-variant py-3.5 text-left last:border-b-0"
     >
-      <Icon name="event" size={large ? 24 : 16} className="mt-0.5 shrink-0" />
-      <span className="min-w-0 flex-1">
-        <span className={cx("line-clamp-2 block break-words", large ? "text-title-medium" : "text-label-large")}>{e.title}</span>
-        <span className={cx("block opacity-80", large ? "text-body-medium" : "text-label-small")}>
-          {e.allDay ? "All day" : `${fmtTime(e.startsAt)} – ${fmtTime(e.endsAt)}`}
-          {e.conflictIds.length > 0 && ` · overlaps ${e.conflictIds.length === 1 ? "a task" : `${e.conflictIds.length} tasks`}`}
-        </span>
-      </span>
+      <Diamond state={dayState(o)} size={16} />
+      <span className="min-w-0 flex-1 text-body-large break-words text-on-surface">{o.title}</span>
+      <span className={cx("shrink-0 text-body-medium", clash ? "text-error" : "text-on-surface-variant")}>{fmtTime(o.dueAt)}</span>
     </button>
   );
 }
@@ -419,18 +401,14 @@ function ColumnItem({ o, clash, onOpen }: { o: Occurrence; clash?: boolean; onOp
 }
 
 function WeekItem({ o, clash, onOpen }: { o: Occurrence; clash?: boolean; onOpen(): void }) {
+  const state = dayState(o);
   return (
-    <button type="button" onClick={onOpen} className="state-layer flex w-full items-start gap-2 rounded-sm px-2 py-1.5 text-left">
-      <span className={cx("mt-1.5 size-2 shrink-0 rounded-full", dotClass(o))} />
-      <span className="min-w-0 flex-1">
-        <span className={cx("line-clamp-2 block text-label-large break-words text-on-surface", o.status === "completed" && "line-through opacity-70")}>
-          {o.title}
-        </span>
-        <span className={cx("flex items-center gap-1 text-label-small", clash ? "text-error" : "text-on-surface-variant")}>
-          {fmtTime(o.dueAt)}
-          {clash && <Icon name="event_busy" size={14} />}
-        </span>
+    <button type="button" onClick={onOpen} className="state-layer flex w-full items-center gap-3 py-1.5 text-left">
+      <Diamond state={state} size={11} className="shrink-0" />
+      <span className={cx("min-w-0 flex-1 text-body-medium break-words", state === "done" || state === "off" ? "text-on-surface-variant" : "text-on-surface")}>
+        {o.title}
       </span>
+      <span className={cx("shrink-0 text-label-medium", clash ? "text-error" : "text-on-surface-variant")}>{fmtTime(o.dueAt)}</span>
     </button>
   );
 }

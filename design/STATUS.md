@@ -19,7 +19,7 @@ Last full sweep: 2026-11-24, web at 390px and 1440px, local seed data.
 | New task / editor | 04, 52–55, desktop 14 | Close | Close | Sentence builder with tappable parts, inline option panels, Also chips, How often sheet, desktop preview and next three. Quick deadlines live in the time panel rather than mockup 55's separate sheet. Android edits the title in a panel (no inline field in a sentence), has no reward picker or "Next" dates line (both were missing before), and there's no "Save as draft" anywhere because drafts don't exist. |
 | + menu | 17 | Not compared | — | |
 | Week | 09, desktop 16 | Matched (#106) | Close (#114) | Desktop shows the date range beside the arrows. The mockup puts it as a small line above the title. |
-| Month | 13 | Not matched | Not matched | Boxed grid with dots. The mockup has serif dates with diamonds, and a hairline list for the chosen day. |
+| Month | 13 | Close | Close | Serif dates, one diamond per day, an accent bar for plans, the chosen day filled in ink, and the day as hairline rows (beside the month on desktop). Plans everywhere now use an accent rule and "Kitten's plan" instead of a colour per person; the colour key is gone. The phone header keeps the week/month icon instead of the mockup's "‹ Week" link. |
 | Plan editor, clashes | 14, 58 | Not compared | Not compared | |
 | Us | 08 | Close | Close | The Safe call button only shows for submissives and switches (correct). On desktop the "Your dynamic" button stretches the full width. |
 | All tasks | 56 | Close | Close | The right column shows an hourglass icon where the mockup has words ("14 day streak", "paused"). The "From a kit" filter is missing. |

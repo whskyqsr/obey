@@ -3,6 +3,7 @@ package app.obey.ui.plans
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -52,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -220,44 +222,34 @@ class PlanViewModel @Inject constructor(
     }
 }
 
-/** A plan in a day's list: an event icon, its title, and when on that day. */
+/** A plan in a day's list: an accent rule down its side, its title, and when and whose. [tone] is kept for callers. */
 @Composable
-fun PlanRow(e: CalendarEvent, day: LocalDate, who: String?, tone: PlanTone, onOpen: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    ListItem(
-        modifier = Modifier.clickable(onClick = onOpen),
-        leadingContent = { Icon(Icons.Outlined.Event, null, tint = tone.dot) },
-        headlineContent = { Text(e.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        supportingContent = { Text(listOfNotNull(e.dayLabel(day), who).joinToString(" · ")) },
-        trailingContent = if (e.conflictIds.isNotEmpty()) ({ Icon(Icons.Outlined.WarningAmber, "Overlaps a task", tint = colors.error) }) else null,
-        colors = ListItemDefaults.colors(containerColor = colors.surface),
-    )
+fun PlanRow(e: CalendarEvent, day: LocalDate, who: String?, @Suppress("UNUSED_PARAMETER") tone: PlanTone, onOpen: () -> Unit) {
+    PlanLine(e.title, listOfNotNull(e.dayLabel(day), who?.let { "$it's plan" }, if (e.conflictIds.isNotEmpty()) "overlaps ${if (e.conflictIds.size == 1) "a task" else "${e.conflictIds.size} tasks"}" else null).joinToString(" · "), e.conflictIds.isNotEmpty(), onOpen)
 }
 
-/** A short tinted bar for all-day and multi-day plans, shown above a day's tasks. */
+/** An all-day or multi-day plan above a day's tasks, ruled the same way as [PlanRow]. */
 @Composable
-fun PlanChip(e: CalendarEvent, day: LocalDate, tone: PlanTone, onOpen: () -> Unit, modifier: Modifier = Modifier) {
-    val colors = MaterialTheme.colorScheme
-    Surface(
-        onClick = onOpen,
-        color = tone.container,
-        contentColor = tone.onContainer,
-        shape = RoundedCornerShape(8.dp),
-        modifier = modifier.fillMaxWidth(),
+fun PlanChip(e: CalendarEvent, day: LocalDate, @Suppress("UNUSED_PARAMETER") tone: PlanTone, onOpen: () -> Unit, modifier: Modifier = Modifier) {
+    val span = if (e.allDay && e.firstDay() == e.lastDay()) "All day" else "${formatDate(e.firstDay())} – ${formatDate(e.lastDay())}"
+    Box(modifier) {
+        PlanLine(e.title, listOfNotNull(span, if (e.conflictIds.isNotEmpty()) "overlaps a task" else null).joinToString(" · "), e.conflictIds.isNotEmpty(), onOpen)
+    }
+}
+
+@Composable
+private fun PlanLine(title: String, sub: String, clash: Boolean, onOpen: () -> Unit) {
+    val c = MaterialTheme.colorScheme
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpen)
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .drawBehind { drawRect(c.primary, size = androidx.compose.ui.geometry.Size(2.dp.toPx(), size.height)) }
+            .padding(start = 16.dp),
     ) {
-        Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.Event, null, Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(e.title, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            Text(
-                if (e.allDay && e.firstDay() == e.lastDay()) "All day" else "${formatDate(e.firstDay())} – ${formatDate(e.lastDay())}",
-                style = MaterialTheme.typography.labelSmall,
-            )
-            if (e.conflictIds.isNotEmpty()) {
-                Spacer(Modifier.width(6.dp))
-                Icon(Icons.Outlined.WarningAmber, "Overlaps a task", Modifier.size(18.dp), tint = colors.error)
-            }
-        }
+        Text(title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(sub, style = MaterialTheme.typography.bodyMedium, color = if (clash) c.error else c.onSurfaceVariant)
     }
 }
 
