@@ -33,8 +33,17 @@ def signin(uid):
         scroll()
     edits = [n for n in dump().iter("node") if n.get("class") == "android.widget.EditText"]
     x, y = center(edits[-1]); adb("shell", "input", "tap", str(x), str(y)); time.sleep(1)
-    adb("shell", "input", "text", uid); time.sleep(1); adb("shell", "input", "keyevent", "111"); time.sleep(1)
-    tap("Use dev user", wait=8)
+    adb("shell", "input", "text", uid); time.sleep(1)
+    for attempt in range(4):
+        n = find("Use dev user")
+        if n is None:
+            print("no button; texts:", [x.get("text") for x in dump().iter("node") if x.get("text")]); break
+        # tap the clickable ancestor's bounds via the node itself
+        x, y = center(n); print("tap dev at", x, y, n.get("bounds"))
+        adb("shell", "input", "tap", str(x), str(y)); time.sleep(6)
+        if not find("Use dev user"): break
+        adb("shell", "input", "keyevent", "4"); time.sleep(1.5)
+    print("after signin texts:", [x.get("text") for x in dump().iter("node") if x.get("text")][:30])
 US = ["Rules", "Rewards", "Consequences", "Notes", "Journal", "Limits", "Agreement", "Scenes", "Location", "Stats", "Monthly review", "Kits", "All tasks"]
 def run(who, uid):
     signin(uid)

@@ -53,7 +53,7 @@ jobs:
       - name: Commit screenshots
         if: always()
         run: |
-          tail -50 /tmp/api.log || true
+          grep -v "^$" /tmp/api.log | tail -40 || true
           cd .audit/android-shots && mogrify -resize 50% *.png || true
           cd $GITHUB_WORKSPACE
           git config user.name "audit-bot"; git config user.email "audit-bot@users.noreply.github.com"
