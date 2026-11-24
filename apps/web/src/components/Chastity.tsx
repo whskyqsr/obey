@@ -614,7 +614,7 @@ export function ChastityToday() {
             <button
               type="button"
               onClick={() => void navigate({ to: "/chastity" })}
-              className="state-layer flex items-baseline gap-3 border-y border-outline-variant py-3 text-left"
+              className="state-layer state-row flex items-baseline gap-3 border-y border-outline-variant py-3 text-left"
             >
               <span className="min-w-0 flex-1">
                 <span className="block text-body-large text-on-surface">
@@ -655,7 +655,7 @@ export function StartLockDialog({ wearers, onClose }: { wearers: Member[]; onClo
   const minutes = length === "open" ? null : length === "custom" ? Math.round((new Date(custom).getTime() - Date.now()) / MIN) : length;
   const valid = minutes === null || (minutes >= 15 && minutes <= 90 * 1440);
   const keyRow = (on: boolean, title: string, body: string | null, pick: () => void) => (
-    <button type="button" onClick={pick} className="state-layer flex w-full items-center gap-4 border-b border-outline-variant py-3 text-left">
+    <button type="button" onClick={pick} className="state-layer state-row flex w-full items-center gap-4 border-b border-outline-variant py-3 text-left">
       <Diamond state={on ? "done" : "open"} size={16} className="shrink-0" />
       <span className="min-w-0 flex-1">
         <span className="block text-body-large text-on-surface">{title}</span>

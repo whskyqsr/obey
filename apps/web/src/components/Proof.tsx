@@ -156,7 +156,7 @@ export function ReportDialog({ subjectId, photoId, onClose }: { subjectId: strin
             role="radio"
             aria-checked={reason === r.value}
             onClick={() => setReason(r.value)}
-            className="state-layer flex items-center gap-4 border-b border-outline-variant py-3.5 text-left text-body-large text-on-surface"
+            className="state-layer state-row flex items-center gap-4 border-b border-outline-variant py-3.5 text-left text-body-large text-on-surface"
           >
             <Diamond state={reason === r.value ? "done" : "open"} size={16} className="shrink-0" />
             {r.label}

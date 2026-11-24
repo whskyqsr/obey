@@ -40,7 +40,7 @@ const Rows = ({ children }: { children: ReactNode }) => (
 /** A setting that opens somewhere else: the name, and its current value on the right. */
 function ValueRow({ label, value, to, hash }: { label: string; value?: ReactNode; to: string; hash?: string }) {
   return (
-    <Link to={to} hash={hash} className="state-layer flex min-h-14 items-center gap-4 py-3.5">
+    <Link to={to} hash={hash} className="state-layer state-row flex min-h-14 items-center gap-4 py-3.5">
       <span className="min-w-0 flex-1 text-body-large text-on-surface">{label}</span>
       <span className="flex shrink-0 items-center gap-0.5 text-body-medium text-on-surface-variant">
         {value}

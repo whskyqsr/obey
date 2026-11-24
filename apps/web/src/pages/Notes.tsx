@@ -85,7 +85,7 @@ function EarlierRow({ n, onOpen }: { n: Note; onOpen(): void }) {
   const { memberName } = useRel();
   const reply = usePartnerReply(n);
   return (
-    <button type="button" onClick={onOpen} className="state-layer flex w-full flex-col gap-1.5 py-5 text-left">
+    <button type="button" onClick={onOpen} className="state-layer state-row flex w-full flex-col gap-1.5 py-5 text-left">
       <span className="flex items-baseline gap-2 text-body-medium text-on-surface-variant">
         <span className="min-w-0 flex-1 truncate">
           {entryDay(n, "short")}

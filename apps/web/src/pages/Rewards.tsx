@@ -125,7 +125,7 @@ export function RewardsPage() {
                       aria-label={isDom ? `Edit “${r.title}”` : `Spend ${r.cost} points on “${r.title}”`}
                       title={dim ? `${r.cost - myBalance} more points` : undefined}
                       onClick={() => (isDom ? setEditing(r) : spend())}
-                      className={cx("state-layer flex w-full flex-col py-3 text-left disabled:cursor-default", dim && "text-outline")}
+                      className={cx("state-layer state-row flex w-full flex-col py-3 text-left disabled:cursor-default", dim && "text-outline")}
                     >
                       <span className="flex w-full items-baseline gap-3">
                         <span className={cx("font-serif text-[24px] leading-8", dim ? "text-outline" : "text-on-surface")}>{r.title}</span>

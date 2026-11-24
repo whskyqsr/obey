@@ -287,7 +287,7 @@ function Tasks({ tasks }: { tasks: DynamicStats["tasks"] }) {
             type="button"
             disabled={!t.active}
             onClick={() => navigate({ to: "/tasks/$taskId", params: { taskId: t.taskId } })}
-            className="state-layer flex w-full flex-col gap-2.5 py-3.5 text-left disabled:cursor-default"
+            className="state-layer state-row flex w-full flex-col gap-2.5 py-3.5 text-left disabled:cursor-default"
           >
             <div className="flex w-full items-baseline gap-3">
               <span className="min-w-0 flex-1 truncate text-body-large text-on-surface">

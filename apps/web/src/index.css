@@ -274,6 +274,12 @@ body {
   .state-layer:disabled::after {
     opacity: 0;
   }
+  /* A row between hairlines keeps its text on the page's edge; its highlight reaches 12px past the text on each
+     side, so it never sits tight against the words. */
+  .state-row::after {
+    inset: 0 -12px;
+    border-radius: 6px;
+  }
 }
 
 :focus-visible {

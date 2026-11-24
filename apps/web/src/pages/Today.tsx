@@ -283,7 +283,7 @@ function LaterDay({ day, items }: { day: string; items: Occurrence[] }) {
   const label = day === addDays(today(), 1) ? "Tomorrow" : fmtDate(day, { weekday: "long", month: "short", day: "numeric" });
   return (
     <div className="border-b border-outline-variant">
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="state-layer flex w-full items-center gap-3 py-3 text-left">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="state-layer state-row flex w-full items-center gap-3 py-3 text-left">
         <div className="min-w-0 flex-1">
           <div className="text-title-medium text-on-surface">
             {label} · {items.length} {items.length === 1 ? "task" : "tasks"}

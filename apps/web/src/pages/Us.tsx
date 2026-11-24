@@ -16,7 +16,7 @@ const ORDER = ["/rules", "/protocols", "/rewards", "/consequences", "/notes", "/
 function Cell({ d, count }: { d: Dest; count?: string }) {
   return (
     <li className="min-w-0">
-      <Link to={d.to} className="state-layer flex h-12 items-center gap-3 border-b border-outline-variant outline-none">
+      <Link to={d.to} className="state-layer state-row flex h-12 items-center gap-3 border-b border-outline-variant outline-none">
         <Icon name={d.icon} size={20} className="shrink-0 text-on-surface-variant" />
         <span className="min-w-0 flex-1 truncate font-serif text-[19px] leading-7 text-on-surface">{d.label}</span>
         {count && <span className="shrink-0 text-[11px] leading-4 text-on-surface-variant">{count}</span>}

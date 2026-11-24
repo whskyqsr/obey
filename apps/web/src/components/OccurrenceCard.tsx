@@ -81,7 +81,7 @@ export function OccurrenceCard({ o, showDate, linkTask = true, plain }: { o: Occ
         // Letters: no box; a due date reads as a row on the page, and overdue shows in the accent, not a fill.
         "relative flex flex-col gap-3 py-3",
         // The title link stretches over the whole row, so the row is the hover and focus target.
-        linkTask && "state-layer has-[a[data-card-link]:focus-visible]:outline-2 has-[a[data-card-link]:focus-visible]:outline-primary",
+        linkTask && "state-layer state-row has-[a[data-card-link]:focus-visible]:outline-2 has-[a[data-card-link]:focus-visible]:outline-primary",
       )}
     >
       <div className={cx("flex items-start gap-3", plain && "hidden")}>

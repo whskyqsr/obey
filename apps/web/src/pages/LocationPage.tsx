@@ -126,7 +126,7 @@ export function LocationPage() {
             <button
               type="button"
               onClick={() => navigate({ to: "/curfew" })}
-              className="state-layer mt-2 flex w-full items-center gap-4 border-b border-outline-variant py-4 text-left"
+              className="state-layer state-row mt-2 flex w-full items-center gap-4 border-b border-outline-variant py-4 text-left"
             >
               {c ? (
                 <span className="min-w-0 flex-1">
@@ -161,7 +161,7 @@ export function LocationPage() {
                 type="button"
                 disabled={!canEdit}
                 onClick={() => setEditing({ place: p })}
-                className="state-layer flex w-full items-center gap-5 py-4 text-left disabled:cursor-default"
+                className="state-layer state-row flex w-full items-center gap-5 py-4 text-left disabled:cursor-default"
               >
                 <Icon name={placeIcon(p.name)} className="text-on-surface" />
                 <span className="min-w-0 flex-1">
@@ -177,7 +177,7 @@ export function LocationPage() {
               <button
                 type="button"
                 onClick={() => setEditing({ place: null })}
-                className="state-layer flex w-full items-center gap-5 py-4 text-left text-primary"
+                className="state-layer state-row flex w-full items-center gap-5 py-4 text-left text-primary"
               >
                 <Icon name="add" />
                 <span className="text-body-large">Add a place</span>
