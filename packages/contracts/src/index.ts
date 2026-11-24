@@ -1002,6 +1002,8 @@ export const calendarEventInput = z
     pauseTasks: z.boolean().default(false),
     /** Only when making a plan; later edits change one plan, or that one and the ones after it. */
     repeat: planRepeat.nullable().optional(),
+    /** Editing one plan of a repeating plan: just it ("one", the default), or it and the ones after ("following"). */
+    applyTo: z.enum(["one", "following"]).nullish(),
   })
   .refine((e) => Date.parse(e.endsAt) > Date.parse(e.startsAt), { message: "an event has to end after it starts", path: ["endsAt"] })
   .refine((e) => Date.parse(e.endsAt) - Date.parse(e.startsAt) <= 31 * 86_400_000, { message: "an event can last a month at most", path: ["endsAt"] });

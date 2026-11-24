@@ -369,14 +369,26 @@ class TodayViewModel @Inject constructor(
         if (!session.canManage || rel == null) {
             _delays.value = emptyList()
             _redemptions.value = emptyList()
+            _pauseAsks.value = emptyList()
             return
         }
+        _pauseAsks.value = runCatching { api.pauseAsks(relId) }.getOrDefault(_pauseAsks.value)
         _delays.value = if (rel.reschedulePolicy == app.obey.api.ReschedulePolicy.Allowance) runCatching { api.delays(relId) }.getOrDefault(_delays.value) else emptyList()
         _redemptions.value = if (rel.features.points) {
             runCatching {
                 api.ledger(relId).filter { it.kind == app.obey.api.LedgerKind.Redemption && it.redeemedAt == null && it.userId != session.userId }
             }.getOrDefault(_redemptions.value)
         } else emptyList()
+    }
+
+    private val _pauseAsks = MutableStateFlow<List<app.obey.api.CalendarEvent>>(emptyList())
+    /** Plans someone asked to pause their tasks during, for a Dominant. */
+    val pauseAsks: StateFlow<List<app.obey.api.CalendarEvent>> = _pauseAsks.asStateFlow()
+
+    fun answerPause(e: app.obey.api.CalendarEvent, approve: Boolean) = action {
+        _pauseAsks.value = _pauseAsks.value.filter { it.id != e.id }
+        api.answerPause(e.id, app.obey.api.PauseAnswerInput(approve))
+        say(if (approve) "Tasks paused" else "Tasks stay on")
     }
 
     fun seenDelay(d: app.obey.api.DelayUsed) = action {

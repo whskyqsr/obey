@@ -208,7 +208,7 @@ export const eventRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     }
     const current = found;
     const { applyTo, ...changes } = { applyTo: "one", ...(req.body as object) } as { applyTo?: unknown } & Record<string, unknown>;
-    const following = z.enum(["one", "following"]).parse(applyTo) === "following" && current.seriesId !== null;
+    const following = z.enum(["one", "following"]).nullish().parse(applyTo) === "following" && current.seriesId !== null;
     // Validate the merged event, so moving only the start can't put it after the end. A plan's repeat is set when it's made.
     const body = calendarEventInput.parse({
       title: current.title,

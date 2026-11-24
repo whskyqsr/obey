@@ -1047,7 +1047,25 @@ data class CalendarEventInput(
     /** Whether the partner is in on it; only then do their tasks count as clashing. */
     val withPartner: Boolean = false,
     val noteMd: String? = null,
+    /** Excuse the tasks that fall due during it; a submissive's plan asks a Dominant first. */
+    val pauseTasks: Boolean = false,
+    /** Only when making a plan. */
+    val repeat: PlanRepeat? = null,
+    /** Editing one plan of a repeating plan: "one", or "following" for it and the ones after. */
+    val applyTo: String? = null,
 )
+
+/** How a plan repeats; each repeat is its own plan, made up front until [until]. */
+@Serializable
+data class PlanRepeat(
+    /** day, week, 2weeks or month. */
+    val every: String,
+    val until: String,
+    val timezone: String,
+)
+
+@Serializable
+data class PauseAnswerInput(val approve: Boolean)
 
 @Serializable
 data class CalendarEvent(
@@ -1060,6 +1078,12 @@ data class CalendarEvent(
     val allDay: Boolean = false,
     val withPartner: Boolean = false,
     val noteMd: String? = null,
+    /** Shared by the plans of one repeating plan. */
+    val seriesId: String? = null,
+    val repeat: PlanRepeat? = null,
+    val pauseTasks: Boolean = false,
+    /** asked: waiting on a Dominant; approved: tasks during it are excused; declined: they aren't. */
+    val pauseStatus: String? = null,
     /** Tasks still to do that fall due during the plan, for the people it involves. */
     val conflictIds: List<String> = emptyList(),
     /** Someone else (a Dominant) moved its end; the author is shown it until they close the card. */

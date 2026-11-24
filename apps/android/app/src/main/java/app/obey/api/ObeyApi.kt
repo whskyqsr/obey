@@ -155,8 +155,16 @@ interface ObeyApi {
     @POST("events/{id}/seen")
     suspend fun seenPlanChange(@Path("id") id: String, @Body body: Map<String, String> = emptyMap())
 
+    /** [following] "1" also removes the later plans of a repeating plan. */
     @DELETE("events/{id}")
-    suspend fun deleteEvent(@Path("id") id: String)
+    suspend fun deleteEvent(@Path("id") id: String, @Query("following") following: String? = null)
+
+    /** Plans someone asked to pause their tasks during, for a Dominant to answer. */
+    @GET("relationships/{id}/events/pause-asks")
+    suspend fun pauseAsks(@Path("id") relationshipId: String): List<CalendarEvent>
+
+    @POST("events/{id}/pause")
+    suspend fun answerPause(@Path("id") id: String, @Body body: PauseAnswerInput): CalendarEvent
 
     @POST("events/{id}/dismiss")
     suspend fun dismissClashes(@Path("id") id: String, @Body body: DismissClashesInput): CalendarEvent
