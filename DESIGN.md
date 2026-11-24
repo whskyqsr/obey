@@ -35,6 +35,21 @@ These rules are binding for every change to the web or Android UI. The approved 
 - A create button reads "+ New", never "+ New rule" or "+ New protocol", so it doesn't change width between tabs.
 - Write it the way you'd say it: partners speak in their own words, and requests read as sentences.
 
+## Nothing from the old design
+
+No style from the pre-Letters design may show through: no Material filled or tonal containers, elevation, rounded cards, coloured chips, M3 list items with leading icons in boxes, boxed stat tiles, the old pink-tinted M3 palette (#FFF8F6 and friends), or bright status colours. If a screen still has any of these, it is unfinished, even when nobody has written a rule about that exact case.
+
+## One decision, every place
+
+Once Jake decides how something looks or behaves, apply it everywhere the same situation comes up, not just on the screen he pointed at. Record each decision here.
+
+- Create buttons read "+ New" (from Rules/Protocols, 2026-11-23).
+- No explainers under names or settings (2026-11-23).
+- Form fields are label-above Letters fields with one hairline (2026-11-23).
+- Deleting an item returns to its list, never back through history to wherever it was opened from (Notes, 2026-11-23).
+
+Pixel perfection isn't the goal. Once the big gaps in `design/STATUS.md` are closed, there will be a consistency pass across every screen: same headers, same row styles, same buttons and same spacing for the same jobs.
+
 ## Structure
 
 - Phone tabs are Today, Week and Us, grouped left, plus the raised rounded-square + button. Other pages are reached from contextual header icons (see the mockup README table).
