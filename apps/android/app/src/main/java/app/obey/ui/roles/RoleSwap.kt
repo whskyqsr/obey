@@ -193,7 +193,7 @@ fun EndSwapDialog(session: Session, swap: RoleSwap, onDismiss: () -> Unit, vm: R
     if (messages) SwapMessages(vm)
     val other = session.nameOf(if (swap.requestedBy == session.userId) swap.partnerId else swap.requestedBy)
     val text = if (swap.active) {
-        val back = if (session.myRole == Role.Submissive) "You go back to being the Dominant and $other the Submissive." else "$other goes back to being the Dominant and you the Submissive."
+        val back = if (session.myRole == Role.Submissive) "You go back to being the Dominant and $other the submissive." else "$other goes back to being the Dominant and you the submissive."
         "$back${if (swap.pauseTasks) " Paused tasks pick up again." else ""} $other gets a notification."
     } else {
         "$other won't be asked any more."

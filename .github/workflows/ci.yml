@@ -26,6 +26,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: node scripts/design-check.mjs
       - run: pnpm typecheck
       - run: pnpm --filter @obey/api build
       - run: pnpm test
