@@ -283,8 +283,6 @@ fun SettingsScreen(onBack: () -> Unit, onOpenDynamic: () -> Unit, onOpenFeatures
                             Hairline()
                         }
                     }
-
-                    }
                 }
             }
         }
