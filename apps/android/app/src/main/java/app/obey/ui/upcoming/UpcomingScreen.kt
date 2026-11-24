@@ -268,7 +268,7 @@ fun UpcomingScreen(
     counting?.let { o -> app.obey.ui.today.CountDialog(o, onDismiss = { counting = null }, onSave = { n -> vm.count(o, to = n); counting = null }) }
     noting?.let { o -> app.obey.ui.today.DoneDialog(o, onDismiss = { noting = null }, onDone = { note, mood, entry -> vm.complete(o, note, mood, entry); noting = null }) }
     rescheduling?.let { o ->
-        RescheduleSheet(o, onDismiss = { rescheduling = null }, onSubmit = { vm.reschedule(o, it) })
+        RescheduleSheet(o, onDismiss = { rescheduling = null }, onSubmit = { vm.reschedule(o, it) }, session = vm.session)
     }
 }
 
