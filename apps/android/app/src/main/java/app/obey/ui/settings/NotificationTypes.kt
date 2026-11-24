@@ -29,6 +29,12 @@ private val TYPES = listOf(
     NotifyType("rewards", "Rewards", "When a reward is redeemed", needsPoints = true),
 )
 
+/** How many kinds of notification are on, of those that apply: "7 of 8". */
+fun notifyCount(muted: List<String>, points: Boolean): Pair<Int, Int> {
+    val types = TYPES.filter { !it.needsPoints || points }
+    return types.count { it.key !in muted } to types.size
+}
+
 /** Which kinds of notification this account gets, on every device; the dynamic's own news always comes through. */
 @Composable
 fun NotificationTypes(
@@ -40,7 +46,7 @@ fun NotificationTypes(
 ) {
     val colors = MaterialTheme.colorScheme
     val points = LocalFeatures.current.points
-    Surface(color = androidx.compose.ui.graphics.Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, colors.outlineVariant), shape = MaterialTheme.shapes.medium, modifier = Modifier.padding(horizontal = 16.dp).padding(top = 8.dp).fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             TYPES.filter { !it.needsPoints || points }.forEach { t ->
                 Row(verticalAlignment = Alignment.CenterVertically) {

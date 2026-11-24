@@ -94,7 +94,12 @@ function LockScreen({ uid, onUnlock }: { uid: string; onUnlock(): void }) {
         <div className="h-5 text-body-medium text-error">{waiting ? `Too many tries. Wait ${Math.ceil((waitUntil - now) / 1000)} s.` : error}</div>
         <div className="grid grid-cols-3 gap-3">
           {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
-            <button key={d} type="button" onClick={() => press(d)} className="state-layer size-16 rounded-full bg-surface-container-high text-headline-small text-on-surface">
+            <button
+              key={d}
+              type="button"
+              onClick={() => press(d)}
+              className="state-layer size-16 rounded-full bg-surface-container-high text-headline-small text-on-surface"
+            >
               {d}
             </button>
           ))}
@@ -106,7 +111,11 @@ function LockScreen({ uid, onUnlock }: { uid: string; onUnlock(): void }) {
           >
             <Icon name="backspace" />
           </button>
-          <button type="button" onClick={() => press("0")} className="state-layer size-16 rounded-full bg-surface-container-high text-headline-small text-on-surface">
+          <button
+            type="button"
+            onClick={() => press("0")}
+            className="state-layer size-16 rounded-full bg-surface-container-high text-headline-small text-on-surface"
+          >
             0
           </button>
           <button
@@ -144,7 +153,7 @@ export function AppLockSetting({ uid }: { uid: string }) {
   const snack = useSnackbar();
   const [setting, setSetting] = useState(false);
   return (
-    <div className="rounded-lg bg-surface-container-low px-4 py-2">
+    <div className="py-1">
       <Switch
         checked={!!config}
         onChange={(on) => (on ? setSetting(true) : (clearPin(uid), snack("App lock off")))}
@@ -165,7 +174,11 @@ export function AppLockSetting({ uid }: { uid: string }) {
           </Button>
         </div>
       )}
-      <PinDialog open={setting} onClose={() => setSetting(false)} onSave={(pin) => setPin(uid, pin, config?.after ?? 60).then(() => (setSetting(false), snack("PIN saved")))} />
+      <PinDialog
+        open={setting}
+        onClose={() => setSetting(false)}
+        onSave={(pin) => setPin(uid, pin, config?.after ?? 60).then(() => (setSetting(false), snack("PIN saved")))}
+      />
     </div>
   );
 }
@@ -197,7 +210,14 @@ function PinDialog({ open, onClose, onSave }: { open: boolean; onClose(): void; 
     >
       <div className="flex flex-col gap-4">
         <p className="text-body-medium text-on-surface-variant">4 to 8 digits. If you forget it, you can sign out and back in.</p>
-        <TextField label="PIN" type="password" inputMode="numeric" autoComplete="new-password" value={pin} onChange={(e) => setPinText(digits(e.target.value))} />
+        <TextField
+          label="PIN"
+          type="password"
+          inputMode="numeric"
+          autoComplete="new-password"
+          value={pin}
+          onChange={(e) => setPinText(digits(e.target.value))}
+        />
         <TextField
           label="PIN again"
           type="password"

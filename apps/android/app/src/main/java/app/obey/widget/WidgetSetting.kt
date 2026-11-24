@@ -59,7 +59,7 @@ fun WidgetSetting(vm: WidgetSettingViewModel = hiltViewModel()) {
     val tick by vm.tick.collectAsStateWithLifecycle()
     val locked by vm.appLock.collectAsStateWithLifecycle()
     val colors = MaterialTheme.colorScheme
-    Surface(color = colors.surfaceContainerLow, shape = MaterialTheme.shapes.large, modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Widgets, null, tint = colors.primary)

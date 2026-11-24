@@ -26,7 +26,7 @@ import { LocationPage } from "./pages/LocationPage";
 import { CurfewPage } from "./pages/Curfew";
 import { KitPage, KitsPage, NewKitPage, SharedKitPage } from "./pages/Kits";
 import { RulesPage } from "./pages/Rules";
-import { SettingsPage } from "./pages/Settings";
+import { SETTINGS_SECTIONS, SettingsPage, type SettingsSection } from "./pages/Settings";
 import { TaskEditorPage } from "./pages/TaskEditor";
 import { TasksPage } from "./pages/Tasks";
 import { TodayPage } from "./pages/Today";
@@ -73,11 +73,22 @@ const todayRoute = createRoute({
   },
 });
 
+const settingsSectionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/$section",
+  component: function SettingsSectionRoute() {
+    const { section } = settingsSectionRoute.useParams();
+    const known = SETTINGS_SECTIONS.some((s) => s.id === section);
+    return <SettingsPage section={known ? (section as SettingsSection) : undefined} />;
+  },
+});
+
 const taskRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/tasks/$taskId",
   // `start` (YYYY-MM-DD) seeds a new task's date, e.g. the day picked on the calendar.
-  validateSearch: (s: Record<string, unknown>): { start?: string } => (typeof s.start === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s.start) ? { start: s.start } : {}),
+  validateSearch: (s: Record<string, unknown>): { start?: string } =>
+    typeof s.start === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s.start) ? { start: s.start } : {},
   component: function TaskRoute() {
     const { taskId } = taskRoute.useParams();
     const { start } = taskRoute.useSearch();
@@ -122,10 +133,10 @@ function Gate({ feature, children }: { feature: keyof Features; children: React.
       <Empty
         icon="toggle_off"
         title="This is switched off"
-        body="It can be turned back on from Your dynamic, under Features."
+        body="It can be turned back on in Settings, under Features."
         action={
-          <Button variant="tonal" icon="favorite" onClick={() => void navigate({ to: "/dynamic", hash: "features" })}>
-            Open Your dynamic
+          <Button variant="tonal" icon="toggle_on" onClick={() => void navigate({ to: "/settings/$section", params: { section: "features" } })}>
+            Open Features
           </Button>
         }
       />
@@ -282,7 +293,8 @@ const routeTree = rootRoute.addChildren([
   sceneRoute,
   page("/aftercare", gated("scenes", AftercarePage)),
   page("/chastity", gated("chastity", ChastityPage)),
-  page("/settings", SettingsPage),
+  page("/settings", () => <SettingsPage />),
+  settingsSectionRoute,
   page("/dynamic", DynamicPage),
   page("/dynamic/people", PeoplePage),
   page("/places", gated("location", PlacesPage)),

@@ -24,7 +24,7 @@ export function QuietHoursSetting() {
   };
 
   return (
-    <div className="border border-outline-variant mt-3 rounded-lg px-4 py-2">
+    <div className="border-b border-outline-variant py-1">
       <Switch
         checked={!!saved}
         onChange={(on) => save(on ? { ...draft, timezone: zone() } : null)}

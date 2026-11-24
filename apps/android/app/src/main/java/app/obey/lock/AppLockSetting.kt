@@ -61,7 +61,7 @@ fun AppLockSetting(vm: AppLockViewModel = hiltViewModel()) {
     val on by vm.on.collectAsStateWithLifecycle()
     val after by vm.after.collectAsStateWithLifecycle()
     val colors = MaterialTheme.colorScheme
-    Surface(color = colors.surfaceContainerLow, shape = MaterialTheme.shapes.large, modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Lock, null, tint = colors.primary)
