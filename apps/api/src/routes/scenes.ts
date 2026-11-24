@@ -267,11 +267,13 @@ export const sceneRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     await requireScenes(req.params.id, req.user.id);
     const body = aftercarePlanInput.parse(req.body);
     const set = { needs: body.needs, note: body.note, updatedAt: deps.now() };
-    await db
+    // Answer with the stored row rather than echoing the request back.
+    const [saved] = await db
       .insert(aftercarePlans)
       .values({ relationshipId: req.params.id, userId: req.user.id, ...set })
-      .onConflictDoUpdate({ target: [aftercarePlans.relationshipId, aftercarePlans.userId], set });
-    return { userId: req.user.id, ...body, updatedAt: set.updatedAt.toISOString() };
+      .onConflictDoUpdate({ target: [aftercarePlans.relationshipId, aftercarePlans.userId], set })
+      .returning();
+    return { userId: saved!.userId, needs: saved!.needs, note: saved!.note, updatedAt: saved!.updatedAt.toISOString() };
   });
 };
 

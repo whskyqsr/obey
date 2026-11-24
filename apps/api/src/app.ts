@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { ZodError, type ZodType } from "zod";
 import { type Authenticator, upsertUser } from "./auth.js";
@@ -60,6 +61,8 @@ export interface Deps {
   appUrl?: string;
   /** This API's public address (API_URL); worked out from each request when unset. */
   apiUrl?: string;
+  /** Per-address request limits (requests per minute, overall); the server turns them on, tests mostly leave them off. */
+  rateLimit?: { max: number } | null;
   logger?: boolean;
 }
 
@@ -100,6 +103,16 @@ export function buildApp(deps: Deps) {
   // calls; it never leaves the process, so nothing from outside can pass for one.
   const internalSecret = randomBytes(32).toString("base64url");
   const aiGrantOf = (req: FastifyRequest) => (req.headers[AI_INTERNAL_HEADER] === internalSecret ? (req.headers["x-ai-grant"] as string | undefined) : undefined);
+  if (deps.rateLimit) {
+    // Counted per caller address. Railway's edge sets X-Real-IP to the caller's address; locally there's none.
+    // MCP tools' in-process calls are already counted once, at /mcp. Routes can set their own limit in config.rateLimit.
+    app.register(rateLimit, {
+      max: deps.rateLimit.max,
+      timeWindow: "1 minute",
+      keyGenerator: (req) => (typeof req.headers["x-real-ip"] === "string" ? req.headers["x-real-ip"] : req.ip),
+      allowList: (req) => req.headers[AI_INTERNAL_HEADER] === internalSecret || req.url === "/health",
+    });
+  }
   // OAuth's token endpoint takes form posts.
   app.addContentTypeParser("application/x-www-form-urlencoded", { parseAs: "string" }, (_req, body, done) => {
     done(null, Object.fromEntries(new URLSearchParams(body as string)));

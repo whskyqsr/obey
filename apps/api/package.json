@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@fastify/cors": "^11.3.1",
+    "@fastify/rate-limit": "^11.3.0",
     "@modelcontextprotocol/sdk": "1.32.2",
     "@obey/contracts": "workspace:*",
     "@obey/recurrence": "workspace:*",
