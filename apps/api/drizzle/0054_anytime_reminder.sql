@@ -1,0 +1,1 @@
+ALTER TABLE "relationships" ADD COLUMN "anytime_reminder" text DEFAULT '20:00' NOT NULL;

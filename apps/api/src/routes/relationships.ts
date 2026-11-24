@@ -75,6 +75,7 @@ export async function relationshipDto(db: Tx, ids: string[]) {
     features: allFeatures(r.features),
     subNotes: r.subNotes,
     proofDays: r.proofDays,
+    anytimeReminder: r.anytimeReminder,
     dates: r.dates,
     createdAt: r.createdAt.toISOString(),
     endedAt: r.endedAt?.toISOString() ?? null,

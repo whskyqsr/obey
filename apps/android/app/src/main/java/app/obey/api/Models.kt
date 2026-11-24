@@ -185,6 +185,8 @@ data class Relationship(
     val subNotes: Boolean = true,
     /** Proof photos are deleted this many days after their task is settled; null keeps them. */
     val proofDays: Int? = null,
+    /** When tasks with no due time are reminded about on their day, local "HH:mm"; a Dominant sets it. */
+    val anytimeReminder: String = "20:00",
     val dates: List<DynamicDate> = emptyList(),
     /** When a partner left or blocked; an ended dynamic is kept read-only for both. */
     val endedAt: String? = null,
@@ -305,6 +307,7 @@ data class UpdateRelationshipInput(
     @EncodeDefault(EncodeDefault.Mode.NEVER) val weeklyDelayAllowance: Int? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER) val features: Features? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER) val subNotes: Boolean? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val anytimeReminder: String? = null,
     /** The whole list, replacing what's stored. */
     @EncodeDefault(EncodeDefault.Mode.NEVER) val dates: List<DynamicDate>? = null,
 )
