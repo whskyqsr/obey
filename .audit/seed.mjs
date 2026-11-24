@@ -1,0 +1,57 @@
+const API = "http://localhost:3000";
+const DOM = "11111111-1111-4111-8111-111111111111", SUB = "22222222-2222-4222-8222-222222222222";
+const mk = (id, name) => async (method, url, body) => {
+  const r = await fetch(API + url, { method, headers: { "x-dev-user": id, "x-dev-name": name, "content-type": "application/json" }, body: body === undefined ? (method==="GET"?undefined:"{}") : JSON.stringify(body) });
+  const t = await r.text(); let j; try { j = t ? JSON.parse(t) : undefined } catch { j = t }
+  if (r.status >= 400) console.log("ERR", method, url, r.status, t.slice(0, 200));
+  return j;
+};
+const dom = mk(DOM, "Marcus"), sub = mk(SUB, "Kitten");
+const TZ = "America/Detroit";
+const me = await dom("GET", "/me"); await sub("GET", "/me");
+const domId = me.user.id; const subId = (await sub("GET", "/me")).user.id;
+const rel = await dom("POST", "/relationships", { name: "Us", role: "dominant" });
+const inv = await dom("POST", `/relationships/${rel.id}/invites`);
+await sub("POST", "/relationships/join", { code: inv.code, role: "submissive" });
+const R = `/relationships/${rel.id}`;
+const today = new Date().toISOString().slice(0, 10);
+const daysAgo = (n) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
+const T = (title, extra = {}) => dom("POST", `${R}/tasks`, { title, assigneeId: subId, points: 10, schedule: { start: daysAgo(10), rule: { freq: "daily" } }, dueTime: "21:00", timezone: TZ, ...extra });
+await T("Make the bed", { dueTime: "09:00", points: 5 });
+await T("Write tonight's journal entry", { dueTime: "22:30" });
+await T("Evening walk, 30 minutes", { dueTime: "20:00", approvalRequired: true });
+await T("Drink water", { dueTime: "23:00", count: { target: 8, mode: "exact" } }).catch(()=>{});
+await T("Gym", { schedule: { start: daysAgo(10), rule: { freq: "weekly", byDay: ["MO","WE","FR"] } }, dueTime: "19:00", points: 15 });
+await T("Morning ritual", { dueTime: "08:30", steps: [{ title: "Kneel for a minute" }, { title: "Say good morning" }, { title: "Plan the day" }] });
+await T("Send a photo of your outfit", { dueTime: "10:00", proofRequired: true });
+await T("Tidy the desk", { schedule: { start: today, rule: null }, dueTime: "23:59", points: 5 });
+// complete past occurrences
+const occ = await sub("GET", `${R}/occurrences?from=${daysAgo(9)}&to=${daysAgo(1)}`);
+let i = 0;
+for (const o of occ || []) { i++; if (i % 5 === 0) continue; await dom("PATCH", `/occurrences/${o.id}`, { status: "completed" }); }
+const todays = await sub("GET", `${R}/occurrences?from=${today}&to=${today}`);
+for (const o of (todays||[]).slice(0, 2)) await sub("POST", `/occurrences/${o.id}/complete`, { noteMd: "Done before work." });
+const walk = (todays||[]).find(o => /walk/i.test(o.title ?? o.task?.title ?? ""));
+if (walk) await sub("POST", `/occurrences/${walk.id}/complete`, { noteMd: "Went round the park twice." });
+for (const t of ["Ask before spending over $50", "Lights out by 11 on work nights", "Tell me where you are when you go out", "Speak respectfully, even when upset"]) await dom("POST", `${R}/rules`, { title: t });
+for (const t of ["Morning greeting", "Kneel when I come home"]) await dom("POST", `${R}/protocols`, { title: t, bodyMd: "Each morning, message me before 9 with how you slept and one thing you'll do for us today." });
+await dom("POST", `${R}/rewards`, { title: "Movie night, your pick", cost: 40 });
+await dom("POST", `${R}/rewards`, { title: "Sleep in on Saturday", cost: 60 });
+const rw = await dom("POST", `${R}/rewards`, { title: "Takeout of your choice", cost: 30 });
+await dom("POST", `${R}/consequences`, { title: "Corner time, 10 minutes" });
+const cq = await dom("POST", `${R}/consequences`, { title: "Write 50 lines" });
+await dom("POST", `${R}/ledger/adjust`, { userId: subId, delta: 50, note: "Good week" });
+if (rw?.id) await sub("POST", `/rewards/${rw.id}/redeem`);
+if (cq?.id) await dom("POST", `/consequences/${cq.id}/assign`, { assigneeId: subId, note: "For Tuesday" });
+await dom("POST", `${R}/notes`, { title: "Shopping list", bodyMd: "- [ ] Candles\n- [x] Rope\n- [ ] Lotion" });
+await dom("POST", `${R}/notes`, { title: "Ideas for the weekend", bodyMd: "Try the new restaurant. **Early night** Sunday." });
+await sub("POST", `${R}/notes`, { kind: "journal", title: "Good day", bodyMd: "Felt calm and focused today. The morning ritual helps more than I expected.", mood: 4, visibility: "shared" });
+await sub("POST", `${R}/notes`, { kind: "journal", title: "Tired", bodyMd: "Long day at work. Skipped the gym, which I regret.", mood: 2, visibility: "shared" });
+const tom = new Date(Date.now() + 864e5); tom.setUTCHours(23,0,0,0);
+await sub("POST", `${R}/events`, { title: "Dinner with Jess", startsAt: tom.toISOString(), endsAt: new Date(tom.getTime()+3*36e5).toISOString() });
+await dom("POST", `${R}/limits`, { title: "Public humiliation", kind: "hard" });
+await dom("POST", `${R}/limits`, { title: "Marks that show", kind: "soft" });
+await dom("POST", `${R}/scenes`, { title: "Friday night", occurredAt: new Date(Date.now()-3*864e5).toISOString(), timezone: TZ, safeword: "yellow", aftercare: ["Water", "Blanket"] });
+await sub("PUT", `${R}/aftercare`, { needs: ["Water", "Cuddles"], note: "Stay close for a while." });
+await dom("POST", `${R}/agreement`, { sections: [{ title: "Why we're doing this", bodyMd: "To keep each other steady." }, { title: "Limits", bodyMd: "See the Limits list." }], note: "First go" }).catch(()=>{});
+console.log(rel.id);
