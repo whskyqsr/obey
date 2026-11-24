@@ -13,7 +13,7 @@ import { localDate, localTime } from "@obey/recurrence";
 import { and, desc, eq, inArray, lte } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { Deps } from "../app.js";
-import { chastityEvents, chastityLocks, memberships, relationships, taskSeries } from "../db/schema.js";
+import { chastityEvents, chastityLocks, memberships, relationships, taskSeries, users } from "../db/schema.js";
 import { HttpError, forbidden, notFound } from "../errors.js";
 import { canManage, requireMember } from "../services/access.js";
 import { type Lock, OPEN, canSeeKeybox, changeLockTime, endLock, eventDto, expiredLocks, lockDto, openLock, overdueBreaks, redCallOpen } from "../services/chastity.js";
@@ -181,7 +181,7 @@ export const chastityRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         .update(chastityLocks)
         .set({ status: declined ? "declined" : "cancelled", endedAt: now, endedBy: req.user.id })
         .where(eq(chastityLocks.id, lock.id));
-      if (declined) await notifier.send([lock.keyholderId], { title: "Fealty", body: `${req.user.displayName} said not now to locking up`, data: { type: "chastity", relationshipId: lock.relationshipId } });
+      if (declined) await notifier.send([lock.keyholderId], { title: "Fealty", body: `${req.user.displayName} said no to locking up`, data: { type: "chastity", relationshipId: lock.relationshipId } });
     } else if (lock.status === "active" || lock.status === "break") {
       keyholderOnly(lock, req.user.id);
       await db.transaction((tx) => endLock(tx, lock, req.user.id, "released", now));
@@ -259,7 +259,7 @@ export const chastityRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       if (ask.kind === "release_ask") await endLock(tx, lock, req.user.id, "released", now);
       else await tx.update(chastityLocks).set({ status: "break", breakEndsAt: new Date(now.getTime() + minutes! * 60_000) }).where(eq(chastityLocks.id, lock.id));
     });
-    const said = body.approve ? (ask.kind === "release_ask" ? "released you" : `allowed a ${minutes}-minute break`) : ask.kind === "release_ask" ? "said not yet to release" : "said no to a break";
+    const said = body.approve ? (ask.kind === "release_ask" ? "released you" : `allowed a ${minutes}-minute break`) : ask.kind === "release_ask" ? "said no to releasing you" : "said no to a break";
     const push = { title: "Fealty", body: `${req.user.displayName} ${said}`, data: { type: "chastity", relationshipId: lock.relationshipId } };
     // The keyholder's note rides along for a wearer who lets partners' words onto their lock screen.
     const note = body.note?.trim();
@@ -325,10 +325,17 @@ export async function finishLocks(deps: Pick<Deps, "db" | "notifier">, now: Date
     if (!ended) continue;
     const data = { type: "chastity", relationshipId: lock.relationshipId };
     await notifier.send([lock.wearerId], { title: "Fealty", body: lock.keyMode === "keybox" ? "Your lock is over. The keybox code is yours." : "Your lock is over", data });
-    await notifier.send([lock.keyholderId], { title: "Fealty", body: "A lock you hold is over", data });
+    const [wearer] = await db.select({ name: users.displayName }).from(users).where(eq(users.id, lock.wearerId));
+    await notifier.send([lock.keyholderId], { title: "Fealty", body: `${wearer?.name ?? "Your partner"}'s lock is over`, data });
   }
-  for (const lock of await db.transaction((tx) => overdueBreaks(tx, now)))
-    await notifier.send([lock.keyholderId], { title: "Fealty", body: "A hygiene break is over, and they haven't relocked", data: { type: "chastity", relationshipId: lock.relationshipId } });
+  for (const lock of await db.transaction((tx) => overdueBreaks(tx, now))) {
+    const [wearer] = await db.select({ name: users.displayName }).from(users).where(eq(users.id, lock.wearerId));
+    await notifier.send([lock.keyholderId], {
+      title: "Fealty",
+      body: `${wearer?.name ?? "Your partner"}'s hygiene break is over and the lock isn't back on`,
+      data: { type: "chastity", relationshipId: lock.relationshipId },
+    });
+  }
   // Asks to lock up that nobody answered within a week lapse.
   await db
     .update(chastityLocks)

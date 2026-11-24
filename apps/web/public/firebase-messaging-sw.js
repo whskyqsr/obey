@@ -21,7 +21,10 @@ self.addEventListener("push", (event) => {
     body: n.body || data.body || "",
     icon: n.icon || "/icon.svg",
     badge: "/icon.svg",
+    // Pushes about the same thing (one plan, rule changes) share a tag, so the newest replaces the last.
     tag: data.tag || payload.fcmMessageId || undefined,
+    // A safe call stays on screen until it's dealt with.
+    requireInteraction: data.urgent === "1",
     // Quiet hours: still shown, but without sound or vibration.
     silent: data.quiet === "1",
     data: { url: data.url || (payload.fcmOptions && payload.fcmOptions.link) || "/" },

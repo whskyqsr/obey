@@ -75,22 +75,67 @@ class ObeyMessagingService : FirebaseMessagingService() {
             else -> 0
         }
         val pending = PendingIntent.getActivity(this, code, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        val quiet = message.data["quiet"] == "1"
-        val channel = getString(if (quiet) R.string.notification_channel_quiet else R.string.notification_channel_default)
+        // A safe call gets its own urgent channel and stays out of the group, so it can't sit unnoticed in a bundle.
+        val urgent = message.data["urgent"] == "1"
+        val quiet = !urgent && message.data["quiet"] == "1"
+        val channel = getString(
+            when {
+                urgent -> R.string.notification_channel_urgent
+                quiet -> R.string.notification_channel_quiet
+                else -> R.string.notification_channel_default
+            },
+        )
+        // Pushes about the same thing (one plan, rule changes, location) share a tag: the newest replaces the last one,
+        // and doesn't buzz again while that one is still showing.
+        val tag = message.data["tag"]
         val notification = NotificationCompat.Builder(this, channel)
             .setSilent(quiet)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true)
             .setContentIntent(pending)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setOnlyAlertOnce(tag != null)
+            .apply {
+                if (urgent) {
+                    setPriority(NotificationCompat.PRIORITY_HIGH)
+                    setCategory(NotificationCompat.CATEGORY_ALARM)
+                } else {
+                    setGroup(GROUP)
+                    setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
+                }
+            }
             .build()
-        NotificationManagerCompat.from(this).notify(message.messageId?.hashCode() ?: 0, notification)
+        val manager = NotificationManagerCompat.from(this)
+        if (tag != null) manager.notify(tag, TAGGED_ID, notification) else manager.notify(message.messageId?.hashCode() ?: 0, notification)
+        if (!urgent) {
+            // Everything else is bundled under one summary once there are two or more.
+            val summary = NotificationCompat.Builder(this, getString(R.string.notification_channel_default))
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(title)
+                .setAutoCancel(true)
+                .setContentIntent(PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP), PendingIntent.FLAG_IMMUTABLE))
+                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                .setGroup(GROUP)
+                .setGroupSummary(true)
+                .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
+                .setSilent(true)
+                .build()
+            manager.notify(SUMMARY_ID, summary)
+        }
     }
 
     override fun onDestroy() {
         scope.cancel()
         super.onDestroy()
+    }
+
+    private companion object {
+        const val GROUP = "fealty"
+        const val SUMMARY_ID = Int.MIN_VALUE
+        // Tagged notifications are told apart by their tag; the id only has to be the same each time.
+        const val TAGGED_ID = 1
     }
 }

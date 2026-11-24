@@ -2,7 +2,7 @@ import { limitInput } from "@obey/contracts";
 import { asc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { Deps } from "../app.js";
-import { limits, memberships } from "../db/schema.js";
+import { limits } from "../db/schema.js";
 import { forbidden, notFound, parsePatch } from "../errors.js";
 import { requireMember } from "../services/access.js";
 
@@ -19,17 +19,11 @@ const limitDto = (l: typeof limits.$inferSelect) => ({
 
 /**
  * Limits: hard, soft and curious. Everyone in the dynamic reads all of them, and each person writes only their own,
- * so nobody can quietly change a partner's hard limit. Partners hear when a limit is added or changed.
+ * so nobody can quietly change a partner's hard limit. The apps moved to the limits list (limitList.ts); this stays for
+ * older installs and sends no notifications.
  */
 export const limitRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   const { db } = deps;
-
-  const tellOthers = async (relationshipId: string, userId: string, name: string) => {
-    const others = (await db.select({ id: memberships.userId }).from(memberships).where(eq(memberships.relationshipId, relationshipId)))
-      .map((m) => m.id)
-      .filter((id) => id !== userId);
-    await deps.notifier.send(others, { title: "Fealty", body: `${name} updated their limits`, data: { type: "limits", relationshipId } });
-  };
 
   const loadOwn = async (id: string, userId: string) => {
     const [l] = await db.select().from(limits).where(eq(limits.id, id));
@@ -52,7 +46,6 @@ export const limitRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       .insert(limits)
       .values({ ...body, relationshipId: req.params.id, ownerId: req.user.id })
       .returning();
-    await tellOthers(req.params.id, req.user.id, req.user.displayName);
     return reply.status(201).send(limitDto(row!));
   });
 
@@ -64,7 +57,6 @@ export const limitRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       .set({ ...body, updatedAt: deps.now() })
       .where(eq(limits.id, existing.id))
       .returning();
-    await tellOthers(existing.relationshipId, req.user.id, req.user.displayName);
     return limitDto(row!);
   });
 

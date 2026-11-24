@@ -198,7 +198,7 @@ export const limitListRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     if (others.length)
       await notifier.send(others, {
         title: "Fealty",
-        body: everyone ? "You've both finished your limits. See them side by side." : `${req.user.displayName} finished their limits. Yours are next.`,
+        body: everyone ? "You've both finished your limits" : `${req.user.displayName} finished their limits`,
         data: { type: "limits", relationshipId: relId },
       });
     return { ok: true };

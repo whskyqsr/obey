@@ -96,7 +96,7 @@ export const roleSwapRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         .update(roleSwaps)
         .set({ status: declined ? "declined" : "cancelled", endedAt: now, endedBy: req.user.id })
         .where(eq(roleSwaps.id, swap.id));
-      if (declined) await notifier.send([other], { title: "Fealty", body: `${req.user.displayName} declined the role swap`, data: { type: "role_swap", relationshipId } });
+      if (declined) await notifier.send([other], { title: "Fealty", body: `${req.user.displayName} said no to the role swap`, data: { type: "role_swap", relationshipId } });
     } else {
       await db.transaction((tx) => endSwap(tx, swap, req.user.id, now));
       await notifier.send([other], { title: "Fealty", body: `${req.user.displayName} ended the role swap. Your roles are back.`, data: { type: "role_swap", relationshipId } });

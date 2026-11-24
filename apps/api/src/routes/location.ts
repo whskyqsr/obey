@@ -5,6 +5,7 @@ import type { Deps } from "../app.js";
 import { memberships, places, taskSeries, users } from "../db/schema.js";
 import { HttpError, notFound, parsePatch } from "../errors.js";
 import { occurrenceDto } from "../serialize.js";
+import { sendWithWords } from "../notify.js";
 import { managers, requireManager, requireMember } from "../services/access.js";
 import { addressSearch } from "../services/geocode.js";
 import { reportsHome } from "../services/curfew.js";
@@ -135,11 +136,12 @@ export const locationRoutes = (deps: Deps) => async (app: FastifyInstance) => {
             : "You left before your time was up",
         data: { type: "occurrence_missed", occurrenceId: occ.id },
       });
-      await notifier.send(await managers(db, series.relationshipId, req.user.id), {
+      const push = {
         title: "Fealty",
-        body: curfew ? `${req.user.displayName} broke curfew` : `${req.user.displayName} left “${series.title}” early`,
+        body: curfew ? `${req.user.displayName} broke curfew` : `${req.user.displayName} left a task early`,
         data: { type: "occurrence_missed", occurrenceId: occ.id },
-      });
+      };
+      await sendWithWords(db, notifier, await managers(db, series.relationshipId, req.user.id), push, curfew ? null : { ...push, body: `${req.user.displayName} left “${series.title}” early` });
     } else if (result.occ.status === "completed" && occ.status === "pending") {
       await notifier.send(await managers(db, series.relationshipId, req.user.id), {
         title: "Fealty",
@@ -155,8 +157,11 @@ export const locationRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const body = reportLocation.parse(req.body);
     const [before] = await db.select({ status: users.locationStatus }).from(users).where(eq(users.id, req.user.id));
     await db.update(users).set({ locationStatus: body.status, locationStatusAt: deps.now() }).where(eq(users.id, req.user.id));
-    // Losing it while location tasks are set matters to whoever set them.
-    if (before?.status === "ready" && body.status !== "ready") {
+    // Losing it while location tasks are set matters to whoever set them, and so does getting it back. Both share a tag,
+    // so a phone that flips back and forth leaves one notification that says where things stand.
+    const lost = before?.status === "ready" && body.status !== "ready";
+    const back = !!before?.status && before.status !== "ready" && body.status === "ready";
+    if (lost || back) {
       const rels = await db
         .selectDistinct({ id: taskSeries.relationshipId })
         .from(taskSeries)
@@ -171,8 +176,9 @@ export const locationRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         if (uses)
           await notifier.send(await managers(db, r.id, req.user.id), {
             title: "Fealty",
-            body: `${req.user.displayName}'s phone can't check location tasks right now`,
+            body: lost ? `${req.user.displayName}'s phone can't check location tasks right now` : `${req.user.displayName}'s phone can check location tasks again`,
             data: { type: "location_status", relationshipId: r.id },
+            tag: `location:${r.id}:${req.user.id}`,
           });
       }
     }
@@ -187,7 +193,7 @@ export const locationRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       .filter((id) => id !== req.user.id);
     await notifier.send(others, {
       title: "Fealty",
-      body: `${req.user.displayName} wants to give you location tasks. Tap to set it up.`,
+      body: `${req.user.displayName} wants to give you location tasks`,
       data: { type: "location_setup", relationshipId: req.params.id },
     });
     return reply.status(204).send();
@@ -207,6 +213,7 @@ export const locationRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       title: "Fealty",
       body: `${req.user.displayName} paused location`,
       data: { type: "location_status", relationshipId: req.params.id },
+      tag: `location:${req.params.id}:${req.user.id}`,
     });
     return reply.status(204).send();
   });
@@ -217,6 +224,13 @@ export const locationRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       .update(memberships)
       .set({ locationPausedAt: null, locationPausedUntil: null })
       .where(and(eq(memberships.relationshipId, req.params.id), eq(memberships.userId, req.user.id)));
+    // Replaces the "paused" notification, so it doesn't sit there after location is back on.
+    await notifier.send(await managers(db, req.params.id, req.user.id), {
+      title: "Fealty",
+      body: `${req.user.displayName} turned location back on`,
+      data: { type: "location_status", relationshipId: req.params.id },
+      tag: `location:${req.params.id}:${req.user.id}`,
+    });
     return reply.status(204).send();
   });
 };

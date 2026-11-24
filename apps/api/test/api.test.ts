@@ -680,7 +680,7 @@ describe("tasks and occurrences", () => {
       at("2026-10-19T02:01:00Z");
       await runJobs(ctx.db, ctx.notifier, ctx.clock.now, opts);
       expect((await night("2026-10-18")).status).toBe("missed");
-      expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Your partner wasn't home by curfew");
+      expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Sub wasn't home by curfew");
 
       // A plan out past curfew shows to the Dominant, who excuses that night or leaves it.
       const plan = (await sub.post(`/relationships/${relId}/events`, { title: "Dinner with Jess", startsAt: "2026-10-21T00:00:00Z", endsAt: "2026-10-21T05:00:00Z" })).body;
@@ -761,7 +761,7 @@ describe("tasks and occurrences", () => {
         endsAt: "2026-10-21T02:00:00.000Z",
         previousEndsAt: "2026-10-21T05:00:00.000Z",
       });
-      expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [subId], push: { body: "Dom changed Dinner with Jess: it now ends at 10:00 PM" } });
+      expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [subId], push: { body: "Dom changed your plan: it now ends at 10:00 PM" } });
       expect((await dom.get(`/relationships/${relId}/curfew`)).body.clashes).toEqual([]);
       expect((await sub.get(`/relationships/${relId}/events/changes`)).body).toMatchObject([{ id: plan.id, previousEndsAt: "2026-10-21T05:00:00.000Z" }]);
       expect((await dom.get(`/relationships/${relId}/events/changes`)).body).toEqual([]);
@@ -773,7 +773,7 @@ describe("tasks and occurrences", () => {
       const thu = await night("2026-10-22");
       const ask3 = (await sub.post(`/relationships/${relId}/curfew/requests`, { occurrenceId: thu.id, until: show.endsAt, eventId: show.id })).body;
       await dom.patch(`/events/${show.id}`, { endsAt: "2026-10-23T03:30:00Z" });
-      expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Dom changed Late show: it now ends at 11:30 PM, and curfew moves to 11:30 PM that night");
+      expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Dom changed your plan: it now ends at 11:30 PM, and curfew moves to 11:30 PM that night");
       expect((await night("2026-10-22")).dueAt).toBe("2026-10-23T03:30:00.000Z");
       expect((await dom.get(`/relationships/${relId}/curfew`)).body).toMatchObject({ clashes: [], requests: [] });
       expect((await sub.get(`/relationships/${relId}/curfew`)).body.requests.find((r: { id: string }) => r.id === ask3.id)).toBeUndefined();
@@ -857,7 +857,7 @@ describe("rescheduling", () => {
     expect((await sub.post(`/reschedules/${pending[0].id}/decide`, { approve: true })).status).toBe(403);
     const decided = await dom.post(`/reschedules/${pending[0].id}/decide`, { approve: true });
     expect(decided.body.occurrence.dueAt).toBe("2026-10-18T01:00:00.000Z");
-    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Your extension was approved");
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Dom OK'd your extension");
   });
 
   it("applies delays directly within the weekly allowance", async () => {
@@ -906,7 +906,7 @@ describe("rescheduling", () => {
     expect(decided.body.requests).toHaveLength(2);
     expect(decided.body.occurrences.map((o: { dueAt: string }) => o.dueAt).sort()).toEqual(["2026-10-17T22:00:00.000Z", "2026-10-18T01:00:00.000Z"]);
     expect((await dom.get(`/relationships/${relId}/reschedules?status=requested`)).body).toHaveLength(0);
-    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Your extension for 2 tasks was approved");
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Dom OK'd your extension for 2 tasks");
   });
 
   it("counts a whole-day request as one delay against the allowance", async () => {
@@ -952,7 +952,7 @@ describe("rescheduling", () => {
     const decided = await dom.post(`/reschedules/${asked.id}/decide`, { approve: true, dueAt: "2026-10-17T22:00:00Z" });
     expect(decided.body.request).toMatchObject({ kind: "move", status: "approved", toDueAt: "2026-10-17T22:00:00.000Z" });
     expect(decided.body.occurrence).toMatchObject({ status: "pending", dueAt: "2026-10-17T22:00:00.000Z" });
-    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Gym was rescheduled instead");
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Dom rescheduled your task instead");
   });
 
   it("calls a task off when the Dom approves, and lets a Dom call one off directly", async () => {
@@ -960,7 +960,7 @@ describe("rescheduling", () => {
     await sub.post(`/relationships/${relId}/reschedules/plan`, { items: [{ occurrenceId: first.id, action: "cancel" }] });
     const [asked] = (await dom.get(`/relationships/${relId}/reschedules?status=requested`)).body;
     expect((await dom.post(`/reschedules/${asked.id}/decide`, { approve: true })).body.occurrence.status).toBe("cancelled");
-    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Your request to call off a task was approved");
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Dom OK'd calling off your task");
 
     const [next] = (await dom.get(`/relationships/${relId}/occurrences?from=2026-10-19&to=2026-10-19`)).body;
     const direct = await dom.post(`/relationships/${relId}/reschedules/plan`, { items: [{ occurrenceId: next.id, action: "cancel" }] });
@@ -1323,7 +1323,7 @@ describe("assigned consequences", () => {
         schedule: { start: "2026-10-17" },
         dueTime: "22:00",
       });
-      expect(ctx.notifier.sent.some((n) => n.push.body === "A task was missed, and a consequence was added")).toBe(true);
+      expect(ctx.notifier.sent.some((n) => n.push.body === "You missed a task, and a consequence was added")).toBe(true);
 
       const [miss] = (await sub.get(`/tasks/${t.id}/history`)).body;
       await dom.patch(`/occurrences/${miss.id}`, { status: "excused" });
@@ -1337,7 +1337,7 @@ describe("assigned consequences", () => {
       expect(listed).toMatchObject({ status: "missed", missConsequence: "Corner time" });
       expect((await sub.post(`/occurrences/${listed.id}/drop-consequence`)).status).toBe(403);
       expect((await dom.post(`/occurrences/${listed.id}/drop-consequence`)).body).toMatchObject({ status: "missed", missConfirmed: true });
-      expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [subId], push: { body: "Dom dropped “Corner time” for “Kneel and write lines”. It still counts as missed." } });
+      expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [subId], push: { body: "Dom dropped a consequence. The task still counts as missed." } });
       expect(await issued()).toHaveLength(0);
       expect((await dom.get(`/relationships/${relId}/occurrences?from=2026-10-17&to=2026-10-17`)).body.find((o: { id: string }) => o.id === listed.id).missConsequence).toBeNull();
       expect((await dom.post(`/occurrences/${listed.id}/drop-consequence`)).status).toBe(409);
@@ -1654,7 +1654,7 @@ describe("calendar events", () => {
       allDay: true,
       withPartner: true,
     });
-    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Dom added a plan on the calendar; it overlaps one of your tasks");
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Dom added a plan on the calendar");
 
     expect((await dom.del(`/events/${made.body.id}`)).status).toBe(403);
     expect((await sub.del(`/events/${made.body.id}`)).status).toBe(204);
@@ -1713,14 +1713,14 @@ describe("calendar events", () => {
     const asked = await sub.post(`/relationships/${relId}/events`, night);
     expect(asked.body).toMatchObject({ pauseTasks: true, pauseStatus: "asked" });
     expect(asked.body.conflictIds).toHaveLength(1);
-    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Sub added a plan on the calendar and asks to pause tasks during Night out");
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Sub added a plan on the calendar and asks to pause tasks during it");
     expect((await dom.get(`/relationships/${relId}/events/pause-asks`)).body.map((e: { id: string }) => e.id)).toEqual([asked.body.id]);
     expect((await sub.get(`/relationships/${relId}/events/pause-asks`)).body).toEqual([]);
     expect((await sub.post(`/events/${asked.body.id}/pause`, { approve: true })).status).toBe(403);
 
     const ok = await dom.post(`/events/${asked.body.id}/pause`, { approve: true });
     expect(ok.body).toMatchObject({ pauseStatus: "approved", conflictIds: [] });
-    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Dom OK'd pausing your tasks during Night out");
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Dom OK'd pausing your tasks during your plan");
     expect((await dom.post(`/events/${asked.body.id}/pause`, { approve: false })).status).toBe(409);
 
     // Moving it asks again; a Dominant's own paused plan needs no one's OK.
@@ -1738,7 +1738,7 @@ describe("calendar events", () => {
     await dom.post(`/relationships/${relId}/tasks`, task(subId));
     const asked = await sub.post(`/relationships/${relId}/events`, { title: "Night out", startsAt: "2026-10-16T19:00:00-04:00", endsAt: "2026-10-16T23:00:00-04:00", pauseTasks: true });
     expect((await dom.post(`/events/${asked.body.id}/pause`, { approve: false })).body).toMatchObject({ pauseStatus: "declined" });
-    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Dom said no to pausing your tasks during Night out");
+    expect(ctx.notifier.sent.at(-1)!.push.body).toBe("Dom said no to pausing your tasks during your plan");
     ctx.clock.now = new Date("2026-10-17T02:01:00Z");
     await runJobs(ctx.db, ctx.notifier, ctx.clock.now, { materializeDays: 14, reminderLeadMinutes: 30 });
     expect((await sub.get(`/relationships/${relId}/occurrences?from=2026-10-16&to=2026-10-16`)).body[0].status).toBe("missed");
