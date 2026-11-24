@@ -105,6 +105,11 @@ function WideSettings({ section }: { section: SettingsSection }) {
               Your dynamic
             </Link>
           </li>
+          <li>
+            <Link to="/dynamic/how" className="state-layer block rounded-md px-3.5 py-2.5 text-body-large text-on-surface-variant">
+              How it works
+            </Link>
+          </li>
           {me.admin && (
             <li>
               <Link to="/admin/reports" className="state-layer block rounded-md px-3.5 py-2.5 text-body-large text-on-surface-variant">
@@ -174,7 +179,7 @@ function SettingsList() {
         <Rows>
           <ValueRow label="Your dynamic" value={<span className="max-w-40 truncate">{dynamicTitle}</span>} to="/dynamic" />
           {!rel.endedAt && <ValueRow label="Features" value={`${on} of ${FEATURE_ROWS.length} on`} to="/settings/features" />}
-          <ValueRow label="Proof photos delete after" value={rel.proofDays ? PROOF_DAYS_SHORT[rel.proofDays] : "Never"} to="/dynamic" />
+          <ValueRow label="Proof photos delete after" value={rel.proofDays ? PROOF_DAYS_SHORT[rel.proofDays] : "Never"} to="/dynamic/how" />
         </Rows>
 
         <Eyebrow>Account</Eyebrow>

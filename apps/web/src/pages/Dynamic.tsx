@@ -1,12 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { useCreateInvite, useCurfew, useLeaveRelationship, useMoods, useUpdateRelationship } from "../api/hooks";
+import { useNavigate } from "@tanstack/react-router";
+import { useCreateInvite, useLeaveRelationship, useMoods, useUpdateRelationship } from "../api/hooks";
 import { errorMessage } from "../api/client";
 import type { DynamicDate, Features, Invite, Member, Relationship, ReschedulePolicy, Role } from "../api/types";
 import { Avatar } from "../components/Avatar";
 import { CollarIcon } from "../components/CollarIcon";
 import { DynamicHero } from "../components/DynamicHero";
-import { SubHeader, BackLink, Button, Checkbox, Chip, Dialog, Icon, IconButton, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
+import { SubHeader, BackLink, Button, Checkbox, Chip, Diamond, Dialog, Icon, IconButton, Select, Switch, TextField, cx, useSnackbar } from "../components/ui";
 import { ReportDialog } from "../components/Proof";
 import { EndSwapDialog, SwapDialog, fmtSwapEnd, swapPartner } from "../components/RoleSwap";
 import { fmtDate, fmtDateTime, localDateOf, today } from "../lib/dates";
@@ -14,13 +14,6 @@ import { anniversary, describeDate } from "../lib/dynamicDates";
 import { inviteLink } from "../lib/invite";
 import { ROLE_LABEL, isCollared, relTitle, useRel } from "../lib/relationship";
 import { useBack } from "../lib/useBack";
-import { describeCurfew } from "./Curfew";
-
-const POLICIES: { value: ReschedulePolicy; label: string }[] = [
-  { value: "dominant_only", label: "Dominant only" },
-  { value: "request", label: "Sub may request" },
-  { value: "allowance", label: "Weekly allowance" },
-];
 
 export const FEATURE_ROWS: { key: keyof Features; label: string; help: string }[] = [
   { key: "points", label: "Points and rewards", help: "Tasks earn points that can be spent on rewards." },
@@ -169,25 +162,17 @@ function Row({
   );
 }
 
-/** Everything about the relationship itself: who's in it, inviting, how it works, and which features are on. */
+/** Everything about the relationship itself: who's in it, inviting and how it works. */
 export function DynamicPage() {
-  const { me, rel, self, isDom: dom, select, memberName, features } = useRel();
+  const { me, rel, isDom: dom, memberName } = useRel();
   // Nothing in an ended dynamic can change, so nobody gets the controls.
   const isDom = dom && rel.endedAt === null;
   const navigate = useNavigate();
   const snack = useSnackbar();
   const update = useUpdateRelationship(rel.id);
-  const curfew = useCurfew(rel.id, features.location);
-  // Settings' Features row opens this page at #features; scroll there once the page has rendered.
-  const hash = useRouterState({ select: (st) => st.location.hash });
-  useEffect(() => {
-    if (hash !== "features") return;
-    const t = setTimeout(() => document.getElementById("features")?.scrollIntoView({ block: "start" }), 50);
-    return () => clearTimeout(t);
-  }, [hash]);
   const back = useBack(() => navigate({ to: "/settings" }));
   const title = useDynamicTitle();
-  const [sheet, setSheet] = useState<"invite" | "name" | "deadlines" | "swap" | "end-swap" | null>(null);
+  const [sheet, setSheet] = useState<"invite" | "swap" | "end-swap" | null>(null);
   const swapWith = swapPartner(rel, me.user.id);
   const swap = rel.roleSwap;
   const inSwap = swap && (swap.requestedBy === me.user.id || swap.partnerId === me.user.id);
@@ -202,9 +187,6 @@ export function DynamicPage() {
   const saveDates = (next: DynamicDate[], msg: string) => patch({ dates: next }, msg);
   const patch = (body: Parameters<typeof update.mutate>[0], msg = "Saved") =>
     update.mutate(body, { onSuccess: () => snack(msg), onError: (e) => snack(errorMessage(e)) });
-  const partner = rel.members.find((m) => m.userId !== me.user.id);
-  const policy = POLICIES.find((p) => p.value === rel.reschedulePolicy);
-  const sub = rel.members.find((m) => m.role === "submissive");
 
   return (
     <div className="flex flex-col pb-10">
@@ -294,113 +276,18 @@ export function DynamicPage() {
             trailing={<Icon name="chevron_right" className="text-on-surface-variant" />}
             onClick={() => navigate({ to: "/dynamic/people" })}
           />
-        </Group>
-
-        {features.location && (
-          <>
-            <Label>Location</Label>
-            <Group>
-              <Row
-                leading={<Icon name="location_on" className="text-on-surface-variant" />}
-                headline="Places"
-                supporting={isDom ? "Where location tasks can send someone" : "The places location tasks use"}
-                trailing={<Icon name="chevron_right" className="text-on-surface-variant" />}
-                onClick={() => navigate({ to: "/location" })}
-              />
-              {(isDom || curfew.data?.settings?.enabled) && (
-                <Row
-                  leading={<Icon name="bedtime" className="text-on-surface-variant" />}
-                  headline="Curfew"
-                  supporting={curfew.data?.settings?.enabled ? describeCurfew(curfew.data.settings) : "Off"}
-                  trailing={<Icon name="chevron_right" className="text-on-surface-variant" />}
-                  onClick={() => navigate({ to: "/curfew" })}
-                />
-              )}
-              {self && self.role !== "dominant" && !ended && (
-                <Row
-                  leading={<Icon name="my_location" className="text-on-surface-variant" />}
-                  headline="Your location"
-                  supporting={self.locationPaused ? "Paused" : self.locationStatus === "ready" ? "On, only for tasks" : "Not set up on your phone"}
-                  trailing={<Icon name="chevron_right" className="text-on-surface-variant" />}
-                  onClick={() => navigate({ to: "/location" })}
-                />
-              )}
-            </Group>
-          </>
-        )}
-
-        <Label>How it works</Label>
-        <Group>
           <Row
-            headline="Name"
-            supporting={rel.name ?? `None set, so it shows ${partner ? memberName(partner.userId) : "your partner's name"}`}
-            trailing={isDom && <Icon name="edit" className="text-on-surface-variant" />}
-            onClick={isDom ? () => setSheet("name") : undefined}
+            headline="How it works"
+            trailing={<Icon name="chevron_right" className="text-on-surface-variant" />}
+            onClick={() => navigate({ to: "/dynamic/how" })}
           />
-          <Row
-            headline="Moving deadlines"
-            supporting={rel.reschedulePolicy === "allowance" ? `${policy?.label}: ${rel.weeklyDelayAllowance} free a week` : policy?.label}
-            trailing={isDom && <Icon name="chevron_right" className="text-on-surface-variant" />}
-            onClick={isDom ? () => setSheet("deadlines") : undefined}
-          />
-          <div className="py-1">
-            <Switch
-              checked={rel.subNotes}
-              onChange={(on) => isDom && patch({ subNotes: on }, on ? "Notes turned on for them" : "Notes turned off for them")}
-              label={`${sub ? sub.displayName : "A submissive"} can write notes`}
-              help="Their own notes. Yours stay read-only to them unless you let them edit one."
-            />
-          </div>
-          <div className="pt-3 pb-4">
-            <Select
-              label="Keep proof photos"
-              value={rel.proofDays === null ? "" : String(rel.proofDays)}
-              disabled={!!rel.endedAt}
-              onChange={(e) => {
-                const days = e.target.value ? Number(e.target.value) : null;
-                patch(
-                  { proofDays: days },
-                  days ? `Proof photos are deleted ${PROOF_DAYS.find((d) => d.value === days)?.label.toLowerCase()}` : "Proof photos are kept",
-                );
-              }}
-              help="Either of you can change this. A photo that's been reported stays until it's reviewed."
-            >
-              <option value="">Until you delete them</option>
-              {PROOF_DAYS.map((d) => (
-                <option key={d.value} value={d.value}>
-                  {d.label}
-                </option>
-              ))}
-            </Select>
-          </div>
         </Group>
 
-        <Label id="features">Features</Label>
-        <Group>
-          <div className="py-1">
-            {FEATURE_ROWS.map((f) => (
-              <Switch
-                key={f.key}
-                checked={features[f.key]}
-                onChange={(on) => isDom && patch({ features: { [f.key]: on } }, on ? `${f.label} on` : `${f.label} off`)}
-                label={f.label}
-              />
-            ))}
-          </div>
-        </Group>
-        <p className="pt-2 text-body-small text-on-surface-variant">
-          {isDom
-            ? "Switched-off features are hidden for everyone here. Nothing is deleted."
-            : ended
-              ? "This dynamic has ended, so nothing here can change."
-              : "Only a Dominant can change how this dynamic works."}
-        </p>
       </div>
 
       <InviteSheet open={sheet === "invite"} onClose={() => setSheet(null)} />
       <SwapDialog open={sheet === "swap"} onClose={() => setSheet(null)} />
       {swap && <EndSwapDialog open={sheet === "end-swap"} onClose={() => setSheet(null)} swap={swap} />}
-      <NameDialog open={sheet === "name"} onClose={() => setSheet(null)} onSave={(name) => patch({ name }, "Name saved")} />
       <DateDialog
         value={editingDate}
         onClose={() => setEditingDate(null)}
@@ -415,7 +302,6 @@ export function DynamicPage() {
           )
         }
       />
-      <DeadlinesDialog open={sheet === "deadlines"} onClose={() => setSheet(null)} onSave={(body) => patch(body)} />
     </div>
   );
 }
@@ -769,57 +655,107 @@ function NameDialog({ open, onClose, onSave }: { open: boolean; onClose(): void;
   );
 }
 
-function DeadlinesDialog({
-  open,
-  onClose,
-  onSave,
-}: {
-  open: boolean;
-  onClose(): void;
-  onSave(body: { reschedulePolicy: ReschedulePolicy; weeklyDelayAllowance?: number }): void;
-}) {
-  const { rel } = useRel();
-  const [policy, setPolicy] = useState(rel.reschedulePolicy);
+/** Rules for the app itself: the name, who moves deadlines, sub notes and how long proof photos stay. Opened from Your dynamic (mockup 87). */
+export function HowItWorksPage() {
+  const { rel, me, isDom: dom, memberName } = useRel();
+  const isDom = dom && rel.endedAt === null;
+  const navigate = useNavigate();
+  const snack = useSnackbar();
+  const update = useUpdateRelationship(rel.id);
+  const back = useBack(() => navigate({ to: "/dynamic" }));
+  const [naming, setNaming] = useState(false);
   const [allowance, setAllowance] = useState(String(rel.weeklyDelayAllowance));
-  useEffect(() => {
-    if (!open) return;
-    setPolicy(rel.reschedulePolicy);
-    setAllowance(String(rel.weeklyDelayAllowance));
-  }, [open, rel.reschedulePolicy, rel.weeklyDelayAllowance]);
-  const n = Math.max(0, Math.min(50, Math.trunc(Number(allowance) || 0)));
+  useEffect(() => setAllowance(String(rel.weeklyDelayAllowance)), [rel.weeklyDelayAllowance]);
+  const patch = (body: Parameters<typeof update.mutate>[0], msg = "Saved") =>
+    update.mutate(body, { onSuccess: () => snack(msg), onError: (e) => snack(errorMessage(e)) });
+  const sub = rel.members.find((m) => m.role === "submissive");
+  const subName = sub?.displayName ?? "The submissive";
+  const partner = rel.members.find((m) => m.userId !== me.user.id);
+  const options: { value: ReschedulePolicy; label: string; supporting?: string }[] = [
+    { value: "dominant_only", label: "Dominant only" },
+    { value: "request", label: `${subName} may ask`, supporting: isDom ? "You approve or decline" : "A Dominant approves or declines" },
+    { value: "allowance", label: "Weekly allowance", supporting: "Free delays each week, more need a yes" },
+  ];
+  const saveAllowance = () => {
+    const n = Math.max(0, Math.min(50, Math.trunc(Number(allowance) || 0)));
+    if (n !== rel.weeklyDelayAllowance) patch({ reschedulePolicy: "allowance", weeklyDelayAllowance: n });
+  };
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      title="Moving deadlines"
-      actions={
-        <>
-          <Button variant="text" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            onClick={() => {
-              onSave(policy === "allowance" ? { reschedulePolicy: policy, weeklyDelayAllowance: n } : { reschedulePolicy: policy });
-              onClose();
-            }}
-          >
-            Save
-          </Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-4">
-        <Select label="Who can move deadlines" value={policy} onChange={(e) => setPolicy(e.target.value as ReschedulePolicy)}>
-          {POLICIES.map((p) => (
-            <option key={p.value} value={p.value}>
-              {p.label}
-            </option>
+    <div className="flex flex-col pb-10">
+      <SubHeader title="How it works" back="Your dynamic" onBack={back} />
+      <div className="mx-auto w-full max-w-2xl px-4 md:px-6">
+        {!isDom && <p className="-mt-2 text-body-medium text-on-surface-variant">{rel.endedAt ? "This dynamic has ended, so nothing here can change." : "Only a Dominant changes these."}</p>}
+        <Group>
+          <Row
+            headline="Name"
+            supporting={rel.name ?? `None set, so it shows ${partner ? memberName(partner.userId) : "your partner's name"}`}
+            trailing={isDom && <Icon name="edit" className="text-on-surface-variant" />}
+            onClick={isDom ? () => setNaming(true) : undefined}
+          />
+        </Group>
+        <Label>Moving deadlines</Label>
+        <Group>
+          {options.map((o) => (
+            <Row
+              key={o.value}
+              leading={<Diamond state={rel.reschedulePolicy === o.value ? "done" : "open"} className="mx-1" />}
+              headline={o.label}
+              supporting={o.supporting}
+              onClick={isDom && rel.reschedulePolicy !== o.value ? () => patch({ reschedulePolicy: o.value }) : undefined}
+            />
           ))}
-        </Select>
-        {policy === "allowance" && (
-          <TextField label="Free delays per week" type="number" min={0} max={50} value={allowance} onChange={(e) => setAllowance(e.target.value)} />
-        )}
+          {rel.reschedulePolicy === "allowance" && (
+            <div className="py-3">
+              <TextField
+                label="Free delays per week"
+                type="number"
+                min={0}
+                max={50}
+                value={allowance}
+                disabled={!isDom}
+                onChange={(e) => setAllowance(e.target.value)}
+                onBlur={saveAllowance}
+              />
+            </div>
+          )}
+        </Group>
+        <Label>Notes</Label>
+        <Group>
+          <div className="py-1">
+            <Switch
+              checked={rel.subNotes}
+              onChange={(on) => isDom && patch({ subNotes: on }, on ? "Notes turned on for them" : "Notes turned off for them")}
+              label={`${subName} can write their own notes`}
+            />
+          </div>
+        </Group>
+        <Label>Proof photos</Label>
+        <Group>
+          <div className="pt-3 pb-4">
+            <Select
+              label="Keep them"
+              value={rel.proofDays === null ? "" : String(rel.proofDays)}
+              disabled={!!rel.endedAt}
+              onChange={(e) => {
+                const days = e.target.value ? Number(e.target.value) : null;
+                patch(
+                  { proofDays: days },
+                  days ? `Proof photos are deleted ${PROOF_DAYS.find((d) => d.value === days)?.label.toLowerCase()}` : "Proof photos are kept",
+                );
+              }}
+              help="A photo that's been reported stays until it's reviewed."
+            >
+              <option value="">Until you delete them</option>
+              {PROOF_DAYS.map((d) => (
+                <option key={d.value} value={d.value}>
+                  {d.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </Group>
       </div>
-    </Dialog>
+      <NameDialog open={naming} onClose={() => setNaming(false)} onSave={(name) => patch({ name }, "Name saved")} />
+    </div>
   );
 }
