@@ -84,8 +84,8 @@ class SettingsStore @Inject constructor(@ApplicationContext private val context:
     /** This device's FCM token as last registered, to find it among the account's devices. */
     suspend fun pushToken(): String? = context.dataStore.data.first()[pushTokenKey]
 
-    suspend fun setPushToken(token: String) {
-        context.dataStore.edit { it[pushTokenKey] = token }
+    suspend fun setPushToken(token: String?) {
+        context.dataStore.edit { if (token == null) it.remove(pushTokenKey) else it[pushTokenKey] = token }
     }
 
     /** When a push last reached this device (ISO instant), for the notification check in Settings. */

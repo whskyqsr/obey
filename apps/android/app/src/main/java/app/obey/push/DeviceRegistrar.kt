@@ -9,6 +9,7 @@ import com.google.firebase.messaging.FirebaseMessaging
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.tasks.await
 
 /** Sends this device's FCM token to POST /devices so the API can push to it. */
@@ -20,7 +21,8 @@ class DeviceRegistrar @Inject constructor(
 ) {
     /** Returns whether the API now has this device's token. */
     suspend fun register(token: String? = null): Boolean {
-        if (!auth.firebaseAvailable) return false
+        // A token refreshed while signed out waits for the next sign-in, which registers it then.
+        if (!auth.hasFirebaseUser) return false
         try {
             val t = token ?: FirebaseMessaging.getInstance().token.await()
             api.registerDevice(RegisterDeviceInput(token = t, platform = "android"))
@@ -33,5 +35,34 @@ class DeviceRegistrar @Inject constructor(
             Log.w("Obey", "Device registration failed", t)
             return false
         }
+    }
+
+    /**
+     * Call before signing out, while the API still knows who we are: the account stops pushing here.
+     * The token is deleted as well, so even if the API couldn't be reached, FCM refuses later pushes
+     * to it and the worker drops it. The next sign-in registers a fresh token.
+     */
+    suspend fun unregister() {
+        if (!auth.firebaseAvailable) return
+        val token = settings.pushToken()
+        withTimeoutOrNull(5_000) {
+            try {
+                if (token != null && auth.hasFirebaseUser) api.unregisterDevice(token)
+            } catch (c: CancellationException) {
+                throw c
+            } catch (t: Throwable) {
+                Log.w("Obey", "Device unregistration failed", t)
+            }
+        }
+        withTimeoutOrNull(5_000) {
+            try {
+                FirebaseMessaging.getInstance().deleteToken().await()
+            } catch (c: CancellationException) {
+                throw c
+            } catch (t: Throwable) {
+                Log.w("Obey", "Deleting the push token failed", t)
+            }
+        }
+        settings.setPushToken(null)
     }
 }

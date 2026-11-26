@@ -62,6 +62,22 @@ describe("relationships", () => {
     expect(ctx.notifier.sent.at(-1)).toMatchObject({ userIds: [domId], push: { data: { type: "test" } } });
   });
 
+  it("forgets a device on sign-out, and a token moves to whoever signs in on that device next", async () => {
+    const { dom, sub } = await ctx.pair();
+    const token = "android:token-0123456789abc";
+    await dom.post("/devices", { token, platform: "android" });
+    // Someone else can't remove a device that isn't theirs.
+    expect((await sub.del(`/devices/${encodeURIComponent(token)}`)).status).toBe(204);
+    expect((await dom.get("/me/devices")).body).toHaveLength(1);
+    expect((await dom.del(`/devices/${encodeURIComponent(token)}`)).status).toBe(204);
+    expect((await dom.get("/me/devices")).body).toEqual([]);
+    // Same phone, other account: the token is theirs now, not the first account's.
+    await dom.post("/devices", { token, platform: "android" });
+    await sub.post("/devices", { token, platform: "android" });
+    expect((await dom.get("/me/devices")).body).toEqual([]);
+    expect((await sub.get("/me/devices")).body).toHaveLength(1);
+  });
+
   it("lets people change their display name", async () => {
     const { dom, relId, domId } = await ctx.pair();
     expect((await dom.patch("/me", { displayName: "  Sir  " })).body.displayName).toBe("Sir");

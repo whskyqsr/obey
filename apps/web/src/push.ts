@@ -35,6 +35,23 @@ export async function registerPush({ prompt = false } = {}): Promise<PushState> 
 
 const TOKEN_KEY = "obey.pushToken";
 
+/**
+ * Call before signing out, while the API still knows who we are: the account stops pushing to this browser.
+ * The token is deleted too, so if the API couldn't be reached FCM refuses later pushes and the worker drops it.
+ */
+export async function unregisterPush(): Promise<void> {
+  const token = storage.get(TOKEN_KEY);
+  if (!token) return;
+  storage.set(TOKEN_KEY, null);
+  await api(`/devices/${encodeURIComponent(token)}`, { method: "DELETE" }).catch(() => {});
+  try {
+    const { getMessaging, deleteToken } = await import("firebase/messaging");
+    await deleteToken(getMessaging(await getFirebaseApp()));
+  } catch {
+    // Nothing more to do: the API no longer has the token, or FCM will refuse it.
+  }
+}
+
 /** The end of this browser's push token, to find it among the account's devices. */
 export const myTokenTail = () => storage.get(TOKEN_KEY)?.slice(-12) ?? null;
 
