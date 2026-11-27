@@ -171,6 +171,9 @@ export async function signOut(): Promise<void> {
   // The app lock belongs to this sign-in on this browser.
   if (current) clearPin(current.uid);
   if (FIREBASE_ENABLED) {
+    // Imported here because push.ts depends on this module. Never holds up sign-out for long.
+    const { unregisterPush } = await import("../push");
+    await Promise.race([unregisterPush().catch(() => {}), new Promise((r) => setTimeout(r, 5000))]);
     const a = await getFirebaseAuth();
     const { signOut: fbSignOut } = await import("firebase/auth");
     await fbSignOut(a);

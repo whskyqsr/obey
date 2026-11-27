@@ -336,6 +336,12 @@ export const relationshipRoutes = (deps: Deps) => async (app: FastifyInstance) =
     reply.status(204);
   });
 
+  /** Sign-out: this device stops getting this account's pushes. Only the account the token is registered to can remove it. */
+  app.delete<{ Params: { token: string } }>("/devices/:token", async (req, reply) => {
+    await db.delete(devices).where(and(eq(devices.token, req.params.token), eq(devices.userId, req.user.id)));
+    reply.status(204);
+  });
+
   /** Ends the dynamic for both partners (see endRelationship). With `block`, the others can't pair with this person again. */
   app.post<{ Params: { id: string } }>("/relationships/:id/leave", async (req) => {
     const body = leaveRelationship.parse(req.body ?? {});

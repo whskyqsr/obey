@@ -33,6 +33,7 @@ class ObeyMessagingService : FirebaseMessagingService() {
     @Inject lateinit var appIcons: AppIcons
     @Inject lateinit var settings: SettingsStore
     @Inject lateinit var location: app.obey.location.LocationWatcher
+    @Inject lateinit var auth: app.obey.auth.AuthManager
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -42,6 +43,8 @@ class ObeyMessagingService : FirebaseMessagingService() {
 
     @SuppressLint("MissingPermission") // checked just below for API 33+
     override fun onMessageReceived(message: RemoteMessage) {
+        // Signed out: whatever was still queued for the old account isn't shown.
+        if (!auth.hasFirebaseUser) return
         scope.launch { settings.markPushReceived() }
         // A new or changed task may name a place, or a pause may have ended; geofences follow the server.
         scope.launch { location.sync() }

@@ -45,6 +45,9 @@ class AuthManager @Inject constructor(
 
     private val auth: FirebaseAuth? get() = if (firebaseAvailable) FirebaseAuth.getInstance() else null
 
+    /** Someone is signed in with Firebase right now: the only accounts that get pushes. */
+    val hasFirebaseUser: Boolean get() = auth?.currentUser != null
+
     private val reloaded = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     private val firebaseUser: Flow<AuthState> =

@@ -620,6 +620,9 @@ interface ObeyApi {
     @POST("devices")
     suspend fun registerDevice(@Body body: RegisterDeviceInput)
 
+    @DELETE("devices/{token}")
+    suspend fun unregisterDevice(@Path("token") token: String)
+
     @GET("me/devices")
     suspend fun devices(): List<DeviceStatus>
 

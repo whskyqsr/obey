@@ -36,6 +36,7 @@ import app.obey.data.AppIcons
 import app.obey.data.SessionRepository
 import app.obey.data.SessionState
 import app.obey.data.SettingsStore
+import app.obey.push.DeviceRegistrar
 import app.obey.ui.common.BaseViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -55,6 +56,7 @@ class SettingsViewModel @Inject constructor(
     private val settings: SettingsStore,
     private val auth: AuthManager,
     private val appIcons: AppIcons,
+    private val registrar: DeviceRegistrar,
 ) : BaseViewModel() {
     val session: StateFlow<SessionState> = sessions.state
     val authState: StateFlow<AuthState> = auth.state.stateIn(viewModelScope, SharingStarted.Eagerly, AuthState.SignedOut)
@@ -293,6 +295,7 @@ class SettingsViewModel @Inject constructor(
     fun reportError(text: String) = say(text)
 
     fun signOut() = action {
+        registrar.unregister()
         auth.signOut()
         sessions.clear()
     }
